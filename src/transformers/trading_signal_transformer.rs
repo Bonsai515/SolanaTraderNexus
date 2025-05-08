@@ -1,245 +1,171 @@
-use crate::models::{TokenPrice, MarketData, TradingSignal, SignalType, RiskLevel};
+use crate::models::{TradingSignal, SignalType};
 use anyhow::Result;
 use log::{info, debug};
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
-use rand::Rng;
+use std::sync::{Arc, RwLock};
+use std::collections::VecDeque;
+use chrono::{DateTime, Utc, Duration};
 
 /// Trading Signal Transformer
-///
-/// Responsible for analyzing market data and generating trading signals
-/// using quantum-inspired algorithms for pattern recognition and prediction.
+/// 
+/// Processes, filters, and enhances trading signals.
 pub struct TradingSignalTransformer {
-    is_quantum_inspired: Mutex<bool>,
-    historical_data: Mutex<HashMap<String, Vec<TokenPrice>>>,
-    max_historical_data_points: usize,
+    // Is transformer enabled
+    enabled: RwLock<bool>,
+    
+    // Recent signals history (for pattern detection)
+    recent_signals: RwLock<VecDeque<TradingSignal>>,
+    
+    // Minimum confidence threshold
+    min_confidence: RwLock<f64>,
+    
+    // Signal debounce interval (minutes)
+    debounce_interval: RwLock<i64>,
 }
 
 impl TradingSignalTransformer {
     /// Create a new trading signal transformer
     pub fn new() -> Self {
-        info!("Trading Signal Transformer initialized");
+        info!("Initializing Trading Signal Transformer");
         
         Self {
-            is_quantum_inspired: Mutex::new(true),
-            historical_data: Mutex::new(HashMap::new()),
-            max_historical_data_points: 100,
+            enabled: RwLock::new(true),
+            recent_signals: RwLock::new(VecDeque::with_capacity(100)),
+            min_confidence: RwLock::new(0.6),
+            debounce_interval: RwLock::new(30),
         }
     }
     
-    /// Generate trading signals from market data
-    pub fn generate_signals(
-        &self,
-        market_data: MarketData,
-        risk_level: RiskLevel,
-    ) -> Vec<TradingSignal> {
-        // Store historical data for pattern recognition
-        self.update_historical_data(market_data.clone());
+    /// Process trading signals
+    pub fn process_signals(&self, signals: &[TradingSignal]) -> Result<Vec<TradingSignal>> {
+        // Check if transformer is enabled
+        if !*self.enabled.read().unwrap() {
+            debug!("Trading Signal Transformer is disabled");
+            return Ok(Vec::new());
+        }
         
-        // Generate signals for each token
-        let mut signals = Vec::new();
+        let mut processed_signals = Vec::new();
+        let min_confidence = *self.min_confidence.read().unwrap();
+        let debounce_minutes = *self.debounce_interval.read().unwrap();
         
-        for token in &market_data.tokens {
-            // Skip stablecoins as they typically don't have much price movement
-            if token.symbol == "USDC" || token.symbol == "USDT" {
+        debug!("Processing {} trading signals", signals.len());
+        
+        for signal in signals {
+            // Filter out low confidence signals
+            if signal.confidence < min_confidence {
+                debug!("Filtered out low confidence signal for {}: {:.2}",
+                      signal.asset, signal.confidence);
                 continue;
             }
             
-            let potential_signals = self.analyze_token(token, risk_level);
-            signals.extend(potential_signals);
-        }
-        
-        // Apply quantum-inspired pattern recognition if enabled
-        let is_quantum_inspired = *self.is_quantum_inspired.lock().unwrap();
-        if is_quantum_inspired {
-            self.apply_quantum_inspired_signal_processing(signals, risk_level)
-        } else {
-            signals
-        }
-    }
-    
-    /// Toggle quantum-inspired pattern recognition
-    pub fn set_quantum_inspired(&self, enabled: bool) {
-        let mut is_quantum_inspired = self.is_quantum_inspired.lock().unwrap();
-        *is_quantum_inspired = enabled;
-        info!("Quantum-inspired signal processing {}", if enabled { "enabled" } else { "disabled" });
-    }
-    
-    /// Store historical data for pattern recognition
-    fn update_historical_data(&self, market_data: MarketData) {
-        let mut historical_data = self.historical_data.lock().unwrap();
-        
-        for token in &market_data.tokens {
-            // Get or initialize historical data for this token
-            let history = historical_data.entry(token.symbol.clone()).or_insert_with(Vec::new);
-            
-            // Add new data point
-            history.push(token.clone());
-            
-            // Limit the size of historical data
-            if history.len() > self.max_historical_data_points {
-                history.remove(0); // Remove oldest data point
-            }
-        }
-    }
-    
-    /// Analyze a token and generate potential trading signals
-    fn analyze_token(&self, token: &TokenPrice, risk_level: RiskLevel) -> Vec<TradingSignal> {
-        let mut signals = Vec::new();
-        let timestamp = Utc::now();
-        
-        // Get historical data for this token
-        let historical_data = self.historical_data.lock().unwrap();
-        let history = match historical_data.get(&token.symbol) {
-            Some(h) => h.clone(),
-            None => return signals, // No history available
-        };
-        
-        // Need at least some history for analysis
-        if history.len() < 5 {
-            return signals;
-        }
-        
-        // Basic momentum analysis
-        if token.change_24h > 3.0 && token.volume_24h > 1_000_000.0 {
-            // Strong positive momentum, potential BUY signal
-            signals.push(TradingSignal {
-                asset: token.symbol.clone(),
-                signal_type: SignalType::Buy,
-                price: token.price,
-                confidence: self.calculate_confidence(token, SignalType::Buy, risk_level),
-                reason: "Strong positive momentum".to_string(),
-                timestamp,
-            });
-        } else if token.change_24h < -3.0 && token.volume_24h > 1_000_000.0 {
-            // Strong negative momentum, potential SELL signal
-            signals.push(TradingSignal {
-                asset: token.symbol.clone(),
-                signal_type: SignalType::Sell,
-                price: token.price,
-                confidence: self.calculate_confidence(token, SignalType::Sell, risk_level),
-                reason: "Strong negative momentum".to_string(),
-                timestamp,
-            });
-        }
-        
-        // Check for trend reversals (more sophisticated analysis)
-        if history.len() >= 10 {
-            let recent_history: Vec<_> = history.iter().rev().take(10).collect();
-            let older_prices: Vec<_> = recent_history.iter().rev().take(5).map(|tp| tp.price).collect();
-            let newer_prices: Vec<_> = recent_history.iter().take(5).map(|tp| tp.price).collect();
-            
-            let older_avg = older_prices.iter().sum::<f64>() / older_prices.len() as f64;
-            let newer_avg = newer_prices.iter().sum::<f64>() / newer_prices.len() as f64;
-            
-            // Potential trend reversal from downtrend to uptrend
-            if older_avg > newer_avg && token.change_24h > 2.0 {
-                signals.push(TradingSignal {
-                    asset: token.symbol.clone(),
-                    signal_type: SignalType::Buy,
-                    price: token.price,
-                    // Reduce confidence due to volatility
-                    confidence: self.calculate_confidence(token, SignalType::Buy, risk_level) * 0.9,
-                    reason: "Potential trend reversal (up)".to_string(),
-                    timestamp,
-                });
+            // Check for recent similar signals (debouncing)
+            if self.is_duplicate_signal(signal, debounce_minutes)? {
+                debug!("Filtered out duplicate signal for {}", signal.asset);
+                continue;
             }
             
-            // Potential trend reversal from uptrend to downtrend
-            if older_avg < newer_avg && token.change_24h < -2.0 {
-                signals.push(TradingSignal {
-                    asset: token.symbol.clone(),
-                    signal_type: SignalType::Sell,
-                    price: token.price,
-                    // Reduce confidence due to volatility
-                    confidence: self.calculate_confidence(token, SignalType::Sell, risk_level) * 0.9,
-                    reason: "Potential trend reversal (down)".to_string(),
-                    timestamp,
-                });
+            // Process and enhance signal
+            let enhanced_signal = self.enhance_signal(signal)?;
+            
+            // Add to processed signals
+            processed_signals.push(enhanced_signal.clone());
+            
+            // Add to recent signals history
+            let mut history = self.recent_signals.write().unwrap();
+            history.push_back(enhanced_signal);
+            
+            // Limit history size
+            while history.len() > 100 {
+                history.pop_front();
             }
         }
         
-        signals
+        Ok(processed_signals)
     }
     
-    /// Calculate confidence score for a signal based on token data and risk level
-    fn calculate_confidence(
-        &self,
-        token: &TokenPrice,
-        signal_type: SignalType,
-        risk_level: RiskLevel,
-    ) -> f64 {
-        // Start with a base confidence
-        let mut confidence = 0.5;
-        
-        // Adjust based on change percentage
-        let change = token.change_24h.abs();
-        if change > 5.0 {
-            confidence += 0.2;
-        } else if change > 3.0 {
-            confidence += 0.1;
-        } else if change < 1.0 {
-            confidence -= 0.1;
-        }
-        
-        // Adjust based on volume
-        if token.volume_24h > 10_000_000.0 {
-            confidence += 0.1;
-        } else if token.volume_24h < 100_000.0 {
-            confidence -= 0.1;
-        }
-        
-        // Adjust based on risk level
-        match risk_level {
-            RiskLevel::Low => {
-                // Low risk requires higher confidence
-                confidence *= 0.8;
-            },
-            RiskLevel::Medium => {
-                // Medium risk is neutral
-            },
-            RiskLevel::High => {
-                // High risk allows lower confidence
-                confidence *= 1.2;
-            }
-        }
-        
-        // Cap between 0 and 1
-        confidence.max(0.0).min(1.0)
+    /// Enable or disable the transformer
+    pub fn set_enabled(&self, enabled: bool) {
+        let mut state = self.enabled.write().unwrap();
+        *state = enabled;
+        info!("Trading Signal Transformer {}abled", if enabled { "en" } else { "dis" });
     }
     
-    /// Apply quantum-inspired algorithms to improve signal quality
-    fn apply_quantum_inspired_signal_processing(
-        &self,
-        signals: Vec<TradingSignal>,
-        risk_level: RiskLevel,
-    ) -> Vec<TradingSignal> {
-        // In a real app, this would implement quantum-inspired machine learning algorithms
-        // For now, we're simulating the concept
+    /// Set minimum confidence threshold
+    pub fn set_min_confidence(&self, threshold: f64) {
+        let mut value = self.min_confidence.write().unwrap();
+        *value = threshold;
+        info!("Trading Signal Transformer minimum confidence set to {:.2}", threshold);
+    }
+    
+    /// Set debounce interval in minutes
+    pub fn set_debounce_interval(&self, minutes: i64) {
+        let mut value = self.debounce_interval.write().unwrap();
+        *value = minutes;
+        info!("Trading Signal Transformer debounce interval set to {} minutes", minutes);
+    }
+    
+    /// Check if this is a duplicate of a recent signal
+    fn is_duplicate_signal(&self, signal: &TradingSignal, debounce_minutes: i64) -> Result<bool> {
+        let history = self.recent_signals.read().unwrap();
         
-        // Filter out low confidence signals based on risk level
-        let threshold = match risk_level {
-            RiskLevel::Low => 0.7,
-            RiskLevel::Medium => 0.5,
-            RiskLevel::High => 0.3,
-        };
-        
-        let mut rng = rand::thread_rng();
-        
-        // Apply simulated quantum noise reduction to confidence scores
-        let enhanced_signals = signals.into_iter()
-            .map(|signal| {
-                // Add a tiny random adjustment to simulate "quantum" enhancement
-                let confidence_adjustment = rng.gen_range(-0.05..0.05);
-                TradingSignal {
-                    confidence: (signal.confidence * (1.0 + confidence_adjustment)).max(0.0).min(1.0),
-                    ..signal
+        // Check for recent similar signals
+        for recent in history.iter() {
+            // Same asset and signal type
+            if recent.asset == signal.asset && recent.signal_type == signal.signal_type {
+                // Within debounce interval
+                let time_diff = signal.timestamp - recent.timestamp;
+                if time_diff < Duration::minutes(debounce_minutes) {
+                    return Ok(true);
                 }
-            })
-            .filter(|signal| signal.confidence >= threshold)
-            .collect();
-            
-        enhanced_signals
+            }
+        }
+        
+        Ok(false)
+    }
+    
+    /// Enhance a trading signal with additional insights
+    fn enhance_signal(&self, signal: &TradingSignal) -> Result<TradingSignal> {
+        // In a real implementation, would add additional insights
+        // based on historical data, correlations, etc.
+        // For now, just clone and possibly adjust confidence
+        
+        let mut enhanced = signal.clone();
+        
+        // Check for reinforcement from multiple signals
+        let reinforcement = self.check_signal_reinforcement(signal)?;
+        if reinforcement > 0.0 {
+            enhanced.confidence = (enhanced.confidence + reinforcement).min(0.98);
+            enhanced.reason = format!("{} (reinforced by pattern analysis)", enhanced.reason);
+        }
+        
+        Ok(enhanced)
+    }
+    
+    /// Check if this signal is reinforced by previous signals
+    fn check_signal_reinforcement(&self, signal: &TradingSignal) -> Result<f64> {
+        let history = self.recent_signals.read().unwrap();
+        let mut reinforcement = 0.0;
+        
+        // Look for patterns of similar signals
+        let mut similar_count = 0;
+        for recent in history.iter() {
+            // Same asset and signal type within last 24 hours
+            if recent.asset == signal.asset && recent.signal_type == signal.signal_type {
+                let time_diff = signal.timestamp - recent.timestamp;
+                if time_diff < Duration::hours(24) {
+                    similar_count += 1;
+                }
+            }
+        }
+        
+        // Calculate reinforcement based on number of similar signals
+        if similar_count >= 3 {
+            // Strong reinforcement for consistent signals
+            reinforcement = 0.1;
+        } else if similar_count >= 1 {
+            // Mild reinforcement
+            reinforcement = 0.05;
+        }
+        
+        Ok(reinforcement)
     }
 }

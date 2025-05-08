@@ -1,92 +1,60 @@
+use std::sync::Arc;
+use log::{info, error};
+use anyhow::Result;
+
 mod models;
-mod solana;
+mod engine;
 mod transformers;
-mod agents;
-mod storage;
-mod api;
-mod utils;
+mod solana;
 mod security;
 mod communication;
-mod engine;
+mod storage;
 
-use actix_web::{web, App, HttpServer, middleware};
-use actix_files as fs;
-use std::sync::{Arc, Mutex};
-use log::{info, error};
-use dotenv::dotenv;
-use std::env;
-
-use crate::solana::{create_solana_connection, WalletManager, TransactionManager};
+use crate::communication::CommunicationCenter;
+use crate::security::SecurityProtocol;
 use crate::storage::Storage;
-use crate::transformers::{MarketDataTransformer, TradingSignalTransformer};
-use crate::agents::{TradingAgent, StrategyManager};
-use crate::security::{SecurityProtocol, quantum_encryption::QuantumEncryption};
-use crate::communication::{CommunicationCenter, WebSocketManager};
+use crate::solana::{SolanaConnection, WalletManager, TransactionManager};
 use crate::engine::TransactionEngine;
+use crate::transformers::{MicroQHCTransformer, MEMECortexTransformer};
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    // Initialize environment
-    dotenv().ok();
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logger
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
     
-    // Configure host and port
-    let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "5000".to_string())
-        .parse::<u16>().expect("PORT must be a number");
+    info!("Starting Solana Trading System with Quantum-Inspired Transformers");
     
-    info!("Starting Solana Quantum Trading System");
+    // Initialize communication center (central messaging hub)
+    let communication_center = Arc::new(CommunicationCenter::new());
+    communication_center.start()?;
+    info!("Communication Center initialized successfully");
     
-    // Initialize storage
-    let storage = Arc::new(Storage::new_in_memory());
-    
-    // Initialize Solana connection
-    let solana_connection = match create_solana_connection() {
-        Ok(connection) => {
-            info!("Connected to Solana blockchain");
-            Arc::new(connection)
-        },
-        Err(e) => {
-            error!("Failed to connect to Solana: {:?}", e);
-            panic!("Failed to connect to Solana blockchain");
-        }
-    };
-    
-    // Initialize wallet and transaction managers
-    let wallet_manager = Arc::new(WalletManager::new(
-        solana_connection.client(),
-        storage.clone(),
-    ));
-    
-    let transaction_manager = Arc::new(TransactionManager::new(
-        solana_connection.client(),
-        storage.clone(),
-    ));
-    
-    // Initialize transformers
-    let market_data_transformer = Arc::new(MarketDataTransformer::new());
-    let trading_signal_transformer = Arc::new(TradingSignalTransformer::new());
-    
-    // Initialize security system
+    // Initialize security protocol (security layer)
     let security_protocol = Arc::new(SecurityProtocol::new());
-    info!("Security Protocol initialized");
+    info!("Security Protocol initialized successfully");
     
-    // Initialize quantum encryption
-    let quantum_encryption = Arc::new(Mutex::new(QuantumEncryption::new()));
-    info!("Quantum Encryption system initialized");
+    // Initialize storage system
+    let storage = Arc::new(Storage::new());
+    info!("Storage System initialized successfully");
     
-    // Initialize communication center
-    let communication_center = Arc::new(CommunicationCenter::new(security_protocol.clone()));
-    info!("Communication Center initialized");
+    // Initialize Solana connection (mainnet-beta or testnet)
+    let solana_endpoint = "https://api.mainnet-beta.solana.com";
+    let solana_connection = Arc::new(SolanaConnection::new(solana_endpoint));
+    info!("Solana Connection initialized with endpoint: {}", solana_endpoint);
     
-    // Initialize WebSocket manager
-    let websocket_manager = Arc::new(WebSocketManager::new(
-        communication_center.clone(),
-        security_protocol.clone(),
+    // Initialize wallet manager
+    let wallet_manager = Arc::new(WalletManager::new(solana_connection.clone()));
+    wallet_manager.start()?;
+    info!("Wallet Manager initialized successfully");
+    
+    // Initialize transaction manager
+    let transaction_manager = Arc::new(TransactionManager::new(
+        solana_connection.clone(),
+        wallet_manager.clone(),
     ));
-    info!("WebSocket Manager initialized");
+    info!("Transaction Manager initialized successfully");
     
-    // Initialize Transaction Engine (core component)
+    // Initialize transaction engine (core component)
     let transaction_engine = Arc::new(TransactionEngine::new(
         storage.clone(),
         wallet_manager.clone(),
@@ -94,75 +62,29 @@ async fn main() -> std::io::Result<()> {
         security_protocol.clone(),
         communication_center.clone(),
     ));
-    info!("Transaction Engine initialized");
+    transaction_engine.start()?;
+    info!("Transaction Engine started successfully");
     
-    // Initialize strategy manager
-    let strategy_manager = Arc::new(StrategyManager::new(storage.clone()));
+    // Register components with security protocol
+    security_protocol.register_secure_component("TransactionEngine")?;
+    security_protocol.register_secure_component("CommunicationCenter")?;
+    security_protocol.register_secure_component("SolanaConnection")?;
+    security_protocol.register_secure_component("WalletManager")?;
     
-    // Initialize trading agent
-    let trading_agent = Arc::new(TradingAgent::new(
-        market_data_transformer.clone(),
-        trading_signal_transformer.clone(),
-        storage.clone(),
-        wallet_manager.clone(),
-        transaction_manager.clone(),
-    ));
+    // Tell user the system is ready
+    info!("Solana Trading System is fully operational");
+    info!("Using specialized transformers: Micro QHC, MEME Cortex, Communication Transformer");
+    info!("System ready to process trading signals and execute transactions");
     
-    // Start the Transaction Engine
-    match transaction_engine.start() {
-        Ok(_) => info!("Transaction Engine started - Core system online"),
-        Err(e) => error!("Failed to start Transaction Engine: {:?}", e),
+    // Keep the application running
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
     
-    // Start the trading agent
-    match trading_agent.start() {
-        Ok(_) => info!("Trading Agent started"),
-        Err(e) => error!("Failed to start Trading Agent: {:?}", e),
-    }
+    // This code will never be reached, but for completeness:
+    // transaction_engine.stop()?;
+    // wallet_manager.stop()?;
+    // communication_center.stop()?;
     
-    // Start HTTP server
-    info!("Starting HTTP server on {}:{}", host, port);
-    
-    HttpServer::new(move || {
-        App::new()
-            // Enable logger middleware
-            .wrap(middleware::Logger::default())
-            
-            // Register application state
-            // Core components
-            .app_data(web::Data::new(storage.clone()))
-            .app_data(web::Data::new(solana_connection.clone()))
-            
-            // Solana integration layer
-            .app_data(web::Data::new(wallet_manager.clone()))
-            .app_data(web::Data::new(transaction_manager.clone()))
-            
-            // Transformer layer
-            .app_data(web::Data::new(market_data_transformer.clone()))
-            .app_data(web::Data::new(trading_signal_transformer.clone()))
-            
-            // Security layer
-            .app_data(web::Data::new(security_protocol.clone()))
-            .app_data(web::Data::new(quantum_encryption.clone()))
-            
-            // Communication layer
-            .app_data(web::Data::new(communication_center.clone()))
-            .app_data(web::Data::new(websocket_manager.clone()))
-            
-            // Engine layer (innermost)
-            .app_data(web::Data::new(transaction_engine.clone()))
-            
-            // Agent layer
-            .app_data(web::Data::new(strategy_manager.clone()))
-            .app_data(web::Data::new(trading_agent.clone()))
-            
-            // Configure API routes
-            .configure(api::configure_routes)
-            
-            // Serve static files from the frontend/dist directory
-            .service(fs::Files::new("/", "./frontend/dist").index_file("index.html"))
-    })
-    .bind((host, port))?
-    .run()
-    .await
+    Ok(())
 }

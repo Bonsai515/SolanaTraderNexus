@@ -1,233 +1,249 @@
 use crate::models::{
-    Transaction, TradingSignal, WebSocketMessage, SystemComponentStatus
+    TradingSignal, Transaction, MarketData, SystemComponentStatus, WebSocketMessage,
+    SystemMessage, MessagePriority, WebSocketMessageType
 };
-use crate::security::SecurityProtocol;
-use anyhow::{Result, Context};
-use log::{info, error, warn, debug};
+use anyhow::Result;
+use log::{info, warn, error, debug};
 use std::sync::{Arc, RwLock, Mutex};
-use chrono::Utc;
+use std::collections::{VecDeque, HashMap, HashSet};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
-use std::collections::{HashMap, VecDeque};
-use tokio::sync::broadcast;
-use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
-/// Communication Center - Manages data flow between system components
-/// Acts as the layer around the transaction engine for inter-component communication
+/// Communication Center
+/// 
+/// Central hub for system-wide communication between components.
+/// Handles signal routing, message queuing, and system status monitoring.
 pub struct CommunicationCenter {
-    security_protocol: Arc<SecurityProtocol>,
-    
-    // Component registry
-    active_components: RwLock<HashMap<String, ComponentInfo>>,
-    
-    // Signal queues
+    // Pending trading signals queue
     pending_signals: RwLock<VecDeque<TradingSignal>>,
     
-    // Broadcast channels for real-time updates
-    transaction_updates: broadcast::Sender<Transaction>,
-    system_status_updates: broadcast::Sender<SystemComponentStatus>,
+    // Transaction log
+    transaction_log: RwLock<VecDeque<TransactionLogEntry>>,
     
-    // Performance/telemetry data
-    system_logs: RwLock<VecDeque<SystemLog>>,
-    max_log_entries: usize,
+    // System messages
+    system_messages: RwLock<VecDeque<SystemMessage>>,
     
-    // Hidden data registry for secure storage
-    hidden_data_registry: RwLock<HashMap<String, HiddenDataInfo>>,
+    // Latest market data
+    latest_market_data: RwLock<Option<MarketData>>,
+    
+    // System status
+    system_status: RwLock<SystemComponentStatus>,
+    
+    // Active components registry
+    active_components: RwLock<HashSet<String>>,
+    
+    // WebSocket channels for UI updates
+    ws_channels: RwLock<Vec<mpsc::Sender<WebSocketMessage>>>,
+    
+    // Background tasks
+    background_tasks: Mutex<Vec<JoinHandle<()>>>,
+    
+    // Last activity timestamp by component
+    last_activity: RwLock<HashMap<String, DateTime<Utc>>>,
 }
 
-/// Information about a registered component
-#[derive(Debug, Clone)]
-struct ComponentInfo {
-    name: String,
-    status: ComponentStatus,
-    last_heartbeat: chrono::DateTime<Utc>,
-}
-
-/// Component status
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ComponentStatus {
-    Active,
-    Inactive,
-    Error,
-}
-
-/// System log entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SystemLog {
-    timestamp: chrono::DateTime<Utc>,
-    level: LogLevel,
-    component: String,
-    message: String,
-    data: Option<serde_json::Value>,
-}
-
-/// Log level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-enum LogLevel {
-    Info,
-    Warning,
-    Error,
-    Security,
-    Transaction,
-}
-
-/// Information about hidden data
-#[derive(Debug, Clone)]
-struct HiddenDataInfo {
-    id: String,
-    data_type: String,
-    security_tag: String,
-    last_access: chrono::DateTime<Utc>,
-    access_count: u32,
-    owner_component: String,
+/// Entry in the transaction log
+#[derive(Clone, Debug)]
+struct TransactionLogEntry {
+    timestamp: DateTime<Utc>,
+    transaction: Transaction,
+    signal: Option<TradingSignal>,
+    notes: Option<String>,
 }
 
 impl CommunicationCenter {
     /// Create a new communication center
-    pub fn new(security_protocol: Arc<SecurityProtocol>) -> Self {
-        info!("Initializing Communication Center - System Communication Layer");
+    pub fn new() -> Self {
+        info!("Initializing Communication Center - System Messaging Hub");
         
-        // Create broadcast channels with capacity
-        let (tx_transaction, _) = broadcast::channel(100);
-        let (tx_status, _) = broadcast::channel(100);
+        let system_status = SystemComponentStatus {
+            blockchain: false,
+            transaction_engine: false,
+            ai_agents: false,
+        };
         
         Self {
-            security_protocol,
-            active_components: RwLock::new(HashMap::new()),
             pending_signals: RwLock::new(VecDeque::new()),
-            transaction_updates: tx_transaction,
-            system_status_updates: tx_status,
-            system_logs: RwLock::new(VecDeque::new()),
-            max_log_entries: 1000,
-            hidden_data_registry: RwLock::new(HashMap::new()),
+            transaction_log: RwLock::new(VecDeque::with_capacity(1000)),
+            system_messages: RwLock::new(VecDeque::with_capacity(1000)),
+            latest_market_data: RwLock::new(None),
+            system_status: RwLock::new(system_status),
+            active_components: RwLock::new(HashSet::new()),
+            ws_channels: RwLock::new(Vec::new()),
+            background_tasks: Mutex::new(Vec::new()),
+            last_activity: RwLock::new(HashMap::new()),
         }
     }
     
-    /// Register a component as active
-    pub fn register_active_component(&self, component_name: &str) -> Result<()> {
-        // Security verification
-        self.security_protocol.verify_component_registration(component_name)?;
+    /// Start the communication center
+    pub fn start(&self) -> Result<()> {
+        info!("Starting Communication Center");
         
-        let mut components = self.active_components.write().unwrap();
-        components.insert(component_name.to_string(), ComponentInfo {
-            name: component_name.to_string(),
-            status: ComponentStatus::Active,
-            last_heartbeat: Utc::now(),
+        // Start WebSocket message dispatcher
+        let task = tokio::spawn(async move {
+            // In the real implementation, this would continuously dispatch messages
+            // to WebSocket clients for UI updates
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                // Handle dispatching...
+            }
         });
         
-        self.log_event(
-            LogLevel::Info,
-            "CommunicationCenter",
-            &format!("Component registered: {}", component_name),
-            None,
-        );
+        // Store task handle
+        let mut tasks = self.background_tasks.lock().unwrap();
+        tasks.push(task);
         
-        info!("Component registered as active: {}", component_name);
+        Ok(())
+    }
+    
+    /// Stop the communication center
+    pub fn stop(&self) -> Result<()> {
+        info!("Stopping Communication Center");
+        
+        // Abort all background tasks
+        let mut tasks = self.background_tasks.lock().unwrap();
+        for task in tasks.drain(..) {
+            task.abort();
+        }
+        
+        Ok(())
+    }
+    
+    /// Register an active component
+    pub fn register_active_component(&self, component_name: &str) -> Result<()> {
+        let mut active_components = self.active_components.write().unwrap();
+        active_components.insert(component_name.to_string());
+        
+        // Update last activity timestamp
+        let mut last_activity = self.last_activity.write().unwrap();
+        last_activity.insert(component_name.to_string(), Utc::now());
+        
+        info!("Component registered with Communication Center: {}", component_name);
         Ok(())
     }
     
     /// Unregister a component
     pub fn unregister_component(&self, component_name: &str) -> Result<()> {
-        let mut components = self.active_components.write().unwrap();
-        
-        if components.remove(component_name).is_some() {
-            self.log_event(
-                LogLevel::Info,
-                "CommunicationCenter",
-                &format!("Component unregistered: {}", component_name),
-                None,
-            );
-            
-            info!("Component unregistered: {}", component_name);
+        let mut active_components = self.active_components.write().unwrap();
+        if active_components.remove(component_name) {
+            info!("Component unregistered from Communication Center: {}", component_name);
         } else {
             warn!("Attempted to unregister unknown component: {}", component_name);
         }
-        
         Ok(())
     }
     
-    /// Update component heartbeat
-    pub fn update_component_heartbeat(&self, component_name: &str) -> Result<()> {
-        let mut components = self.active_components.write().unwrap();
+    /// Submit a trading signal to be processed
+    pub fn submit_trading_signal(&self, signal: TradingSignal) -> Result<()> {
+        let mut pending_signals = self.pending_signals.write().unwrap();
         
-        if let Some(component) = components.get_mut(component_name) {
-            component.last_heartbeat = Utc::now();
-            debug!("Updated heartbeat for component: {}", component_name);
-        } else {
-            warn!("Attempted to update heartbeat for unknown component: {}", component_name);
+        // Check if we already have this signal (avoid duplicates)
+        if pending_signals.iter().any(|s| {
+            s.asset == signal.asset && s.signal_type == signal.signal_type &&
+            (Utc::now() - s.timestamp) < Duration::minutes(30)
+        }) {
+            debug!("Duplicate signal for {} ignored", signal.asset);
+            return Ok(());
         }
         
-        Ok(())
-    }
-    
-    /// Submit a trading signal for processing
-    pub fn submit_trading_signal(&self, signal: TradingSignal) -> Result<()> {
-        // Verify the signal through security
-        self.security_protocol.verify_trading_signal(&signal)?;
+        // Add to queue
+        pending_signals.push_back(signal.clone());
         
-        // Add to pending signals
-        let mut signals = self.pending_signals.write().unwrap();
-        signals.push_back(signal.clone());
+        // Limit queue size
+        if pending_signals.len() > 100 {
+            pending_signals.pop_front();
+        }
         
-        self.log_event(
-            LogLevel::Info,
-            "CommunicationCenter",
-            &format!("Trading signal submitted for {}", signal.asset),
-            Some(serde_json::to_value(&signal)?),
-        );
+        // Broadcast to WebSocket clients
+        self.broadcast_signal_update(signal)?;
         
-        debug!("Trading signal submitted for {}", signal.asset);
         Ok(())
     }
     
     /// Get pending trading signals
     pub fn get_pending_signals(&self) -> Result<Vec<TradingSignal>> {
-        let mut signals = self.pending_signals.write().unwrap();
+        // Get all signals from the queue
+        let mut pending_signals = self.pending_signals.write().unwrap();
+        let signals: Vec<TradingSignal> = pending_signals.drain(..).collect();
         
-        // Take all pending signals
-        let signals_vec: Vec<TradingSignal> = signals.drain(..).collect();
-        
-        debug!("Retrieved {} pending trading signals", signals_vec.len());
-        Ok(signals_vec)
+        Ok(signals)
     }
     
-    /// Log a transaction for monitoring and auditing
-    pub fn log_transaction(&self, transaction: &Transaction) -> Result<()> {
-        // Log the transaction
-        self.log_event(
-            LogLevel::Transaction,
-            "TransactionEngine",
-            &format!("Transaction executed: {:?}", transaction.id),
-            Some(serde_json::to_value(transaction)?),
-        );
+    /// Update latest market data
+    pub fn update_market_data(&self, data: MarketData) -> Result<()> {
+        let mut market_data = self.latest_market_data.write().unwrap();
+        *market_data = Some(data.clone());
         
-        // Broadcast the transaction to all listeners
-        if let Err(e) = self.transaction_updates.send(transaction.clone()) {
-            warn!("Failed to broadcast transaction: {}", e);
-        }
+        // Broadcast to WebSocket clients
+        self.broadcast_market_data_update(data)?;
         
         Ok(())
     }
     
-    /// Log transaction execution for a trading signal
+    /// Get latest market data
+    pub fn get_latest_market_data(&self) -> Result<Option<MarketData>> {
+        let market_data = self.latest_market_data.read().unwrap();
+        Ok(market_data.clone())
+    }
+    
+    /// Log a transaction
+    pub fn log_transaction(&self, transaction: &Transaction) -> Result<()> {
+        let entry = TransactionLogEntry {
+            timestamp: Utc::now(),
+            transaction: transaction.clone(),
+            signal: None,
+            notes: None,
+        };
+        
+        // Add to log
+        let mut transaction_log = self.transaction_log.write().unwrap();
+        transaction_log.push_back(entry);
+        
+        // Limit log size
+        while transaction_log.len() > 1000 {
+            transaction_log.pop_front();
+        }
+        
+        // Broadcast to WebSocket clients
+        self.broadcast_transaction_update(transaction)?;
+        
+        Ok(())
+    }
+    
+    /// Log transaction execution from a signal
     pub fn log_transaction_execution(
         &self,
         signal: &TradingSignal,
         transaction: &Transaction,
         success: bool,
     ) -> Result<()> {
-        let status = if success { "success" } else { "failure" };
+        let notes = if success {
+            Some(format!("Successfully executed transaction from signal"))
+        } else {
+            Some(format!("Failed to execute transaction from signal"))
+        };
         
-        self.log_event(
-            LogLevel::Transaction,
-            "TransactionEngine",
-            &format!("Signal execution {}: {} for {}", 
-                status, transaction.id, signal.asset),
-            Some(serde_json::json!({
-                "signal": signal,
-                "transaction": transaction,
-                "success": success
-            })),
-        );
+        let entry = TransactionLogEntry {
+            timestamp: Utc::now(),
+            transaction: transaction.clone(),
+            signal: Some(signal.clone()),
+            notes,
+        };
+        
+        // Add to log
+        let mut transaction_log = self.transaction_log.write().unwrap();
+        transaction_log.push_back(entry);
+        
+        // Limit log size
+        while transaction_log.len() > 1000 {
+            transaction_log.pop_front();
+        }
+        
+        // Broadcast to WebSocket clients
+        self.broadcast_transaction_update(transaction)?;
         
         Ok(())
     }
@@ -239,198 +255,164 @@ impl CommunicationCenter {
         strategy_id: Uuid,
         error_message: String,
     ) -> Result<()> {
-        self.log_event(
-            LogLevel::Error,
-            "TransactionEngine",
-            &format!("Failed to execute transaction for signal: {}", signal.asset),
-            Some(serde_json::json!({
-                "signal": signal,
-                "strategy_id": strategy_id.to_string(),
-                "error": error_message
-            })),
-        );
-        
-        Ok(())
-    }
-    
-    /// Update system status and broadcast to clients
-    pub fn update_system_status(&self, status: SystemComponentStatus) -> Result<()> {
-        // Broadcast the status update
-        if let Err(e) = self.system_status_updates.send(status.clone()) {
-            warn!("Failed to broadcast system status: {}", e);
-        }
-        
-        self.log_event(
-            LogLevel::Info,
-            "CommunicationCenter",
-            "System status updated",
-            Some(serde_json::to_value(&status)?),
-        );
-        
-        Ok(())
-    }
-    
-    /// Get a WebSocket message receiver for real-time updates
-    pub fn get_transaction_receiver(&self) -> broadcast::Receiver<Transaction> {
-        self.transaction_updates.subscribe()
-    }
-    
-    /// Get a WebSocket message receiver for system status updates
-    pub fn get_status_receiver(&self) -> broadcast::Receiver<SystemComponentStatus> {
-        self.system_status_updates.subscribe()
-    }
-    
-    /// Register hidden data with a security tag
-    pub fn register_hidden_data(
-        &self,
-        data_id: &str,
-        data_type: &str,
-        security_tag: &str,
-        owner_component: &str,
-    ) -> Result<()> {
-        // Verify with security protocol
-        self.security_protocol.verify_hidden_data_registration(
-            data_id, data_type, security_tag, owner_component)?;
-        
-        let mut registry = self.hidden_data_registry.write().unwrap();
-        
-        registry.insert(data_id.to_string(), HiddenDataInfo {
-            id: data_id.to_string(),
-            data_type: data_type.to_string(),
-            security_tag: security_tag.to_string(),
-            last_access: Utc::now(),
-            access_count: 0,
-            owner_component: owner_component.to_string(),
-        });
-        
-        self.log_event(
-            LogLevel::Security,
-            "CommunicationCenter",
-            &format!("Hidden data registered: {} (type: {}, owner: {})", 
-                data_id, data_type, owner_component),
-            None,
-        );
-        
-        info!("Hidden data registered with ID: {}", data_id);
-        Ok(())
-    }
-    
-    /// Record access to hidden data
-    pub fn record_hidden_data_access(
-        &self,
-        data_id: &str,
-        accessing_component: &str,
-    ) -> Result<()> {
-        // Verify access with security protocol
-        self.security_protocol.verify_hidden_data_access(data_id, accessing_component)?;
-        
-        let mut registry = self.hidden_data_registry.write().unwrap();
-        
-        if let Some(data_info) = registry.get_mut(data_id) {
-            data_info.last_access = Utc::now();
-            data_info.access_count += 1;
-            
-            self.log_event(
-                LogLevel::Security,
-                "CommunicationCenter",
-                &format!("Hidden data accessed: {} by {}", data_id, accessing_component),
-                None,
-            );
-            
-            debug!("Hidden data {} accessed by {}", data_id, accessing_component);
-        } else {
-            return Err(anyhow::anyhow!("Hidden data not found: {}", data_id));
-        }
-        
-        Ok(())
-    }
-    
-    /// Get activity log for a specific hidden data item
-    pub fn get_hidden_data_activity(&self, data_id: &str) -> Result<HiddenDataActivity> {
-        // Verify access with security protocol
-        self.security_protocol.verify_hidden_data_monitoring(data_id)?;
-        
-        let registry = self.hidden_data_registry.read().unwrap();
-        
-        if let Some(data_info) = registry.get(data_id) {
-            Ok(HiddenDataActivity {
-                id: data_info.id.clone(),
-                last_access: data_info.last_access,
-                access_count: data_info.access_count,
-                owner: data_info.owner_component.clone(),
-            })
-        } else {
-            Err(anyhow::anyhow!("Hidden data not found: {}", data_id))
-        }
-    }
-    
-    /// Get system logs with optional filtering
-    pub fn get_system_logs(
-        &self,
-        level: Option<LogLevel>,
-        component: Option<&str>,
-        limit: Option<usize>,
-    ) -> Vec<SystemLog> {
-        let logs = self.system_logs.read().unwrap();
-        
-        let filtered = logs.iter()
-            .filter(|log| {
-                // Filter by log level if specified
-                if let Some(log_level) = level {
-                    if log.level != log_level {
-                        return false;
-                    }
-                }
-                
-                // Filter by component if specified
-                if let Some(comp_name) = component {
-                    if log.component != comp_name {
-                        return false;
-                    }
-                }
-                
-                true
-            })
-            .take(limit.unwrap_or(100))
-            .cloned()
-            .collect();
-            
-        filtered
-    }
-    
-    /// Add a log entry to the system logs
-    fn log_event(
-        &self,
-        level: LogLevel,
-        component: &str,
-        message: &str,
-        data: Option<serde_json::Value>,
-    ) {
-        let log_entry = SystemLog {
+        // Add system message for the error
+        let system_message = SystemMessage {
+            id: Uuid::new_v4(),
             timestamp: Utc::now(),
-            level,
-            component: component.to_string(),
-            message: message.to_string(),
-            data,
+            priority: MessagePriority::Error,
+            source: "TransactionEngine".to_string(),
+            message: format!("Failed to execute transaction for strategy {:?}: {}", 
+                             strategy_id, error_message),
+            acknowledged: false,
         };
         
-        let mut logs = self.system_logs.write().unwrap();
+        self.add_system_message(system_message)?;
         
-        // Add the new log entry
-        logs.push_back(log_entry);
-        
-        // Ensure we don't exceed the maximum number of log entries
-        while logs.len() > self.max_log_entries {
-            logs.pop_front();
-        }
+        Ok(())
     }
-}
-
-/// Activity information for hidden data
-#[derive(Debug, Clone, Serialize)]
-pub struct HiddenDataActivity {
-    pub id: String,
-    pub last_access: chrono::DateTime<Utc>,
-    pub access_count: u32,
-    pub owner: String,
+    
+    /// Add a system message
+    pub fn add_system_message(&self, message: SystemMessage) -> Result<()> {
+        let mut system_messages = self.system_messages.write().unwrap();
+        system_messages.push_back(message.clone());
+        
+        // Limit message queue
+        while system_messages.len() > 1000 {
+            system_messages.pop_front();
+        }
+        
+        // Broadcast to WebSocket clients
+        self.broadcast_system_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Update system status
+    pub fn update_system_status(&self, status: SystemComponentStatus) -> Result<()> {
+        let mut system_status = self.system_status.write().unwrap();
+        *system_status = status.clone();
+        
+        // Broadcast to WebSocket clients
+        self.broadcast_status_update(status)?;
+        
+        Ok(())
+    }
+    
+    /// Get current system status
+    pub fn get_system_status(&self) -> Result<SystemComponentStatus> {
+        let status = self.system_status.read().unwrap();
+        Ok(status.clone())
+    }
+    
+    /// Register a WebSocket channel for UI updates
+    pub fn register_ws_channel(&self, channel: mpsc::Sender<WebSocketMessage>) -> Result<()> {
+        let mut ws_channels = self.ws_channels.write().unwrap();
+        ws_channels.push(channel);
+        
+        Ok(())
+    }
+    
+    /// Update component activity timestamp
+    pub fn update_component_activity(&self, component_name: &str) -> Result<()> {
+        let mut last_activity = self.last_activity.write().unwrap();
+        last_activity.insert(component_name.to_string(), Utc::now());
+        
+        Ok(())
+    }
+    
+    /// Broadcast a trading signal update to WebSocket clients
+    fn broadcast_signal_update(&self, signal: TradingSignal) -> Result<()> {
+        // Create WebSocket message
+        let message = WebSocketMessage {
+            id: Uuid::new_v4(),
+            message_type: WebSocketMessageType::TradingSignal,
+            timestamp: Utc::now(),
+            data: serde_json::to_value(signal)?,
+        };
+        
+        // Broadcast to all channels
+        self.broadcast_ws_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Broadcast a transaction update to WebSocket clients
+    fn broadcast_transaction_update(&self, transaction: &Transaction) -> Result<()> {
+        // Create WebSocket message
+        let message = WebSocketMessage {
+            id: Uuid::new_v4(),
+            message_type: WebSocketMessageType::Transaction,
+            timestamp: Utc::now(),
+            data: serde_json::to_value(transaction)?,
+        };
+        
+        // Broadcast to all channels
+        self.broadcast_ws_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Broadcast market data update to WebSocket clients
+    fn broadcast_market_data_update(&self, data: MarketData) -> Result<()> {
+        // Create WebSocket message
+        let message = WebSocketMessage {
+            id: Uuid::new_v4(),
+            message_type: WebSocketMessageType::MarketData,
+            timestamp: Utc::now(),
+            data: serde_json::to_value(data)?,
+        };
+        
+        // Broadcast to all channels
+        self.broadcast_ws_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Broadcast status update to WebSocket clients
+    fn broadcast_status_update(&self, status: SystemComponentStatus) -> Result<()> {
+        // Create WebSocket message
+        let message = WebSocketMessage {
+            id: Uuid::new_v4(),
+            message_type: WebSocketMessageType::SystemStatus,
+            timestamp: Utc::now(),
+            data: serde_json::to_value(status)?,
+        };
+        
+        // Broadcast to all channels
+        self.broadcast_ws_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Broadcast system message to WebSocket clients
+    fn broadcast_system_message(&self, system_message: SystemMessage) -> Result<()> {
+        // Create WebSocket message
+        let message = WebSocketMessage {
+            id: Uuid::new_v4(),
+            message_type: WebSocketMessageType::SystemMessage,
+            timestamp: Utc::now(),
+            data: serde_json::to_value(system_message)?,
+        };
+        
+        // Broadcast to all channels
+        self.broadcast_ws_message(message)?;
+        
+        Ok(())
+    }
+    
+    /// Broadcast a message to all WebSocket channels
+    fn broadcast_ws_message(&self, message: WebSocketMessage) -> Result<()> {
+        // Get all channels
+        let ws_channels = self.ws_channels.read().unwrap();
+        
+        // Send message to each channel (non-blocking)
+        for channel in ws_channels.iter() {
+            if let Err(e) = channel.try_send(message.clone()) {
+                // Only log error, don't propagate
+                debug!("Failed to send WebSocket message: {}", e);
+            }
+        }
+        
+        Ok(())
+    }
 }

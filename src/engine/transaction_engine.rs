@@ -2,6 +2,9 @@ use crate::models::{
     Transaction, TransactionType, TransactionStatus, Strategy, StrategyType,
     TradingSignal, SignalType, RiskLevel
 };
+use crate::transformers::{
+    MicroQHCTransformer, MEMECortexTransformer, CommunicationTransformer
+};
 use crate::solana::{WalletManager, TransactionManager};
 use crate::storage::Storage;
 use crate::security::SecurityProtocol;
@@ -78,6 +81,32 @@ impl TransactionEngine {
         }
     }
     
+    /// Initialize specialized transformers
+    pub async fn initialize_transformers(&self) -> Result<(Arc<MicroQHCTransformer>, Arc<MEMECortexTransformer>, Arc<CommunicationTransformer>)> {
+        info!("Initializing specialized transformers for Transaction Engine");
+        
+        // Create communication transformer
+        let communication_transformer = Arc::new(CommunicationTransformer::new(
+            self.communication_center.clone()
+        ));
+        
+        // Create specialized transformers
+        let micro_qhc = Arc::new(MicroQHCTransformer::new());
+        let meme_cortex = Arc::new(MEMECortexTransformer::new());
+        
+        // Start communication transformer
+        communication_transformer.start().await?;
+        
+        // Register transformers with security protocol
+        self.security_protocol.register_secure_component("MicroQHCTransformer")?;
+        self.security_protocol.register_secure_component("MEMECortexTransformer")?;
+        self.security_protocol.register_secure_component("CommunicationTransformer")?;
+        
+        info!("Specialized transformers initialized successfully");
+        
+        Ok((micro_qhc, meme_cortex, communication_transformer))
+    }
+    
     /// Start the transaction engine
     pub fn start(&self) -> Result<()> {
         let mut is_running = self.is_running.lock().unwrap();
@@ -89,6 +118,12 @@ impl TransactionEngine {
         
         // Security check before starting
         self.security_protocol.verify_component_integrity("TransactionEngine")?;
+        
+        // Initialize transformers
+        tokio::runtime::Handle::current().block_on(async {
+            let _ = self.initialize_transformers().await?;
+            Ok::<_, anyhow::Error>(())
+        })?;
         
         // Set running state to true
         *is_running = true;
@@ -261,7 +296,7 @@ impl TransactionEngine {
     }
 }
 
-/// Process trading signals from the communication center
+/// Process trading signals from the communication center and specialized transformers
 async fn process_signals(
     storage: &Storage,
     wallet_manager: &WalletManager,
@@ -269,7 +304,68 @@ async fn process_signals(
     security_protocol: &SecurityProtocol,
     communication_center: &CommunicationCenter,
 ) -> Result<()> {
-    let signals = communication_center.get_pending_signals()?;
+    // Fetch market data for transformer processing
+    let market_data = match communication_center.get_latest_market_data() {
+        Ok(data) => data,
+        Err(e) => {
+            warn!("Failed to get market data for transformer processing: {}", e);
+            None
+        }
+    };
+    
+    // Initialize specialized transformers to process market data
+    let mut transformer_signals = Vec::new();
+    
+    // Create temporary transformer instances if we have market data
+    if let Some(market_data) = &market_data {
+        // Initialize specialized transformers
+        let micro_qhc = MicroQHCTransformer::new();
+        let meme_cortex = MEMECortexTransformer::new();
+        
+        // Process market data with transformers
+        if let Ok(signals) = micro_qhc.process_data(&market_data) {
+            info!("MicroQHC transformer generated {} signals", signals.len());
+            transformer_signals.extend(signals);
+        }
+        
+        if let Ok(signals) = meme_cortex.process_data(&market_data) {
+            info!("MEME Cortex transformer generated {} signals", signals.len());
+            transformer_signals.extend(signals);
+        }
+        
+        // For security, verify all transformer-generated signals
+        transformer_signals.retain(|signal| {
+            match security_protocol.verify_trading_signal(&signal) {
+                Ok(valid) => {
+                    if !valid {
+                        warn!("Transformer signal failed security verification: {}", signal.asset);
+                    }
+                    valid
+                },
+                Err(e) => {
+                    error!("Error verifying transformer signal: {}", e);
+                    false
+                }
+            }
+        });
+        
+        // Submit verified transformer signals to communication center
+        for signal in &transformer_signals {
+            if let Err(e) = communication_center.submit_trading_signal(signal.clone()) {
+                error!("Failed to submit transformer signal to communication center: {}", e);
+            }
+        }
+    }
+    
+    // Get pending signals from communication center (including ones just submitted)
+    let mut signals = communication_center.get_pending_signals()?;
+    
+    // Add transformer signals that weren't submitted (fallback)
+    for signal in transformer_signals {
+        if !signals.contains(&signal) {
+            signals.push(signal);
+        }
+    }
     
     if signals.is_empty() {
         return Ok(());
