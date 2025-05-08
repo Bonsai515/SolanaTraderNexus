@@ -1,534 +1,358 @@
-// Solana blockchain connection
+// Solana connection management
 
 use anyhow::{Result, anyhow, Context};
 use log::{info, warn, error, debug};
-use std::sync::{Arc, RwLock, Mutex};
-use std::env;
-use std::time::{Duration, Instant};
-use reqwest::Client;
 use serde::{Serialize, Deserialize};
-use serde_json::{json, Value};
-use tokio::time::sleep;
+use std::sync::{Arc, RwLock, Mutex};
+use std::time::{Duration, Instant};
+use std::env;
 
-/// Maximum number of retries for RPC requests
-const MAX_RETRIES: usize = 3;
+use solana_client::rpc_client::RpcClient;
+use solana_client::client_error::ClientError;
+use solana_sdk::commitment_config::CommitmentConfig;
 
-/// Timeout for RPC requests (seconds)
-const RPC_TIMEOUT_SECONDS: u64 = 30;
-
-/// Solana connection status
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConnectionStatus {
-    /// Connection not initialized
-    NotInitialized,
-    
-    /// Connection is operational
-    Operational,
-    
-    /// Connection has issues
-    Degraded,
-    
-    /// Connection is down
-    Down,
-}
-
-/// JSON-RPC request
+/// Connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct JsonRpcRequest {
-    jsonrpc: String,
-    id: u64,
-    method: String,
-    params: Vec<Value>,
-}
-
-/// JSON-RPC response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct JsonRpcResponse {
-    jsonrpc: String,
-    id: u64,
-    result: Option<Value>,
-    error: Option<JsonRpcError>,
-}
-
-/// JSON-RPC error
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct JsonRpcError {
-    code: i64,
-    message: String,
-}
-
-/// Solana connection configuration
-#[derive(Debug, Clone)]
-pub struct SolanaConnectionConfig {
-    /// Primary RPC endpoint
-    pub primary_endpoint: String,
+pub struct ConnectionConfig {
+    /// Primary RPC endpoint URL
+    pub primary_endpoint: Option<String>,
     
-    /// Fallback RPC endpoints
-    pub fallback_endpoints: Vec<String>,
-    
-    /// API key for RPC service (if any)
-    pub api_key: Option<String>,
-    
-    /// Network (mainnet-beta, testnet, devnet)
-    pub network: String,
+    /// Fallback RPC endpoint URL
+    pub fallback_endpoint: Option<String>,
     
     /// Commitment level
     pub commitment: String,
     
-    /// Timeout in seconds
+    /// Connection timeout in seconds
     pub timeout_seconds: u64,
     
-    /// Maximum retries
-    pub max_retries: usize,
+    /// Health check interval in seconds
+    pub health_check_seconds: u64,
 }
 
-impl Default for SolanaConnectionConfig {
+impl Default for ConnectionConfig {
     fn default() -> Self {
-        // Check environment for custom RPC URL
-        let primary_endpoint = env::var("INSTANT_NODES_RPC_URL")
-            .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
-        
-        // Check environment for API key
-        let api_key = env::var("SOLANA_RPC_API_KEY").ok();
-        
         Self {
-            primary_endpoint,
-            fallback_endpoints: vec![
-                "https://solana-api.projectserum.com".to_string(),
-                "https://rpc.ankr.com/solana".to_string(),
-            ],
-            api_key,
-            network: "mainnet-beta".to_string(),
+            primary_endpoint: None,
+            fallback_endpoint: None,
             commitment: "confirmed".to_string(),
-            timeout_seconds: RPC_TIMEOUT_SECONDS,
-            max_retries: MAX_RETRIES,
+            timeout_seconds: 30,
+            health_check_seconds: 60,
         }
     }
 }
 
-/// Solana blockchain connection
-#[derive(Clone)]
+/// Connection status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConnectionStatus {
+    /// Connected
+    Connected,
+    
+    /// Connecting
+    Connecting,
+    
+    /// Disconnected
+    Disconnected,
+    
+    /// Error
+    Error,
+}
+
+/// Connection health
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionHealth {
+    /// Connection status
+    pub status: ConnectionStatus,
+    
+    /// Active endpoint
+    pub active_endpoint: String,
+    
+    /// Last health check time
+    #[serde(skip)]
+    pub last_check: Instant,
+    
+    /// Error message (if any)
+    pub error: Option<String>,
+    
+    /// Version info
+    pub version: Option<String>,
+}
+
+/// Solana connection manager
 pub struct SolanaConnection {
-    /// HTTP client
-    client: Client,
+    /// Configuration
+    config: ConnectionConfig,
     
-    /// Connection configuration
-    config: RwLock<SolanaConnectionConfig>,
+    /// RPC client
+    client: RwLock<Option<RpcClient>>,
     
-    /// Currently active endpoint
-    active_endpoint: RwLock<String>,
+    /// Connection health
+    health: RwLock<ConnectionHealth>,
     
-    /// Current connection status
-    status: RwLock<ConnectionStatus>,
-    
-    /// Last successful request time
-    last_success: Mutex<Instant>,
-    
-    /// Request counter for statistics
-    request_counter: RwLock<u64>,
-    
-    /// Failed request counter
-    failed_counter: RwLock<u64>,
+    /// Last error
+    last_error: Mutex<Option<ClientError>>,
 }
 
 impl SolanaConnection {
     /// Create a new Solana connection
-    pub fn new(endpoint: &str) -> Self {
-        let mut config = SolanaConnectionConfig::default();
-        config.primary_endpoint = endpoint.to_string();
+    pub fn new(config: ConnectionConfig) -> Result<Self> {
+        // Set default endpoints if not provided
+        let primary_endpoint = config.primary_endpoint.clone().unwrap_or_else(|| {
+            // Try to get from environment
+            env::var("INSTANT_NODES_RPC_URL")
+                .or_else(|_| {
+                    // Try Helius API key
+                    env::var("SOLANA_RPC_API_KEY")
+                        .map(|key| format!("https://mainnet.helius-rpc.com/?api-key={}", key))
+                })
+                .unwrap_or_else(|_| {
+                    // Fallback to public endpoint
+                    "https://api.mainnet-beta.solana.com".to_string()
+                })
+        });
         
-        let client = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_seconds))
-            .build()
-            .expect("Failed to create HTTP client");
+        let fallback_endpoint = config.fallback_endpoint.clone().unwrap_or_else(|| {
+            // Fallback to public endpoint
+            "https://api.mainnet-beta.solana.com".to_string()
+        });
         
-        Self {
-            client,
-            config: RwLock::new(config.clone()),
-            active_endpoint: RwLock::new(config.primary_endpoint),
-            status: RwLock::new(ConnectionStatus::NotInitialized),
-            last_success: Mutex::new(Instant::now()),
-            request_counter: RwLock::new(0),
-            failed_counter: RwLock::new(0),
-        }
+        // Initialize connection health
+        let health = ConnectionHealth {
+            status: ConnectionStatus::Disconnected,
+            active_endpoint: primary_endpoint.clone(),
+            last_check: Instant::now(),
+            error: None,
+            version: None,
+        };
+        
+        let connection = Self {
+            config,
+            client: RwLock::new(None),
+            health: RwLock::new(health),
+            last_error: Mutex::new(None),
+        };
+        
+        Ok(connection)
     }
     
-    /// Create a new Solana connection with custom configuration
-    pub fn with_config(config: SolanaConnectionConfig) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_seconds))
-            .build()
-            .expect("Failed to create HTTP client");
+    /// Initialize connection
+    pub fn initialize(&self) -> Result<()> {
+        // Get endpoint
+        let endpoint = self.get_active_endpoint();
         
-        Self {
-            client,
-            active_endpoint: RwLock::new(config.primary_endpoint.clone()),
-            config: RwLock::new(config),
-            status: RwLock::new(ConnectionStatus::NotInitialized),
-            last_success: Mutex::new(Instant::now()),
-            request_counter: RwLock::new(0),
-            failed_counter: RwLock::new(0),
+        // Create commitment config
+        let commitment = match self.config.commitment.as_str() {
+            "processed" => CommitmentConfig::processed(),
+            "confirmed" => CommitmentConfig::confirmed(),
+            "finalized" => CommitmentConfig::finalized(),
+            _ => CommitmentConfig::confirmed(),
+        };
+        
+        // Create timeout
+        let timeout = Duration::from_secs(self.config.timeout_seconds);
+        
+        // Create RPC client
+        let client = RpcClient::new_with_timeout_and_commitment(
+            endpoint.clone(),
+            timeout,
+            commitment,
+        );
+        
+        // Update health
+        {
+            let mut health = self.health.write().unwrap();
+            health.status = ConnectionStatus::Connecting;
+            health.active_endpoint = endpoint.clone();
         }
-    }
-    
-    /// Initialize the connection
-    pub async fn init(&self) -> Result<()> {
-        info!("Initializing Solana connection");
         
-        // Test connection
-        match self.get_latest_blockhash().await {
+        // Store client
+        {
+            let mut client_lock = self.client.write().unwrap();
+            *client_lock = Some(client);
+        }
+        
+        // Perform health check
+        match self.check_health() {
             Ok(_) => {
-                let mut status = self.status.write().unwrap();
-                *status = ConnectionStatus::Operational;
-                info!("Solana connection initialized successfully");
+                info!("Connected to Solana network at {}", endpoint);
                 Ok(())
             }
             Err(e) => {
-                error!("Failed to initialize Solana connection: {}", e);
-                Err(anyhow!("Failed to initialize Solana connection: {}", e))
+                // Try fallback endpoint if available
+                if endpoint != self.config.fallback_endpoint.clone().unwrap_or_default() {
+                    warn!("Failed to connect to primary endpoint: {}", e);
+                    warn!("Trying fallback endpoint");
+                    
+                    // Update active endpoint to fallback
+                    {
+                        let mut health = self.health.write().unwrap();
+                        health.active_endpoint = self.config.fallback_endpoint.clone().unwrap_or_default();
+                    }
+                    
+                    // Try again with fallback
+                    self.initialize()
+                } else {
+                    // Both endpoints failed
+                    error!("Failed to connect to Solana network: {}", e);
+                    Err(e)
+                }
             }
         }
     }
     
-    /// Update connection status
-    fn update_status(&self, new_status: ConnectionStatus) {
-        let mut status = self.status.write().unwrap();
-        if *status != new_status {
-            debug!("Solana connection status changed: {:?} -> {:?}", *status, new_status);
-            *status = new_status;
+    /// Get RPC client
+    pub fn get_rpc_client(&self) -> Result<RpcClient> {
+        // Check if client exists
+        let client_lock = self.client.read().unwrap();
+        
+        match client_lock.as_ref() {
+            Some(client) => Ok(client.clone()),
+            None => {
+                // Initialize connection
+                drop(client_lock); // Release lock before initializing
+                self.initialize()?;
+                
+                // Get client again
+                let client_lock = self.client.read().unwrap();
+                match client_lock.as_ref() {
+                    Some(client) => Ok(client.clone()),
+                    None => Err(anyhow!("Failed to initialize Solana connection")),
+                }
+            }
         }
     }
     
     /// Get active endpoint
     pub fn get_active_endpoint(&self) -> String {
-        self.active_endpoint.read().unwrap().clone()
+        let health = self.health.read().unwrap();
+        health.active_endpoint.clone()
     }
     
-    /// Check if using custom RPC endpoint
-    pub fn is_using_custom_rpc(&self) -> bool {
-        let config = self.config.read().unwrap();
-        !config.primary_endpoint.contains("mainnet-beta.solana.com")
-    }
-    
-    /// Check if using API key
-    pub fn is_using_api_key(&self) -> bool {
-        let config = self.config.read().unwrap();
-        config.api_key.is_some()
-    }
-    
-    /// Get network name
-    pub fn get_network(&self) -> String {
-        let config = self.config.read().unwrap();
-        config.network.clone()
-    }
-    
-    /// Get connection status
-    pub fn get_status(&self) -> ConnectionStatus {
-        *self.status.read().unwrap()
-    }
-    
-    /// Get connection health JSON
-    pub fn get_health_json(&self) -> Value {
-        json!({
-            "status": format!("{:?}", self.get_status()),
-            "customRpc": self.is_using_custom_rpc(),
-            "apiKey": self.is_using_api_key(),
-            "network": self.get_network(),
-            "endpoint": self.get_active_endpoint(),
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-        })
-    }
-    
-    /// Switch to next endpoint if current one is failing
-    async fn try_fallback_endpoint(&self) -> Result<()> {
-        let config = self.config.read().unwrap();
-        let current = self.active_endpoint.read().unwrap().clone();
+    /// Check connection health
+    pub fn check_health(&self) -> Result<ConnectionHealth> {
+        // Get client
+        let client = self.get_rpc_client()?;
         
-        // Find current endpoint index
-        let current_index = if current == config.primary_endpoint {
-            None
-        } else {
-            config.fallback_endpoints.iter().position(|e| *e == current)
-        };
-        
-        // Get next endpoint
-        let next_endpoint = match current_index {
-            None => {
-                // Current is primary, switch to first fallback
-                config.fallback_endpoints.first().cloned()
+        // Check connection
+        match client.get_version() {
+            Ok(version) => {
+                // Update health
+                let mut health = self.health.write().unwrap();
+                health.status = ConnectionStatus::Connected;
+                health.last_check = Instant::now();
+                health.error = None;
+                health.version = Some(format!("{}.{}.{}", 
+                    version.solana_core.major,
+                    version.solana_core.minor,
+                    version.solana_core.patch
+                ));
+                
+                Ok(health.clone())
             }
-            Some(idx) => {
-                // Try next fallback
-                if idx + 1 < config.fallback_endpoints.len() {
-                    config.fallback_endpoints.get(idx + 1).cloned()
-                } else {
-                    // Go back to primary
-                    Some(config.primary_endpoint.clone())
-                }
-            }
-        };
-        
-        if let Some(endpoint) = next_endpoint {
-            warn!("Switching Solana RPC endpoint: {} -> {}", current, endpoint);
-            let mut active = self.active_endpoint.write().unwrap();
-            *active = endpoint;
-            
-            // Update status to degraded
-            self.update_status(ConnectionStatus::Degraded);
-            
-            Ok(())
-        } else {
-            // No fallback available
-            self.update_status(ConnectionStatus::Down);
-            Err(anyhow!("No fallback endpoints available"))
-        }
-    }
-    
-    /// Send JSON-RPC request to Solana
-    async fn send_request(&self, method: &str, params: Vec<Value>) -> Result<Value> {
-        let config = self.config.read().unwrap();
-        let endpoint = self.active_endpoint.read().unwrap().clone();
-        
-        // Update request counter
-        {
-            let mut counter = self.request_counter.write().unwrap();
-            *counter += 1;
-        }
-        
-        // Create request
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: 1,
-            method: method.to_string(),
-            params,
-        };
-        
-        // Add API key if available
-        let mut headers = reqwest::header::HeaderMap::new();
-        if let Some(api_key) = &config.api_key {
-            headers.insert(
-                "x-api-key",
-                reqwest::header::HeaderValue::from_str(api_key)
-                    .map_err(|e| anyhow!("Invalid API key header: {}", e))?,
-            );
-        }
-        
-        let mut retries = 0;
-        let mut last_error = None;
-        
-        while retries < config.max_retries {
-            if retries > 0 {
-                debug!("Retrying RPC request ({}/{}): {}", retries + 1, config.max_retries, method);
-                sleep(Duration::from_millis(500 * (retries as u64 + 1))).await;
-            }
-            
-            // Send request
-            let response = match self.client
-                .post(&endpoint)
-                .headers(headers.clone())
-                .json(&request)
-                .send()
-                .await
-            {
-                Ok(resp) => resp,
-                Err(e) => {
-                    warn!("RPC request failed: {}", e);
-                    last_error = Some(anyhow!("HTTP error: {}", e));
-                    retries += 1;
-                    continue;
-                }
-            };
-            
-            // Parse response
-            let rpc_response: JsonRpcResponse = match response.json().await {
-                Ok(resp) => resp,
-                Err(e) => {
-                    warn!("Failed to parse RPC response: {}", e);
-                    last_error = Some(anyhow!("Parse error: {}", e));
-                    retries += 1;
-                    continue;
-                }
-            };
-            
-            // Check for RPC error
-            if let Some(error) = rpc_response.error {
-                warn!("RPC error: {} (code {})", error.message, error.code);
-                last_error = Some(anyhow!("RPC error: {} (code {})", error.message, error.code));
-                retries += 1;
-                continue;
-            }
-            
-            // Return result
-            if let Some(result) = rpc_response.result {
-                // Update last success
+            Err(e) => {
+                // Update health
+                let mut health = self.health.write().unwrap();
+                health.status = ConnectionStatus::Error;
+                health.last_check = Instant::now();
+                health.error = Some(e.to_string());
+                
+                // Store error
                 {
-                    let mut last = self.last_success.lock().unwrap();
-                    *last = Instant::now();
+                    let mut last_error = self.last_error.lock().unwrap();
+                    *last_error = Some(e.clone());
                 }
                 
-                // Update status if needed
-                if self.get_status() != ConnectionStatus::Operational {
-                    self.update_status(ConnectionStatus::Operational);
-                }
-                
-                return Ok(result);
-            } else {
-                warn!("RPC response has no result");
-                last_error = Some(anyhow!("RPC response has no result"));
-                retries += 1;
-                continue;
+                Err(anyhow!("Failed to get Solana version: {}", e))
             }
         }
+    }
+    
+    /// Get connection health
+    pub fn get_health(&self) -> ConnectionHealth {
+        // Check if we need to refresh health
+        let refresh = {
+            let health = self.health.read().unwrap();
+            let elapsed = health.last_check.elapsed();
+            let interval = Duration::from_secs(self.config.health_check_seconds);
+            
+            elapsed >= interval
+        };
         
-        // Update failed counter
-        {
-            let mut counter = self.failed_counter.write().unwrap();
-            *counter += 1;
+        // Refresh health if needed
+        if refresh {
+            let _ = self.check_health();
         }
         
-        // Try fallback endpoint for next request
-        let _ = self.try_fallback_endpoint().await;
-        
-        // Return last error
-        Err(last_error.unwrap_or_else(|| anyhow!("Unknown RPC error")))
+        // Return health
+        let health = self.health.read().unwrap();
+        health.clone()
     }
     
-    /// Get latest blockhash
-    pub async fn get_latest_blockhash(&self) -> Result<String> {
-        let params = vec![json!({
-            "commitment": self.config.read().unwrap().commitment,
-        })];
-        
-        let response = self.send_request("getLatestBlockhash", params).await?;
-        
-        // Extract blockhash
-        let blockhash = response.get("value")
-            .and_then(|v| v.get("blockhash"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Invalid response format"))?;
-        
-        Ok(blockhash.to_string())
+    /// Get last error
+    pub fn get_last_error(&self) -> Option<ClientError> {
+        let last_error = self.last_error.lock().unwrap();
+        last_error.clone()
     }
     
-    /// Get account info
-    pub async fn get_account_info(&self, pubkey: &str) -> Result<Value> {
-        let params = vec![
-            json!(pubkey),
-            json!({
-                "encoding": "jsonParsed",
-                "commitment": self.config.read().unwrap().commitment,
-            }),
-        ];
+    /// Switch to fallback endpoint
+    pub fn switch_to_fallback(&self) -> Result<()> {
+        // Check if fallback is available
+        let fallback = self.config.fallback_endpoint.clone()
+            .ok_or_else(|| anyhow!("No fallback endpoint configured"))?;
         
-        let response = self.send_request("getAccountInfo", params).await?;
+        // Check if already on fallback
+        let current = self.get_active_endpoint();
+        if current == fallback {
+            return Err(anyhow!("Already using fallback endpoint"));
+        }
         
-        Ok(response)
+        info!("Switching from {} to fallback endpoint {}", current, fallback);
+        
+        // Update health
+        {
+            let mut health = self.health.write().unwrap();
+            health.status = ConnectionStatus::Connecting;
+            health.active_endpoint = fallback.clone();
+        }
+        
+        // Reset client to force re-initialization
+        {
+            let mut client_lock = self.client.write().unwrap();
+            *client_lock = None;
+        }
+        
+        // Initialize with fallback
+        self.initialize()
     }
     
-    /// Get token account balance
-    pub async fn get_token_account_balance(&self, account: &str) -> Result<f64> {
-        let params = vec![
-            json!(account),
-            json!({
-                "commitment": self.config.read().unwrap().commitment,
-            }),
-        ];
+    /// Switch to primary endpoint
+    pub fn switch_to_primary(&self) -> Result<()> {
+        // Check if primary is available
+        let primary = self.config.primary_endpoint.clone()
+            .ok_or_else(|| anyhow!("No primary endpoint configured"))?;
         
-        let response = self.send_request("getTokenAccountBalance", params).await?;
+        // Check if already on primary
+        let current = self.get_active_endpoint();
+        if current == primary {
+            return Err(anyhow!("Already using primary endpoint"));
+        }
         
-        // Extract balance and decimals
-        let amount = response.get("value")
-            .and_then(|v| v.get("amount"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        info!("Switching from {} to primary endpoint {}", current, primary);
         
-        let decimals = response.get("value")
-            .and_then(|v| v.get("decimals"))
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        // Update health
+        {
+            let mut health = self.health.write().unwrap();
+            health.status = ConnectionStatus::Connecting;
+            health.active_endpoint = primary.clone();
+        }
         
-        // Parse amount
-        let amount_raw = amount.parse::<f64>()
-            .context("Failed to parse amount")?;
+        // Reset client to force re-initialization
+        {
+            let mut client_lock = self.client.write().unwrap();
+            *client_lock = None;
+        }
         
-        // Calculate real amount
-        let real_amount = amount_raw / (10_f64.powi(decimals as i32));
-        
-        Ok(real_amount)
-    }
-    
-    /// Get SOL balance
-    pub async fn get_sol_balance(&self, address: &str) -> Result<f64> {
-        let params = vec![
-            json!(address),
-            json!({
-                "commitment": self.config.read().unwrap().commitment,
-            }),
-        ];
-        
-        let response = self.send_request("getBalance", params).await?;
-        
-        // Extract balance
-        let balance = response.get("value")
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow!("Invalid response format"))?;
-        
-        // Calculate real amount (SOL has 9 decimals)
-        let real_balance = balance as f64 / 1_000_000_000.0;
-        
-        Ok(real_balance)
-    }
-    
-    /// Get token accounts by owner
-    pub async fn get_token_accounts_by_owner(&self, owner: &str) -> Result<Value> {
-        let params = vec![
-            json!(owner),
-            json!({
-                "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-            }),
-            json!({
-                "encoding": "jsonParsed",
-                "commitment": self.config.read().unwrap().commitment,
-            }),
-        ];
-        
-        let response = self.send_request("getTokenAccountsByOwner", params).await?;
-        
-        Ok(response)
-    }
-    
-    /// Send transaction
-    pub async fn send_transaction(&self, serialized_tx: &str) -> Result<String> {
-        let params = vec![
-            json!(serialized_tx),
-            json!({
-                "encoding": "base64",
-                "skipPreflight": false,
-                "preflightCommitment": self.config.read().unwrap().commitment,
-            }),
-        ];
-        
-        let response = self.send_request("sendTransaction", params).await?;
-        
-        // Extract signature
-        let signature = response.as_str()
-            .ok_or_else(|| anyhow!("Invalid response format"))?;
-        
-        Ok(signature.to_string())
-    }
-    
-    /// Get transaction status
-    pub async fn get_transaction_status(&self, signature: &str) -> Result<Value> {
-        let params = vec![
-            json!(signature),
-            json!({
-                "encoding": "jsonParsed",
-                "commitment": self.config.read().unwrap().commitment,
-            }),
-        ];
-        
-        let response = self.send_request("getTransaction", params).await?;
-        
-        Ok(response)
+        // Initialize with primary
+        self.initialize()
     }
 }
