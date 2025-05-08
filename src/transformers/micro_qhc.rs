@@ -1,6 +1,6 @@
 use crate::models::{MarketData, TokenPrice, TradingSignal, SignalType};
 use anyhow::Result;
-use log::{info, debug};
+use log::{info, debug, warn};
 use std::sync::{Arc, RwLock};
 use chrono::Utc;
 use rand::{Rng, thread_rng};
@@ -106,14 +106,14 @@ impl MicroQHCTransformer {
     }
     
     /// Set the decoherence rate
-    pub fn set_decoherence_rate(&self, rate: f64) {
+    pub fn set_decoherence_rate(&mut self, rate: f64) {
         if rate < 0.0 || rate > 1.0 {
             warn!("Invalid decoherence rate: {}. Must be between 0.0 and 1.0", rate);
             return;
         }
         
-        let mut decoherence = self.decoherence_rate.write().unwrap();
-        *decoherence = rate;
+        // We need mutable self to modify a direct field
+        self.decoherence_rate = rate;
         info!("Micro QHC Transformer decoherence rate set to {}", rate);
     }
     

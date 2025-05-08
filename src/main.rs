@@ -37,10 +37,17 @@ async fn main() -> Result<()> {
     let storage = Arc::new(Storage::new());
     info!("Storage System initialized successfully");
     
-    // Initialize Solana connection (mainnet-beta or testnet)
-    let solana_endpoint = "https://api.mainnet-beta.solana.com";
+    // Initialize Solana connection with custom RPC from environment
+    // Will automatically use INSTANT_NODES_RPC_URL from environment if available
+    let solana_endpoint = "https://api.mainnet-beta.solana.com"; // Fallback endpoint
     let solana_connection = Arc::new(SolanaConnection::new(solana_endpoint));
-    info!("Solana Connection initialized with endpoint: {}", solana_endpoint);
+    
+    // Log whether we're using the custom RPC
+    if let Ok(custom_rpc) = std::env::var("INSTANT_NODES_RPC_URL") {
+        info!("Using custom Instant Nodes RPC endpoint");
+    } else {
+        info!("Using default Solana RPC endpoint: {}", solana_endpoint);
+    }
     
     // Initialize wallet manager
     let wallet_manager = Arc::new(WalletManager::new(solana_connection.clone()));

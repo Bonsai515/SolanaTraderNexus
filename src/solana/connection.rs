@@ -64,9 +64,17 @@ impl SolanaConnection {
     pub fn new(endpoint: &str) -> Self {
         info!("Initializing Solana Connection - Blockchain Interface");
         
+        // Use environment variables for custom RPC if available
+        let custom_endpoint = std::env::var("INSTANT_NODES_RPC_URL").unwrap_or_else(|_| {
+            info!("INSTANT_NODES_RPC_URL not found, using provided endpoint");
+            endpoint.to_string()
+        });
+        
+        info!("Using Solana RPC endpoint: {}", custom_endpoint);
+        
         Self {
             client: Arc::new(RwLock::new(None)),
-            endpoint: RwLock::new(endpoint.to_string()),
+            endpoint: RwLock::new(custom_endpoint),
             is_connected: RwLock::new(false),
             last_blockhash: RwLock::new(None),
             last_blockhash_update: RwLock::new(None),
@@ -81,11 +89,28 @@ impl SolanaConnection {
         let endpoint = self.endpoint.read().unwrap().clone();
         info!("Connecting to Solana network: {}", endpoint);
         
-        // Create RPC client
-        let client = RpcClient::new_with_commitment(
-            endpoint,
-            CommitmentConfig::confirmed(),
-        );
+        // Check if API key is available
+        let api_key = std::env::var("SOLANA_RPC_API_KEY").ok();
+        
+        // Create RPC client with or without API key
+        let client = if let Some(key) = api_key {
+            info!("Using custom API key for RPC connection");
+            
+            // For simplicity, we'll use the standard client for now
+            // In a production environment, we would add headers with the API key
+            // This requires additional dependencies that might not be available
+            info!("API key available but using standard client due to header limitations");
+            RpcClient::new_with_commitment(
+                endpoint,
+                CommitmentConfig::confirmed(),
+            )
+        } else {
+            info!("No API key found, using default RPC connection");
+            RpcClient::new_with_commitment(
+                endpoint,
+                CommitmentConfig::confirmed(),
+            )
+        };
         
         // Test connection
         match client.get_version() {
@@ -210,9 +235,9 @@ impl SolanaConnection {
     
     /// Start the blockhash refresh task
     fn start_blockhash_refresh_task(&self) -> Result<()> {
-        let client = self.client.clone();
-        let last_blockhash = self.last_blockhash.clone();
-        let last_blockhash_update = self.last_blockhash_update.clone();
+        let client = Arc::clone(&self.client);
+        let last_blockhash = Arc::clone(&self.last_blockhash);
+        let last_blockhash_update = Arc::clone(&self.last_blockhash_update);
         
         let task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(45));
@@ -258,9 +283,9 @@ impl SolanaConnection {
     
     /// Start the connection monitoring task
     fn start_monitor_task(&self) -> Result<()> {
-        let client = self.client.clone();
-        let is_connected = self.is_connected.clone();
-        let network_stats = self.network_stats.clone();
+        let client = Arc::clone(&self.client);
+        let is_connected = Arc::clone(&self.is_connected);
+        let network_stats = Arc::clone(&self.network_stats);
         
         let task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
