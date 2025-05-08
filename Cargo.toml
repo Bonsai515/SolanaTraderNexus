@@ -1,0 +1,82 @@
+[package]
+name = "solana_quantum_trading"
+version = "0.1.0"
+edition = "2021"
+authors = ["Quantum Trading Team"]
+description = "A quantum-inspired Solana trading system with custom transformers and AI trading agents"
+
+[dependencies]
+# Solana related
+solana-sdk = "1.17.2"
+solana-client = "1.17.2"
+solana-transaction-status = "1.17.2"
+solana-program = "1.17.2"
+
+# Web framework and server
+actix-web = "4.3.1"
+actix-rt = "2.9.0"
+actix-web-actors = "4.2.0"
+actix-files = "0.6.2"
+
+# WebSocket support
+actix-ws = "0.2.5"
+
+# Serialization/Deserialization
+serde = { version = "1.0.183", features = ["derive"] }
+serde_json = "1.0.104"
+
+# Database interaction
+sqlx = { version = "0.7.1", features = ["runtime-tokio-rustls", "postgres", "chrono", "json"] }
+
+# Error handling
+anyhow = "1.0.72"
+thiserror = "1.0.44"
+
+# Async runtime
+tokio = { version = "1.29.1", features = ["full"] }
+futures = "0.3.28"
+async-trait = "0.1.73"
+
+# Logging
+log = "0.4.19"
+env_logger = "0.10.0"
+
+# Configuration
+dotenv = "0.15.0"
+config = "0.13.3"
+
+# Time handling
+chrono = { version = "0.4.26", features = ["serde"] }
+
+# Cryptography
+rand = "0.8.5"
+ring = "0.16.20"
+
+# Web specific
+mime = "0.3.17"
+mime_guess = "2.0.4"
+
+# For reactive frontend with Rust (WebAssembly)
+yew = { version = "0.20.0", features = ["csr"] }
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = "0.4.37"
+web-sys = { version = "0.3.64", features = [
+    "HtmlInputElement", "HtmlSelectElement", "Window", "Document",
+    "Element", "HtmlElement", "Node", "EventTarget", "MouseEvent",
+    "DomRect", "CssStyleDeclaration", "Performance"
+] }
+gloo = "0.8.1"
+
+# HTTP client for WASM
+reqwasm = "0.5.0"
+
+# UUID
+uuid = { version = "1.4.1", features = ["v4", "serde"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
