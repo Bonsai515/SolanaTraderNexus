@@ -1,7 +1,7 @@
 pub mod connection;
-pub mod wallet;
-pub mod transactions;
+pub mod transaction_manager;
+pub mod wallet_manager;
 
-pub use connection::{SolanaConnectionManager, create_solana_connection};
-pub use wallet::WalletManager;
-pub use transactions::TransactionManager;
+pub use connection::SolanaConnection;
+pub use transaction_manager::TransactionManager;
+pub use wallet_manager::WalletManager;
