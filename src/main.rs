@@ -9,6 +9,7 @@ mod solana;
 mod security;
 mod communication;
 mod storage;
+mod dex;
 
 use crate::communication::CommunicationCenter;
 use crate::security::SecurityProtocol;
@@ -16,6 +17,7 @@ use crate::storage::Storage;
 use crate::solana::{SolanaConnection, WalletManager, TransactionManager};
 use crate::engine::TransactionEngine;
 use crate::transformers::{MicroQHCTransformer, MEMECortexTransformer};
+use crate::dex::{DexClient, TradingStrategy};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -78,10 +80,33 @@ async fn main() -> Result<()> {
     security_protocol.register_secure_component("SolanaConnection")?;
     security_protocol.register_secure_component("WalletManager")?;
     
+    // Initialize DEX client
+    info!("Initializing DEX integrations and trading strategies...");
+    let dex_client = Arc::new(DexClient::new(
+        solana_connection.clone(),
+        wallet_manager.clone(),
+    ).await?);
+    
+    // Activate trading strategies
+    dex_client.activate_strategy("SOL/USDC", TradingStrategy::MarketMaking)?;
+    dex_client.activate_strategy("BTC/USDC", TradingStrategy::RangeTrading)?;
+    dex_client.activate_strategy("ETH/USDC", TradingStrategy::MomentumTrading)?;
+    info!("Trading strategies activated successfully");
+    
+    // Display wallet addresses for funding
+    let trading_wallet = wallet_manager.get_or_create_wallet("trading")?;
+    let collateral_wallet = wallet_manager.get_or_create_wallet("collateral")?;
+    
+    info!("========== WALLET ADDRESSES FOR FUNDING ==========");
+    info!("Trading Wallet Address: {}", trading_wallet.pubkey());
+    info!("Collateral Wallet Address: {}", collateral_wallet.pubkey());
+    info!("==================================================");
+    info!("Please fund these wallets to begin trading operations");
+    
     // Tell user the system is ready
     info!("Solana Trading System is fully operational");
     info!("Using specialized transformers: Micro QHC, MEME Cortex, Communication Transformer");
-    info!("System ready to process trading signals and execute transactions");
+    info!("Trading strategies active - system ready to execute transactions");
     
     // Keep the application running
     loop {
