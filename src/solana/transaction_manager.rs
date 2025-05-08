@@ -1,604 +1,604 @@
-// Transaction manager for Solana
+// Transaction manager for the Solana blockchain
 
-use crate::models::{Transaction, TransactionStatus};
-use super::connection::SolanaConnection;
-use super::wallet_manager::WalletManager;
 use anyhow::{Result, anyhow, Context};
 use log::{info, warn, error, debug};
-use std::sync::{Arc, RwLock, Mutex};
-use std::collections::{HashMap, BinaryHeap, VecDeque};
-use std::cmp::{Ordering, Reverse};
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex, RwLock};
+use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
-use thiserror::Error;
-use tokio::task::JoinHandle;
-use tokio::time::sleep;
-use solana_sdk::{
-    signature::{Keypair, Signature},
-    pubkey::Pubkey,
-    transaction::Transaction as SolanaTransaction,
-};
+use chrono::{DateTime, Utc};
 
-/// Maximum concurrent transactions
-const MAX_CONCURRENT_TRANSACTIONS: usize = 5;
+use solana_client::rpc_client::RpcClient;
+use solana_program::instruction::Instruction;
+use solana_program::program_pack::Pack;
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::{Keypair, Signature};
+use solana_sdk::signer::Signer;
+use solana_sdk::system_instruction;
+use solana_sdk::transaction::Transaction;
 
-/// Transaction confirmation timeout (seconds)
-const TRANSACTION_TIMEOUT_SECONDS: u64 = 60;
+use crate::solana::connection::{SolanaConnection, ConnectionConfig};
+use crate::models::transaction::{TransactionData, TransactionStatus, TransactionType};
 
-/// Transaction batch size
-const TRANSACTION_BATCH_SIZE: usize = 10;
-
-/// Transaction error type
-#[derive(Debug, Error)]
-pub enum TransactionError {
-    #[error("Transaction not found: {0}")]
-    TransactionNotFound(String),
+/// Transaction priority
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum TransactionPriority {
+    /// Critical transactions (must execute ASAP)
+    Critical = 0,
     
-    #[error("Invalid transaction state")]
-    InvalidState,
+    /// High priority transactions (execute soon)
+    High = 1,
     
-    #[error("Transaction failed: {0}")]
-    TransactionFailed(String),
+    /// Normal priority transactions
+    Normal = 2,
     
-    #[error("Transaction timed out")]
-    TransactionTimeout,
-    
-    #[error("Failed to sign transaction")]
-    SigningFailed,
-    
-    #[error("Failed to serialize transaction")]
-    SerializationFailed,
-    
-    #[error("Wallet not found")]
-    WalletNotFound,
-    
-    #[error("Invalid wallet")]
-    InvalidWallet,
-    
-    #[error("Insufficient balance")]
-    InsufficientBalance,
+    /// Low priority transactions (can wait)
+    Low = 3,
 }
 
-/// Transaction with priority (for the queue)
-#[derive(Debug, Clone)]
-struct PrioritizedTransaction {
+impl Default for TransactionPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+/// Transaction request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionRequest {
     /// Transaction ID
-    id: String,
+    pub id: String,
     
-    /// Transaction priority
-    priority: u8,
+    /// Transaction type
+    pub transaction_type: TransactionType,
     
-    /// Insertion order (for stable sorting)
-    insertion_order: u64,
+    /// Token pair (e.g. "SOL/USDC")
+    pub pair: String,
+    
+    /// Source wallet address
+    pub wallet_address: String,
+    
+    /// Transaction amount
+    pub amount: f64,
+    
+    /// Price (if applicable)
+    pub price: Option<f64>,
+    
+    /// Priority
+    pub priority: TransactionPriority,
+    
+    /// Created timestamp
+    pub created_at: DateTime<Utc>,
+    
+    /// Additional transaction data
+    pub data: Option<TransactionData>,
+    
+    /// Max retries
+    pub max_retries: u32,
+    
+    /// Current retry count
+    pub retry_count: u32,
+    
+    /// Last retry timestamp
+    pub last_retry: Option<DateTime<Utc>>,
+    
+    /// Transaction result (signature)
+    pub result: Option<String>,
+    
+    /// Transaction status
+    pub status: TransactionStatus,
+    
+    /// Error message (if any)
+    pub error: Option<String>,
 }
 
-impl PartialEq for PrioritizedTransaction {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+impl TransactionRequest {
+    /// Create a new transaction request
+    pub fn new(
+        id: String,
+        transaction_type: TransactionType,
+        pair: String,
+        wallet_address: String,
+        amount: f64,
+        price: Option<f64>,
+        priority: TransactionPriority,
+        data: Option<TransactionData>,
+    ) -> Self {
+        Self {
+            id,
+            transaction_type,
+            pair,
+            wallet_address,
+            amount,
+            price,
+            priority,
+            created_at: Utc::now(),
+            data,
+            max_retries: 3,
+            retry_count: 0,
+            last_retry: None,
+            result: None,
+            status: TransactionStatus::Pending,
+            error: None,
+        }
     }
-}
-
-impl Eq for PrioritizedTransaction {}
-
-impl PartialOrd for PrioritizedTransaction {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for PrioritizedTransaction {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // First by priority (higher first)
-        let priority_cmp = other.priority.cmp(&self.priority);
-        if priority_cmp != Ordering::Equal {
-            return priority_cmp;
+    
+    /// Check if transaction can be retried
+    pub fn can_retry(&self) -> bool {
+        if self.status != TransactionStatus::Failed {
+            return false;
         }
         
-        // Then by insertion order (lower first)
-        self.insertion_order.cmp(&other.insertion_order)
+        self.retry_count < self.max_retries
+    }
+    
+    /// Increment retry count
+    pub fn increment_retry(&mut self) {
+        self.retry_count += 1;
+        self.last_retry = Some(Utc::now());
     }
 }
 
-/// Transaction in progress
-#[derive(Debug)]
-struct TransactionInProgress {
-    /// Transaction ID
-    id: String,
+/// Transaction manager configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionManagerConfig {
+    /// Maximum number of transactions in the queue
+    pub max_queue_size: usize,
     
-    /// Transaction signature
-    signature: String,
+    /// Minimum time between transaction submissions (in milliseconds)
+    pub min_submit_interval_ms: u64,
     
-    /// Start time
-    start_time: Instant,
+    /// Time to wait before retrying a failed transaction (in milliseconds)
+    pub retry_interval_ms: u64,
     
-    /// Timeout
-    timeout: Duration,
+    /// Maximum number of concurrent transactions
+    pub max_concurrent_transactions: usize,
     
-    /// Confirmation attempt count
-    confirmation_attempts: u8,
+    /// Default priority for transactions
+    pub default_priority: TransactionPriority,
+    
+    /// Default maximum number of retries
+    pub default_max_retries: u32,
+    
+    /// Whether to automatically retry failed transactions
+    pub auto_retry: bool,
 }
 
-/// Transaction manager for executing and monitoring blockchain transactions
+impl Default for TransactionManagerConfig {
+    fn default() -> Self {
+        Self {
+            max_queue_size: 1000,
+            min_submit_interval_ms: 200,
+            retry_interval_ms: 5000,
+            max_concurrent_transactions: 5,
+            default_priority: TransactionPriority::Normal,
+            default_max_retries: 3,
+            auto_retry: true,
+        }
+    }
+}
+
+/// Transaction manager for executing Solana transactions
 pub struct TransactionManager {
     /// Solana connection
-    solana_connection: Arc<SolanaConnection>,
+    connection: Arc<SolanaConnection>,
     
-    /// Wallet manager
-    wallet_manager: Arc<WalletManager>,
-    
-    /// Pending transactions
-    pending_transactions: RwLock<HashMap<String, Transaction>>,
-    
-    /// Transaction queue (prioritized)
-    transaction_queue: Mutex<BinaryHeap<PrioritizedTransaction>>,
+    /// Transaction queue (by priority)
+    queue: RwLock<HashMap<TransactionPriority, VecDeque<TransactionRequest>>>,
     
     /// Transactions in progress
-    in_progress: Mutex<HashMap<String, TransactionInProgress>>,
+    in_progress: RwLock<HashMap<String, TransactionRequest>>,
     
     /// Completed transactions
-    completed_transactions: RwLock<VecDeque<Transaction>>,
+    completed: RwLock<HashMap<String, TransactionRequest>>,
     
-    /// Processing thread
-    processing_thread: Mutex<Option<JoinHandle<()>>>,
+    /// Configuration
+    config: TransactionManagerConfig,
     
-    /// Monitoring thread
-    monitoring_thread: Mutex<Option<JoinHandle<()>>>,
+    /// Last submission time
+    last_submit_time: Mutex<Instant>,
     
-    /// Next insertion order
-    next_insertion_order: Mutex<u64>,
+    /// Rate limiter
+    rate_limiter: Arc<RwLock<crate::solana::rate_limiter::RateLimiter>>,
+    
+    /// Wallet manager
+    wallet_manager: Option<Arc<crate::solana::wallet_manager::WalletManager>>,
+    
+    /// Is running
+    running: RwLock<bool>,
 }
 
 impl TransactionManager {
     /// Create a new transaction manager
     pub fn new(
-        solana_connection: Arc<SolanaConnection>,
-        wallet_manager: Arc<WalletManager>,
+        connection: Arc<SolanaConnection>,
+        config: TransactionManagerConfig,
+        rate_limiter: Arc<RwLock<crate::solana::rate_limiter::RateLimiter>>,
+        wallet_manager: Option<Arc<crate::solana::wallet_manager::WalletManager>>,
     ) -> Self {
+        // Initialize queue with all priority levels
+        let mut queue = HashMap::new();
+        queue.insert(TransactionPriority::Critical, VecDeque::new());
+        queue.insert(TransactionPriority::High, VecDeque::new());
+        queue.insert(TransactionPriority::Normal, VecDeque::new());
+        queue.insert(TransactionPriority::Low, VecDeque::new());
+        
         Self {
-            solana_connection,
+            connection,
+            queue: RwLock::new(queue),
+            in_progress: RwLock::new(HashMap::new()),
+            completed: RwLock::new(HashMap::new()),
+            config,
+            last_submit_time: Mutex::new(Instant::now()),
+            rate_limiter,
             wallet_manager,
-            pending_transactions: RwLock::new(HashMap::new()),
-            transaction_queue: Mutex::new(BinaryHeap::new()),
-            in_progress: Mutex::new(HashMap::new()),
-            completed_transactions: RwLock::new(VecDeque::with_capacity(100)),
-            processing_thread: Mutex::new(None),
-            monitoring_thread: Mutex::new(None),
-            next_insertion_order: Mutex::new(0),
+            running: RwLock::new(false),
         }
     }
     
     /// Start the transaction manager
     pub fn start(&self) -> Result<()> {
-        info!("Starting transaction manager");
-        
-        // Start transaction processing thread
-        let tm = Arc::new(self.clone());
-        let processing_handle = tokio::spawn(async move {
-            TransactionManager::transaction_processing_loop(tm.clone()).await;
-        });
-        
-        {
-            let mut thread = self.processing_thread.lock().unwrap();
-            *thread = Some(processing_handle);
+        let mut running = self.running.write().unwrap();
+        if *running {
+            return Ok(());
         }
         
-        // Start transaction monitoring thread
-        let tm = Arc::new(self.clone());
-        let monitoring_handle = tokio::spawn(async move {
-            TransactionManager::transaction_monitoring_loop(tm.clone()).await;
-        });
-        
-        {
-            let mut thread = self.monitoring_thread.lock().unwrap();
-            *thread = Some(monitoring_handle);
-        }
+        *running = true;
         
         info!("Transaction manager started");
         
         Ok(())
     }
     
-    /// Submit a transaction for processing
-    pub fn submit_transaction(&self, tx: Transaction) -> Result<Transaction> {
-        debug!("Submitting transaction: {}", tx.id);
-        
-        // Check transaction status
-        if tx.status != TransactionStatus::Pending {
-            return Err(TransactionError::InvalidState.into());
-        }
-        
-        // Add to pending transactions
-        {
-            let mut pending = self.pending_transactions.write().unwrap();
-            pending.insert(tx.id.clone(), tx.clone());
-        }
-        
-        // Add to transaction queue
-        {
-            let mut queue = self.transaction_queue.lock().unwrap();
-            let mut next_order = self.next_insertion_order.lock().unwrap();
-            
-            queue.push(PrioritizedTransaction {
-                id: tx.id.clone(),
-                priority: tx.priority,
-                insertion_order: *next_order,
-            });
-            
-            *next_order += 1;
-        }
-        
-        debug!("Transaction {} added to queue", tx.id);
-        
-        Ok(tx)
-    }
-    
-    /// Get transaction by ID
-    pub fn get_transaction(&self, id: &str) -> Result<Transaction> {
-        // Check pending transactions
-        {
-            let pending = self.pending_transactions.read().unwrap();
-            if let Some(tx) = pending.get(id) {
-                return Ok(tx.clone());
-            }
-        }
-        
-        // Check completed transactions
-        {
-            let completed = self.completed_transactions.read().unwrap();
-            for tx in completed.iter() {
-                if tx.id == id {
-                    return Ok(tx.clone());
-                }
-            }
-        }
-        
-        Err(TransactionError::TransactionNotFound(id.to_string()).into())
-    }
-    
-    /// Get all transactions
-    pub fn get_transactions(&self) -> Vec<Transaction> {
-        let mut transactions = Vec::new();
-        
-        // Add pending transactions
-        {
-            let pending = self.pending_transactions.read().unwrap();
-            transactions.extend(pending.values().cloned());
-        }
-        
-        // Add completed transactions
-        {
-            let completed = self.completed_transactions.read().unwrap();
-            transactions.extend(completed.iter().cloned());
-        }
-        
-        transactions
-    }
-    
-    /// Cancel a pending transaction
-    pub fn cancel_transaction(&self, id: &str, reason: Option<String>) -> Result<Transaction> {
-        // Check if transaction is pending
-        let mut tx = {
-            let mut pending = self.pending_transactions.write().unwrap();
-            if let Some(tx) = pending.remove(id) {
-                tx
-            } else {
-                return Err(TransactionError::TransactionNotFound(id.to_string()).into());
-            }
-        };
-        
-        // Update transaction status
-        tx.mark_cancelled(reason);
-        
-        // Add to completed transactions
-        {
-            let mut completed = self.completed_transactions.write().unwrap();
-            completed.push_back(tx.clone());
-            
-            // Limit completed transaction history
-            while completed.len() > 100 {
-                completed.pop_front();
-            }
-        }
-        
-        debug!("Transaction {} cancelled", id);
-        
-        Ok(tx)
-    }
-    
-    /// Transaction processing loop
-    async fn transaction_processing_loop(tm: Arc<TransactionManager>) {
-        info!("Starting transaction processing loop");
-        
-        loop {
-            // Process up to MAX_CONCURRENT_TRANSACTIONS transactions at a time
-            let in_progress_count = {
-                let in_progress = tm.in_progress.lock().unwrap();
-                in_progress.len()
-            };
-            
-            let available_slots = MAX_CONCURRENT_TRANSACTIONS.saturating_sub(in_progress_count);
-            
-            if available_slots > 0 {
-                // Get next batch of transactions
-                let batch = tm.get_next_transaction_batch(available_slots);
-                
-                if !batch.is_empty() {
-                    debug!("Processing {} transactions", batch.len());
-                    
-                    for tx_id in batch {
-                        match tm.process_transaction(&tx_id).await {
-                            Ok(signature) => {
-                                debug!("Transaction {} submitted with signature {}", tx_id, signature);
-                                
-                                // Add to in-progress map
-                                let in_progress = TransactionInProgress {
-                                    id: tx_id,
-                                    signature,
-                                    start_time: Instant::now(),
-                                    timeout: Duration::from_secs(TRANSACTION_TIMEOUT_SECONDS),
-                                    confirmation_attempts: 0,
-                                };
-                                
-                                let mut in_progress_map = tm.in_progress.lock().unwrap();
-                                in_progress_map.insert(in_progress.id.clone(), in_progress);
-                            }
-                            Err(e) => {
-                                warn!("Failed to process transaction {}: {}", tx_id, e);
-                                
-                                // Mark transaction as failed
-                                if let Err(e) = tm.mark_transaction_failed(&tx_id, format!("Processing failed: {}", e)) {
-                                    error!("Failed to mark transaction as failed: {}", e);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Sleep briefly before next batch
-            sleep(Duration::from_millis(100)).await;
-        }
-    }
-    
-    /// Transaction monitoring loop
-    async fn transaction_monitoring_loop(tm: Arc<TransactionManager>) {
-        info!("Starting transaction monitoring loop");
-        
-        loop {
-            // Get in-progress transactions
-            let transactions = {
-                let in_progress = tm.in_progress.lock().unwrap();
-                in_progress.values().cloned().collect::<Vec<_>>()
-            };
-            
-            for tx in transactions {
-                // Check if transaction has timed out
-                if tx.start_time.elapsed() > tx.timeout {
-                    warn!("Transaction {} timed out", tx.id);
-                    
-                    // Mark transaction as failed
-                    if let Err(e) = tm.mark_transaction_failed(&tx.id, "Transaction timed out".to_string()) {
-                        error!("Failed to mark transaction as failed: {}", e);
-                    }
-                    
-                    // Remove from in-progress map
-                    let mut in_progress = tm.in_progress.lock().unwrap();
-                    in_progress.remove(&tx.id);
-                    
-                    continue;
-                }
-                
-                // Check transaction status
-                match tm.check_transaction_status(&tx.signature).await {
-                    Ok(status) => {
-                        match status {
-                            TransactionStatus::Confirmed => {
-                                info!("Transaction {} confirmed", tx.id);
-                                
-                                // Mark transaction as confirmed
-                                if let Err(e) = tm.mark_transaction_confirmed(&tx.id, &tx.signature) {
-                                    error!("Failed to mark transaction as confirmed: {}", e);
-                                }
-                                
-                                // Remove from in-progress map
-                                let mut in_progress = tm.in_progress.lock().unwrap();
-                                in_progress.remove(&tx.id);
-                            }
-                            TransactionStatus::Failed => {
-                                warn!("Transaction {} failed", tx.id);
-                                
-                                // Mark transaction as failed
-                                if let Err(e) = tm.mark_transaction_failed(&tx.id, "Transaction failed on chain".to_string()) {
-                                    error!("Failed to mark transaction as failed: {}", e);
-                                }
-                                
-                                // Remove from in-progress map
-                                let mut in_progress = tm.in_progress.lock().unwrap();
-                                in_progress.remove(&tx.id);
-                            }
-                            _ => {
-                                // Still pending, continue monitoring
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!("Error checking transaction status: {}", e);
-                        
-                        // Increment confirmation attempts
-                        let mut in_progress = tm.in_progress.lock().unwrap();
-                        if let Some(tx_in_progress) = in_progress.get_mut(&tx.id) {
-                            tx_in_progress.confirmation_attempts += 1;
-                            
-                            // If too many attempts, mark as failed
-                            if tx_in_progress.confirmation_attempts > 10 {
-                                warn!("Transaction {} failed after {} attempts", tx.id, tx_in_progress.confirmation_attempts);
-                                
-                                // Mark transaction as failed
-                                if let Err(e) = tm.mark_transaction_failed(&tx.id, "Transaction status check failed".to_string()) {
-                                    error!("Failed to mark transaction as failed: {}", e);
-                                }
-                                
-                                // Remove from in-progress map
-                                in_progress.remove(&tx.id);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Sleep before next check
-            sleep(Duration::from_secs(2)).await;
-        }
-    }
-    
-    /// Get next batch of transactions to process
-    fn get_next_transaction_batch(&self, max_count: usize) -> Vec<String> {
-        let mut batch = Vec::with_capacity(max_count.min(TRANSACTION_BATCH_SIZE));
-        
-        let mut queue = self.transaction_queue.lock().unwrap();
-        
-        while batch.len() < max_count && !queue.is_empty() {
-            if let Some(tx) = queue.pop() {
-                batch.push(tx.id);
-            }
-        }
-        
-        batch
-    }
-    
-    /// Process a transaction
-    async fn process_transaction(&self, id: &str) -> Result<String> {
-        // Get transaction
-        let tx = {
-            let pending = self.pending_transactions.read().unwrap();
-            pending.get(id)
-                .cloned()
-                .ok_or_else(|| TransactionError::TransactionNotFound(id.to_string()))?
-        };
-        
-        debug!("Processing transaction {}", id);
-        
-        // Get wallet keypair
-        let keypair = self.wallet_manager.get_wallet_keypair(&tx.wallet_id)
-            .map_err(|_| TransactionError::WalletNotFound)?;
-        
-        // Create and sign Solana transaction
-        // For simplicity, this is a placeholder. In a real implementation,
-        // this would construct the appropriate instruction based on the transaction type
-        
-        // For example, a transfer transaction
-        let serialized_tx = "base64_encoded_transaction";
-        
-        // Submit transaction to Solana
-        let signature = self.solana_connection.send_transaction(serialized_tx).await
-            .map_err(|e| TransactionError::TransactionFailed(e.to_string()))?;
-        
-        Ok(signature)
-    }
-    
-    /// Check transaction status
-    async fn check_transaction_status(&self, signature: &str) -> Result<TransactionStatus> {
-        // Get transaction status from Solana
-        let status = self.solana_connection.get_transaction_status(signature).await
-            .map_err(|e| TransactionError::TransactionFailed(e.to_string()))?;
-        
-        // Parse status
-        let confirmed = status.get("meta")
-            .and_then(|meta| meta.get("err"))
-            .is_none();
-        
-        if confirmed {
-            Ok(TransactionStatus::Confirmed)
-        } else {
-            Ok(TransactionStatus::Failed)
-        }
-    }
-    
-    /// Mark transaction as confirmed
-    fn mark_transaction_confirmed(&self, id: &str, signature: &str) -> Result<()> {
-        // Get transaction
-        let mut tx = {
-            let mut pending = self.pending_transactions.write().unwrap();
-            pending.remove(id)
-                .ok_or_else(|| TransactionError::TransactionNotFound(id.to_string()))?
-        };
-        
-        // Update transaction status
-        tx.mark_confirmed(signature.to_string(), signature.to_string(), 0);
-        
-        // Add to completed transactions
-        let mut completed = self.completed_transactions.write().unwrap();
-        completed.push_back(tx);
-        
-        // Limit completed transaction history
-        while completed.len() > 100 {
-            completed.pop_front();
-        }
-        
-        Ok(())
-    }
-    
-    /// Mark transaction as failed
-    fn mark_transaction_failed(&self, id: &str, error: String) -> Result<()> {
-        // Get transaction
-        let mut tx = {
-            let mut pending = self.pending_transactions.write().unwrap();
-            pending.remove(id)
-                .ok_or_else(|| TransactionError::TransactionNotFound(id.to_string()))?
-        };
-        
-        // Update transaction status
-        tx.mark_failed(error);
-        
-        // Add to completed transactions
-        let mut completed = self.completed_transactions.write().unwrap();
-        completed.push_back(tx);
-        
-        // Limit completed transaction history
-        while completed.len() > 100 {
-            completed.pop_front();
-        }
-        
-        Ok(())
-    }
-    
     /// Stop the transaction manager
     pub fn stop(&self) -> Result<()> {
-        info!("Stopping transaction manager");
-        
-        // Stop processing thread
-        {
-            let mut thread = self.processing_thread.lock().unwrap();
-            if let Some(handle) = thread.take() {
-                handle.abort();
-            }
+        let mut running = self.running.write().unwrap();
+        if !*running {
+            return Ok(());
         }
         
-        // Stop monitoring thread
-        {
-            let mut thread = self.monitoring_thread.lock().unwrap();
-            if let Some(handle) = thread.take() {
-                handle.abort();
-            }
-        }
+        *running = false;
         
         info!("Transaction manager stopped");
         
         Ok(())
     }
-}
-
-impl Clone for TransactionManager {
-    fn clone(&self) -> Self {
-        Self {
-            solana_connection: self.solana_connection.clone(),
-            wallet_manager: self.wallet_manager.clone(),
-            pending_transactions: RwLock::new(self.pending_transactions.read().unwrap().clone()),
-            transaction_queue: Mutex::new(self.transaction_queue.lock().unwrap().clone()),
-            in_progress: Mutex::new(HashMap::new()),
-            completed_transactions: RwLock::new(self.completed_transactions.read().unwrap().clone()),
-            processing_thread: Mutex::new(None),
-            monitoring_thread: Mutex::new(None),
-            next_insertion_order: Mutex::new(*self.next_insertion_order.lock().unwrap()),
+    
+    /// Check if the transaction manager is running
+    pub fn is_running(&self) -> bool {
+        *self.running.read().unwrap()
+    }
+    
+    /// Enqueue a transaction
+    pub fn enqueue(&self, request: TransactionRequest) -> Result<()> {
+        let mut queue = self.queue.write().unwrap();
+        
+        // Check if queue is full
+        let total_queue_size: usize = queue.values().map(|q| q.len()).sum();
+        if total_queue_size >= self.config.max_queue_size {
+            return Err(anyhow!("Transaction queue is full"));
+        }
+        
+        // Add to queue based on priority
+        let priority_queue = queue.get_mut(&request.priority).ok_or_else(|| {
+            anyhow!("Invalid transaction priority: {:?}", request.priority)
+        })?;
+        
+        priority_queue.push_back(request.clone());
+        
+        debug!("Enqueued transaction {} with priority {:?}", request.id, request.priority);
+        
+        Ok(())
+    }
+    
+    /// Dequeue a transaction
+    pub fn dequeue(&self) -> Option<TransactionRequest> {
+        let mut queue = self.queue.write().unwrap();
+        
+        // Try to dequeue in priority order
+        for priority in [
+            TransactionPriority::Critical,
+            TransactionPriority::High,
+            TransactionPriority::Normal,
+            TransactionPriority::Low,
+        ] {
+            if let Some(priority_queue) = queue.get_mut(&priority) {
+                if let Some(request) = priority_queue.pop_front() {
+                    debug!("Dequeued transaction {} with priority {:?}", request.id, priority);
+                    return Some(request);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Get queue size
+    pub fn queue_size(&self) -> usize {
+        let queue = self.queue.read().unwrap();
+        queue.values().map(|q| q.len()).sum()
+    }
+    
+    /// Get queue size by priority
+    pub fn queue_size_by_priority(&self, priority: TransactionPriority) -> usize {
+        let queue = self.queue.read().unwrap();
+        queue.get(&priority).map(|q| q.len()).unwrap_or(0)
+    }
+    
+    /// Get number of transactions in progress
+    pub fn in_progress_count(&self) -> usize {
+        let in_progress = self.in_progress.read().unwrap();
+        in_progress.len()
+    }
+    
+    /// Get a transaction by ID
+    pub fn get_transaction(&self, id: &str) -> Option<TransactionRequest> {
+        // Check in-progress transactions
+        let in_progress = self.in_progress.read().unwrap();
+        if let Some(tx) = in_progress.get(id) {
+            return Some(tx.clone());
+        }
+        
+        // Check completed transactions
+        let completed = self.completed.read().unwrap();
+        if let Some(tx) = completed.get(id) {
+            return Some(tx.clone());
+        }
+        
+        // Check queued transactions
+        let queue = self.queue.read().unwrap();
+        for priority_queue in queue.values() {
+            for tx in priority_queue {
+                if tx.id == id {
+                    return Some(tx.clone());
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Execute the next transaction in the queue
+    pub async fn execute_next(&self) -> Result<Option<String>> {
+        // Check if rate limited
+        {
+            let rate_limiter = self.rate_limiter.read().unwrap();
+            if rate_limiter.is_limited() {
+                let retry_after = rate_limiter.retry_after();
+                debug!("Rate limited, retry after {:?}", retry_after);
+                return Err(anyhow!("Rate limited, retry after {:?}", retry_after));
+            }
+        }
+        
+        // Check if we can submit a transaction
+        {
+            let last_submit_time = self.last_submit_time.lock().unwrap();
+            let elapsed = last_submit_time.elapsed();
+            if elapsed < Duration::from_millis(self.config.min_submit_interval_ms) {
+                let wait_time = Duration::from_millis(self.config.min_submit_interval_ms) - elapsed;
+                debug!("Submitting too quickly, waiting {:?}", wait_time);
+                return Err(anyhow!("Submitting too quickly, waiting {:?}", wait_time));
+            }
+        }
+        
+        // Dequeue a transaction
+        let request = match self.dequeue() {
+            Some(request) => request,
+            None => {
+                debug!("No transactions in queue");
+                return Ok(None);
+            }
+        };
+        
+        // Mark as in-progress
+        {
+            let mut in_progress = self.in_progress.write().unwrap();
+            in_progress.insert(request.id.clone(), request.clone());
+        }
+        
+        // Update last submit time
+        {
+            let mut last_submit_time = self.last_submit_time.lock().unwrap();
+            *last_submit_time = Instant::now();
+        }
+        
+        // Execute the transaction
+        let result = self.execute_transaction(&request).await;
+        
+        // Update transaction status
+        let mut updated_request = request.clone();
+        match result {
+            Ok(signature) => {
+                updated_request.status = TransactionStatus::Confirmed;
+                updated_request.result = Some(signature.clone());
+                
+                // Remove from in-progress and add to completed
+                {
+                    let mut in_progress = self.in_progress.write().unwrap();
+                    in_progress.remove(&request.id);
+                }
+                
+                {
+                    let mut completed = self.completed.write().unwrap();
+                    completed.insert(request.id.clone(), updated_request);
+                }
+                
+                info!("Transaction {} executed successfully: {}", request.id, signature);
+                Ok(Some(signature))
+            }
+            Err(e) => {
+                updated_request.status = TransactionStatus::Failed;
+                updated_request.error = Some(e.to_string());
+                
+                // Increment retry count
+                updated_request.increment_retry();
+                
+                // If we can retry, enqueue again
+                if updated_request.can_retry() && self.config.auto_retry {
+                    debug!(
+                        "Transaction {} failed, retrying ({}/{}): {}", 
+                        request.id, 
+                        updated_request.retry_count, 
+                        updated_request.max_retries,
+                        e
+                    );
+                    
+                    // Remove from in-progress
+                    {
+                        let mut in_progress = self.in_progress.write().unwrap();
+                        in_progress.remove(&request.id);
+                    }
+                    
+                    // Re-enqueue with higher priority
+                    let retry_priority = match updated_request.priority {
+                        TransactionPriority::Low => TransactionPriority::Normal,
+                        TransactionPriority::Normal => TransactionPriority::High,
+                        _ => updated_request.priority,
+                    };
+                    
+                    let mut retry_request = updated_request.clone();
+                    retry_request.priority = retry_priority;
+                    
+                    if let Err(e) = self.enqueue(retry_request) {
+                        error!("Failed to re-enqueue transaction {}: {}", request.id, e);
+                    }
+                } else {
+                    error!("Transaction {} failed: {}", request.id, e);
+                    
+                    // Remove from in-progress and add to completed
+                    {
+                        let mut in_progress = self.in_progress.write().unwrap();
+                        in_progress.remove(&request.id);
+                    }
+                    
+                    {
+                        let mut completed = self.completed.write().unwrap();
+                        completed.insert(request.id.clone(), updated_request);
+                    }
+                }
+                
+                Err(e)
+            }
         }
     }
+    
+    /// Execute a transaction
+    pub async fn execute_transaction(&self, request: &TransactionRequest) -> Result<String> {
+        debug!("Executing transaction {}: {:?}", request.id, request);
+        
+        // Get wallet keypair
+        let keypair = if let Some(wallet_manager) = &self.wallet_manager {
+            wallet_manager.get_wallet_keypair(&request.wallet_address)?
+        } else {
+            return Err(anyhow!("Wallet manager not configured"));
+        };
+        
+        // Get RPC client
+        let rpc_client = self.connection.get_rpc_client()?;
+        
+        // Create transaction based on type
+        match request.transaction_type {
+            TransactionType::Transfer => {
+                self.execute_transfer(request, &keypair, &rpc_client).await
+            }
+            TransactionType::Swap => {
+                self.execute_swap(request, &keypair, &rpc_client).await
+            }
+            _ => {
+                Err(anyhow!("Unsupported transaction type: {:?}", request.transaction_type))
+            }
+        }
+    }
+    
+    /// Execute a transfer transaction
+    pub async fn execute_transfer(
+        &self,
+        request: &TransactionRequest,
+        keypair: &Keypair,
+        rpc_client: &RpcClient,
+    ) -> Result<String> {
+        // Extract recipient from transaction data
+        let recipient_address = match &request.data {
+            Some(TransactionData::Transfer { recipient, .. }) => recipient,
+            _ => return Err(anyhow!("Invalid transaction data for transfer")),
+        };
+        
+        // Parse recipient pubkey
+        let recipient_pubkey = Pubkey::from_str(recipient_address)
+            .map_err(|e| anyhow!("Invalid recipient address: {}", e))?;
+        
+        // Convert amount to lamports
+        let amount_lamports = (request.amount * 1_000_000_000.0) as u64;
+        
+        // Create transfer instruction
+        let instruction = system_instruction::transfer(
+            &keypair.pubkey(),
+            &recipient_pubkey,
+            amount_lamports,
+        );
+        
+        // Create and send transaction
+        let signature = self.send_transaction(rpc_client, keypair, &[instruction]).await?;
+        
+        Ok(signature.to_string())
+    }
+    
+    /// Execute a swap transaction
+    pub async fn execute_swap(
+        &self,
+        request: &TransactionRequest,
+        keypair: &Keypair,
+        rpc_client: &RpcClient,
+    ) -> Result<String> {
+        // Extract swap data from transaction data
+        let (token_in, token_out, min_amount_out) = match &request.data {
+            Some(TransactionData::Swap { token_in, token_out, min_amount_out, .. }) => {
+                (token_in, token_out, min_amount_out)
+            }
+            _ => return Err(anyhow!("Invalid transaction data for swap")),
+        };
+        
+        // This is a placeholder for actual swap logic
+        // In a real implementation, this would involve:
+        // 1. Creating Jupiter swap instructions
+        // 2. Sending the transaction
+        
+        warn!("Swap implementation is a placeholder");
+        
+        Ok("simulated_swap_signature".to_string())
+    }
+    
+    /// Send a transaction with the given instructions
+    pub async fn send_transaction(
+        &self,
+        rpc_client: &RpcClient,
+        keypair: &Keypair,
+        instructions: &[Instruction],
+    ) -> Result<Signature> {
+        // Get recent blockhash
+        let recent_blockhash = rpc_client.get_latest_blockhash()
+            .map_err(|e| anyhow!("Failed to get recent blockhash: {}", e))?;
+        
+        // Create transaction
+        let transaction = Transaction::new_signed_with_payer(
+            instructions,
+            Some(&keypair.pubkey()),
+            &[keypair],
+            recent_blockhash,
+        );
+        
+        // Send transaction
+        let signature = rpc_client.send_and_confirm_transaction(&transaction)
+            .map_err(|e| anyhow!("Failed to send transaction: {}", e))?;
+        
+        // Update rate limiter
+        {
+            let mut rate_limiter = self.rate_limiter.write().unwrap();
+            rate_limiter.increment();
+        }
+        
+        Ok(signature)
+    }
 }
+
+use std::str::FromStr;

@@ -1,466 +1,411 @@
-// Wallet manager for Solana
+// Wallet management for Solana accounts
 
-use crate::models::{Wallet, WalletType};
-use super::connection::SolanaConnection;
 use anyhow::{Result, anyhow, Context};
 use log::{info, warn, error, debug};
-use std::sync::{Arc, RwLock, Mutex};
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
-use std::env;
+use std::path::PathBuf;
 use std::fs;
-use std::path::Path;
-use thiserror::Error;
-use base64::{Engine as _, engine::general_purpose};
-use rand::Rng;
-use crypto::{buffer, aes, blockmodes};
-use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
-use uuid::Uuid;
-use chrono::Utc;
-use solana_sdk::{
-    signature::{Keypair, Signer},
-    pubkey::Pubkey,
-};
-use bs58;
+use std::io::{Read, Write};
 
-/// Wallet encryption key environment variable
-const WALLET_ENCRYPTION_KEY_ENV: &str = "WALLET_ENCRYPTION_KEY";
+use solana_sdk::signature::{Keypair, Signer};
+use solana_sdk::pubkey::Pubkey;
+use ring::aead::{Aad, BoundKey, Nonce, NonceSequence, UnboundKey, CHACHA20_POLY1305};
+use ring::rand::{SecureRandom, SystemRandom};
 
-/// Wallet storage directory
-const WALLET_STORAGE_DIR: &str = ".wallets";
-
-/// Wallet error type
-#[derive(Debug, Error)]
-pub enum WalletError {
-    #[error("Wallet not found: {0}")]
-    WalletNotFound(String),
-    
-    #[error("Wallet already exists: {0}")]
-    WalletAlreadyExists(String),
-    
-    #[error("Failed to generate wallet")]
-    WalletGenerationFailed,
-    
-    #[error("Failed to encrypt wallet")]
-    EncryptionFailed,
-    
-    #[error("Failed to decrypt wallet")]
-    DecryptionFailed,
-    
-    #[error("Failed to save wallet")]
-    SaveFailed(#[source] std::io::Error),
-    
-    #[error("Failed to load wallet")]
-    LoadFailed(#[source] std::io::Error),
-    
-    #[error("Invalid wallet format")]
-    InvalidFormat,
-    
-    #[error("Encryption key not found")]
-    EncryptionKeyNotFound,
+/// Wallet encryption nonce sequence
+struct WalletNonceSequence {
+    nonce: [u8; 12],
 }
 
-/// Wallet manager for creating and managing Solana wallets
+impl WalletNonceSequence {
+    fn new() -> Self {
+        let mut nonce = [0u8; 12];
+        let rng = SystemRandom::new();
+        rng.fill(&mut nonce).expect("Failed to generate nonce");
+        Self { nonce }
+    }
+}
+
+impl NonceSequence for WalletNonceSequence {
+    fn advance(&mut self) -> std::result::Result<Nonce, ring::error::Unspecified> {
+        Ok(Nonce::assume_unique_for_key(self.nonce))
+    }
+}
+
+/// Wallet data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletData {
+    /// Wallet ID
+    pub id: String,
+    
+    /// Wallet name
+    pub name: String,
+    
+    /// Public key
+    pub public_key: String,
+    
+    /// Encrypted private key (base64)
+    pub encrypted_private_key: String,
+    
+    /// Encryption nonce (base64)
+    pub nonce: String,
+    
+    /// Created timestamp
+    pub created_at: String,
+    
+    /// Last updated timestamp
+    pub updated_at: String,
+}
+
+/// Wallet configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletManagerConfig {
+    /// Path to wallet storage directory
+    pub wallet_dir: String,
+    
+    /// Master encryption key (will be loaded from environment)
+    #[serde(skip)]
+    pub master_key: Option<[u8; 32]>,
+    
+    /// Auto-save wallets to disk
+    pub auto_save: bool,
+}
+
+impl Default for WalletManagerConfig {
+    fn default() -> Self {
+        Self {
+            wallet_dir: "data/wallets".to_string(),
+            master_key: None,
+            auto_save: true,
+        }
+    }
+}
+
+/// Wallet manager for storing and retrieving wallet keypairs
 pub struct WalletManager {
-    /// Solana connection
-    solana_connection: Arc<SolanaConnection>,
+    /// Wallet storage
+    wallets: RwLock<HashMap<String, WalletData>>,
     
-    /// Active wallets
-    wallets: RwLock<HashMap<String, Wallet>>,
+    /// Keypair cache
+    keypair_cache: RwLock<HashMap<String, Keypair>>,
     
-    /// Encryption key
-    encryption_key: Mutex<Option<Vec<u8>>>,
+    /// Configuration
+    config: WalletManagerConfig,
     
-    /// Whether persistent storage is enabled
-    persistent_storage: bool,
+    /// Random number generator
+    rng: SystemRandom,
 }
 
 impl WalletManager {
     /// Create a new wallet manager
-    pub fn new(solana_connection: Arc<SolanaConnection>) -> Self {
-        Self {
-            solana_connection,
-            wallets: RwLock::new(HashMap::new()),
-            encryption_key: Mutex::new(None),
-            persistent_storage: true,
+    pub fn new(config: WalletManagerConfig) -> Result<Self> {
+        if config.master_key.is_none() {
+            return Err(anyhow!("Master encryption key not provided"));
         }
-    }
-    
-    /// Initialize the wallet manager
-    pub fn init(&self) -> Result<()> {
-        // Get encryption key from environment
-        let encryption_key = match env::var(WALLET_ENCRYPTION_KEY_ENV) {
-            Ok(key) => {
-                // Use the provided key
-                info!("Using encryption key from environment");
-                key.as_bytes().to_vec()
-            }
-            Err(_) => {
-                // Generate a temporary key
-                warn!("No encryption key provided, generating temporary key");
-                warn!("Wallets will not be persistable across restarts");
-                warn!("Set the {} environment variable for persistent wallets", WALLET_ENCRYPTION_KEY_ENV);
-                
-                let mut key = vec![0u8; 32];
-                rand::thread_rng().fill(&mut key[..]);
-                key
-            }
+        
+        let wallets = RwLock::new(HashMap::new());
+        let keypair_cache = RwLock::new(HashMap::new());
+        let rng = SystemRandom::new();
+        
+        // Create wallet directory if it doesn't exist
+        let wallet_dir = PathBuf::from(&config.wallet_dir);
+        if !wallet_dir.exists() {
+            fs::create_dir_all(&wallet_dir)
+                .context("Failed to create wallet directory")?;
+        }
+        
+        let manager = Self {
+            wallets,
+            keypair_cache,
+            config,
+            rng,
         };
         
-        // Set the encryption key
-        {
-            let mut key = self.encryption_key.lock().unwrap();
-            *key = Some(encryption_key);
-        }
+        // Load wallets from disk
+        manager.load_wallets()?;
         
-        // Create wallet storage directory if needed
-        if self.persistent_storage {
-            if let Err(e) = fs::create_dir_all(WALLET_STORAGE_DIR) {
-                warn!("Failed to create wallet storage directory: {}", e);
-                self.persistent_storage = false;
-            }
-        }
-        
-        // Load existing wallets
-        if self.persistent_storage {
-            match self.load_wallets() {
-                Ok(count) => {
-                    info!("Loaded {} wallets from storage", count);
-                }
-                Err(e) => {
-                    warn!("Failed to load wallets: {}", e);
-                }
-            }
-        }
-        
-        Ok(())
+        Ok(manager)
     }
     
-    /// Get or create a wallet by name
-    pub fn get_or_create_wallet(&self, name: &str) -> Result<Wallet> {
-        // Check if wallet exists
-        {
-            let wallets = self.wallets.read().unwrap();
-            for wallet in wallets.values() {
-                if let Some(wallet_name) = &wallet.name {
-                    if wallet_name == name {
-                        return Ok(wallet.clone());
-                    }
-                }
-            }
-        }
-        
-        // Create new wallet
-        let wallet_type = match name {
-            "trading" => WalletType::Trading,
-            "collateral" => WalletType::Collateral,
-            "profit" => WalletType::Profit,
-            "contract" => WalletType::Contract,
-            _ => WalletType::Temporary,
-        };
-        
-        self.create_wallet(Some(name.to_string()), wallet_type)
-    }
-    
-    /// Create a new wallet
-    pub fn create_wallet(
-        &self,
-        name: Option<String>,
-        wallet_type: WalletType,
-    ) -> Result<Wallet> {
-        // Generate new keypair
-        let keypair = Keypair::new();
-        let pubkey = keypair.pubkey();
-        let address = pubkey.to_string();
-        
-        // Encrypt private key
-        let private_key = keypair.to_bytes().to_vec();
-        let encrypted_private_key = self.encrypt_data(&private_key)
-            .map_err(|_| WalletError::EncryptionFailed)?;
-        
-        // Create wallet
-        let wallet = Wallet::new(
-            name,
-            wallet_type,
-            address.clone(),
-            Some(pubkey.to_bytes().to_vec()),
-            Some(encrypted_private_key),
-        );
-        
-        // Add wallet to active wallets
-        {
-            let mut wallets = self.wallets.write().unwrap();
-            wallets.insert(wallet.id.clone(), wallet.clone());
-        }
-        
-        // Save wallet to storage
-        if self.persistent_storage {
-            self.save_wallet(&wallet)?;
-        }
-        
-        info!("Created new wallet: {} ({})", address, wallet_type);
-        
-        Ok(wallet)
-    }
-    
-    /// Get wallet by ID
-    pub fn get_wallet(&self, id: &str) -> Result<Wallet> {
-        let wallets = self.wallets.read().unwrap();
-        wallets.get(id)
-            .cloned()
-            .ok_or_else(|| WalletError::WalletNotFound(id.to_string()).into())
-    }
-    
-    /// Get wallet by address
-    pub fn get_wallet_by_address(&self, address: &str) -> Result<Wallet> {
-        let wallets = self.wallets.read().unwrap();
-        wallets.values()
-            .find(|w| w.address == address)
-            .cloned()
-            .ok_or_else(|| WalletError::WalletNotFound(address.to_string()).into())
-    }
-    
-    /// Get all wallets
-    pub fn get_wallets(&self) -> Vec<Wallet> {
-        let wallets = self.wallets.read().unwrap();
-        wallets.values().cloned().collect()
-    }
-    
-    /// Update wallet balance
-    pub async fn update_wallet_balance(
-        &self,
-        wallet_id: &str,
-        token: &str,
-        amount: f64,
-    ) -> Result<Wallet> {
-        let mut wallet = self.get_wallet(wallet_id)?;
-        wallet.update_balance(token, amount);
-        
-        // Update wallet in active wallets
-        {
-            let mut wallets = self.wallets.write().unwrap();
-            wallets.insert(wallet.id.clone(), wallet.clone());
-        }
-        
-        // Save wallet to storage
-        if self.persistent_storage {
-            self.save_wallet(&wallet)?;
-        }
-        
-        Ok(wallet)
-    }
-    
-    /// Fetch wallet balances from blockchain
-    pub async fn fetch_wallet_balances(&self, wallet_id: &str) -> Result<Wallet> {
-        let mut wallet = self.get_wallet(wallet_id)?;
-        
-        // Fetch SOL balance
-        let sol_balance = self.solana_connection.get_sol_balance(&wallet.address).await?;
-        wallet.update_balance("SOL", sol_balance);
-        
-        // Fetch token balances
-        // This would require more implementation to get SPL token accounts
-        // and fetch their balances
-        
-        // Update wallet in active wallets
-        {
-            let mut wallets = self.wallets.write().unwrap();
-            wallets.insert(wallet.id.clone(), wallet.clone());
-        }
-        
-        // Save wallet to storage
-        if self.persistent_storage {
-            self.save_wallet(&wallet)?;
-        }
-        
-        Ok(wallet)
-    }
-    
-    /// Save wallet to storage
-    fn save_wallet(&self, wallet: &Wallet) -> Result<()> {
-        if !self.persistent_storage {
+    /// Load wallets from disk
+    pub fn load_wallets(&self) -> Result<()> {
+        let wallet_dir = PathBuf::from(&self.config.wallet_dir);
+        if !wallet_dir.exists() {
             return Ok(());
         }
         
-        let wallet_path = format!("{}/{}.json", WALLET_STORAGE_DIR, wallet.id);
-        let wallet_json = serde_json::to_string_pretty(wallet)
-            .context("Failed to serialize wallet")?;
+        let entries = fs::read_dir(&wallet_dir)
+            .context("Failed to read wallet directory")?;
         
-        fs::write(&wallet_path, wallet_json)
-            .map_err(|e| WalletError::SaveFailed(e))?;
+        let mut wallets = self.wallets.write().unwrap();
         
-        debug!("Saved wallet {} to {}", wallet.id, wallet_path);
-        
-        Ok(())
-    }
-    
-    /// Load wallets from storage
-    fn load_wallets(&self) -> Result<usize> {
-        if !self.persistent_storage {
-            return Ok(0);
-        }
-        
-        let wallet_dir = Path::new(WALLET_STORAGE_DIR);
-        if !wallet_dir.exists() {
-            return Ok(0);
-        }
-        
-        let mut loaded_count = 0;
-        
-        for entry in fs::read_dir(wallet_dir)
-            .map_err(|e| WalletError::LoadFailed(e))?
-        {
-            let entry = entry.map_err(|e| WalletError::LoadFailed(e))?;
+        for entry in entries {
+            let entry = entry.context("Failed to read wallet file")?;
             let path = entry.path();
             
             if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
-                match fs::read_to_string(&path) {
-                    Ok(wallet_json) => {
-                        match serde_json::from_str::<Wallet>(&wallet_json) {
-                            Ok(wallet) => {
-                                let mut wallets = self.wallets.write().unwrap();
-                                wallets.insert(wallet.id.clone(), wallet);
-                                loaded_count += 1;
-                            }
-                            Err(e) => {
-                                warn!("Failed to parse wallet from {}: {}", path.display(), e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Failed to read wallet file {}: {}", path.display(), e);
-                    }
-                }
+                let mut file = fs::File::open(&path)
+                    .context("Failed to open wallet file")?;
+                
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)
+                    .context("Failed to read wallet file")?;
+                
+                let wallet_data: WalletData = serde_json::from_str(&contents)
+                    .context("Failed to parse wallet file")?;
+                
+                wallets.insert(wallet_data.id.clone(), wallet_data);
+                
+                debug!("Loaded wallet {} from {}", wallet_data.id, path.display());
             }
         }
         
-        Ok(loaded_count)
-    }
-    
-    /// Encrypt data with the wallet encryption key
-    fn encrypt_data(&self, data: &[u8]) -> Result<Vec<u8>> {
-        let key = {
-            let key_guard = self.encryption_key.lock().unwrap();
-            key_guard.clone().ok_or(WalletError::EncryptionKeyNotFound)?
-        };
-        
-        // Generate random IV
-        let mut iv = [0u8; 16];
-        rand::thread_rng().fill(&mut iv);
-        
-        // Encrypt data
-        let mut encryptor = aes::cbc_encryptor(
-            aes::KeySize::KeySize256,
-            &key,
-            &iv,
-            blockmodes::PaddingType::PKCS7,
-        );
-        
-        let mut final_result = Vec::new();
-        let mut buffer = [0u8; 4096];
-        let mut read_buffer = buffer::RefReadBuffer::new(data);
-        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
-        
-        loop {
-            let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true)
-                .map_err(|_| WalletError::EncryptionFailed)?;
-            
-            final_result.extend(write_buffer.take_read_buffer().take_remaining());
-            
-            match result {
-                BufferResult::BufferUnderflow => break,
-                BufferResult::BufferOverflow => continue,
-            }
-        }
-        
-        // Prepend IV to the encrypted data
-        let mut output = Vec::with_capacity(iv.len() + final_result.len());
-        output.extend_from_slice(&iv);
-        output.extend_from_slice(&final_result);
-        
-        // Base64 encode the result
-        Ok(general_purpose::STANDARD.encode(output).into_bytes())
-    }
-    
-    /// Decrypt data with the wallet encryption key
-    fn decrypt_data(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
-        let key = {
-            let key_guard = self.encryption_key.lock().unwrap();
-            key_guard.clone().ok_or(WalletError::EncryptionKeyNotFound)?
-        };
-        
-        // Base64 decode
-        let decoded = general_purpose::STANDARD.decode(encrypted_data)
-            .map_err(|_| WalletError::DecryptionFailed)?;
-        
-        if decoded.len() < 16 {
-            return Err(WalletError::DecryptionFailed.into());
-        }
-        
-        // Extract IV and ciphertext
-        let iv = &decoded[0..16];
-        let ciphertext = &decoded[16..];
-        
-        // Decrypt data
-        let mut decryptor = aes::cbc_decryptor(
-            aes::KeySize::KeySize256,
-            &key,
-            iv,
-            blockmodes::PaddingType::PKCS7,
-        );
-        
-        let mut final_result = Vec::new();
-        let mut buffer = [0u8; 4096];
-        let mut read_buffer = buffer::RefReadBuffer::new(ciphertext);
-        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
-        
-        loop {
-            let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true)
-                .map_err(|_| WalletError::DecryptionFailed)?;
-            
-            final_result.extend(write_buffer.take_read_buffer().take_remaining());
-            
-            match result {
-                BufferResult::BufferUnderflow => break,
-                BufferResult::BufferOverflow => continue,
-            }
-        }
-        
-        Ok(final_result)
-    }
-    
-    /// Get keypair for a wallet (decrypts private key)
-    pub fn get_wallet_keypair(&self, wallet_id: &str) -> Result<Keypair> {
-        let wallet = self.get_wallet(wallet_id)?;
-        
-        let encrypted_private_key = wallet.encrypted_private_key
-            .ok_or_else(|| anyhow!("Wallet has no private key"))?;
-        
-        let private_key = self.decrypt_data(&encrypted_private_key)
-            .map_err(|_| WalletError::DecryptionFailed)?;
-        
-        if private_key.len() != 64 {
-            return Err(WalletError::InvalidFormat.into());
-        }
-        
-        let mut keypair_bytes = [0u8; 64];
-        keypair_bytes.copy_from_slice(&private_key);
-        
-        Keypair::from_bytes(&keypair_bytes)
-            .map_err(|_| WalletError::InvalidFormat.into())
-    }
-    
-    /// Stop the wallet manager
-    pub fn stop(&self) -> Result<()> {
-        // Save all wallets
-        if self.persistent_storage {
-            let wallets = self.wallets.read().unwrap();
-            for wallet in wallets.values() {
-                if let Err(e) = self.save_wallet(wallet) {
-                    warn!("Failed to save wallet {}: {}", wallet.id, e);
-                }
-            }
-        }
+        info!("Loaded {} wallets from {}", wallets.len(), wallet_dir.display());
         
         Ok(())
     }
+    
+    /// Save wallets to disk
+    pub fn save_wallets(&self) -> Result<()> {
+        let wallet_dir = PathBuf::from(&self.config.wallet_dir);
+        if !wallet_dir.exists() {
+            fs::create_dir_all(&wallet_dir)
+                .context("Failed to create wallet directory")?;
+        }
+        
+        let wallets = self.wallets.read().unwrap();
+        
+        for (_, wallet_data) in wallets.iter() {
+            let path = wallet_dir.join(format!("{}.json", wallet_data.id));
+            
+            let contents = serde_json::to_string_pretty(wallet_data)
+                .context("Failed to serialize wallet data")?;
+            
+            let mut file = fs::File::create(&path)
+                .context("Failed to create wallet file")?;
+            
+            file.write_all(contents.as_bytes())
+                .context("Failed to write wallet file")?;
+            
+            debug!("Saved wallet {} to {}", wallet_data.id, path.display());
+        }
+        
+        info!("Saved {} wallets to {}", wallets.len(), wallet_dir.display());
+        
+        Ok(())
+    }
+    
+    /// Create a new wallet
+    pub fn create_wallet(&self, id: &str, name: &str) -> Result<WalletData> {
+        // Generate a new keypair
+        let keypair = Keypair::new();
+        
+        // Encrypt private key
+        let encrypted_private_key = self.encrypt_private_key(&keypair)?;
+        let nonce_base64 = encrypted_private_key.1;
+        let encrypted_private_key_base64 = encrypted_private_key.0;
+        
+        // Create wallet data
+        let wallet_data = WalletData {
+            id: id.to_string(),
+            name: name.to_string(),
+            public_key: keypair.pubkey().to_string(),
+            encrypted_private_key: encrypted_private_key_base64,
+            nonce: nonce_base64,
+            created_at: chrono::Utc::now().to_rfc3339(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        };
+        
+        // Store wallet
+        {
+            let mut wallets = self.wallets.write().unwrap();
+            wallets.insert(id.to_string(), wallet_data.clone());
+        }
+        
+        // Cache keypair
+        {
+            let mut keypair_cache = self.keypair_cache.write().unwrap();
+            keypair_cache.insert(id.to_string(), keypair);
+        }
+        
+        // Save to disk if auto-save is enabled
+        if self.config.auto_save {
+            self.save_wallets()?;
+        }
+        
+        info!("Created new wallet {} with public key {}", id, wallet_data.public_key);
+        
+        Ok(wallet_data)
+    }
+    
+    /// Get wallet data
+    pub fn get_wallet(&self, id: &str) -> Result<WalletData> {
+        let wallets = self.wallets.read().unwrap();
+        
+        wallets.get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Wallet not found: {}", id))
+    }
+    
+    /// Get all wallets
+    pub fn get_wallets(&self) -> Result<Vec<WalletData>> {
+        let wallets = self.wallets.read().unwrap();
+        
+        Ok(wallets.values().cloned().collect())
+    }
+    
+    /// Get wallet keypair
+    pub fn get_wallet_keypair(&self, id: &str) -> Result<Keypair> {
+        // Check cache first
+        {
+            let keypair_cache = self.keypair_cache.read().unwrap();
+            if let Some(keypair) = keypair_cache.get(id) {
+                return Ok(keypair.clone());
+            }
+        }
+        
+        // Load wallet data
+        let wallet_data = self.get_wallet(id)?;
+        
+        // Decrypt private key
+        let keypair = self.decrypt_private_key(
+            &wallet_data.encrypted_private_key,
+            &wallet_data.nonce,
+        )?;
+        
+        // Cache keypair
+        {
+            let mut keypair_cache = self.keypair_cache.write().unwrap();
+            keypair_cache.insert(id.to_string(), keypair.clone());
+        }
+        
+        Ok(keypair)
+    }
+    
+    /// Get wallet public key
+    pub fn get_wallet_pubkey(&self, id: &str) -> Result<Pubkey> {
+        let wallet_data = self.get_wallet(id)?;
+        
+        let pubkey = Pubkey::from_str(&wallet_data.public_key)
+            .map_err(|e| anyhow!("Invalid public key: {}", e))?;
+        
+        Ok(pubkey)
+    }
+    
+    /// Delete wallet
+    pub fn delete_wallet(&self, id: &str) -> Result<()> {
+        // Remove from storage
+        {
+            let mut wallets = self.wallets.write().unwrap();
+            if !wallets.contains_key(id) {
+                return Err(anyhow!("Wallet not found: {}", id));
+            }
+            
+            wallets.remove(id);
+        }
+        
+        // Remove from cache
+        {
+            let mut keypair_cache = self.keypair_cache.write().unwrap();
+            keypair_cache.remove(id);
+        }
+        
+        // Delete file
+        let wallet_dir = PathBuf::from(&self.config.wallet_dir);
+        let path = wallet_dir.join(format!("{}.json", id));
+        
+        if path.exists() {
+            fs::remove_file(&path)
+                .context("Failed to delete wallet file")?;
+            
+            debug!("Deleted wallet file: {}", path.display());
+        }
+        
+        info!("Deleted wallet: {}", id);
+        
+        Ok(())
+    }
+    
+    /// Encrypt private key
+    fn encrypt_private_key(&self, keypair: &Keypair) -> Result<(String, String)> {
+        let master_key = self.config.master_key
+            .ok_or_else(|| anyhow!("Master encryption key not available"))?;
+        
+        // Extract private key bytes (first 32 bytes of keypair)
+        let private_key_bytes = keypair.to_bytes()[..32].to_vec();
+        
+        // Create encryption key
+        let key = UnboundKey::new(&CHACHA20_POLY1305, &master_key)
+            .map_err(|_| anyhow!("Failed to create encryption key"))?;
+        
+        // Create nonce sequence
+        let mut nonce_seq = WalletNonceSequence::new();
+        let nonce_bytes = nonce_seq.nonce.clone();
+        
+        // Create sealing key
+        let mut sealing_key = BoundKey::new(key, nonce_seq);
+        
+        // Encrypt private key
+        let mut encrypted = private_key_bytes.clone();
+        sealing_key.seal_in_place_append_tag(Aad::empty(), &mut encrypted)
+            .map_err(|_| anyhow!("Failed to encrypt private key"))?;
+        
+        // Encode as base64
+        let encrypted_base64 = base64::encode(&encrypted);
+        let nonce_base64 = base64::encode(&nonce_bytes);
+        
+        Ok((encrypted_base64, nonce_base64))
+    }
+    
+    /// Decrypt private key
+    fn decrypt_private_key(&self, encrypted_base64: &str, nonce_base64: &str) -> Result<Keypair> {
+        let master_key = self.config.master_key
+            .ok_or_else(|| anyhow!("Master encryption key not available"))?;
+        
+        // Decode from base64
+        let mut encrypted = base64::decode(encrypted_base64)
+            .context("Failed to decode encrypted private key")?;
+        
+        let nonce_bytes = base64::decode(nonce_base64)
+            .context("Failed to decode nonce")?;
+        
+        if nonce_bytes.len() != 12 {
+            return Err(anyhow!("Invalid nonce length: {}", nonce_bytes.len()));
+        }
+        
+        let mut nonce = [0u8; 12];
+        nonce.copy_from_slice(&nonce_bytes);
+        
+        // Create opening key
+        let key = UnboundKey::new(&CHACHA20_POLY1305, &master_key)
+            .map_err(|_| anyhow!("Failed to create decryption key"))?;
+        
+        struct StaticNonce(Nonce);
+        impl NonceSequence for StaticNonce {
+            fn advance(&mut self) -> std::result::Result<Nonce, ring::error::Unspecified> {
+                Ok(self.0)
+            }
+        }
+        
+        let nonce = Nonce::assume_unique_for_key(nonce);
+        let mut opening_key = BoundKey::new(key, StaticNonce(nonce));
+        
+        // Decrypt private key
+        let private_key = opening_key.open_in_place(Aad::empty(), &mut encrypted)
+            .map_err(|_| anyhow!("Failed to decrypt private key"))?;
+        
+        // Create keypair from private key
+        let mut keypair_bytes = [0u8; 64];
+        keypair_bytes[..32].copy_from_slice(private_key);
+        
+        // Derive public key from private key
+        let keypair = Keypair::from_bytes(&keypair_bytes)
+            .map_err(|e| anyhow!("Failed to create keypair from private key: {}", e))?;
+        
+        Ok(keypair)
+    }
 }
+
+use std::str::FromStr;
