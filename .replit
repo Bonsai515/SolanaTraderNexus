@@ -23,7 +23,7 @@ externalPort = 5000
 localPort = 5904
 
 [workflows]
-runButton = "Project"
+runButton = "Run Rust App"
 
 [[workflows.workflow]]
 name = "Project"
@@ -42,3 +42,12 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Run Rust App"
+author = 39917403
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cargo run"

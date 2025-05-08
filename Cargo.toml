@@ -6,11 +6,13 @@ authors = ["Quantum Trading Team"]
 description = "A quantum-inspired Solana trading system with custom transformers and AI trading agents"
 
 [dependencies]
-# Solana related
-solana-sdk = "1.17.2"
-solana-client = "1.17.2"
-solana-transaction-status = "1.17.2"
-solana-program = "1.17.2"
+# Solana related - use older version for compatibility
+solana-sdk = "1.14.17"
+solana-client = "1.14.17"
+solana-transaction-status = "1.14.17"
+solana-program = "1.14.17"
+# Additional decoders for Solana
+bs58 = "0.4.0"
 
 # Web framework and server
 actix-web = "4.3.1"
@@ -25,8 +27,8 @@ actix-ws = "0.2.5"
 serde = { version = "1.0.183", features = ["derive"] }
 serde_json = "1.0.104"
 
-# Database interaction
-sqlx = { version = "0.7.1", features = ["runtime-tokio-rustls", "postgres", "chrono", "json"] }
+# Database interaction - use an older version to avoid conflicts
+sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "chrono", "json"] }
 
 # Error handling
 anyhow = "1.0.72"
