@@ -5,10 +5,13 @@ mod agents;
 mod storage;
 mod api;
 mod utils;
+mod security;
+mod communication;
+mod engine;
 
 use actix_web::{web, App, HttpServer, middleware};
 use actix_files as fs;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use log::{info, error};
 use dotenv::dotenv;
 use std::env;
@@ -17,6 +20,9 @@ use crate::solana::{create_solana_connection, WalletManager, TransactionManager}
 use crate::storage::Storage;
 use crate::transformers::{MarketDataTransformer, TradingSignalTransformer};
 use crate::agents::{TradingAgent, StrategyManager};
+use crate::security::{SecurityProtocol, quantum_encryption::QuantumEncryption};
+use crate::communication::{CommunicationCenter, WebSocketManager};
+use crate::engine::TransactionEngine;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -61,6 +67,35 @@ async fn main() -> std::io::Result<()> {
     let market_data_transformer = Arc::new(MarketDataTransformer::new());
     let trading_signal_transformer = Arc::new(TradingSignalTransformer::new());
     
+    // Initialize security system
+    let security_protocol = Arc::new(SecurityProtocol::new());
+    info!("Security Protocol initialized");
+    
+    // Initialize quantum encryption
+    let quantum_encryption = Arc::new(Mutex::new(QuantumEncryption::new()));
+    info!("Quantum Encryption system initialized");
+    
+    // Initialize communication center
+    let communication_center = Arc::new(CommunicationCenter::new(security_protocol.clone()));
+    info!("Communication Center initialized");
+    
+    // Initialize WebSocket manager
+    let websocket_manager = Arc::new(WebSocketManager::new(
+        communication_center.clone(),
+        security_protocol.clone(),
+    ));
+    info!("WebSocket Manager initialized");
+    
+    // Initialize Transaction Engine (core component)
+    let transaction_engine = Arc::new(TransactionEngine::new(
+        storage.clone(),
+        wallet_manager.clone(),
+        transaction_manager.clone(),
+        security_protocol.clone(),
+        communication_center.clone(),
+    ));
+    info!("Transaction Engine initialized");
+    
     // Initialize strategy manager
     let strategy_manager = Arc::new(StrategyManager::new(storage.clone()));
     
@@ -73,10 +108,16 @@ async fn main() -> std::io::Result<()> {
         transaction_manager.clone(),
     ));
     
+    // Start the Transaction Engine
+    match transaction_engine.start() {
+        Ok(_) => info!("Transaction Engine started - Core system online"),
+        Err(e) => error!("Failed to start Transaction Engine: {:?}", e),
+    }
+    
     // Start the trading agent
     match trading_agent.start() {
-        Ok(_) => info!("Trading agent started"),
-        Err(e) => error!("Failed to start trading agent: {:?}", e),
+        Ok(_) => info!("Trading Agent started"),
+        Err(e) => error!("Failed to start Trading Agent: {:?}", e),
     }
     
     // Start HTTP server
@@ -88,12 +129,30 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             
             // Register application state
+            // Core components
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(solana_connection.clone()))
+            
+            // Solana integration layer
             .app_data(web::Data::new(wallet_manager.clone()))
             .app_data(web::Data::new(transaction_manager.clone()))
+            
+            // Transformer layer
             .app_data(web::Data::new(market_data_transformer.clone()))
             .app_data(web::Data::new(trading_signal_transformer.clone()))
+            
+            // Security layer
+            .app_data(web::Data::new(security_protocol.clone()))
+            .app_data(web::Data::new(quantum_encryption.clone()))
+            
+            // Communication layer
+            .app_data(web::Data::new(communication_center.clone()))
+            .app_data(web::Data::new(websocket_manager.clone()))
+            
+            // Engine layer (innermost)
+            .app_data(web::Data::new(transaction_engine.clone()))
+            
+            // Agent layer
             .app_data(web::Data::new(strategy_manager.clone()))
             .app_data(web::Data::new(trading_agent.clone()))
             

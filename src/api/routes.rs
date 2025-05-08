@@ -1,9 +1,13 @@
-use actix_web::{web, Responder, HttpResponse, Error, get, post, put, delete};
+use actix_web::{web, Responder, HttpResponse, Error, HttpRequest, get, post, put, delete};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::Utc;
 use std::sync::Arc;
 use log::{info, error};
+
+use crate::communication::WebSocketManager;
+use crate::security::SecurityProtocol;
+use crate::engine::TransactionEngine;
 
 use crate::models::{RiskLevel, StrategyType, SystemComponent, ComponentStatus};
 use crate::storage::Storage;
@@ -476,6 +480,62 @@ async fn stop_agent(
     Ok(HttpResponse::Ok().json(status))
 }
 
+/// WebSocket handler for real-time updates
+#[get("/ws")]
+async fn websocket_handler(
+    req: HttpRequest,
+    stream: web::Payload,
+    websocket_manager: web::Data<Arc<WebSocketManager>>,
+) -> Result<HttpResponse, Error> {
+    websocket_manager.handle_connection(req, stream).await
+}
+
+/// Handler for requesting access to protected areas
+#[post("/api/security/protected-area")]
+async fn request_protected_area_access(
+    security_protocol: web::Data<Arc<SecurityProtocol>>,
+    req: web::Json<ProtectedAreaRequest>,
+) -> Result<impl Responder, Error> {
+    match security_protocol.check_protected_area_access(&req.area_name, &req.component_name) {
+        Ok(has_access) => {
+            if has_access {
+                Ok(HttpResponse::Ok().json(serde_json::json!({
+                    "status": "granted",
+                    "area": req.area_name,
+                    "component": req.component_name
+                })))
+            } else {
+                Ok(HttpResponse::Forbidden().json(serde_json::json!({
+                    "status": "denied",
+                    "area": req.area_name,
+                    "component": req.component_name,
+                    "reason": "Unauthorized access attempt"
+                })))
+            }
+        },
+        Err(e) => {
+            error!("Error checking protected area access: {}", e);
+            Err(actix_web::error::ErrorInternalServerError("Error checking protected area access"))
+        }
+    }
+}
+
+/// Request for protected area access
+#[derive(Deserialize)]
+struct ProtectedAreaRequest {
+    area_name: String,
+    component_name: String,
+}
+
+/// Handler for engine performance metrics
+#[get("/api/engine/metrics")]
+async fn get_engine_metrics(
+    transaction_engine: web::Data<Arc<TransactionEngine>>,
+) -> Result<impl Responder, Error> {
+    let metrics = transaction_engine.get_performance_metrics();
+    Ok(HttpResponse::Ok().json(metrics))
+}
+
 /// Configure API routes
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_system_status)
@@ -491,5 +551,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         .service(get_wallet_transactions)
         .service(update_agent_settings)
         .service(start_agent)
-        .service(stop_agent);
+        .service(stop_agent)
+        .service(websocket_handler)
+        .service(request_protected_area_access)
+        .service(get_engine_metrics);
 }
