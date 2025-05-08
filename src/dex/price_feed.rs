@@ -1,409 +1,417 @@
-use crate::dex::rate_limiter::RateLimiter;
-use crate::models::{TokenPrice, MarketData};
-use crate::solana::SolanaConnection;
-use anyhow::{Result, Context};
-use log::{info, warn, debug, error};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tokio::time::interval;
-use chrono::Utc;
-use solana_sdk::pubkey::Pubkey;
+// Price feed aggregator for multiple DEXes
 
-/// Supported price feed sources
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum PriceSource {
-    Jupiter,
-    Goat,
-    Raydium,
-    Orca,
-    Openbook,
-    Pyth,
+use super::{TokenPair, PriceData, DexSource};
+use crate::models::TradingSignal;
+use anyhow::{Result, anyhow};
+use log::{info, warn, error, debug};
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, RwLock, Mutex};
+use chrono::{DateTime, Utc, Duration};
+use tokio::task::JoinHandle;
+use serde::{Serialize, Deserialize};
+
+/// Price history entry
+#[derive(Debug, Clone)]
+struct PriceHistoryEntry {
+    /// Price data
+    price: PriceData,
+    
+    /// Timestamp
+    timestamp: DateTime<Utc>,
+}
+
+/// Price metrics for a token pair
+#[derive(Debug, Clone)]
+struct PriceMetrics {
+    /// Current price (weighted average across DEXes)
+    current_price: f64,
+    
+    /// 24h high price
+    high_24h: f64,
+    
+    /// 24h low price
+    low_24h: f64,
+    
+    /// 24h volume across all DEXes
+    volume_24h: f64,
+    
+    /// Price change percentage (24h)
+    change_24h_pct: f64,
+    
+    /// Last update timestamp
+    updated_at: DateTime<Utc>,
 }
 
 /// Price feed configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceFeedConfig {
-    /// Update interval in seconds
-    pub update_interval_secs: u64,
+    /// Max history length per pair/source
+    pub max_history_length: usize,
     
-    /// Token list to track
-    pub tokens: Vec<String>,
+    /// Default update interval (seconds)
+    pub update_interval_seconds: u64,
     
-    /// Price sources in order of preference
-    pub price_sources: Vec<PriceSource>,
+    /// Trading pairs to monitor
+    pub pairs: Vec<String>,
     
-    /// Cache duration in seconds
-    pub cache_duration_secs: u64,
+    /// DEX sources to use
+    pub sources: Vec<DexSource>,
 }
 
 impl Default for PriceFeedConfig {
     fn default() -> Self {
         Self {
-            update_interval_secs: 10,
-            tokens: vec![
-                "SOL".to_string(),
-                "USDC".to_string(),
-                "BTC".to_string(),
-                "ETH".to_string(),
-                "RAY".to_string(),
-                "ORCA".to_string(),
-                "BONK".to_string(),
-                "JUP".to_string(),
+            max_history_length: 1000,
+            update_interval_seconds: 60,
+            pairs: vec![
+                "SOL/USDC".to_string(),
+                "BTC/USDC".to_string(),
+                "ETH/USDC".to_string(),
             ],
-            price_sources: vec![
-                PriceSource::Jupiter,
-                PriceSource::Goat,
-                PriceSource::Pyth,
+            sources: vec![
+                DexSource::Jupiter,
+                DexSource::Raydium,
+                DexSource::Openbook,
             ],
-            cache_duration_secs: 60,
         }
     }
 }
 
-/// Price Feed Service
+/// Price feed for aggregating prices from multiple DEXes
 pub struct PriceFeed {
-    /// Current prices
-    prices: RwLock<HashMap<String, TokenPrice>>,
+    /// Price history for each pair and source
+    price_history: RwLock<HashMap<String, HashMap<DexSource, VecDeque<PriceHistoryEntry>>>>,
     
-    /// Price feed configuration
-    config: RwLock<PriceFeedConfig>,
-    
-    /// Last update time
-    last_update: RwLock<Instant>,
-    
-    /// Rate limiter
-    rate_limiter: Arc<RateLimiter>,
-    
-    /// Solana connection
-    solana_connection: Arc<SolanaConnection>,
-    
-    /// Is the price feed running
-    is_running: RwLock<bool>,
+    /// Aggregated price metrics for each pair
+    price_metrics: RwLock<HashMap<String, PriceMetrics>>,
     
     /// Update task
-    update_task: RwLock<Option<tokio::task::JoinHandle<()>>>,
+    update_task: Mutex<Option<JoinHandle<()>>>,
+    
+    /// Configuration
+    config: PriceFeedConfig,
 }
 
 impl PriceFeed {
     /// Create a new price feed
-    pub fn new(
-        config: PriceFeedConfig,
-        rate_limiter: Arc<RateLimiter>,
-        solana_connection: Arc<SolanaConnection>,
-    ) -> Self {
-        info!("Initializing price feed with {} tokens", config.tokens.len());
-        
+    pub fn new(config: PriceFeedConfig) -> Self {
         Self {
-            prices: RwLock::new(HashMap::new()),
-            config: RwLock::new(config),
-            last_update: RwLock::new(Instant::now()),
-            rate_limiter,
-            solana_connection,
-            is_running: RwLock::new(false),
-            update_task: RwLock::new(None),
+            price_history: RwLock::new(HashMap::new()),
+            price_metrics: RwLock::new(HashMap::new()),
+            update_task: Mutex::new(None),
+            config,
         }
     }
     
-    /// Start the price feed
-    pub fn start(&self) -> Result<()> {
-        let mut is_running = self.is_running.write().unwrap();
-        if *is_running {
-            info!("Price feed is already running");
-            return Ok(());
-        }
+    /// Start price feed updates
+    pub fn start(&self) {
+        let price_feed = Arc::new(self.clone());
         
-        *is_running = true;
-        
-        // Create a clone of required components for the task
-        let rate_limiter = Arc::clone(&self.rate_limiter);
-        let solana_connection = Arc::clone(&self.solana_connection);
-        let prices = Arc::new(self.prices.clone());
-        let config = self.config.read().unwrap().clone();
-        let update_interval = Duration::from_secs(config.update_interval_secs);
-        
-        // Create update task
-        let task = tokio::spawn(async move {
-            let mut update_interval = interval(update_interval);
+        let handle = tokio::spawn(async move {
+            info!("Starting price feed updates");
+            
+            let mut interval = tokio::time::interval(
+                std::time::Duration::from_secs(price_feed.config.update_interval_seconds)
+            );
             
             loop {
-                update_interval.tick().await;
+                interval.tick().await;
                 
-                if let Err(e) = Self::update_prices(
-                    Arc::clone(&prices),
-                    &config,
-                    Arc::clone(&rate_limiter),
-                    Arc::clone(&solana_connection)
-                ).await {
-                    error!("Failed to update prices: {}", e);
+                // Update prices for all pairs
+                for pair_str in &price_feed.config.pairs {
+                    if let Ok(pair) = TokenPair::from_string(pair_str) {
+                        if let Err(e) = price_feed.update_prices(&pair).await {
+                            warn!("Failed to update prices for {}: {}", pair_str, e);
+                        }
+                    } else {
+                        warn!("Invalid pair format: {}", pair_str);
+                    }
                 }
             }
         });
         
-        let mut update_task = self.update_task.write().unwrap();
-        *update_task = Some(task);
+        let mut update_task = self.update_task.lock().unwrap();
+        *update_task = Some(handle);
         
-        info!("Price feed started successfully");
-        Ok(())
+        debug!("Price feed updates started");
     }
     
-    /// Stop the price feed
-    pub fn stop(&self) -> Result<()> {
-        let mut is_running = self.is_running.write().unwrap();
-        if !*is_running {
-            info!("Price feed is not running");
-            return Ok(());
-        }
+    /// Update prices for a pair
+    async fn update_prices(&self, pair: &TokenPair) -> Result<()> {
+        debug!("Updating prices for {}", pair.to_string());
         
-        *is_running = false;
+        let mut new_prices = HashMap::new();
+        let pair_str = pair.to_string();
         
-        let mut update_task = self.update_task.write().unwrap();
-        if let Some(task) = update_task.take() {
-            task.abort();
-            info!("Price feed stopped");
-        }
-        
-        Ok(())
-    }
-    
-    /// Get the latest market data
-    pub fn get_market_data(&self) -> Result<MarketData> {
-        let prices = self.prices.read().unwrap();
-        let config = self.config.read().unwrap();
-        
-        // Check if we need to update
-        let last_update = self.last_update.read().unwrap();
-        let elapsed = last_update.elapsed();
-        
-        if elapsed > Duration::from_secs(config.cache_duration_secs) {
-            warn!("Using stale price data ({}s old)", elapsed.as_secs());
-        }
-        
-        // Convert to vector of token prices
-        let tokens: Vec<TokenPrice> = prices.values().cloned().collect();
-        
-        Ok(MarketData {
-            tokens,
-            timestamp: Utc::now(),
-        })
-    }
-    
-    /// Update token prices
-    async fn update_prices(
-        prices: Arc<RwLock<HashMap<String, TokenPrice>>>,
-        config: &PriceFeedConfig,
-        rate_limiter: Arc<RateLimiter>,
-        solana_connection: Arc<SolanaConnection>,
-    ) -> Result<()> {
-        debug!("Updating token prices");
-        
-        // Check rate limiter
-        rate_limiter.check_price_query().await?;
-        
-        let mut updated_prices = HashMap::new();
-        
-        // Iterate through each token
-        for token_symbol in &config.tokens {
-            // Try each price source in order of preference
-            for &source in &config.price_sources {
-                match Self::fetch_token_price(token_symbol, source, &rate_limiter, &solana_connection).await {
-                    Ok(price) => {
-                        updated_prices.insert(token_symbol.clone(), price);
-                        break;
-                    },
-                    Err(e) => {
-                        warn!("Failed to get price for {} from {:?}: {}", token_symbol, source, e);
-                        continue;
-                    }
+        // Fetch prices from all configured sources
+        for source in &self.config.sources {
+            let price_result = match source {
+                DexSource::Jupiter => super::jupiter::fetch_price(pair).await,
+                DexSource::Raydium => super::raydium::fetch_price(pair).await,
+                DexSource::Openbook => super::openbook::fetch_price(pair).await,
+            };
+            
+            match price_result {
+                Ok(price) => {
+                    debug!("Got {} price for {}: {}", 
+                           format!("{:?}", source).to_lowercase(), 
+                           pair_str, price.price);
+                    new_prices.insert(*source, price);
+                }
+                Err(e) => {
+                    warn!("Failed to fetch {} price for {}: {}", 
+                          format!("{:?}", source).to_lowercase(), 
+                          pair_str, e);
                 }
             }
         }
         
-        // Update prices
-        let mut price_lock = prices.write().unwrap();
-        *price_lock = updated_prices;
+        if new_prices.is_empty() {
+            return Err(anyhow!("Failed to fetch prices from any source"));
+        }
         
-        debug!("Updated prices for {} tokens", price_lock.len());
+        // Add prices to history and update metrics
+        self.add_prices_to_history(pair, new_prices);
+        
         Ok(())
     }
     
-    /// Fetch token price from a specific source
-    async fn fetch_token_price(
-        token_symbol: &str,
-        source: PriceSource,
-        rate_limiter: &RateLimiter,
-        solana_connection: &SolanaConnection,
-    ) -> Result<TokenPrice> {
-        // Check rate limiter
-        rate_limiter.check_dex_query().await?;
+    /// Add prices to history
+    fn add_prices_to_history(&self, pair: &TokenPair, prices: HashMap<DexSource, PriceData>) {
+        let pair_str = pair.to_string();
+        let now = Utc::now();
         
-        match source {
-            PriceSource::Jupiter => Self::fetch_jupiter_price(token_symbol, solana_connection).await,
-            PriceSource::Goat => Self::fetch_goat_price(token_symbol, solana_connection).await,
-            PriceSource::Pyth => Self::fetch_pyth_price(token_symbol, solana_connection).await,
-            _ => Err(anyhow::anyhow!("Price source {:?} not implemented yet", source)),
+        // Update price history
+        let mut price_history = self.price_history.write().unwrap();
+        
+        // Get or create history for this pair
+        let pair_history = price_history
+            .entry(pair_str.clone())
+            .or_insert_with(HashMap::new);
+        
+        // Add new prices to history
+        for (source, price) in prices.iter() {
+            let source_history = pair_history
+                .entry(*source)
+                .or_insert_with(VecDeque::new);
+            
+            // Add new entry
+            source_history.push_back(PriceHistoryEntry {
+                price: price.clone(),
+                timestamp: now,
+            });
+            
+            // Trim history if needed
+            while source_history.len() > self.config.max_history_length {
+                source_history.pop_front();
+            }
+        }
+        
+        // Calculate aggregated metrics
+        let weighted_price = self.calculate_weighted_price(&prices);
+        
+        // Get 24h high, low, and volume
+        let mut high_24h = weighted_price;
+        let mut low_24h = weighted_price;
+        let mut volume_24h = 0.0;
+        
+        // Get price 24h ago for calculating change
+        let price_24h_ago = self.get_price_at_time(pair, now - Duration::days(1));
+        let change_24h_pct = if let Some(old_price) = price_24h_ago {
+            (weighted_price - old_price) / old_price * 100.0
+        } else {
+            0.0
+        };
+        
+        // Calculate high/low/volume from history over last 24h
+        let cutoff = now - Duration::days(1);
+        
+        for (_, source_history) in pair_history.iter() {
+            for entry in source_history.iter().rev() {
+                if entry.timestamp < cutoff {
+                    break;
+                }
+                
+                high_24h = high_24h.max(entry.price.price);
+                low_24h = low_24h.min(entry.price.price);
+                volume_24h += entry.price.volume_24h / source_history.len() as f64;
+            }
+        }
+        
+        // Update metrics
+        let metrics = PriceMetrics {
+            current_price: weighted_price,
+            high_24h,
+            low_24h,
+            volume_24h,
+            change_24h_pct,
+            updated_at: now,
+        };
+        
+        let mut price_metrics = self.price_metrics.write().unwrap();
+        price_metrics.insert(pair_str, metrics);
+    }
+    
+    /// Calculate weighted average price across sources
+    fn calculate_weighted_price(&self, prices: &HashMap<DexSource, PriceData>) -> f64 {
+        let mut total_weight = 0.0;
+        let mut weighted_sum = 0.0;
+        
+        // Source weights (based on liquidity/reliability)
+        let mut weights = HashMap::new();
+        weights.insert(DexSource::Jupiter, 1.0);
+        weights.insert(DexSource::Raydium, 0.8);
+        weights.insert(DexSource::Openbook, 0.7);
+        
+        for (source, price) in prices {
+            let weight = match weights.get(source) {
+                Some(w) => *w,
+                None => 0.5, // Default weight
+            };
+            
+            weighted_sum += price.price * weight * price.volume_24h.sqrt();
+            total_weight += weight * price.volume_24h.sqrt();
+        }
+        
+        if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            // Simple average if no weights
+            prices.values().map(|p| p.price).sum::<f64>() / prices.len() as f64
         }
     }
     
-    /// Fetch price from Jupiter
-    async fn fetch_jupiter_price(token_symbol: &str, solana_connection: &SolanaConnection) -> Result<TokenPrice> {
-        // This would be implemented using the Jupiter API
-        // For now, we'll use a placeholder implementation
+    /// Get price at a specific time
+    fn get_price_at_time(&self, pair: &TokenPair, time: DateTime<Utc>) -> Option<f64> {
+        let pair_str = pair.to_string();
+        let price_history = self.price_history.read().unwrap();
         
-        // Note: In a real implementation, you would:
-        // 1. Convert the token symbol to a mint address
-        // 2. Query Jupiter's price API
-        // 3. Parse the response and convert to TokenPrice
-        
-        // Example placeholder implementation (replace with actual implementation)
-        let mint_address = Self::get_token_mint(token_symbol)?;
-        
-        // In a real implementation, use the jupiter-aggregator crate or API
-        let price = match token_symbol {
-            "SOL" => 100.0,
-            "USDC" => 1.0,
-            "BTC" => 50000.0,
-            "ETH" => 3000.0,
-            _ => 0.5, // Default placeholder price
-        };
-        
-        let volume_24h = 1000000.0; // Placeholder volume
-        let change_24h = 2.5; // Placeholder 24h change
-        
-        Ok(TokenPrice {
-            symbol: token_symbol.to_string(),
-            mint: mint_address.to_string(),
-            price,
-            volume_24h,
-            change_24h,
-            source: "jupiter".to_string(),
-            last_updated: Utc::now(),
-        })
-    }
-    
-    /// Fetch price from Goat
-    async fn fetch_goat_price(token_symbol: &str, solana_connection: &SolanaConnection) -> Result<TokenPrice> {
-        // This would be implemented using the Goat SDK
-        // For now, we'll use a placeholder implementation
-        
-        // Note: In a real implementation, you would:
-        // 1. Convert the token symbol to a mint address
-        // 2. Use the Goat SDK to query prices
-        // 3. Parse the response and convert to TokenPrice
-        
-        // Example placeholder implementation (replace with actual implementation)
-        let mint_address = Self::get_token_mint(token_symbol)?;
-        
-        // In a real implementation, use the goat-sdk crate
-        let price = match token_symbol {
-            "SOL" => 101.0,
-            "USDC" => 1.0,
-            "BTC" => 50100.0,
-            "ETH" => 3010.0,
-            _ => 0.51, // Default placeholder price
-        };
-        
-        let volume_24h = 1100000.0; // Placeholder volume
-        let change_24h = 2.7; // Placeholder 24h change
-        
-        Ok(TokenPrice {
-            symbol: token_symbol.to_string(),
-            mint: mint_address.to_string(),
-            price,
-            volume_24h,
-            change_24h,
-            source: "goat".to_string(),
-            last_updated: Utc::now(),
-        })
-    }
-    
-    /// Fetch price from Pyth
-    async fn fetch_pyth_price(token_symbol: &str, solana_connection: &SolanaConnection) -> Result<TokenPrice> {
-        // This would be implemented using Pyth's on-chain price accounts
-        // For now, we'll use a placeholder implementation
-        
-        // Note: In a real implementation, you would:
-        // 1. Convert the token symbol to a Pyth price account address
-        // 2. Query that account using the Solana connection
-        // 3. Parse the account data to extract the price
-        
-        // Example placeholder implementation (replace with actual implementation)
-        let mint_address = Self::get_token_mint(token_symbol)?;
-        
-        // In a real implementation, you'd query Pyth's on-chain price account
-        let price = match token_symbol {
-            "SOL" => 102.0,
-            "USDC" => 1.0,
-            "BTC" => 50200.0,
-            "ETH" => 3020.0,
-            _ => 0.52, // Default placeholder price
-        };
-        
-        let volume_24h = 1200000.0; // Placeholder volume
-        let change_24h = 2.9; // Placeholder 24h change
-        
-        Ok(TokenPrice {
-            symbol: token_symbol.to_string(),
-            mint: mint_address.to_string(),
-            price,
-            volume_24h,
-            change_24h,
-            source: "pyth".to_string(),
-            last_updated: Utc::now(),
-        })
-    }
-    
-    /// Helper method to convert token symbol to mint address
-    fn get_token_mint(token_symbol: &str) -> Result<String> {
-        // In a real implementation, you would look up the mint address for each token
-        // For now, we'll use placeholder addresses
-        let mint = match token_symbol {
-            "SOL" => "So11111111111111111111111111111111111111112",
-            "USDC" => "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-            "BTC" => "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E", // Solana BTC (wrapped)
-            "ETH" => "2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk", // Solana ETH (wrapped)
-            "RAY" => "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-            "ORCA" => "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
-            "BONK" => "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-            "JUP" => "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-            _ => return Err(anyhow::anyhow!("Unknown token: {}", token_symbol)),
-        };
-        
-        Ok(mint.to_string())
-    }
-    
-    /// Update the configuration
-    pub fn update_config(&self, config: PriceFeedConfig) -> Result<()> {
-        let mut current_config = self.config.write().unwrap();
-        *current_config = config;
-        info!("Price feed configuration updated");
-        Ok(())
-    }
-    
-    /// Add a token to track
-    pub fn add_token(&self, token_symbol: &str) -> Result<()> {
-        let mut config = self.config.write().unwrap();
-        if !config.tokens.contains(&token_symbol.to_string()) {
-            config.tokens.push(token_symbol.to_string());
-            info!("Added token {} to price feed", token_symbol);
+        if let Some(pair_history) = price_history.get(&pair_str) {
+            let mut closest_prices = HashMap::new();
+            
+            // Find closest price entry for each source
+            for (source, history) in pair_history {
+                let mut closest_entry = None;
+                let mut smallest_diff = i64::MAX;
+                
+                for entry in history {
+                    let diff = (entry.timestamp - time).num_seconds().abs();
+                    if diff < smallest_diff {
+                        smallest_diff = diff;
+                        closest_entry = Some(entry);
+                    }
+                }
+                
+                if let Some(entry) = closest_entry {
+                    closest_prices.insert(*source, entry.price.clone());
+                }
+            }
+            
+            if !closest_prices.is_empty() {
+                return Some(self.calculate_weighted_price(&closest_prices));
+            }
         }
-        Ok(())
+        
+        None
     }
     
-    /// Remove a token from tracking
-    pub fn remove_token(&self, token_symbol: &str) -> Result<()> {
-        let mut config = self.config.write().unwrap();
-        config.tokens.retain(|t| t != token_symbol);
-        info!("Removed token {} from price feed", token_symbol);
-        Ok(())
+    /// Get latest price for a pair
+    pub fn get_latest_price(&self, pair_str: &str) -> Option<f64> {
+        let price_metrics = self.price_metrics.read().unwrap();
+        price_metrics.get(pair_str).map(|m| m.current_price)
     }
     
-    /// Set the update interval
-    pub fn set_update_interval(&self, seconds: u64) -> Result<()> {
-        let mut config = self.config.write().unwrap();
-        config.update_interval_secs = seconds;
-        info!("Price feed update interval set to {}s", seconds);
+    /// Get price metrics for a pair
+    pub fn get_price_metrics(&self, pair_str: &str) -> Option<PriceMetricsView> {
+        let price_metrics = self.price_metrics.read().unwrap();
+        
+        price_metrics.get(pair_str).map(|metrics| {
+            PriceMetricsView {
+                pair: pair_str.to_string(),
+                price: metrics.current_price,
+                high_24h: metrics.high_24h,
+                low_24h: metrics.low_24h,
+                volume_24h: metrics.volume_24h,
+                change_24h_pct: metrics.change_24h_pct,
+                updated_at: metrics.updated_at,
+            }
+        })
+    }
+    
+    /// Get all price metrics
+    pub fn get_all_price_metrics(&self) -> HashMap<String, PriceMetricsView> {
+        let price_metrics = self.price_metrics.read().unwrap();
+        
+        price_metrics
+            .iter()
+            .map(|(pair, metrics)| {
+                (pair.clone(), PriceMetricsView {
+                    pair: pair.clone(),
+                    price: metrics.current_price,
+                    high_24h: metrics.high_24h,
+                    low_24h: metrics.low_24h,
+                    volume_24h: metrics.volume_24h,
+                    change_24h_pct: metrics.change_24h_pct,
+                    updated_at: metrics.updated_at,
+                })
+            })
+            .collect()
+    }
+    
+    /// Stop price feed updates
+    pub fn stop(&self) -> Result<()> {
+        let mut update_task = self.update_task.lock().unwrap();
+        
+        if let Some(task) = update_task.take() {
+            task.abort();
+            debug!("Price feed updates stopped");
+        }
+        
         Ok(())
     }
+}
+
+/// Public price metrics view
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriceMetricsView {
+    /// Token pair
+    pub pair: String,
+    
+    /// Current price
+    pub price: f64,
+    
+    /// 24h high
+    pub high_24h: f64,
+    
+    /// 24h low
+    pub low_24h: f64,
+    
+    /// 24h volume
+    pub volume_24h: f64,
+    
+    /// 24h price change percentage
+    pub change_24h_pct: f64,
+    
+    /// Last updated timestamp
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Clone for PriceFeed {
+    fn clone(&self) -> Self {
+        Self {
+            price_history: RwLock::new(self.price_history.read().unwrap().clone()),
+            price_metrics: RwLock::new(self.price_metrics.read().unwrap().clone()),
+            update_task: Mutex::new(None),
+            config: self.config.clone(),
+        }
+    }
+}
+
+// Helper macro for HashMap creation
+macro_rules! hashmap {
+    ($( $key: expr => $val: expr ),*) => {{
+        let mut map = HashMap::new();
+        $( map.insert($key, $val); )*
+        map
+    }}
 }

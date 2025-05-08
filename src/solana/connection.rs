@@ -1,372 +1,534 @@
-use anyhow::Result;
-use log::{info, warn, error, debug};
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    signature::Keypair,
-    pubkey::Pubkey,
-    hash::Hash,
-    commitment_config::CommitmentConfig,
-};
-use std::sync::{Arc, RwLock, Mutex};
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use tokio::task::JoinHandle;
-use chrono::Utc;
+// Solana blockchain connection
 
-/// Solana blockchain connection manager
-pub struct SolanaConnection {
-    // RPC client for Solana
-    client: Arc<RwLock<Option<RpcClient>>>,
+use anyhow::{Result, anyhow, Context};
+use log::{info, warn, error, debug};
+use std::sync::{Arc, RwLock, Mutex};
+use std::env;
+use std::time::{Duration, Instant};
+use reqwest::Client;
+use serde::{Serialize, Deserialize};
+use serde_json::{json, Value};
+use tokio::time::sleep;
+
+/// Maximum number of retries for RPC requests
+const MAX_RETRIES: usize = 3;
+
+/// Timeout for RPC requests (seconds)
+const RPC_TIMEOUT_SECONDS: u64 = 30;
+
+/// Solana connection status
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionStatus {
+    /// Connection not initialized
+    NotInitialized,
     
-    // Connection endpoint
-    endpoint: RwLock<String>,
+    /// Connection is operational
+    Operational,
     
-    // Connection status
-    is_connected: RwLock<bool>,
+    /// Connection has issues
+    Degraded,
     
-    // Last block hash
-    last_blockhash: RwLock<Option<Hash>>,
-    
-    // Last blockhash update time
-    last_blockhash_update: RwLock<Option<Instant>>,
-    
-    // Blockhash refresh task
-    blockhash_task: Mutex<Option<JoinHandle<()>>>,
-    
-    // Connection monitoring task
-    monitor_task: Mutex<Option<JoinHandle<()>>>,
-    
-    // Network stats
-    network_stats: RwLock<NetworkStats>,
+    /// Connection is down
+    Down,
 }
 
-/// Network statistics
-#[derive(Clone, Debug, Default)]
-struct NetworkStats {
-    // Current slot
-    current_slot: u64,
+/// JSON-RPC request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JsonRpcRequest {
+    jsonrpc: String,
+    id: u64,
+    method: String,
+    params: Vec<Value>,
+}
+
+/// JSON-RPC response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JsonRpcResponse {
+    jsonrpc: String,
+    id: u64,
+    result: Option<Value>,
+    error: Option<JsonRpcError>,
+}
+
+/// JSON-RPC error
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JsonRpcError {
+    code: i64,
+    message: String,
+}
+
+/// Solana connection configuration
+#[derive(Debug, Clone)]
+pub struct SolanaConnectionConfig {
+    /// Primary RPC endpoint
+    pub primary_endpoint: String,
     
-    // Transactions per second
-    transactions_per_second: f64,
+    /// Fallback RPC endpoints
+    pub fallback_endpoints: Vec<String>,
     
-    // Average block time
-    avg_block_time_ms: f64,
+    /// API key for RPC service (if any)
+    pub api_key: Option<String>,
     
-    // Validators count
-    validators_count: usize,
+    /// Network (mainnet-beta, testnet, devnet)
+    pub network: String,
     
-    // Last update time
-    last_update: chrono::DateTime<Utc>,
+    /// Commitment level
+    pub commitment: String,
+    
+    /// Timeout in seconds
+    pub timeout_seconds: u64,
+    
+    /// Maximum retries
+    pub max_retries: usize,
+}
+
+impl Default for SolanaConnectionConfig {
+    fn default() -> Self {
+        // Check environment for custom RPC URL
+        let primary_endpoint = env::var("INSTANT_NODES_RPC_URL")
+            .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
+        
+        // Check environment for API key
+        let api_key = env::var("SOLANA_RPC_API_KEY").ok();
+        
+        Self {
+            primary_endpoint,
+            fallback_endpoints: vec![
+                "https://solana-api.projectserum.com".to_string(),
+                "https://rpc.ankr.com/solana".to_string(),
+            ],
+            api_key,
+            network: "mainnet-beta".to_string(),
+            commitment: "confirmed".to_string(),
+            timeout_seconds: RPC_TIMEOUT_SECONDS,
+            max_retries: MAX_RETRIES,
+        }
+    }
+}
+
+/// Solana blockchain connection
+#[derive(Clone)]
+pub struct SolanaConnection {
+    /// HTTP client
+    client: Client,
+    
+    /// Connection configuration
+    config: RwLock<SolanaConnectionConfig>,
+    
+    /// Currently active endpoint
+    active_endpoint: RwLock<String>,
+    
+    /// Current connection status
+    status: RwLock<ConnectionStatus>,
+    
+    /// Last successful request time
+    last_success: Mutex<Instant>,
+    
+    /// Request counter for statistics
+    request_counter: RwLock<u64>,
+    
+    /// Failed request counter
+    failed_counter: RwLock<u64>,
 }
 
 impl SolanaConnection {
     /// Create a new Solana connection
     pub fn new(endpoint: &str) -> Self {
-        info!("Initializing Solana Connection - Blockchain Interface");
+        let mut config = SolanaConnectionConfig::default();
+        config.primary_endpoint = endpoint.to_string();
         
-        // Use environment variables for custom RPC if available
-        let custom_endpoint = std::env::var("INSTANT_NODES_RPC_URL").unwrap_or_else(|_| {
-            info!("INSTANT_NODES_RPC_URL not found, using provided endpoint");
-            endpoint.to_string()
-        });
-        
-        info!("Using Solana RPC endpoint: {}", custom_endpoint);
+        let client = Client::builder()
+            .timeout(Duration::from_secs(config.timeout_seconds))
+            .build()
+            .expect("Failed to create HTTP client");
         
         Self {
-            client: Arc::new(RwLock::new(None)),
-            endpoint: RwLock::new(custom_endpoint),
-            is_connected: RwLock::new(false),
-            last_blockhash: RwLock::new(None),
-            last_blockhash_update: RwLock::new(None),
-            blockhash_task: Mutex::new(None),
-            monitor_task: Mutex::new(None),
-            network_stats: RwLock::new(NetworkStats::default()),
+            client,
+            config: RwLock::new(config.clone()),
+            active_endpoint: RwLock::new(config.primary_endpoint),
+            status: RwLock::new(ConnectionStatus::NotInitialized),
+            last_success: Mutex::new(Instant::now()),
+            request_counter: RwLock::new(0),
+            failed_counter: RwLock::new(0),
         }
     }
     
-    /// Connect to Solana network
-    pub fn connect(&self) -> Result<()> {
-        let endpoint = self.endpoint.read().unwrap().clone();
-        info!("Connecting to Solana network: {}", endpoint);
+    /// Create a new Solana connection with custom configuration
+    pub fn with_config(config: SolanaConnectionConfig) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(config.timeout_seconds))
+            .build()
+            .expect("Failed to create HTTP client");
         
-        // Check if API key is available
-        let api_key = std::env::var("SOLANA_RPC_API_KEY").ok();
-        
-        // Create RPC client with or without API key
-        let client = if let Some(key) = api_key {
-            info!("Using custom API key for RPC connection");
-            
-            // For simplicity, we'll use the standard client for now
-            // In a production environment, we would add headers with the API key
-            // This requires additional dependencies that might not be available
-            info!("API key available but using standard client due to header limitations");
-            RpcClient::new_with_commitment(
-                endpoint,
-                CommitmentConfig::confirmed(),
-            )
-        } else {
-            info!("No API key found, using default RPC connection");
-            RpcClient::new_with_commitment(
-                endpoint,
-                CommitmentConfig::confirmed(),
-            )
-        };
+        Self {
+            client,
+            active_endpoint: RwLock::new(config.primary_endpoint.clone()),
+            config: RwLock::new(config),
+            status: RwLock::new(ConnectionStatus::NotInitialized),
+            last_success: Mutex::new(Instant::now()),
+            request_counter: RwLock::new(0),
+            failed_counter: RwLock::new(0),
+        }
+    }
+    
+    /// Initialize the connection
+    pub async fn init(&self) -> Result<()> {
+        info!("Initializing Solana connection");
         
         // Test connection
-        match client.get_version() {
-            Ok(version) => {
-                info!("Connected to Solana network, version: {:?}", version);
-                
-                // Update client
-                let mut client_lock = self.client.write().unwrap();
-                *client_lock = Some(client);
-                
-                // Update connection status
-                let mut is_connected = self.is_connected.write().unwrap();
-                *is_connected = true;
-                
-                // Get initial blockhash
-                self.refresh_blockhash()?;
-                
-                // Start blockhash refresh task
-                self.start_blockhash_refresh_task()?;
-                
-                // Start connection monitoring
-                self.start_monitor_task()?;
-                
+        match self.get_latest_blockhash().await {
+            Ok(_) => {
+                let mut status = self.status.write().unwrap();
+                *status = ConnectionStatus::Operational;
+                info!("Solana connection initialized successfully");
                 Ok(())
-            },
+            }
             Err(e) => {
-                error!("Failed to connect to Solana network: {}", e);
-                Err(anyhow::anyhow!("Failed to connect to Solana: {}", e))
+                error!("Failed to initialize Solana connection: {}", e);
+                Err(anyhow!("Failed to initialize Solana connection: {}", e))
             }
         }
     }
     
-    /// Disconnect from Solana network
-    pub fn disconnect(&self) -> Result<()> {
-        info!("Disconnecting from Solana network");
-        
-        // Stop background tasks
-        self.stop_tasks()?;
-        
-        // Clear client
-        let mut client_lock = self.client.write().unwrap();
-        *client_lock = None;
-        
-        // Update connection status
-        let mut is_connected = self.is_connected.write().unwrap();
-        *is_connected = false;
-        
-        Ok(())
-    }
-    
-    /// Check if connected to Solana
-    pub fn is_connected(&self) -> bool {
-        *self.is_connected.read().unwrap()
-    }
-    
-    /// Get the current blockhash
-    pub fn get_recent_blockhash(&self) -> Result<Hash> {
-        // Try to use cached blockhash first
-        let blockhash = self.last_blockhash.read().unwrap();
-        let last_update = self.last_blockhash_update.read().unwrap();
-        
-        if let (Some(hash), Some(time)) = (blockhash.as_ref(), last_update.as_ref()) {
-            // If blockhash is less than 50 seconds old, use it
-            if time.elapsed() < Duration::from_secs(50) {
-                return Ok(*hash);
-            }
+    /// Update connection status
+    fn update_status(&self, new_status: ConnectionStatus) {
+        let mut status = self.status.write().unwrap();
+        if *status != new_status {
+            debug!("Solana connection status changed: {:?} -> {:?}", *status, new_status);
+            *status = new_status;
         }
-        
-        // Need to refresh blockhash
-        self.refresh_blockhash()
     }
     
-    /// Get current network statistics
-    pub fn get_network_stats(&self) -> NetworkStats {
-        self.network_stats.read().unwrap().clone()
+    /// Get active endpoint
+    pub fn get_active_endpoint(&self) -> String {
+        self.active_endpoint.read().unwrap().clone()
     }
     
-    /// Update network statistics
-    pub fn update_network_stats(&self) -> Result<()> {
-        let client_lock = self.client.read().unwrap();
-        let client = client_lock.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Not connected to Solana network")
-        })?;
-        
-        // Get current slot
-        let slot = client.get_slot()?;
-        
-        // In a real implementation, would get more detailed stats
-        // Here we just simulate some values
-        
-        let mut stats = self.network_stats.write().unwrap();
-        stats.current_slot = slot;
-        stats.transactions_per_second = 1500.0 + (slot % 500) as f64;
-        stats.avg_block_time_ms = 400.0 + (slot % 100) as f64;
-        stats.validators_count = 1500 + (slot % 100) as usize;
-        stats.last_update = Utc::now();
-        
-        Ok(())
+    /// Check if using custom RPC endpoint
+    pub fn is_using_custom_rpc(&self) -> bool {
+        let config = self.config.read().unwrap();
+        !config.primary_endpoint.contains("mainnet-beta.solana.com")
     }
     
-    /// Refresh the blockhash
-    fn refresh_blockhash(&self) -> Result<Hash> {
-        let client_lock = self.client.read().unwrap();
-        let client = client_lock.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Not connected to Solana network")
-        })?;
+    /// Check if using API key
+    pub fn is_using_api_key(&self) -> bool {
+        let config = self.config.read().unwrap();
+        config.api_key.is_some()
+    }
+    
+    /// Get network name
+    pub fn get_network(&self) -> String {
+        let config = self.config.read().unwrap();
+        config.network.clone()
+    }
+    
+    /// Get connection status
+    pub fn get_status(&self) -> ConnectionStatus {
+        *self.status.read().unwrap()
+    }
+    
+    /// Get connection health JSON
+    pub fn get_health_json(&self) -> Value {
+        json!({
+            "status": format!("{:?}", self.get_status()),
+            "customRpc": self.is_using_custom_rpc(),
+            "apiKey": self.is_using_api_key(),
+            "network": self.get_network(),
+            "endpoint": self.get_active_endpoint(),
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        })
+    }
+    
+    /// Switch to next endpoint if current one is failing
+    async fn try_fallback_endpoint(&self) -> Result<()> {
+        let config = self.config.read().unwrap();
+        let current = self.active_endpoint.read().unwrap().clone();
         
-        // Get new blockhash
-        let blockhash = client.get_latest_blockhash()?;
+        // Find current endpoint index
+        let current_index = if current == config.primary_endpoint {
+            None
+        } else {
+            config.fallback_endpoints.iter().position(|e| *e == current)
+        };
         
-        // Update cached values
+        // Get next endpoint
+        let next_endpoint = match current_index {
+            None => {
+                // Current is primary, switch to first fallback
+                config.fallback_endpoints.first().cloned()
+            }
+            Some(idx) => {
+                // Try next fallback
+                if idx + 1 < config.fallback_endpoints.len() {
+                    config.fallback_endpoints.get(idx + 1).cloned()
+                } else {
+                    // Go back to primary
+                    Some(config.primary_endpoint.clone())
+                }
+            }
+        };
+        
+        if let Some(endpoint) = next_endpoint {
+            warn!("Switching Solana RPC endpoint: {} -> {}", current, endpoint);
+            let mut active = self.active_endpoint.write().unwrap();
+            *active = endpoint;
+            
+            // Update status to degraded
+            self.update_status(ConnectionStatus::Degraded);
+            
+            Ok(())
+        } else {
+            // No fallback available
+            self.update_status(ConnectionStatus::Down);
+            Err(anyhow!("No fallback endpoints available"))
+        }
+    }
+    
+    /// Send JSON-RPC request to Solana
+    async fn send_request(&self, method: &str, params: Vec<Value>) -> Result<Value> {
+        let config = self.config.read().unwrap();
+        let endpoint = self.active_endpoint.read().unwrap().clone();
+        
+        // Update request counter
         {
-            let mut hash_lock = self.last_blockhash.write().unwrap();
-            *hash_lock = Some(blockhash);
-            
-            let mut time_lock = self.last_blockhash_update.write().unwrap();
-            *time_lock = Some(Instant::now());
+            let mut counter = self.request_counter.write().unwrap();
+            *counter += 1;
         }
         
-        Ok(blockhash)
-    }
-    
-    /// Start the blockhash refresh task
-    fn start_blockhash_refresh_task(&self) -> Result<()> {
-        let client = Arc::clone(&self.client);
-        let last_blockhash = Arc::clone(&self.last_blockhash);
-        let last_blockhash_update = Arc::clone(&self.last_blockhash_update);
+        // Create request
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: 1,
+            method: method.to_string(),
+            params,
+        };
         
-        let task = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(45));
-            
-            loop {
-                interval.tick().await;
-                
-                // Get client
-                let client_lock = client.read().unwrap();
-                let client_opt = client_lock.as_ref();
-                
-                if let Some(client) = client_opt {
-                    // Refresh blockhash
-                    match client.get_latest_blockhash() {
-                        Ok(blockhash) => {
-                            // Update cached values
-                            {
-                                let mut hash_lock = last_blockhash.write().unwrap();
-                                *hash_lock = Some(blockhash);
-                                
-                                let mut time_lock = last_blockhash_update.write().unwrap();
-                                *time_lock = Some(Instant::now());
-                            }
-                            
-                            debug!("Refreshed Solana blockhash: {:?}", blockhash);
-                        },
-                        Err(e) => {
-                            warn!("Failed to refresh blockhash: {}", e);
-                        }
-                    }
-                } else {
-                    // No client, probably disconnected
-                    break;
-                }
+        // Add API key if available
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Some(api_key) = &config.api_key {
+            headers.insert(
+                "x-api-key",
+                reqwest::header::HeaderValue::from_str(api_key)
+                    .map_err(|e| anyhow!("Invalid API key header: {}", e))?,
+            );
+        }
+        
+        let mut retries = 0;
+        let mut last_error = None;
+        
+        while retries < config.max_retries {
+            if retries > 0 {
+                debug!("Retrying RPC request ({}/{}): {}", retries + 1, config.max_retries, method);
+                sleep(Duration::from_millis(500 * (retries as u64 + 1))).await;
             }
-        });
-        
-        let mut blockhash_task = self.blockhash_task.lock().unwrap();
-        *blockhash_task = Some(task);
-        
-        Ok(())
-    }
-    
-    /// Start the connection monitoring task
-    fn start_monitor_task(&self) -> Result<()> {
-        let client = Arc::clone(&self.client);
-        let is_connected = Arc::clone(&self.is_connected);
-        let network_stats = Arc::clone(&self.network_stats);
-        
-        let task = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(30));
             
-            loop {
-                interval.tick().await;
-                
-                // Get client
-                let client_lock = client.read().unwrap();
-                let client_opt = client_lock.as_ref();
-                
-                if let Some(client) = client_opt {
-                    // Check connection
-                    match client.get_version() {
-                        Ok(_) => {
-                            // Still connected
-                            let mut connected = is_connected.write().unwrap();
-                            if !*connected {
-                                *connected = true;
-                                info!("Reconnected to Solana network");
-                            }
-                            
-                            // Update stats
-                            match client.get_slot() {
-                                Ok(slot) => {
-                                    let mut stats = network_stats.write().unwrap();
-                                    stats.current_slot = slot;
-                                    stats.transactions_per_second = 1500.0 + (slot % 500) as f64;
-                                    stats.avg_block_time_ms = 400.0 + (slot % 100) as f64;
-                                    stats.validators_count = 1500 + (slot % 100) as usize;
-                                    stats.last_update = Utc::now();
-                                },
-                                Err(e) => {
-                                    warn!("Failed to get slot: {}", e);
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            // Lost connection
-                            warn!("Lost connection to Solana network: {}", e);
-                            let mut connected = is_connected.write().unwrap();
-                            *connected = false;
-                        }
-                    }
-                } else {
-                    // No client, probably disconnected
-                    break;
+            // Send request
+            let response = match self.client
+                .post(&endpoint)
+                .headers(headers.clone())
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => resp,
+                Err(e) => {
+                    warn!("RPC request failed: {}", e);
+                    last_error = Some(anyhow!("HTTP error: {}", e));
+                    retries += 1;
+                    continue;
                 }
+            };
+            
+            // Parse response
+            let rpc_response: JsonRpcResponse = match response.json().await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    warn!("Failed to parse RPC response: {}", e);
+                    last_error = Some(anyhow!("Parse error: {}", e));
+                    retries += 1;
+                    continue;
+                }
+            };
+            
+            // Check for RPC error
+            if let Some(error) = rpc_response.error {
+                warn!("RPC error: {} (code {})", error.message, error.code);
+                last_error = Some(anyhow!("RPC error: {} (code {})", error.message, error.code));
+                retries += 1;
+                continue;
             }
-        });
-        
-        let mut monitor_task = self.monitor_task.lock().unwrap();
-        *monitor_task = Some(task);
-        
-        Ok(())
-    }
-    
-    /// Stop background tasks
-    fn stop_tasks(&self) -> Result<()> {
-        // Stop blockhash refresh task
-        let mut blockhash_task = self.blockhash_task.lock().unwrap();
-        if let Some(task) = blockhash_task.take() {
-            task.abort();
-            debug!("Stopped blockhash refresh task");
+            
+            // Return result
+            if let Some(result) = rpc_response.result {
+                // Update last success
+                {
+                    let mut last = self.last_success.lock().unwrap();
+                    *last = Instant::now();
+                }
+                
+                // Update status if needed
+                if self.get_status() != ConnectionStatus::Operational {
+                    self.update_status(ConnectionStatus::Operational);
+                }
+                
+                return Ok(result);
+            } else {
+                warn!("RPC response has no result");
+                last_error = Some(anyhow!("RPC response has no result"));
+                retries += 1;
+                continue;
+            }
         }
         
-        // Stop monitor task
-        let mut monitor_task = self.monitor_task.lock().unwrap();
-        if let Some(task) = monitor_task.take() {
-            task.abort();
-            debug!("Stopped connection monitor task");
+        // Update failed counter
+        {
+            let mut counter = self.failed_counter.write().unwrap();
+            *counter += 1;
         }
         
-        Ok(())
+        // Try fallback endpoint for next request
+        let _ = self.try_fallback_endpoint().await;
+        
+        // Return last error
+        Err(last_error.unwrap_or_else(|| anyhow!("Unknown RPC error")))
     }
     
-    /// Get the RPC client
-    pub fn get_client(&self) -> Result<Arc<RpcClient>> {
-        let client_lock = self.client.read().unwrap();
-        client_lock.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Not connected to Solana network"))
-            .map(|c| Arc::new(c.clone()))
+    /// Get latest blockhash
+    pub async fn get_latest_blockhash(&self) -> Result<String> {
+        let params = vec![json!({
+            "commitment": self.config.read().unwrap().commitment,
+        })];
+        
+        let response = self.send_request("getLatestBlockhash", params).await?;
+        
+        // Extract blockhash
+        let blockhash = response.get("value")
+            .and_then(|v| v.get("blockhash"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        
+        Ok(blockhash.to_string())
+    }
+    
+    /// Get account info
+    pub async fn get_account_info(&self, pubkey: &str) -> Result<Value> {
+        let params = vec![
+            json!(pubkey),
+            json!({
+                "encoding": "jsonParsed",
+                "commitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("getAccountInfo", params).await?;
+        
+        Ok(response)
+    }
+    
+    /// Get token account balance
+    pub async fn get_token_account_balance(&self, account: &str) -> Result<f64> {
+        let params = vec![
+            json!(account),
+            json!({
+                "commitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("getTokenAccountBalance", params).await?;
+        
+        // Extract balance and decimals
+        let amount = response.get("value")
+            .and_then(|v| v.get("amount"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        
+        let decimals = response.get("value")
+            .and_then(|v| v.get("decimals"))
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        
+        // Parse amount
+        let amount_raw = amount.parse::<f64>()
+            .context("Failed to parse amount")?;
+        
+        // Calculate real amount
+        let real_amount = amount_raw / (10_f64.powi(decimals as i32));
+        
+        Ok(real_amount)
+    }
+    
+    /// Get SOL balance
+    pub async fn get_sol_balance(&self, address: &str) -> Result<f64> {
+        let params = vec![
+            json!(address),
+            json!({
+                "commitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("getBalance", params).await?;
+        
+        // Extract balance
+        let balance = response.get("value")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        
+        // Calculate real amount (SOL has 9 decimals)
+        let real_balance = balance as f64 / 1_000_000_000.0;
+        
+        Ok(real_balance)
+    }
+    
+    /// Get token accounts by owner
+    pub async fn get_token_accounts_by_owner(&self, owner: &str) -> Result<Value> {
+        let params = vec![
+            json!(owner),
+            json!({
+                "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            }),
+            json!({
+                "encoding": "jsonParsed",
+                "commitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("getTokenAccountsByOwner", params).await?;
+        
+        Ok(response)
+    }
+    
+    /// Send transaction
+    pub async fn send_transaction(&self, serialized_tx: &str) -> Result<String> {
+        let params = vec![
+            json!(serialized_tx),
+            json!({
+                "encoding": "base64",
+                "skipPreflight": false,
+                "preflightCommitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("sendTransaction", params).await?;
+        
+        // Extract signature
+        let signature = response.as_str()
+            .ok_or_else(|| anyhow!("Invalid response format"))?;
+        
+        Ok(signature.to_string())
+    }
+    
+    /// Get transaction status
+    pub async fn get_transaction_status(&self, signature: &str) -> Result<Value> {
+        let params = vec![
+            json!(signature),
+            json!({
+                "encoding": "jsonParsed",
+                "commitment": self.config.read().unwrap().commitment,
+            }),
+        ];
+        
+        let response = self.send_request("getTransaction", params).await?;
+        
+        Ok(response)
     }
 }

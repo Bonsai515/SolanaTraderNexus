@@ -1,130 +1,135 @@
-use anyhow::Result;
-use governor::{Quota, RateLimiter as GovernorRateLimiter, clock::{DefaultClock, Clock}};
-use nonzero_ext::nonzero;
-use std::num::NonZeroU32;
-use std::sync::Arc;
-use std::time::Duration;
-use log::{info, warn, debug};
+// Rate limiter for API calls to prevent hitting rate limits
 
-/// Rate limiter to prevent exceeding API limits
-pub struct RateLimiter {
-    /// DEX API rate limiter (queries per second)
-    dex_limiter: Arc<GovernorRateLimiter<&'static str, DefaultClock>>,
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
+use log::{debug, warn};
+use once_cell::sync::Lazy;
+use nonzero_ext::nonzero;
+use governor::{
+    Quota, RateLimiter,
+    clock::DefaultClock,
+    state::{InMemoryState, NotKeyed},
+};
+
+/// Global rate limiters for different APIs
+static RATE_LIMITERS: Lazy<Mutex<HashMap<String, ApiRateLimiter>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// API rate limiter using token bucket algorithm
+pub struct ApiRateLimiter {
+    /// API name for logging
+    name: String,
     
-    /// Price feed rate limiter (queries per second)
-    price_limiter: Arc<GovernorRateLimiter<&'static str, DefaultClock>>,
+    /// Rate limiter implementation
+    limiter: RateLimiter<NotKeyed, InMemoryState, DefaultClock>,
     
-    /// Order submission rate limiter (orders per minute)
-    order_limiter: Arc<GovernorRateLimiter<&'static str, DefaultClock>>,
+    /// Last request time for this API
+    last_request: Instant,
+    
+    /// Minimum delay between requests (ms)
+    min_delay_ms: u64,
+    
+    /// Whether to warn on rate limiting
+    warn_on_limit: bool,
 }
 
-impl RateLimiter {
-    /// Create a new rate limiter with default settings
-    pub fn new() -> Self {
-        // Default limits
-        // 5 DEX queries per second
-        let dex_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(nonzero!(5u32))));
-        
-        // 10 price queries per second
-        let price_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(nonzero!(10u32))));
-        
-        // 10 orders per minute
-        let order_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_minute(nonzero!(10u32))));
-        
-        info!("Rate limiter initialized with default settings");
-        Self {
-            dex_limiter,
-            price_limiter,
-            order_limiter,
-        }
-    }
-    
-    /// Create a new rate limiter with custom settings
-    pub fn with_limits(dex_per_second: u32, price_per_second: u32, orders_per_minute: u32) -> Self {
-        let dex_per_second = NonZeroU32::new(dex_per_second).unwrap_or(nonzero!(5u32));
-        let price_per_second = NonZeroU32::new(price_per_second).unwrap_or(nonzero!(10u32));
-        let orders_per_minute = NonZeroU32::new(orders_per_minute).unwrap_or(nonzero!(10u32));
-        
-        let dex_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(dex_per_second)));
-        let price_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(price_per_second)));
-        let order_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_minute(orders_per_minute)));
-        
-        info!("Rate limiter initialized with custom settings: DEX={}/s, Price={}/s, Orders={}/min", 
-              dex_per_second, price_per_second, orders_per_minute);
+impl ApiRateLimiter {
+    /// Create a new API rate limiter
+    pub fn new(
+        name: &str,
+        requests_per_minute: u32,
+        min_delay_ms: u64,
+        warn_on_limit: bool,
+    ) -> Self {
+        let quota = Quota::per_minute(nonzero!(requests_per_minute));
         
         Self {
-            dex_limiter,
-            price_limiter,
-            order_limiter,
+            name: name.to_string(),
+            limiter: RateLimiter::direct(quota),
+            last_request: Instant::now(),
+            min_delay_ms,
+            warn_on_limit,
         }
     }
     
-    /// Check if we can make a DEX query and wait if necessary
-    pub async fn check_dex_query(&self) -> Result<()> {
-        match self.dex_limiter.check_key(&"dex_query") {
+    /// Try to acquire a rate limit token, sleeping if necessary
+    pub async fn acquire(&mut self) {
+        // Check minimum delay between requests
+        let elapsed = self.last_request.elapsed();
+        let min_delay = Duration::from_millis(self.min_delay_ms);
+        
+        if elapsed < min_delay {
+            let sleep_duration = min_delay - elapsed;
+            debug!("Enforcing minimum delay for {}, sleeping for {:?}", 
+                   self.name, sleep_duration);
+            sleep(sleep_duration).await;
+        }
+        
+        // Use the governor rate limiter
+        match self.limiter.check() {
             Ok(_) => {
-                debug!("DEX query permitted immediately");
-                Ok(())
-            },
+                // We're good to go
+                self.last_request = Instant::now();
+            }
             Err(negative) => {
-                let wait_time = negative.wait_time_from(DefaultClock::default().now());
-                debug!("Rate limit hit for DEX query, waiting for {:?}", wait_time);
-                tokio::time::sleep(wait_time).await;
-                Ok(())
+                // Need to wait
+                let wait_time = negative.wait_time_from(Instant::now());
+                
+                if self.warn_on_limit {
+                    warn!("Rate limit reached for {}, waiting for {:?}",
+                          self.name, wait_time);
+                } else {
+                    debug!("Rate limit reached for {}, waiting for {:?}",
+                           self.name, wait_time);
+                }
+                
+                sleep(wait_time).await;
+                self.last_request = Instant::now();
             }
         }
     }
+}
+
+/// Get or create a rate limiter for an API
+pub fn get_rate_limiter(
+    name: &str,
+    requests_per_minute: u32,
+    min_delay_ms: u64,
+    warn_on_limit: bool,
+) -> ApiRateLimiter {
+    let mut limiters = RATE_LIMITERS.lock().unwrap();
     
-    /// Check if we can make a price query and wait if necessary
-    pub async fn check_price_query(&self) -> Result<()> {
-        match self.price_limiter.check_key(&"price_query") {
-            Ok(_) => {
-                debug!("Price query permitted immediately");
-                Ok(())
-            },
-            Err(negative) => {
-                let wait_time = negative.wait_time_from(DefaultClock::default().now());
-                debug!("Rate limit hit for price query, waiting for {:?}", wait_time);
-                tokio::time::sleep(wait_time).await;
-                Ok(())
-            }
+    if let Some(limiter) = limiters.get(name) {
+        return limiter.clone();
+    }
+    
+    // Create new rate limiter
+    let limiter = ApiRateLimiter::new(name, requests_per_minute, min_delay_ms, warn_on_limit);
+    limiters.insert(name.to_string(), limiter.clone());
+    
+    limiter
+}
+
+/// Apply rate limiting for an API
+pub async fn apply_rate_limiting(
+    name: &str,
+    requests_per_minute: u32,
+    min_delay_ms: u64,
+) {
+    let mut limiter = get_rate_limiter(name, requests_per_minute, min_delay_ms, false);
+    limiter.acquire().await;
+}
+
+impl Clone for ApiRateLimiter {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            limiter: self.limiter.clone(),
+            last_request: self.last_request,
+            min_delay_ms: self.min_delay_ms,
+            warn_on_limit: self.warn_on_limit,
         }
-    }
-    
-    /// Check if we can submit an order and wait if necessary
-    pub async fn check_order_submission(&self) -> Result<()> {
-        match self.order_limiter.check_key(&"order_submission") {
-            Ok(_) => {
-                debug!("Order submission permitted immediately");
-                Ok(())
-            },
-            Err(negative) => {
-                let wait_time = negative.wait_time_from(DefaultClock::default().now());
-                warn!("Rate limit hit for order submission, waiting for {:?}", wait_time);
-                tokio::time::sleep(wait_time).await;
-                Ok(())
-            }
-        }
-    }
-    
-    /// Update the DEX queries per second limit
-    pub fn set_dex_queries_per_second(&mut self, queries_per_second: u32) {
-        let queries_per_second = NonZeroU32::new(queries_per_second).unwrap_or(nonzero!(5u32));
-        self.dex_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(queries_per_second)));
-        info!("DEX query rate limit updated to {}/second", queries_per_second);
-    }
-    
-    /// Update the price queries per second limit
-    pub fn set_price_queries_per_second(&mut self, queries_per_second: u32) {
-        let queries_per_second = NonZeroU32::new(queries_per_second).unwrap_or(nonzero!(10u32));
-        self.price_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_second(queries_per_second)));
-        info!("Price query rate limit updated to {}/second", queries_per_second);
-    }
-    
-    /// Update the orders per minute limit
-    pub fn set_orders_per_minute(&mut self, orders_per_minute: u32) {
-        let orders_per_minute = NonZeroU32::new(orders_per_minute).unwrap_or(nonzero!(10u32));
-        self.order_limiter = Arc::new(GovernorRateLimiter::direct(Quota::per_minute(orders_per_minute)));
-        info!("Order submission rate limit updated to {}/minute", orders_per_minute);
     }
 }
