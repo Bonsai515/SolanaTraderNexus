@@ -5,6 +5,7 @@ pub mod solana;
 pub mod models;
 pub mod transformers;
 pub mod dex;
+pub mod agents;
 
 // These modules are planned but will be implemented in future iterations
 pub mod engine;

@@ -215,6 +215,18 @@ pub struct QuantumOmegaAgent {
     
     /// LLM Controller
     llm_controller: Option<Arc<LLMController>>,
+    
+    /// Wallet generator 
+    wallet_generator: Option<Arc<crate::agents::wallet_generator::WalletGenerator>>,
+    
+    /// Agent wallets (separated by purpose)
+    agent_wallets: HashMap<crate::agents::wallet_generator::WalletPurpose, crate::agents::wallet_generator::AgentWallet>,
+    
+    /// Launch detector
+    launch_detector: Option<Arc<launch_detector::LaunchDetector>>,
+    
+    /// Whale tracker
+    whale_tracker: Option<Arc<whale_tracker::WhaleTracker>>,
 }
 
 impl QuantumOmegaAgent {
@@ -248,7 +260,16 @@ impl QuantumOmegaAgent {
             tx_manager: None,
             transformer_api: None,
             llm_controller: None,
+            wallet_generator: None,
+            agent_wallets: HashMap::new(),
+            launch_detector: None,
+            whale_tracker: None,
         })
+    }
+    
+    /// Set wallet generator
+    pub fn set_wallet_generator(&mut self, wallet_generator: Arc<crate::agents::wallet_generator::WalletGenerator>) {
+        self.wallet_generator = Some(wallet_generator);
     }
     
     /// Set connection manager
@@ -511,8 +532,104 @@ impl Agent for QuantumOmegaAgent {
             warn!("Transaction manager not set for Quantum Omega agent");
         }
         
-        // Initialize state
-        self.state.snipe_vault = "quantum_omega_vault".to_string(); // In real implementation, this would be a Solana pubkey
+        if self.wallet_generator.is_none() {
+            warn!("Wallet generator not set for Quantum Omega agent");
+            
+            // Create wallet generator if wallet_manager and tx_manager are available
+            if let (Some(wallet_manager), Some(tx_manager)) = (&self.wallet_manager, &self.tx_manager) {
+                let wallet_generator = crate::agents::wallet_generator::WalletGenerator::new(
+                    wallet_manager.clone(),
+                    tx_manager.clone(),
+                );
+                self.wallet_generator = Some(Arc::new(wallet_generator));
+                info!("Created wallet generator for Quantum Omega agent");
+            }
+        }
+        
+        // Initialize agent wallets if wallet generator is available
+        if let Some(wallet_generator) = &self.wallet_generator {
+            // Initialize agent wallets
+            info!("Initializing wallets for Quantum Omega agent");
+            wallet_generator.initialize_agent_wallets(&self.config.id)?;
+            
+            // Create standard wallets for different purposes
+            let trading_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::Trading
+            )?;
+            
+            let profit_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::ProfitVault
+            )?;
+            
+            let fee_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::FeePayment
+            )?;
+            
+            // Create stealth wallet for sniping
+            let stealth_wallet = wallet_generator.create_stealth_wallet(&self.config.id)?;
+            
+            // Store wallets in agent state
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::Trading, trading_wallet);
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::ProfitVault, profit_wallet);
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::FeePayment, fee_wallet);
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::Stealth, stealth_wallet);
+            
+            info!("Initialized {} wallets for Quantum Omega agent", self.agent_wallets.len());
+            
+            // Use the profit wallet pubkey as the snipe vault
+            if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
+                self.state.snipe_vault = profit_wallet.public_key.clone();
+                info!("Set snipe vault to profit wallet: {}", self.state.snipe_vault);
+            }
+        } else {
+            // Initialize state with placeholder
+            self.state.snipe_vault = "quantum_omega_vault".to_string();
+        }
+        
+        // Initialize launch detector if connection is available
+        if let Some(connection) = &self.connection {
+            if self.launch_detector.is_none() {
+                // Get RPC client
+                let rpc_client = connection.get_rpc_client()?;
+                
+                // Create default parameters
+                let params = launch_detector::LaunchDetectionParams::default();
+                
+                // Create launch detector
+                self.launch_detector = Some(Arc::new(
+                    launch_detector::LaunchDetector::new(Arc::new(rpc_client), params)
+                ));
+                
+                // Initialize detector
+                self.launch_detector.as_ref().unwrap().initialize()?;
+                
+                info!("Launch detector initialized");
+            }
+        }
+        
+        // Initialize whale tracker if connection is available
+        if let Some(connection) = &self.connection {
+            if self.whale_tracker.is_none() {
+                // Get RPC client
+                let rpc_client = connection.get_rpc_client()?;
+                
+                // Create default parameters
+                let params = whale_tracker::WhaleTrackerParams::default();
+                
+                // Create whale tracker
+                self.whale_tracker = Some(Arc::new(
+                    whale_tracker::WhaleTracker::new(Arc::new(rpc_client), params)
+                ));
+                
+                // Initialize tracker
+                self.whale_tracker.as_ref().unwrap().initialize()?;
+                
+                info!("Whale tracker initialized");
+            }
+        }
         
         // Initialize RL model parameters
         self.state.rl_model.parameters.insert("learning_rate".to_string(), 0.001);
@@ -548,60 +665,227 @@ impl Agent for QuantumOmegaAgent {
     fn execute_strategy(&mut self) -> Result<AgentExecutionResult> {
         info!("Executing strategy for Quantum Omega agent: {}", self.config.name);
         
-        // Create sample launch target
-        let target = LaunchTarget {
-            symbol: "ROCKET".to_string(),
-            token_address: "RockXzT5zbk2WTUyQbYCupdG9X5ofgsr8iuSEi7Vt67".to_string(),
-            initial_price: Some(0.000001),
-            initial_liquidity: Some(50000.0),
-            dex: "raydium".to_string(),
-            launch_time: Some(Utc::now()),
-            token_metrics: TokenMetrics {
-                total_supply: 1000000000000,
-                initial_market_cap: Some(1000000.0),
-                creator_wallet: "RockDevXYZ12345678abcdefghijklmnop".to_string(),
-                holder_count: Some(1),
-                liquidity_percentage: Some(0.8),
-                tax_percentage: Some(0.03),
-                max_tx_percentage: Some(0.01),
-                trading_enabled: true,
-                metadata: HashMap::new(),
-            },
-            social_signals: SocialSignals {
-                telegram_members: Some(1500),
-                twitter_followers: Some(2800),
-                discord_members: Some(1200),
-                website_url: Some("https://rocket-token.io".to_string()),
-                activity_score: Some(0.85),
-                sentiment_score: Some(0.7),
-            },
+        // Check for stealth wallet - create one if needed
+        let stealth_wallet = match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Stealth) {
+            Some(wallet) => wallet.clone(),
+            None => {
+                // If no wallet is available, try to initialize
+                if self.agent_wallets.is_empty() {
+                    self.initialize()?;
+                }
+                
+                // Try again or create a new stealth wallet
+                match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Stealth) {
+                    Some(wallet) => wallet.clone(),
+                    None => {
+                        if let Some(wallet_generator) = &self.wallet_generator {
+                            let new_stealth_wallet = wallet_generator.create_stealth_wallet(&self.config.id)?;
+                            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::Stealth, new_stealth_wallet.clone());
+                            new_stealth_wallet
+                        } else {
+                            return Err(anyhow!("No wallet generator available for stealth wallet creation"));
+                        }
+                    }
+                }
+            }
         };
         
-        // Execute snipe
-        let snipe_result = self.execute_precision_snipe(target)?;
+        info!("Using stealth wallet {} for sniping operation", stealth_wallet.public_key);
         
-        // Create execution result
+        // Update wallet last used timestamp if wallet generator available
+        if let Some(wallet_generator) = &self.wallet_generator {
+            wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::Stealth)?;
+        }
+        
+        // Check for launch opportunities using detectors
+        let mut launch_targets = Vec::new();
+        
+        // Check launch detector
+        if let Some(detector) = &self.launch_detector {
+            // Scan for new token launches
+            let new_launches = detector.check_new_launches()?;
+            launch_targets.extend(new_launches);
+        }
+        
+        // Use a sample target if no real ones detected
+        if launch_targets.is_empty() {
+            // Create sample launch target for demonstration
+            launch_targets.push(LaunchTarget {
+                symbol: "ROCKET".to_string(),
+                token_address: "RockXzT5zbk2WTUyQbYCupdG9X5ofgsr8iuSEi7Vt67".to_string(),
+                initial_price: Some(0.000001),
+                initial_liquidity: Some(50000.0),
+                dex: "raydium".to_string(),
+                launch_time: Some(Utc::now()),
+                token_metrics: TokenMetrics {
+                    total_supply: 1000000000000,
+                    initial_market_cap: Some(1000000.0),
+                    creator_wallet: "RockDevXYZ12345678abcdefghijklmnop".to_string(),
+                    holder_count: Some(1),
+                    liquidity_percentage: Some(0.8),
+                    tax_percentage: Some(0.03),
+                    max_tx_percentage: Some(0.01),
+                    trading_enabled: true,
+                    metadata: HashMap::new(),
+                },
+                social_signals: SocialSignals {
+                    telegram_members: Some(1500),
+                    twitter_followers: Some(2800),
+                    discord_members: Some(1200),
+                    website_url: Some("https://rocket-token.io".to_string()),
+                    activity_score: Some(0.85),
+                    sentiment_score: Some(0.7),
+                },
+            });
+        }
+        
+        // Process best launch target
+        if let Some(target) = launch_targets.into_iter().next() {
+            info!("Processing launch target: {} ({})", target.symbol, target.token_address);
+            
+            // Execute snipe with stealth wallet
+            let snipe_result = self.execute_precision_snipe(target)?;
+            
+            // If snipe was successful, transfer tokens to profit vault
+            if snipe_result.success {
+                if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
+                    info!("Transferring tokens to profit vault: {}", profit_wallet.public_key);
+                    
+                    // In real implementation, this would create a transaction to transfer tokens
+                    // from stealth wallet to profit vault
+                    
+                    // Update profit wallet last used timestamp
+                    if let Some(wallet_generator) = &self.wallet_generator {
+                        wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::ProfitVault)?;
+                    }
+                }
+            }
+            
+            // Create execution result
+            let execution_result = AgentExecutionResult {
+                id: uuid::Uuid::new_v4().to_string(),
+                success: snipe_result.success,
+                profit: if snipe_result.success { snipe_result.amount_purchased * 0.2 } else { 0.0 }, // 20% profit for demo
+                timestamp: Utc::now().to_rfc3339(),
+                signature: snipe_result.signature,
+                error: snipe_result.error,
+                metrics: snipe_result.metrics,
+            };
+            
+            return Ok(execution_result);
+        }
+        
+        // No targets found
         let execution_result = AgentExecutionResult {
             id: uuid::Uuid::new_v4().to_string(),
-            success: snipe_result.success,
-            profit: if snipe_result.success { snipe_result.amount_purchased * 0.2 } else { 0.0 }, // 20% profit for demo
+            success: false,
+            profit: 0.0,
             timestamp: Utc::now().to_rfc3339(),
-            signature: snipe_result.signature,
-            error: snipe_result.error,
-            metrics: snipe_result.metrics,
+            signature: None,
+            error: Some("No suitable launch targets found".to_string()),
+            metrics: HashMap::new(),
         };
         
         Ok(execution_result)
     }
     
     fn update(&mut self) -> Result<()> {
-        // Periodic update, e.g. for scanning launch detections
-        match self.status {
-            AgentStatus::Scanning => {
-                // In a real implementation, this would scan for token launches
-                debug!("Quantum Omega scanning for token launches...");
+        // Only update if in scanning state
+        if self.status != AgentStatus::Scanning {
+            return Ok(());
+        }
+        
+        debug!("Updating Quantum Omega agent: {}", self.config.name);
+        
+        // Check for new token launches
+        if let Some(detector) = &self.launch_detector {
+            let new_launches = detector.check_new_launches()?;
+            
+            // Process new launches
+            if !new_launches.is_empty() {
+                info!("Detected {} new token launches", new_launches.len());
+                
+                // Score each launch
+                for launch in &new_launches {
+                    let potential_score = if let (Some(social_score), Some(market_cap)) = (
+                        launch.social_signals.activity_score,
+                        launch.token_metrics.initial_market_cap) {
+                        
+                        // Simple scoring model
+                        let social_factor = social_score * 0.4; // 40% weight
+                        let market_factor = if market_cap < 500000.0 { 0.4 } else { 0.2 }; // Prefer smaller caps
+                        let liquidity_factor = if let Some(liq) = launch.initial_liquidity {
+                            if liq > 50000.0 { 0.2 } else { 0.1 }
+                        } else {
+                            0.0
+                        };
+                        
+                        social_factor + market_factor + liquidity_factor
+                    } else {
+                        0.3 // Default medium score
+                    };
+                    
+                    info!("Launch potential for {}: {:.2}", launch.symbol, potential_score);
+                    
+                    // In a full implementation, we would store these and execute on the highest scoring ones
+                }
             }
-            _ => {}
+        }
+        
+        // Track whale activity
+        if let Some(tracker) = &self.whale_tracker {
+            let whale_transactions = tracker.check_transactions()?;
+            
+            // Process whale transactions
+            if !whale_transactions.is_empty() {
+                info!("Detected {} new whale transactions", whale_transactions.len());
+                
+                // Analyze for interesting patterns
+                for tx in &whale_transactions {
+                    match tx.transaction_type {
+                        whale_tracker::WhaleTransactionType::Buy => {
+                            // Consider following whale buys
+                            if let Some(value) = tx.usd_value {
+                                if value > 100000.0 {
+                                    info!("Notable whale buy: {} ${} of {}", 
+                                        tx.whale_pubkey, value, tx.token_pubkey);
+                                    
+                                    // In a full implementation, we would analyze this token
+                                    // and potentially add it to our snipe targets
+                                }
+                            }
+                        },
+                        _ => {} // Process other transaction types as needed
+                    }
+                }
+            }
+        }
+        
+        // Update wallet balances periodically
+        if let Some(wallet_generator) = &self.wallet_generator {
+            // Update trading wallet balance
+            if let Some(trading_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Trading) {
+                match wallet_generator.update_wallet_balance(&trading_wallet.id) {
+                    Ok(balance) => {
+                        debug!("Updated trading wallet balance: {} SOL", balance);
+                    },
+                    Err(e) => {
+                        warn!("Failed to update trading wallet balance: {}", e);
+                    }
+                }
+            }
+            
+            // Update profit vault balance
+            if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
+                match wallet_generator.update_wallet_balance(&profit_wallet.id) {
+                    Ok(balance) => {
+                        debug!("Updated profit vault balance: {} SOL", balance);
+                    },
+                    Err(e) => {
+                        warn!("Failed to update profit vault balance: {}", e);
+                    }
+                }
+            }
         }
         
         Ok(())

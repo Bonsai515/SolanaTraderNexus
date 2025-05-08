@@ -5,7 +5,9 @@ use solana_quantum_trading::solana::connection::{SolanaConnection, ConnectionCon
 use solana_quantum_trading::solana::wallet_manager::{WalletManager, WalletManagerConfig};
 use solana_quantum_trading::solana::rate_limiter::{RateLimiter, RateLimiterConfig};
 use solana_quantum_trading::solana::transaction_manager::{TransactionManager, TransactionManagerConfig};
-use solana_quantum_trading::transformers::{TransformerConfig};
+use solana_quantum_trading::transformers::{TransformerConfig, TransformerAPI};
+use solana_quantum_trading::agents::{AgentManager, AgentConfig, AgentType, Agent};
+use solana_quantum_trading::agents::intelligence::LLMController;
 
 use anyhow::{Result, anyhow, Context};
 use log::{info, warn, error, debug, LevelFilter};
@@ -180,6 +182,122 @@ fn init_transaction_manager(
 }
 
 // Main function
+// Initialize transformer API
+fn init_transformer_api() -> Result<Arc<TransformerAPI>> {
+    let config = TransformerConfig {
+        model_dir: "data/models".to_string(),
+        cache_dir: "data/cache".to_string(),
+        max_batch_size: 64,
+        prediction_window_seconds: 300,
+        transformer_binary_path: Some("binary/transformer_engine".to_string()),
+    };
+    
+    info!("Initializing transformer API...");
+    let transformer_api = TransformerAPI::new(config)?;
+    let transformer_api = Arc::new(transformer_api);
+    
+    transformer_api.initialize()?;
+    info!("Transformer API initialized");
+    
+    Ok(transformer_api)
+}
+
+// Initialize LLM controller
+fn init_llm_controller() -> Result<Arc<LLMController>> {
+    // Get API key from environment
+    let api_key = env::var("PERPLEXITY_API_KEY").unwrap_or_else(|_| {
+        warn!("PERPLEXITY_API_KEY not found in environment, using dummy key");
+        "dummy-key".to_string()
+    });
+    
+    info!("Initializing LLM controller...");
+    let llm_controller = LLMController::new(api_key, "llama-3.1-sonar-small-128k-online");
+    let llm_controller = Arc::new(llm_controller);
+    
+    // Initialize system message
+    llm_controller.initialize_system()?;
+    
+    info!("LLM controller initialized");
+    
+    Ok(llm_controller)
+}
+
+// Initialize agent manager
+fn init_agent_manager(
+    connection: Arc<SolanaConnection>,
+    wallet_manager: Arc<WalletManager>,
+    transaction_manager: Arc<TransactionManager>,
+    transformer_api: Arc<TransformerAPI>,
+    llm_controller: Arc<LLMController>,
+) -> Result<Arc<AgentManager>> {
+    info!("Initializing agent manager...");
+    
+    let agent_manager = AgentManager::new(
+        connection,
+        wallet_manager, 
+        transaction_manager,
+        transformer_api,
+        llm_controller,
+    )?;
+    
+    let agent_manager = Arc::new(agent_manager);
+    
+    info!("Agent manager initialized");
+    
+    Ok(agent_manager)
+}
+
+// Create Hyperion agent configuration
+fn create_hyperion_config() -> Result<AgentConfig> {
+    let hyperion_config = AgentConfig {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: "Hyperion Flash Arbitrage Agent".to_string(),
+        agent_type: AgentType::Hyperion,
+        active: true,
+        risk_level: 0.7,
+        max_capital: 10.0, // 10 SOL
+        strategy_ids: vec!["flash_arb".to_string(), "triangle_arb".to_string()],
+        wallet_id: "primary_strategy_wallet".to_string(), // Would use actual wallet ID in production
+        priority: 2,
+        parameters: std::collections::HashMap::new(),
+    };
+    
+    Ok(hyperion_config)
+}
+
+// Create Quantum Omega agent configuration
+fn create_quantum_omega_config() -> Result<AgentConfig> {
+    let quantum_omega_config = AgentConfig {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: "Quantum Omega Sniper Agent".to_string(),
+        agent_type: AgentType::QuantumOmega,
+        active: true,
+        risk_level: 0.5,
+        max_capital: 2.0, // 2 SOL
+        strategy_ids: vec!["precision_snipe".to_string(), "microcap_rocket".to_string()],
+        wallet_id: "primary_strategy_wallet".to_string(), // Would use actual wallet ID in production
+        priority: 1,
+        parameters: std::collections::HashMap::new(),
+    };
+    
+    Ok(quantum_omega_config)
+}
+
+// Update agents
+fn update_agents(agent_manager: &AgentManager) -> Result<()> {
+    // Update all agents
+    agent_manager.update_all()?;
+    
+    // Check for agent execution opportunities
+    if let Some(execution_results) = agent_manager.check_execution_opportunities()? {
+        for result in execution_results {
+            info!("Agent execution result: {:?}", result);
+        }
+    }
+    
+    Ok(())
+}
+
 fn main() -> Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
@@ -291,10 +409,42 @@ fn main() -> Result<()> {
                 wallet_manager.clone(),
             )?;
             
-            info!("System initialized and ready");
+            // Initialize transformer API (market prediction)
+            let transformer_api = init_transformer_api()?;
             
-            // Run forever
+            // Initialize LLM controller
+            let llm_controller = init_llm_controller()?;
+            
+            // Initialize agent manager
+            let agent_manager = init_agent_manager(
+                connection.clone(),
+                wallet_manager.clone(),
+                transaction_manager.clone(),
+                transformer_api.clone(),
+                llm_controller.clone(),
+            )?;
+            
+            // Create and start the Hyperion agent
+            let hyperion_config = create_hyperion_config()?;
+            let hyperion_id = agent_manager.create_agent(hyperion_config)?;
+            info!("Created Hyperion agent with ID: {}", hyperion_id);
+            
+            // Create and start the Quantum Omega agent
+            let quantum_omega_config = create_quantum_omega_config()?;
+            let quantum_omega_id = agent_manager.create_agent(quantum_omega_config)?;
+            info!("Created Quantum Omega agent with ID: {}", quantum_omega_id);
+            
+            // Start all agents
+            agent_manager.start_all()?;
+            
+            info!("System initialized and agents active");
+            
+            // Run main system loop
             loop {
+                // Update agents
+                update_agents(&agent_manager)?;
+                
+                // Sleep to avoid high CPU usage
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
         }
