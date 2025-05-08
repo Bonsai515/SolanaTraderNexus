@@ -12,14 +12,19 @@ A comprehensive Solana trading system with custom transformers, AI trading agent
 
 ## Architecture
 
-The system is built with a modular architecture:
+The system is built with a layered architecture:
 
-- **Core**: Solana connection, wallet management, and transaction processing
-- **Transformers**: Data processing and pattern recognition modules
-- **Agents**: Trading strategy management and execution
-- **API**: RESTful interfaces for frontend interaction
-- **Storage**: Secure, persistent data management
-- **Frontend**: Interactive dashboard for monitoring and configuration (using WebAssembly)
+- **Engine Layer (Innermost)**: Transaction Engine for executing strategies and managing blockchain transactions
+- **Security Layer**: Advanced security protocols with quantum encryption, vault storage, and quarantine areas
+- **Communication Layer**: Centralized communication center for inter-component data flow
+- **AI Agents Layer**: Trading agents with different strategies for opportunity detection
+- **Transformer Layer**: Market data and trading signal transformers for data analysis
+- **Solana Integration Layer**: Connection, wallet management, and transaction interfaces
+- **Storage Layer**: Secure, persistent data management with controlled access
+- **API Layer**: RESTful and WebSocket interfaces for frontend interaction
+- **Frontend Layer**: Interactive dashboard (WebAssembly) for monitoring and configuration
+
+Each layer communicates through the Communication Center, with the Security Protocol enforcing access controls and data integrity between components.
 
 ## Technology Stack
 
