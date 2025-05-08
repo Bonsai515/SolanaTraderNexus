@@ -1,16 +1,13 @@
-// Export all modules
-pub mod models;
-pub mod engine;
-pub mod transformers;
+// Solana Trading Platform
+
+// Public modules
 pub mod solana;
+pub mod models;
+pub mod transformers;
+pub mod dex;
+
+// These modules are planned but will be implemented in future iterations
+pub mod engine;
+pub mod storage;
 pub mod security;
 pub mod communication;
-pub mod storage;
-
-// Export commonly used items
-pub use crate::communication::CommunicationCenter;
-pub use crate::security::SecurityProtocol;
-pub use crate::storage::Storage;
-pub use crate::solana::{SolanaConnection, WalletManager, TransactionManager};
-pub use crate::engine::TransactionEngine;
-pub use crate::transformers::{MicroQHCTransformer, MEMECortexTransformer, CommunicationTransformer};

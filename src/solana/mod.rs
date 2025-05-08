@@ -1,7 +1,10 @@
-pub mod connection;
-pub mod transaction_manager;
-pub mod wallet_manager;
+// Solana integration module
+
+mod connection;
+mod wallet_manager;
+mod transaction_manager;
 
 pub use connection::SolanaConnection;
-pub use transaction_manager::TransactionManager;
-pub use wallet_manager::WalletManager;
+pub use wallet_manager::{WalletManager, WalletError};
+pub use transaction_manager::{TransactionManager, TransactionError};
+pub use crate::models::Wallet;
