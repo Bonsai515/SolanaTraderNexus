@@ -173,6 +173,12 @@ pub struct HyperionAgent {
     
     /// LLM Controller
     llm_controller: Option<Arc<LLMController>>,
+    
+    /// Wallet generator 
+    wallet_generator: Option<Arc<crate::agents::wallet_generator::WalletGenerator>>,
+    
+    /// Agent wallets (separated by purpose)
+    agent_wallets: HashMap<crate::agents::wallet_generator::WalletPurpose, crate::agents::wallet_generator::AgentWallet>,
 }
 
 impl HyperionAgent {
@@ -195,7 +201,14 @@ impl HyperionAgent {
             tx_manager: None,
             transformer_api: None,
             llm_controller: None,
+            wallet_generator: None,
+            agent_wallets: HashMap::new(),
         })
+    }
+    
+    /// Set wallet generator
+    pub fn set_wallet_generator(&mut self, wallet_generator: Arc<crate::agents::wallet_generator::WalletGenerator>) {
+        self.wallet_generator = Some(wallet_generator);
     }
     
     /// Set connection manager
@@ -409,8 +422,58 @@ impl Agent for HyperionAgent {
             warn!("Transaction manager not set for Hyperion agent");
         }
         
-        // Initialize state
-        self.state.strategy_vault = "hyperion_vault".to_string(); // In real implementation, this would be a Solana pubkey
+        if self.wallet_generator.is_none() {
+            warn!("Wallet generator not set for Hyperion agent");
+            
+            // Create wallet generator if wallet_manager and tx_manager are available
+            if let (Some(wallet_manager), Some(tx_manager)) = (&self.wallet_manager, &self.tx_manager) {
+                let wallet_generator = crate::agents::wallet_generator::WalletGenerator::new(
+                    wallet_manager.clone(),
+                    tx_manager.clone(),
+                );
+                self.wallet_generator = Some(Arc::new(wallet_generator));
+                info!("Created wallet generator for Hyperion agent");
+            }
+        }
+        
+        // Initialize agent wallets if wallet generator is available
+        if let Some(wallet_generator) = &self.wallet_generator {
+            // Initialize agent wallets
+            info!("Initializing wallets for Hyperion agent");
+            wallet_generator.initialize_agent_wallets(&self.config.id)?;
+            
+            // Get wallets for different purposes
+            let trading_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::Trading
+            )?;
+            
+            let profit_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::ProfitVault
+            )?;
+            
+            let fee_wallet = wallet_generator.get_wallet(
+                &self.config.id, 
+                crate::agents::wallet_generator::WalletPurpose::FeePayment
+            )?;
+            
+            // Store wallets in agent state
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::Trading, trading_wallet);
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::ProfitVault, profit_wallet);
+            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::FeePayment, fee_wallet);
+            
+            info!("Initialized {} wallets for Hyperion agent", self.agent_wallets.len());
+            
+            // Use the profit wallet pubkey as the strategy vault
+            if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
+                self.state.strategy_vault = profit_wallet.public_key.clone();
+                info!("Set strategy vault to profit wallet: {}", self.state.strategy_vault);
+            }
+        } else {
+            // Initialize state with placeholder
+            self.state.strategy_vault = "hyperion_vault".to_string(); // In real implementation, this would be a Solana pubkey
+        }
         
         // Initialize chain mapper
         self.state.chain_mapper.insert("solana".to_string(), vec![
@@ -448,7 +511,33 @@ impl Agent for HyperionAgent {
     fn execute_strategy(&mut self) -> Result<AgentExecutionResult> {
         info!("Executing strategy for Hyperion agent: {}", self.config.name);
         
-        // Build sample strategy
+        // Get trading wallet
+        let trading_wallet = match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Trading) {
+            Some(wallet) => wallet,
+            None => {
+                // If no wallet is available, try to initialize
+                if self.state.strategy_vault.is_empty() {
+                    self.initialize()?;
+                }
+                
+                // Try again
+                match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Trading) {
+                    Some(wallet) => wallet,
+                    None => {
+                        return Err(anyhow!("No trading wallet available for execution"));
+                    }
+                }
+            }
+        };
+        
+        info!("Using trading wallet {} for strategy execution", trading_wallet.public_key);
+        
+        // Update wallet last used timestamp if wallet generator available
+        if let Some(wallet_generator) = &self.wallet_generator {
+            wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::Trading)?;
+        }
+        
+        // Build strategy
         let dex_routes = vec![
             DexRoute {
                 dex_name: "raydium".to_string(),
@@ -479,8 +568,21 @@ impl Agent for HyperionAgent {
             },
         ];
         
-        // Execute arbitrage
+        // Execute arbitrage using agent's trading wallet
         let arb_result = self.execute_zero_capital_arb(dex_routes, None)?;
+        
+        // Transfer profit to profit vault if available
+        if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
+            info!("Transferring profit to profit vault: {}", profit_wallet.public_key);
+            
+            // In real implementation, this would create a transaction to transfer profits
+            // from trading wallet to profit vault
+            
+            // Update profit wallet last used timestamp
+            if let Some(wallet_generator) = &self.wallet_generator {
+                wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::ProfitVault)?;
+            }
+        }
         
         // Create execution result
         let execution_result = AgentExecutionResult {
