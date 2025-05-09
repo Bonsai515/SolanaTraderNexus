@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAllInsightsViaWs, fetchAgentInsightsViaWs, applyInsightViaWs } from '../lib/insightClient';
+import { 
+  fetchAllInsightsViaWs, 
+  fetchAgentInsightsViaWs, 
+  applyInsightViaWs,
+  getMarketPatternAnalysis,
+  MarketAnalysisResult
+} from '../lib/insightClient';
 import { LearningInsight, InsightType } from '../../shared/schema';
 
 const InsightTypeBadge = ({ type }: { type: InsightType }) => {
@@ -131,6 +137,146 @@ const InsightCard = ({
   );
 };
 
+// Market Pattern Analysis Component
+const MarketPatternAnalysis = () => {
+  const [selectedPair, setSelectedPair] = useState('SOL/USDC');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<MarketAnalysisResult | null>(null);
+  const [timestamp, setTimestamp] = useState<string | null>(null);
+  
+  const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+  
+  const fetchMarketAnalysis = async () => {
+    if (!selectedPair) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const result = await getMarketPatternAnalysis(selectedPair);
+      setAnalysis(result.marketAnalysis);
+      setTimestamp(result.timestamp);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch market analysis');
+      setAnalysis(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const getSentimentColor = (sentiment: string) => {
+    switch(sentiment) {
+      case 'bullish': return 'text-green-400';
+      case 'bearish': return 'text-red-400';
+      default: return 'text-yellow-400';
+    }
+  };
+  
+  return (
+    <div className="bg-slate-800 rounded-lg shadow-md p-4 mb-6 border border-slate-700">
+      <h3 className="text-xl font-semibold mb-4 text-slate-200">AI-Powered Market Pattern Analysis</h3>
+      
+      <div className="flex items-center mb-4 space-x-4">
+        <div className="flex-grow">
+          <select
+            className="w-full bg-slate-700 text-slate-200 rounded p-2"
+            value={selectedPair}
+            onChange={(e) => setSelectedPair(e.target.value)}
+          >
+            {pairs.map(pair => (
+              <option key={pair} value={pair}>{pair}</option>
+            ))}
+          </select>
+        </div>
+        <button
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center"
+          onClick={fetchMarketAnalysis}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <div className="flex items-center">
+              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+              Analyzing...
+            </div>
+          ) : 'Analyze Patterns'}
+        </button>
+      </div>
+      
+      {error && (
+        <div className="bg-red-900/30 text-red-300 p-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
+      {analysis && (
+        <div className="border border-slate-700 rounded p-4 bg-slate-800/50">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-lg font-medium text-slate-100">
+              {selectedPair} Analysis
+            </h4>
+            <div className={`font-semibold ${getSentimentColor(analysis.sentiment)}`}>
+              {analysis.sentiment.toUpperCase()} 
+              <span className="ml-2 bg-slate-700 px-2 py-1 rounded text-xs text-slate-300">
+                {(analysis.confidenceScore * 100).toFixed(0)}% confidence
+              </span>
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <h5 className="text-sm font-semibold text-slate-400 mb-2">Market Trends</h5>
+              <ul className="list-disc pl-5 text-slate-300 text-sm">
+                {analysis.trends.map((trend, idx) => (
+                  <li key={idx}>{trend}</li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h5 className="text-sm font-semibold text-slate-400 mb-2">Key Levels</h5>
+              <div className="text-slate-300 text-sm">
+                <div className="flex">
+                  <span className="font-medium text-green-400 w-24">Support:</span>
+                  <span>
+                    {analysis.keyLevels.support.map(level => `$${level.toFixed(4)}`).join(', ')}
+                  </span>
+                </div>
+                <div className="flex mt-1">
+                  <span className="font-medium text-red-400 w-24">Resistance:</span>
+                  <span>
+                    {analysis.keyLevels.resistance.map(level => `$${level.toFixed(4)}`).join(', ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h5 className="text-sm font-semibold text-slate-400 mb-2">Volatility Assessment</h5>
+              <p className="text-slate-300 text-sm">{analysis.volatilityAssessment}</p>
+            </div>
+            
+            <div>
+              <h5 className="text-sm font-semibold text-slate-400 mb-2">Potential Catalysts</h5>
+              <ul className="list-disc pl-5 text-slate-300 text-sm">
+                {analysis.potentialCatalysts.map((catalyst, idx) => (
+                  <li key={idx}>{catalyst}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          
+          {timestamp && (
+            <div className="mt-4 text-right text-xs text-slate-500">
+              Generated at {new Date(timestamp).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FilterPanel = ({ 
   agentFilter, 
   setAgentFilter,
@@ -229,6 +375,9 @@ export default function AIInsights() {
         </button>
       </div>
       
+      {/* AI Market Pattern Analysis Section */}
+      <MarketPatternAnalysis />
+      
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="md:col-span-1">
           <FilterPanel 
@@ -271,6 +420,8 @@ export default function AIInsights() {
         </div>
         
         <div className="md:col-span-3">
+          <h2 className="text-xl font-bold text-slate-100 mb-4">Learning Insights History</h2>
+          
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>

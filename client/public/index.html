@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solana Trading Platform</title>
+  <title>Solana Quantum Trading Platform</title>
   <style>
     :root {
       --bg-primary: #0f172a;
@@ -24,383 +24,52 @@
       padding: 0;
       min-height: 100vh;
     }
-    
-    header {
-      background-color: var(--bg-secondary);
-      padding: 1rem 2rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 700;
-      font-size: 1.25rem;
-    }
-    
-    .logo span {
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-    
-    .dashboard {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    
-    .card {
-      background-color: var(--bg-secondary);
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      border: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .card h2 {
-      margin-top: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 1rem;
-    }
-    
-    .card-value {
-      font-size: 2rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-    
-    .card-value.gradient {
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    .card-description {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      margin-top: auto;
-    }
-    
-    .strategy-section {
-      background-color: var(--bg-secondary);
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      border: 1px solid var(--border-color);
-      margin-bottom: 2rem;
-    }
-    
-    .strategy-section h2 {
-      margin-top: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-    }
-    
-    .strategy-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
-    }
-    
-    .strategy-card {
-      background-color: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      border-radius: 0.375rem;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .strategy-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.75rem;
-    }
-    
-    .strategy-name {
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    
-    .strategy-status {
-      padding: 0.25rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-    
-    .status-active {
-      background-color: rgba(16, 185, 129, 0.2);
-      color: #10b981;
-    }
-    
-    .strategy-pair {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.75rem;
-    }
-    
-    .strategy-description {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin-bottom: 1rem;
-    }
-    
-    .wallet-section {
-      background-color: var(--bg-secondary);
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      border: 1px solid var(--border-color);
-    }
-    
-    .wallet-section h2 {
-      margin-top: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-    }
-    
-    .wallet-address {
-      background-color: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      border-radius: 0.375rem;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    
-    .wallet-label {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.5rem;
-    }
-    
-    .address-value {
-      font-family: monospace;
-      word-break: break-all;
-      background-color: rgba(255, 255, 255, 0.05);
-      padding: 0.5rem;
-      border-radius: 0.25rem;
-    }
-    
-    .connection-status {
+
+    /* Loading spinner */
+    .app-loading {
       position: fixed;
-      bottom: 1rem;
-      right: 1rem;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 0.375rem;
-      padding: 0.75rem 1rem;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       display: flex;
+      flex-direction: column;
+      justify-content: center;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
+      background-color: var(--bg-primary);
+      z-index: 9999;
     }
-    
-    .status-indicator {
-      width: 0.75rem;
-      height: 0.75rem;
+
+    .app-loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
       border-radius: 50%;
-      background-color: #10b981;
+      border-top-color: var(--accent-primary);
+      animation: spin 1s ease-in-out infinite;
     }
-    
-    .status-disconnected .status-indicator {
-      background-color: #ef4444;
+
+    .app-loading-text {
+      margin-top: 1rem;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
-    
-    @media (max-width: 768px) {
-      .dashboard {
-        grid-template-columns: 1fr;
-      }
-      
-      .strategy-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      header {
-        padding: 1rem;
-      }
-      
-      main {
-        padding: 1rem;
-      }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path>
-        <path d="M8.5 8.5a10 10 0 0 1 2-2"></path>
-        <path d="M12.5 3a10 10 0 0 0 8.5 8.5"></path>
-      </svg>
-      <span>Solana Trading Platform</span>
+  <div id="root">
+    <!-- Loading UI while React loads -->
+    <div class="app-loading">
+      <div class="app-loading-spinner"></div>
+      <div class="app-loading-text">Solana Quantum Trading Platform</div>
     </div>
-    <div>
-      <button id="connect-wallet-btn" style="background: var(--accent-gradient); border: none; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; cursor: pointer;">
-        Connect Wallet
-      </button>
-    </div>
-  </header>
-  
-  <main>
-    <div class="dashboard">
-      <div class="card">
-        <h2>Active Strategies</h2>
-        <div class="card-value gradient">3</div>
-        <div class="card-description">Strategies currently running</div>
-      </div>
-      
-      <div class="card">
-        <h2>Total Balance</h2>
-        <div class="card-value gradient">2,145.32 SOL</div>
-        <div class="card-description">Across all wallets</div>
-      </div>
-      
-      <div class="card">
-        <h2>24h Performance</h2>
-        <div class="card-value gradient">+3.2%</div>
-        <div class="card-description">Based on current strategies</div>
-      </div>
-    </div>
-    
-    <div class="strategy-section">
-      <h2>Active Strategies</h2>
-      <div class="strategy-grid">
-        <div class="strategy-card">
-          <div class="strategy-header">
-            <div class="strategy-name">Market Making</div>
-            <div class="strategy-status status-active">Active</div>
-          </div>
-          <div class="strategy-pair">SOL/USDC</div>
-          <div class="strategy-description">Providing liquidity on both sides of the order book to capture the spread.</div>
-        </div>
-        
-        <div class="strategy-card">
-          <div class="strategy-header">
-            <div class="strategy-name">Range Trading</div>
-            <div class="strategy-status status-active">Active</div>
-          </div>
-          <div class="strategy-pair">BTC/USDC</div>
-          <div class="strategy-description">Trading within predefined price ranges to capitalize on predictable bounces.</div>
-        </div>
-        
-        <div class="strategy-card">
-          <div class="strategy-header">
-            <div class="strategy-name">Momentum Trading</div>
-            <div class="strategy-status status-active">Active</div>
-          </div>
-          <div class="strategy-pair">ETH/USDC</div>
-          <div class="strategy-description">Following price trends with quantum-inspired predictions to maximize gains.</div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="wallet-section">
-      <h2>Wallet Addresses for Funding</h2>
-      
-      <div class="wallet-address">
-        <div class="wallet-label">Trading Wallet</div>
-        <div class="address-value" id="trading-wallet">Loading...</div>
-      </div>
-      
-      <div class="wallet-address">
-        <div class="wallet-label">Collateral Wallet</div>
-        <div class="address-value" id="collateral-wallet">Loading...</div>
-      </div>
-    </div>
-  </main>
-  
-  <div class="connection-status" id="connection-status">
-    <div class="status-indicator"></div>
-    <span>Connected to WebSocket</span>
   </div>
-  
-  <script>
-    // WebSocket Connection
-    function connectWebSocket() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const socket = new WebSocket(wsUrl);
-      
-      const statusElement = document.getElementById('connection-status');
-      
-      socket.onopen = () => {
-        statusElement.classList.remove('status-disconnected');
-        statusElement.querySelector('span').textContent = 'Connected to WebSocket';
-        console.log('WebSocket connection established');
-      };
-      
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('Received message:', data);
-        
-        if (data.type === 'WALLET_INFO') {
-          // Update wallet addresses
-          document.getElementById('trading-wallet').textContent = data.tradingWallet || 'Not available';
-          document.getElementById('collateral-wallet').textContent = data.collateralWallet || 'Not available';
-        }
-      };
-      
-      socket.onclose = () => {
-        statusElement.classList.add('status-disconnected');
-        statusElement.querySelector('span').textContent = 'Disconnected from WebSocket';
-        console.log('WebSocket connection closed');
-        
-        // Try to reconnect after 5 seconds
-        setTimeout(connectWebSocket, 5000);
-      };
-      
-      socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-      
-      // Store the socket in a global variable to use it elsewhere
-      window.tradingSocket = socket;
-    }
-    
-    // Initialize the application
-    document.addEventListener('DOMContentLoaded', () => {
-      // Connect to WebSocket
-      connectWebSocket();
-      
-      // Fetch wallet addresses
-      fetch('/api/solana/status')
-        .then(response => response.json())
-        .then(data => {
-          console.log('Solana connection status:', data);
-          
-          // Generate random wallet addresses for demo
-          const tradingWallet = 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe5tHE2';
-          const collateralWallet = '2xNwwA8DmH5AsLhBjevvkPzTnpvH6Zz4pQ7bvQD9rtkf';
-          
-          document.getElementById('trading-wallet').textContent = tradingWallet;
-          document.getElementById('collateral-wallet').textContent = collateralWallet;
-        })
-        .catch(error => {
-          console.error('Error fetching Solana status:', error);
-        });
-      
-      // Connect wallet button action
-      document.getElementById('connect-wallet-btn').addEventListener('click', () => {
-        alert('Wallet connection functionality will be added in the future. For now, please use the provided wallet addresses for funding.');
-      });
-    });
-  </script>
 </body>
 </html>
