@@ -47,6 +47,7 @@
     "convert-source-map": "^2.0.0",
     "cookie": "^0.7.1",
     "cookie-signature": "^1.0.6",
+    "cors": "^2.8.5",
     "cross-spawn": "^7.0.6",
     "cssesc": "^3.0.0",
     "csstype": "^3.1.3",

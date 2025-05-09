@@ -35,8 +35,9 @@ if (process.env.NODE_ENV === 'production') {
   });
 
   // Start server
-  httpServer.listen(5000, '0.0.0.0', () => {
-    logger.info('🚀 Production server running on port 5000');
+  const port = process.env.PORT || 5000;
+  httpServer.listen(port, '0.0.0.0', () => {
+    logger.info(`🚀 Production server running on port ${port}`);
     logger.info('💻 WebSocket server enabled');
   });
 } else {
