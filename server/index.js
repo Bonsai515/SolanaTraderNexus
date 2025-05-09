@@ -127,9 +127,10 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Listen on the port Replit expects (must be 5000 to match workflow config)
-const port = 5000;
+// Listen on port 5000 for production deployment
+const port = process.env.PORT || 5000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`💻 WebSocket server accessible at /ws endpoint`);
+}););
 });
