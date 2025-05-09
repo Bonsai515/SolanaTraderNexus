@@ -1,0 +1,16 @@
+{
+  "pair": "SOL/USDC",
+  "price": 150.25,
+  "confidence": 0.85,
+  "window_seconds": 3600,
+  "timestamp": "1746820758",
+  "price_change": 0.035,
+  "volatility": 0.015,
+  "direction": 0.8,
+  "metrics": {
+    "momentum": 0.75,
+    "volume_change": 0.3,
+    "liquidity_score": 0.8,
+    "reason": "Strong buying pressure detected with increasing volume"
+  }
+}
