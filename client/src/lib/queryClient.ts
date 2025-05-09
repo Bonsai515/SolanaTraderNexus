@@ -26,20 +26,37 @@ const defaultOptions: FetcherOptions = {
   credentials: 'same-origin',
 };
 
+// Get base API URL
+const getApiBaseUrl = (): string => {
+  // In production, use the current origin
+  // In development, use localhost:5000 if not in the browser
+  const isProduction = import.meta.env.PROD;
+  const isBrowser = typeof window !== 'undefined';
+  
+  if (isProduction || isBrowser) {
+    return window.location.origin;
+  }
+  
+  return 'http://localhost:5000';
+};
+
 /**
  * Generic API request function
- * @param url The URL to fetch from
  * @param method The HTTP method to use
+ * @param endpoint The API endpoint path (e.g., '/api/health')
  * @param data The data to send (for POST/PUT/PATCH)
  * @param options Additional fetch options
- * @returns The parsed JSON response
+ * @returns The Response object
  */
-export async function apiRequest<T>(
-  url: string,
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
+export async function apiRequest(
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  endpoint: string,
   data?: unknown,
   options: FetcherOptions = {}
-): Promise<T> {
+): Promise<Response> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint}`;
+  
   const opts: RequestInit = {
     method,
     ...defaultOptions,
@@ -54,7 +71,24 @@ export async function apiRequest<T>(
     opts.body = JSON.stringify(data);
   }
 
-  const response = await fetch(url, opts);
+  return fetch(url, opts);
+}
+
+/**
+ * Generic API request function with JSON parsing
+ * @param method The HTTP method to use
+ * @param endpoint The API endpoint path
+ * @param data The data to send (for POST/PUT/PATCH)
+ * @param options Additional fetch options
+ * @returns The parsed JSON response
+ */
+export async function apiRequestJson<T>(
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  endpoint: string,
+  data?: unknown,
+  options: FetcherOptions = {}
+): Promise<T> {
+  const response = await apiRequest(method, endpoint, data, options);
 
   // Handle non-JSON responses
   const contentType = response.headers.get('content-type');
@@ -77,12 +111,13 @@ export async function apiRequest<T>(
 
 /**
  * Default query function for react-query
- * @param url The URL to fetch from
+ * @param queryKey The query key (first element should be the endpoint)
  * @returns The parsed JSON response
  */
 export async function defaultQueryFn<T>({ queryKey }: { queryKey: (string | Record<string, unknown>)[] }): Promise<T> {
-  const url = queryKey[0] as string;
-  return apiRequest<T>(url);
+  const endpoint = queryKey[0] as string;
+  const response = await apiRequest('GET', endpoint);
+  return response.json() as Promise<T>;
 }
 
 // Configure the query client with the default query function

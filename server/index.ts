@@ -53,7 +53,46 @@ app.use(express.urlencoded({ extended: true }));
 // API routes - register with '/api' prefix
 app.use('/api', routes);
 
-// Add a root health check
+// Add a root endpoint
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Solana Quantum Trading Platform</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #0f172a; color: white; padding: 20px; }
+          h1 { color: #38bdf8; }
+          .card { background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          button { background: #3b82f6; color: white; border: none; padding: 10px 20px; 
+                  border-radius: 4px; cursor: pointer; }
+          pre { background: #0f172a; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        </style>
+      </head>
+      <body>
+        <h1>Solana Quantum Trading Platform</h1>
+        <div class="card">
+          <h2>Server Status</h2>
+          <p>Server time: ${new Date().toISOString()}</p>
+          <button onclick="fetch('/api/health').then(r=>r.json()).then(d=>{
+            document.getElementById('result').textContent = JSON.stringify(d, null, 2);
+          })">Check API Health</button>
+          <pre id="result"></pre>
+        </div>
+        <div class="card">
+          <h2>Test Data</h2>
+          <button onclick="fetch('/api/test/populate-price-feed', {method:'POST'})
+            .then(r=>r.json()).then(d=>{
+              document.getElementById('test-result').textContent = JSON.stringify(d, null, 2);
+            })">Populate Test Data</button>
+          <pre id="test-result"></pre>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+// Add a health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -65,7 +104,6 @@ app.get('/api/health', (req, res) => {
     server: 'running',
     timestamp: new Date().toISOString(),
     clientIp: req.ip || 'unknown',
-    requestHeaders: req.headers,
     environment: process.env.NODE_ENV || 'development',
     port: preferredPort
   });
@@ -114,6 +152,27 @@ async function startServer() {
       logger.info(`🚀 Server running on port ${port}`);
       logger.info(`💻 WebSocket server accessible at /ws endpoint`);
       logger.info(`🧪 Test page available at http://localhost:${port}/test-page`);
+      
+      // Print additional debugging information
+      logger.info('🔍 DEBUG: Server details:');
+      logger.info(`- Server address: ${httpServer.address()}`);
+      logger.info(`- Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`- Replit URL: ${process.env.REPL_SLUG || 'Not in Replit'}`);
+      logger.info(`- Process ID: ${process.pid}`);
+      
+      // Test reachability
+      setTimeout(() => {
+        const http = require('http');
+        http.get(`http://localhost:${port}/health`, (res: any) => {
+          let data = '';
+          res.on('data', (chunk: any) => { data += chunk; });
+          res.on('end', () => {
+            logger.info(`✅ Self-test successful: ${data}`);
+          });
+        }).on('error', (err: Error) => {
+          logger.error(`❌ Self-test failed: ${err.message}`);
+        });
+      }, 1000);
     });
   } catch (err: any) {
     logger.error('Failed to start server:', err);
