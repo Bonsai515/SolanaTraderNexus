@@ -4,21 +4,16 @@
  * This file provides the JavaScript interface to the Rust-based agent system,
  * allowing the web application to initialize, monitor, and control the agents.
  */
-
-import { Router } from 'express';
-import WebSocket from 'ws';
-import { exec, spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
+import express from 'express';
+import { spawn } from 'child_process';
 import { logger } from './logger';
+import WebSocket from 'ws';
 
-// Agent types
 export enum AgentType {
   HYPERION = 'hyperion',
   QUANTUM_OMEGA = 'quantum_omega',
 }
 
-// Agent status
 export enum AgentStatus {
   IDLE = 'idle',
   INITIALIZING = 'initializing',
@@ -28,7 +23,6 @@ export enum AgentStatus {
   ERROR = 'error',
 }
 
-// Agent state interface
 export interface AgentState {
   id: string;
   name: string;
@@ -50,7 +44,6 @@ export interface AgentState {
   lastError?: string;
 }
 
-// Execution result interface
 export interface ExecutionResult {
   id: string;
   agentId: string;
@@ -63,569 +56,378 @@ export interface ExecutionResult {
   error?: string;
 }
 
-// Agent manager class
-class AgentManager {
-  private agentProcess?: any;
-  private agents: Map<string, AgentState> = new Map();
-  private executions: ExecutionResult[] = [];
-  private wsClients: Set<WebSocket> = new Set();
-  private transformerProcess?: any;
-  private isRunning: boolean = false;
-  
-  constructor() {
-    // Initialize agents
-    this.initializeAgentStates();
+// A map of agent IDs to agent states
+const agents = new Map<string, AgentState>();
+
+// A list of recent execution results
+const executions: ExecutionResult[] = [];
+
+// A set of WebSocket clients
+const wsClients = new Set<WebSocket>();
+
+// Whether the agent system is running
+let _isRunning = false;
+
+// Initialize mock agent states
+function initializeAgentStates() {
+  const hyperion: AgentState = {
+    id: 'hyperion-1',
+    name: 'Hyperion Flash Arbitrage Overlord',
+    type: AgentType.HYPERION,
+    status: AgentStatus.IDLE,
+    active: false,
+    wallets: {},
+    metrics: {
+      totalExecutions: 0,
+      successRate: 0,
+      totalProfit: 0,
+    }
+  };
+
+  const quantumOmega: AgentState = {
+    id: 'quantum-omega-1',
+    name: 'Quantum Omega Sniper',
+    type: AgentType.QUANTUM_OMEGA,
+    status: AgentStatus.IDLE,
+    active: false,
+    wallets: {},
+    metrics: {
+      totalExecutions: 0,
+      successRate: 0,
+      totalProfit: 0,
+    }
+  };
+
+  agents.set(hyperion.id, hyperion);
+  agents.set(quantumOmega.id, quantumOmega);
+}
+
+// Initialize agent states
+initializeAgentStates();
+
+/**
+ * Start the agent system
+ * @returns Whether the agent system started successfully
+ */
+export async function startAgentSystem(): Promise<boolean> {
+  if (_isRunning) {
+    logger.info('Agent system already running');
+    return true;
   }
+
+  logger.info('Starting agent system');
   
-  // Initialize agent states
-  private initializeAgentStates() {
-    // Hyperion agent state
-    const hyperion: AgentState = {
-      id: 'hyperion-1',
-      name: 'Hyperion Flash Arbitrage Overlord',
-      type: AgentType.HYPERION,
-      status: AgentStatus.IDLE,
-      active: false,
-      wallets: {},
-      metrics: {
-        totalExecutions: 0,
-        successRate: 0,
-        totalProfit: 0,
-      },
-    };
+  try {
+    // Simulate starting the agent system
+    // In a real implementation, this would start a Rust-based process
+    _isRunning = true;
     
-    // Quantum Omega agent state
-    const quantumOmega: AgentState = {
-      id: 'quantum-omega-1',
-      name: 'Quantum Omega Sniper',
-      type: AgentType.QUANTUM_OMEGA,
-      status: AgentStatus.IDLE,
-      active: false,
-      wallets: {},
-      metrics: {
-        totalExecutions: 0,
-        successRate: 0,
-        totalProfit: 0,
-      },
-    };
-    
-    // Add agents to map
-    this.agents.set(hyperion.id, hyperion);
-    this.agents.set(quantumOmega.id, quantumOmega);
-    
-    logger.info('Agent states initialized');
-  }
-  
-  // Start agent system
-  async startAgentSystem(): Promise<boolean> {
-    if (this.isRunning) {
-      logger.info('Agent system already running');
-      return true;
+    // Update all agent statuses
+    for (const agent of agents.values()) {
+      agent.status = AgentStatus.SCANNING;
     }
     
-    try {
-      logger.info('Starting agent system...');
-      
-      // First start the transformers
-      await this.startTransformers();
-      
-      // Then start the agent process
-      await this.startAgentProcess();
-      
-      this.isRunning = true;
-      
-      // Update agent statuses
-      for (const agent of this.agents.values()) {
-        agent.status = AgentStatus.INITIALIZING;
-        agent.active = true;
-        this.broadcastAgentUpdate(agent);
-      }
-      
-      logger.info('Agent system started successfully');
-      return true;
-    } catch (error) {
-      logger.error('Failed to start agent system:', error);
-      return false;
-    }
-  }
-  
-  // Start transformer models
-  private async startTransformers(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      logger.info('Starting transformer models...');
-      
-      // Check if running in development mode (Replit)
-      const isDev = process.env.REPL_ID || process.env.NODE_ENV === 'development';
-      
-      // In development, we'll simulate the transformer startup
-      if (isDev) {
-        logger.info('Development mode: Simulating transformer startup');
-        
-        // Update all clients
-        this.broadcastMessage({
-          type: 'transformer_status',
-          status: 'starting',
-          message: 'Initializing quantum transformer models...',
-        });
-        
-        // Simulate initialization
-        setTimeout(() => {
-          this.broadcastMessage({
-            type: 'transformer_status',
-            status: 'running',
-            message: 'Quantum transformer models initialized and running',
-          });
-          resolve();
-        }, 3000);
-        return;
-      }
-      
-      // In production, we'd start the actual Rust transformer process
-      try {
-        const transformerBinaryPath = path.resolve(process.cwd(), 'target/release/transformer_engine');
-        
-        // Check if binary exists
-        if (!fs.existsSync(transformerBinaryPath)) {
-          logger.error(`Transformer binary not found at ${transformerBinaryPath}`);
-          reject(new Error('Transformer binary not found'));
-          return;
-        }
-        
-        // Start the transformer process
-        this.transformerProcess = spawn(transformerBinaryPath, ['--mode', 'service'], {
-          stdio: 'pipe',
-        });
-        
-        this.transformerProcess.stdout.on('data', (data: Buffer) => {
-          const output = data.toString().trim();
-          logger.info(`Transformer output: ${output}`);
-          
-          // Look for initialization complete message
-          if (output.includes('Transformer initialization complete')) {
-            this.broadcastMessage({
-              type: 'transformer_status',
-              status: 'running',
-              message: 'Quantum transformer models initialized and running',
-            });
-            resolve();
-          }
-        });
-        
-        this.transformerProcess.stderr.on('data', (data: Buffer) => {
-          logger.error(`Transformer error: ${data.toString().trim()}`);
-        });
-        
-        this.transformerProcess.on('error', (error: Error) => {
-          logger.error('Failed to start transformer process:', error);
-          reject(error);
-        });
-        
-        this.transformerProcess.on('exit', (code: number) => {
-          logger.info(`Transformer process exited with code ${code}`);
-          this.transformerProcess = undefined;
-        });
-        
-        // Initial status
-        this.broadcastMessage({
-          type: 'transformer_status',
-          status: 'starting',
-          message: 'Initializing quantum transformer models...',
-        });
-      } catch (error) {
-        logger.error('Error starting transformer process:', error);
-        reject(error);
-      }
-    });
-  }
-  
-  // Start agent process
-  private async startAgentProcess(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      logger.info('Starting agent process...');
-      
-      // Check if running in development mode (Replit)
-      const isDev = process.env.REPL_ID || process.env.NODE_ENV === 'development';
-      
-      // In development, we'll simulate the agent process
-      if (isDev) {
-        logger.info('Development mode: Simulating agent process startup');
-        
-        // Update all clients
-        this.broadcastMessage({
-          type: 'agent_system_status',
-          status: 'starting',
-          message: 'Initializing agent system...',
-        });
-        
-        // Simulate agent initialization
-        setTimeout(() => {
-          // Update status for Hyperion
-          const hyperion = this.agents.get('hyperion-1');
-          if (hyperion) {
-            hyperion.status = AgentStatus.SCANNING;
-            hyperion.wallets = {
-              trading: 'HyperionTrading123456789',
-              profit: 'HyperionProfit123456789',
-              fee: 'HyperionFee123456789',
-            };
-            this.broadcastAgentUpdate(hyperion);
-          }
-          
-          // Update status for Quantum Omega
-          const quantumOmega = this.agents.get('quantum-omega-1');
-          if (quantumOmega) {
-            quantumOmega.status = AgentStatus.SCANNING;
-            quantumOmega.wallets = {
-              trading: 'QuantumTrading123456789',
-              profit: 'QuantumProfit123456789',
-              fee: 'QuantumFee123456789',
-              stealth: ['QuantumStealth123456789'],
-            };
-            this.broadcastAgentUpdate(quantumOmega);
-          }
-          
-          // System running
-          this.broadcastMessage({
-            type: 'agent_system_status',
-            status: 'running',
-            message: 'Agent system initialized and running',
-          });
-          
-          resolve();
-        }, 5000);
-        return;
-      }
-      
-      // In production, we'd start the actual Rust agent process
-      try {
-        const agentBinaryPath = path.resolve(process.cwd(), 'target/release/solana_quantum_trading');
-        
-        // Check if binary exists
-        if (!fs.existsSync(agentBinaryPath)) {
-          logger.error(`Agent binary not found at ${agentBinaryPath}`);
-          reject(new Error('Agent binary not found'));
-          return;
-        }
-        
-        // Start the agent process
-        this.agentProcess = spawn(agentBinaryPath, [], {
-          stdio: 'pipe',
-          env: {
-            ...process.env,
-            RUST_LOG: 'info',
-          },
-        });
-        
-        this.agentProcess.stdout.on('data', (data: Buffer) => {
-          const output = data.toString().trim();
-          logger.info(`Agent output: ${output}`);
-          
-          // Process agent output
-          this.processAgentOutput(output);
-          
-          // Look for initialization complete message
-          if (output.includes('System initialized and agents active')) {
-            this.broadcastMessage({
-              type: 'agent_system_status',
-              status: 'running',
-              message: 'Agent system initialized and running',
-            });
-            resolve();
-          }
-        });
-        
-        this.agentProcess.stderr.on('data', (data: Buffer) => {
-          logger.error(`Agent error: ${data.toString().trim()}`);
-        });
-        
-        this.agentProcess.on('error', (error: Error) => {
-          logger.error('Failed to start agent process:', error);
-          reject(error);
-        });
-        
-        this.agentProcess.on('exit', (code: number) => {
-          logger.info(`Agent process exited with code ${code}`);
-          this.agentProcess = undefined;
-          this.isRunning = false;
-        });
-        
-        // Initial status
-        this.broadcastMessage({
-          type: 'agent_system_status',
-          status: 'starting',
-          message: 'Initializing agent system...',
-        });
-      } catch (error) {
-        logger.error('Error starting agent process:', error);
-        reject(error);
-      }
-    });
-  }
-  
-  // Process agent output
-  private processAgentOutput(output: string): void {
-    // Look for wallet creation messages
-    const walletMatch = output.match(/Created (.*) wallet for agent (.*): (.*)/);
-    if (walletMatch) {
-      const walletType = walletMatch[1].toLowerCase();
-      const agentId = walletMatch[2];
-      const walletAddress = walletMatch[3];
-      
-      const agent = Array.from(this.agents.values()).find(a => a.name.includes(agentId));
-      if (agent) {
-        if (walletType.includes('trading')) {
-          agent.wallets.trading = walletAddress;
-        } else if (walletType.includes('profit')) {
-          agent.wallets.profit = walletAddress;
-        } else if (walletType.includes('fee')) {
-          agent.wallets.fee = walletAddress;
-        } else if (walletType.includes('stealth')) {
-          if (!agent.wallets.stealth) {
-            agent.wallets.stealth = [];
-          }
-          agent.wallets.stealth.push(walletAddress);
-        }
-        
-        this.broadcastAgentUpdate(agent);
-      }
-    }
-    
-    // Look for agent status changes
-    const statusMatch = output.match(/(Hyperion|Quantum Omega) agent .* (scanning|executing|idle|cooldown)/i);
-    if (statusMatch) {
-      const agentType = statusMatch[1];
-      const statusStr = statusMatch[2].toLowerCase();
-      
-      const agent = Array.from(this.agents.values()).find(a => a.name.includes(agentType));
-      if (agent) {
-        switch (statusStr) {
-          case 'scanning':
-            agent.status = AgentStatus.SCANNING;
-            break;
-          case 'executing':
-            agent.status = AgentStatus.EXECUTING;
-            break;
-          case 'idle':
-            agent.status = AgentStatus.IDLE;
-            break;
-          case 'cooldown':
-            agent.status = AgentStatus.COOLDOWN;
-            break;
-        }
-        
-        this.broadcastAgentUpdate(agent);
-      }
-    }
-    
-    // Look for execution results
-    const executionMatch = output.match(/Agent (.*) executed strategy: success=(true|false), profit=(.*)/);
-    if (executionMatch) {
-      const agentId = executionMatch[1];
-      const success = executionMatch[2] === 'true';
-      const profit = parseFloat(executionMatch[3]);
-      
-      const agent = Array.from(this.agents.values()).find(a => a.name.includes(agentId) || a.id === agentId);
-      if (agent) {
-        // Update agent metrics
-        agent.metrics.totalExecutions++;
-        agent.metrics.totalProfit += profit;
-        agent.metrics.successRate = 
-          (agent.metrics.successRate * (agent.metrics.totalExecutions - 1) + (success ? 1 : 0)) / 
-          agent.metrics.totalExecutions;
-        agent.metrics.lastExecution = new Date();
-        
-        // Create execution result
-        const execution: ExecutionResult = {
-          id: `exec-${Date.now()}`,
-          agentId: agent.id,
-          success,
-          profit,
-          timestamp: new Date(),
-          strategy: agent.type === AgentType.HYPERION ? 'flash_arbitrage' : 'token_snipe',
-          metrics: {
-            profitPercentage: profit * 100,
-          },
-        };
-        
-        // Add to executions
-        this.executions.push(execution);
-        
-        // Broadcast updates
-        this.broadcastAgentUpdate(agent);
-        this.broadcastMessage({
-          type: 'execution_result',
-          execution,
-        });
-      }
-    }
-  }
-  
-  // Stop agent system
-  async stopAgentSystem(): Promise<boolean> {
-    if (!this.isRunning) {
-      logger.info('Agent system not running');
-      return true;
-    }
-    
-    try {
-      logger.info('Stopping agent system...');
-      
-      // Stop the agent process
-      if (this.agentProcess) {
-        this.agentProcess.kill();
-        this.agentProcess = undefined;
-      }
-      
-      // Stop the transformer process
-      if (this.transformerProcess) {
-        this.transformerProcess.kill();
-        this.transformerProcess = undefined;
-      }
-      
-      this.isRunning = false;
-      
-      // Update agent statuses
-      for (const agent of this.agents.values()) {
-        agent.status = AgentStatus.IDLE;
-        agent.active = false;
-        this.broadcastAgentUpdate(agent);
-      }
-      
-      // Broadcast system status
-      this.broadcastMessage({
-        type: 'agent_system_status',
-        status: 'stopped',
-        message: 'Agent system stopped',
-      });
-      
-      logger.info('Agent system stopped successfully');
-      return true;
-    } catch (error) {
-      logger.error('Failed to stop agent system:', error);
-      return false;
-    }
-  }
-  
-  // Get all agents
-  getAgents(): AgentState[] {
-    return Array.from(this.agents.values());
-  }
-  
-  // Get agent by ID
-  getAgent(id: string): AgentState | undefined {
-    return this.agents.get(id);
-  }
-  
-  // Get recent executions
-  getRecentExecutions(limit: number = 10): ExecutionResult[] {
-    return this.executions.slice(-limit).reverse();
-  }
-  
-  // Add WebSocket client
-  addWsClient(client: WebSocket): void {
-    this.wsClients.add(client);
-    
-    // Send initial state
-    client.send(JSON.stringify({
-      type: 'agents_list',
-      agents: this.getAgents(),
-    }));
-    
-    client.send(JSON.stringify({
+    // Broadcast agent updates to all WebSocket clients
+    broadcastMessage({
       type: 'agent_system_status',
-      status: this.isRunning ? 'running' : 'stopped',
-      message: this.isRunning ? 'Agent system is running' : 'Agent system is stopped',
-    }));
-    
-    client.send(JSON.stringify({
-      type: 'recent_executions',
-      executions: this.getRecentExecutions(),
-    }));
-  }
-  
-  // Remove WebSocket client
-  removeWsClient(client: WebSocket): void {
-    this.wsClients.delete(client);
-  }
-  
-  // Broadcast message to all WebSocket clients
-  broadcastMessage(message: any): void {
-    const messageStr = JSON.stringify(message);
-    for (const client of this.wsClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(messageStr);
-      }
-    }
-  }
-  
-  // Broadcast agent update
-  broadcastAgentUpdate(agent: AgentState): void {
-    this.broadcastMessage({
-      type: 'agent_update',
-      agent,
+      status: 'running',
+      message: 'Agent system started successfully'
     });
+    
+    // Broadcast agent updates
+    for (const agent of agents.values()) {
+      broadcastAgentUpdate(agent);
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to start agent system:', error);
+    _isRunning = false;
+    return false;
   }
 }
 
-// Create agent manager instance
-const agentManager = new AgentManager();
-
-// Create agent router
-const agentRouter = Router();
-
-// GET /api/agents - List all agents
-agentRouter.get('/agents', (req, res) => {
-  res.json(agentManager.getAgents());
-});
-
-// GET /api/agents/:id - Get agent by ID
-agentRouter.get('/agents/:id', (req, res) => {
-  const agent = agentManager.getAgent(req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
+/**
+ * Stop the agent system
+ * @returns Whether the agent system stopped successfully
+ */
+export async function stopAgentSystem(): Promise<boolean> {
+  if (!_isRunning) {
+    logger.info('Agent system already stopped');
+    return true;
   }
-  res.json(agent);
-});
 
-// POST /api/agents/system/start - Start agent system
-agentRouter.post('/agents/system/start', async (req, res) => {
-  const success = await agentManager.startAgentSystem();
-  res.json({ success });
-});
+  logger.info('Stopping agent system');
+  
+  try {
+    // Simulate stopping the agent system
+    _isRunning = false;
+    
+    // Update all agent statuses
+    for (const agent of agents.values()) {
+      agent.status = AgentStatus.IDLE;
+      agent.active = false;
+    }
+    
+    // Broadcast agent updates to all WebSocket clients
+    broadcastMessage({
+      type: 'agent_system_status',
+      status: 'stopped',
+      message: 'Agent system is stopped'
+    });
+    
+    // Broadcast agent updates
+    for (const agent of agents.values()) {
+      broadcastAgentUpdate(agent);
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to stop agent system:', error);
+    return false;
+  }
+}
 
-// POST /api/agents/system/stop - Stop agent system
-agentRouter.post('/agents/system/stop', async (req, res) => {
-  const success = await agentManager.stopAgentSystem();
-  res.json({ success });
-});
+/**
+ * Get all agents
+ * @returns An array of agent states
+ */
+export function getAgents(): AgentState[] {
+  return Array.from(agents.values());
+}
 
-// GET /api/executions - Get recent executions
-agentRouter.get('/executions', (req, res) => {
-  const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-  res.json(agentManager.getRecentExecutions(limit));
-});
+/**
+ * Get a specific agent by ID
+ * @param id The agent ID
+ * @returns The agent state, or undefined if not found
+ */
+export function getAgent(id: string): AgentState | undefined {
+  return agents.get(id);
+}
 
-// WebSocket handler
-export const handleAgentWebSocket = (ws: WebSocket): void => {
-  agentManager.addWsClient(ws);
+/**
+ * Get recent execution results
+ * @param limit The maximum number of results to return
+ * @returns An array of execution results
+ */
+export function getRecentExecutions(limit: number = 10): ExecutionResult[] {
+  return executions.slice(0, limit);
+}
+
+/**
+ * Check if the agent system is running
+ * @returns Whether the agent system is running
+ */
+export function isRunning(): boolean {
+  return _isRunning;
+}
+
+/**
+ * Add a WebSocket client
+ * @param client The WebSocket client
+ */
+export function addWsClient(client: WebSocket): void {
+  wsClients.add(client);
+  
+  // Send initial data
+  client.send(JSON.stringify({
+    type: 'agents_list',
+    agents: getAgents()
+  }));
+  
+  client.send(JSON.stringify({
+    type: 'agent_system_status',
+    status: _isRunning ? 'running' : 'stopped',
+    message: _isRunning ? 'Agent system is running' : 'Agent system is stopped'
+  }));
+  
+  client.send(JSON.stringify({
+    type: 'recent_executions',
+    executions: getRecentExecutions()
+  }));
+}
+
+/**
+ * Remove a WebSocket client
+ * @param client The WebSocket client
+ */
+export function removeWsClient(client: WebSocket): void {
+  wsClients.delete(client);
+}
+
+/**
+ * Broadcast a message to all WebSocket clients
+ * @param message The message to broadcast
+ */
+export function broadcastMessage(message: any): void {
+  for (const client of wsClients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  }
+}
+
+/**
+ * Broadcast an agent update to all WebSocket clients
+ * @param agent The agent state to broadcast
+ */
+export function broadcastAgentUpdate(agent: AgentState): void {
+  broadcastMessage({
+    type: 'agent_update',
+    agent
+  });
+}
+
+/**
+ * Handle a WebSocket connection
+ * @param ws The WebSocket connection
+ */
+export function handleAgentWebSocket(ws: WebSocket): void {
+  addWsClient(ws);
   
   ws.on('close', () => {
-    agentManager.removeWsClient(ws);
+    removeWsClient(ws);
   });
-  
-  ws.on('message', (message: string) => {
-    try {
-      const data = JSON.parse(message);
-      
-      if (data.type === 'start_agents') {
-        agentManager.startAgentSystem();
-      } else if (data.type === 'stop_agents') {
-        agentManager.stopAgentSystem();
-      }
-    } catch (error) {
-      logger.error('Error processing WebSocket message:', error);
+}
+
+// Create router
+const agentRouter = express.Router();
+
+// Get all agents
+agentRouter.get('/', (req, res) => {
+  try {
+    const agentsList = getAgents();
+    res.json({
+      agents: agentsList,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents:", error);
+    res.status(500).json({ error: 'Failed to fetch agents' });
+  }
+});
+
+// Get agent system status
+agentRouter.get('/status', (req, res) => {
+  try {
+    const running = isRunning();
+    res.json({
+      status: running ? 'running' : 'stopped',
+      message: running ? 'Agent system is running' : 'Agent system is stopped',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/status:", error);
+    res.status(500).json({ error: 'Failed to get agent system status' });
+  }
+});
+
+// Start agent system
+agentRouter.post('/start', async (req, res) => {
+  try {
+    const success = await startAgentSystem();
+    res.json({
+      success,
+      message: success ? 'Agent system started successfully' : 'Failed to start agent system',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/start:", error);
+    res.status(500).json({ error: 'Failed to start agent system' });
+  }
+});
+
+// Stop agent system
+agentRouter.post('/stop', async (req, res) => {
+  try {
+    const success = await stopAgentSystem();
+    res.json({
+      success,
+      message: success ? 'Agent system stopped successfully' : 'Failed to stop agent system',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/stop:", error);
+    res.status(500).json({ error: 'Failed to stop agent system' });
+  }
+});
+
+// Get specific agent
+agentRouter.get('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
     }
-  });
-};
+    
+    res.json({
+      agent,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}:`, error);
+    res.status(500).json({ error: 'Failed to fetch agent' });
+  }
+});
+
+// Activate agent
+agentRouter.post('/:id/activate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    
+    if (agent.status !== 'idle') {
+      return res.status(400).json({ error: `Agent is ${agent.status}, must be idle to activate` });
+    }
+    
+    agent.active = true;
+    agent.status = AgentStatus.SCANNING;
+    
+    broadcastAgentUpdate(agent);
+    
+    res.json({
+      success: true,
+      agent,
+      message: `Agent ${id} activated successfully`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}/activate:`, error);
+    res.status(500).json({ error: 'Failed to activate agent' });
+  }
+});
+
+// Deactivate agent
+agentRouter.post('/:id/deactivate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    
+    agent.active = false;
+    agent.status = AgentStatus.IDLE;
+    
+    broadcastAgentUpdate(agent);
+    
+    res.json({
+      success: true,
+      agent,
+      message: `Agent ${id} deactivated successfully`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}/deactivate:`, error);
+    res.status(500).json({ error: 'Failed to deactivate agent' });
+  }
+});
 
 export default agentRouter;
