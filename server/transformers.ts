@@ -57,10 +57,8 @@ export class TransformerAPI {
       try {
         await fs.access(this.rustBinary);
       } catch (e) {
-        logger.warn(`Rust binary not found at ${this.rustBinary}. Running in simulation mode.`);
-        // Set initialized to true but in simulation mode
-        this.isInitialized = true;
-        return;
+        logger.error(`Rust binary not found at ${this.rustBinary}. Cannot continue without the binary.`);
+        throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
       // Create transformer directory if it doesn't exist
@@ -79,20 +77,26 @@ export class TransformerAPI {
       if (this.activePairs.length > 0) {
         // Initialize models for active pairs
         await this.executeRustCommand('init', { pairs: this.activePairs });
+      } else {
+        // Initialize with default pairs for SOL and other major tokens
+        const defaultPairs = ['SOL/USDC', 'SOL/USDT', 'BTC/USDC', 'ETH/USDC', 'BONK/USDC', 'JUP/USDC'];
+        await this.executeRustCommand('init', { pairs: defaultPairs });
+        this.activePairs = defaultPairs;
+        logger.info(`No active strategies found. Initialized with default pairs: ${defaultPairs.join(', ')}`);
       }
       
       this.isInitialized = true;
-      logger.info('Transformer API initialized successfully');
+      logger.info('Transformer API initialized successfully with real trading engine');
     } catch (error) {
       logger.error('Failed to initialize transformer API:', error);
-      // Set to initialized but in limited mode rather than throwing
-      this.isInitialized = true;
-      logger.warn('Transformer API will operate in limited mode');
+      // Critical error - do not allow system to operate without real data
+      this.isInitialized = false;
+      throw new Error(`Cannot initialize trading system: ${error.message}`);
     }
   }
 
   /**
-   * Make a prediction for a specific pair
+   * Make a prediction for a specific pair using real trading engine
    */
   public async predict(
     pair: string, 
@@ -106,95 +110,54 @@ export class TransformerAPI {
     logger.debug(`Making prediction for ${pair} with window ${windowSeconds}s`);
     
     try {
-      // Check if Rust binary exists
+      // Verify trading engine binary is available
       try {
         await fs.access(this.rustBinary);
       } catch (e) {
-        logger.warn(`Rust binary not found. Returning simulated prediction for ${pair}`);
-        
-        // Create a simulated prediction with realistic values
-        const now = new Date();
-        const lastPrice = marketData.prices.length > 0 ? 
-          marketData.prices[marketData.prices.length - 1][1] : 
-          100.0;
-        
-        // Generate random values with realistic bounds
-        const direction = Math.random() > 0.5 ? 0.7 : -0.7;  // Strong up or down
-        const confidence = 0.7 + Math.random() * 0.2;        // High confidence (0.7-0.9)
-        const priceChange = direction * (0.01 + Math.random() * 0.05); // 1-6% change
-        const volatility = 0.005 + Math.random() * 0.02;    // 0.5-2.5% volatility
-        
-        const simulatedPrediction: PredictionResult = {
-          pair,
-          price: lastPrice,
-          confidence,
-          windowSeconds,
-          timestamp: now.toISOString(),
-          priceChange,
-          volatility,
-          direction,
-          metrics: {
-            momentum: direction > 0 ? 0.6 + Math.random() * 0.3 : -0.6 - Math.random() * 0.3,
-            volume_change: Math.random() * 0.5,
-            liquidity_score: 0.5 + Math.random() * 0.4
-          }
-        };
-        
-        // Generate signal from simulated prediction
-        await this.generateSignalFromPrediction(simulatedPrediction);
-        
-        return simulatedPrediction;
+        logger.error(`Rust binary not found at ${this.rustBinary}. Cannot make predictions without trading engine.`);
+        throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
-      // If we reach here, the binary exists, so proceed with real prediction
-      // Prepare input data
+      // Validate market data
+      if (!marketData || 
+          !marketData.prices || 
+          !Array.isArray(marketData.prices) || 
+          marketData.prices.length === 0) {
+        logger.error(`Invalid market data for ${pair}. Cannot make prediction without real market data.`);
+        throw new Error(`Invalid market data format. Cannot make prediction for ${pair} without real market data.`);
+      }
+      
+      // Prepare input data for trading engine
       const input = {
         pair,
         marketData,
         windowSeconds
       };
       
-      // Execute prediction
+      // Execute prediction using real trading engine
       const result = await this.executeRustCommand('predict', input);
       
-      // Parse result
+      // Parse and validate result
+      if (!result || typeof result.confidence !== 'number') {
+        throw new Error(`Invalid prediction result from trading engine for ${pair}`);
+      }
+      
       const prediction = result as PredictionResult;
       
-      // Generate signal from prediction
+      // Generate trading signal from prediction
       await this.generateSignalFromPrediction(prediction);
       
+      logger.info(`Successfully generated prediction for ${pair} with confidence ${prediction.confidence}`);
       return prediction;
     } catch (error) {
       logger.error(`Prediction failed for ${pair}:`, error);
-      
-      // On error, still return a simulated prediction rather than failing
-      const now = new Date();
-      const lastPrice = marketData.prices.length > 0 ? 
-        marketData.prices[marketData.prices.length - 1][1] : 
-        100.0;
-        
-      const fallbackPrediction: PredictionResult = {
-        pair,
-        price: lastPrice,
-        confidence: 0.6,
-        windowSeconds,
-        timestamp: now.toISOString(),
-        priceChange: 0.005,
-        volatility: 0.01,
-        direction: 0.2,
-        metrics: {
-          momentum: 0.3,
-          volume_change: 0.1,
-          liquidity_score: 0.7
-        }
-      };
-      
-      return fallbackPrediction;
+      // Critical failure - we do not use simulation or fallbacks
+      throw new Error(`Cannot generate prediction for ${pair}: ${error.message}`);
     }
   }
 
   /**
-   * Update a model with new market data
+   * Update a model with new market data using real trading engine
    */
   public async updateModel(pair: string, marketData: MarketData): Promise<void> {
     if (!this.isInitialized) {
@@ -204,31 +167,41 @@ export class TransformerAPI {
     logger.debug(`Updating model for ${pair}`);
     
     try {
-      // Check if Rust binary exists
+      // Verify trading engine binary is available
       try {
         await fs.access(this.rustBinary);
       } catch (e) {
-        logger.warn(`Rust binary not found. Skipping model update for ${pair}`);
-        return; // Silently succeed in simulation mode
+        logger.error(`Rust binary not found at ${this.rustBinary}. Cannot update model without trading engine.`);
+        throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
-      // Prepare input data
+      // Validate market data
+      if (!marketData || 
+          !marketData.prices || 
+          !Array.isArray(marketData.prices) || 
+          marketData.prices.length === 0) {
+        logger.error(`Invalid market data for ${pair}. Cannot update model without real market data.`);
+        throw new Error(`Invalid market data format. Cannot update model for ${pair} without real market data.`);
+      }
+      
+      // Prepare input data for trading engine
       const input = {
         pair,
         marketData
       };
       
-      // Execute update
+      // Execute update using real trading engine
       await this.executeRustCommand('update', input);
+      logger.info(`Successfully updated model for ${pair} with ${marketData.prices.length} data points`);
     } catch (error) {
       logger.error(`Model update failed for ${pair}:`, error);
-      // Don't throw in deployment - just log the error
-      logger.warn(`Continuing without model update`);
+      // Critical error - do not silently succeed
+      throw new Error(`Cannot update model for ${pair}: ${error.message}`);
     }
   }
 
   /**
-   * Train a model with historical market data
+   * Train a model with historical market data using real trading engine
    */
   public async trainModel(
     pair: string, 
@@ -242,24 +215,21 @@ export class TransformerAPI {
     logger.info(`Training model for ${pair} with ${marketData.length} data points`);
     
     try {
-      // Check if Rust binary exists
+      // Verify trading engine binary is available
       try {
         await fs.access(this.rustBinary);
       } catch (e) {
-        logger.warn(`Rust binary not found. Returning simulated training metrics for ${pair}`);
-        
-        // Return simulated training metrics
-        return {
-          epochs_completed: config.epochs || 100,
-          train_loss: 0.001 + Math.random() * 0.005,
-          validation_loss: 0.01 + Math.random() * 0.01,
-          train_accuracy: 0.85 + Math.random() * 0.1,
-          validation_accuracy: 0.75 + Math.random() * 0.15,
-          training_time_seconds: 15 + Math.random() * 30
-        };
+        logger.error(`Rust binary not found at ${this.rustBinary}. Cannot train model without trading engine.`);
+        throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
-      // Prepare input data
+      // Validate market data
+      if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
+        logger.error(`Invalid market data for ${pair}. Cannot train model without real historical data.`);
+        throw new Error(`Invalid market data format. Cannot train model for ${pair} without real historical data.`);
+      }
+      
+      // Prepare input data for trading engine
       const input = {
         pair,
         marketData,
@@ -272,23 +242,19 @@ export class TransformerAPI {
         }
       };
       
-      // Execute training
+      // Execute training using real trading engine
       const result = await this.executeRustCommand('train', input);
       
+      if (!result) {
+        throw new Error(`Invalid training result from trading engine for ${pair}`);
+      }
+      
+      logger.info(`Successfully trained model for ${pair} with ${marketData.length} data points`);
       return result;
     } catch (error) {
       logger.error(`Model training failed for ${pair}:`, error);
-      
-      // Return simulated metrics instead of failing
-      return {
-        epochs_completed: Math.floor(config.epochs / 2) || 50,
-        train_loss: 0.008 + Math.random() * 0.01,
-        validation_loss: 0.02 + Math.random() * 0.02,
-        train_accuracy: 0.7 + Math.random() * 0.1,
-        validation_accuracy: 0.65 + Math.random() * 0.1,
-        training_time_seconds: 5 + Math.random() * 10,
-        error: error.message
-      };
+      // Critical error - we do not use simulation or fallbacks
+      throw new Error(`Cannot train model for ${pair}: ${error.message}`);
     }
   }
 
