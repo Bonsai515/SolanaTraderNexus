@@ -333,7 +333,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx server/index.ts",
-    "build": "tsc",
+    "build": "tsc && cargo build --release",
     "start": "node dist/server/index.js"
   },
   "keywords": [],

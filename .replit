@@ -13,7 +13,7 @@ packages = ["jq"]
 [deployment]
 deploymentTarget = "gce"
 build = ["sh", "-c", "npm install --no-optional && npm run build && cargo build --release"]
-run = ["sh", "-c", "npm run start"]
+run = ["sh", "-c", "node dist/server/index.js"]
 
 [[ports]]
 localPort = 80
