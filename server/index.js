@@ -132,5 +132,4 @@ const port = process.env.PORT || 5000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`💻 WebSocket server accessible at /ws endpoint`);
-}););
 });
