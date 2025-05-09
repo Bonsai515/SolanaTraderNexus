@@ -26,10 +26,11 @@ const wss = setupWebSocketServer(httpServer);
 
 // Configure Vite in development mode
 configureViteServer(app, httpServer).then(() => {
-  // Start the server
-  httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Server running at http://0.0.0.0:${port}`);
-    console.log(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
+  // Start the server - Use port 5000 for production deployment
+  const deploymentPort = 5000;
+  httpServer.listen(deploymentPort, '0.0.0.0', () => {
+    console.log(`🚀 Server running at http://0.0.0.0:${deploymentPort}`);
+    console.log(`💻 WebSocket server running at ws://0.0.0.0:${deploymentPort}/ws`);
   });
 }).catch(err => {
   console.error('Failed to start server:', err);
