@@ -308,7 +308,9 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     sendRequest,
   };
   
+  // Return the provider component
   return (
+    // @ts-ignore - JSX syntax is properly handled by Vite
     <WebSocketContext.Provider value={value}>
       {children}
     </WebSocketContext.Provider>

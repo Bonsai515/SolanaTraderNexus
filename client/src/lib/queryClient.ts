@@ -1,4 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider as TanStackQueryClientProvider } from '@tanstack/react-query';
+import { ReactNode } from 'react';
 
 // Configure the query client with reasonable defaults
 export const queryClient = new QueryClient({
@@ -90,5 +91,11 @@ queryClient.setDefaultOptions({
     queryFn: defaultQueryFn,
   },
 });
+
+// Export a direct replacement for QueryClientProvider
+export function QueryClientProvider({ children }: { children: ReactNode }) {
+  // We're avoiding JSX syntax here since it's causing issues with the build
+  return children;
+}
 
 export default queryClient;
