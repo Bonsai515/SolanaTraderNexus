@@ -27,21 +27,26 @@ const wss = setupWebSocketServer(httpServer);
 // Configure server based on environment
 if (process.env.NODE_ENV === 'production') {
   // Serve static files in production
-  app.use(express.static('dist/client'));
+  app.use(express.static(path.join(__dirname, '../dist/client')));
+  
+  // Ensure client-side routing works
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/client/index.html'));
+  });
 
   // Start server
   httpServer.listen(5000, '0.0.0.0', () => {
-    console.log('🚀 Production server running on port 5000');
-    console.log('💻 WebSocket server enabled');
+    logger.info('🚀 Production server running on port 5000');
+    logger.info('💻 WebSocket server enabled');
   });
 } else {
   // Development mode with Vite
   configureViteServer(app, httpServer).then(() => {
     httpServer.listen(port, '0.0.0.0', () => {
-      console.log(`🚀 Development server running on port ${port}`);
-      console.log(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
+      logger.info(`🚀 Development server running on port ${port}`);
+      logger.info(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
     });
   }).catch(err => {
-    console.error('Failed to start server:', err);
+    logger.error('Failed to start server:', err);
   });
 }
