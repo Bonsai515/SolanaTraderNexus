@@ -120,19 +120,16 @@ class ExternalSignalService {
   public async forwardSignal(signal: Signal): Promise<string[]> {
     const sentTo: string[] = [];
     
-    // Create a simplified signal format for external platforms
+    // Create a simplified signal format for external platforms with minimal details
     const externalSignal = {
       id: signal.id,
       timestamp: signal.timestamp,
       pair: signal.pair,
       type: signal.type,
-      source: signal.source,
       strength: signal.strength,
       direction: signal.direction,
       confidence: signal.confidence,
-      description: signal.description,
-      actionable: signal.actionable,
-      metadata: signal.metadata
+      actionable: signal.actionable
     };
     
     for (const platform of this.platforms.values()) {
