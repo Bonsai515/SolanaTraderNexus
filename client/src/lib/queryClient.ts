@@ -94,7 +94,7 @@ queryClient.setDefaultOptions({
 
 // Export a direct replacement for QueryClientProvider
 export function QueryClientProvider({ children }: { children: ReactNode }) {
-  // We're avoiding JSX syntax here since it's causing issues with the build
+  // Return the children directly for now to avoid build issues
   return children;
 }
 
