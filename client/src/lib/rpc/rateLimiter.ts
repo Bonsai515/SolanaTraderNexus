@@ -1,197 +1,176 @@
 /**
  * RPC Rate Limiter
- * Ensures that we don't exceed the daily limit of API calls to the Solana RPC
+ * Ensures we don't exceed our daily RPC rate limit of 40k requests
  */
-export class RpcRateLimiter {
-  private static instance: RpcRateLimiter;
+
+class RateLimiter {
+  private static instance: RateLimiter;
   
-  private dailyLimit: number;
-  private requestCount: number;
-  private resetTime: Date;
-  private highPriorityQueue: Array<() => Promise<any>>;
-  private lowPriorityQueue: Array<() => Promise<any>>;
-  private processingInterval: NodeJS.Timeout | null;
-  private isProcessing: boolean;
-  private throttleDelay: number;
+  // Daily request limit (40k)
+  private dailyLimit: number = 40000;
   
-  private constructor(dailyLimit: number = 40000) {
-    this.dailyLimit = dailyLimit;
-    this.requestCount = 0;
-    this.resetTime = this.calculateNextResetTime();
-    this.highPriorityQueue = [];
-    this.lowPriorityQueue = [];
-    this.processingInterval = null;
-    this.isProcessing = false;
-    this.throttleDelay = 100; // 100ms between requests by default
+  // Reserve 20% for high-priority requests
+  private highPriorityReserve: number = 0.2 * this.dailyLimit;
+  
+  // Count of requests made today
+  private requestCount: number = 0;
+  
+  // Last reset timestamp
+  private lastResetTimestamp: Date = new Date();
+  
+  // Queue for pending requests
+  private lowPriorityQueue: Array<{ task: () => Promise<any>, resolve: (value: any) => void, reject: (reason: any) => void }> = [];
+  private highPriorityQueue: Array<{ task: () => Promise<any>, resolve: (value: any) => void, reject: (reason: any) => void }> = [];
+  
+  // Processing flag
+  private isProcessing: boolean = false;
+  
+  private constructor() {
+    this.resetCounterIfNewDay();
     
-    // Start the processing queue
-    this.startProcessing();
+    // Reset counter at midnight
+    setInterval(() => {
+      this.resetCounterIfNewDay();
+    }, 60000); // Check every minute
     
-    // Set up daily reset
-    this.setupDailyReset();
+    // Process queue every second
+    setInterval(() => {
+      this.processQueue();
+    }, 1000);
   }
   
   /**
-   * Get the RpcRateLimiter instance (singleton)
+   * Get the RateLimiter instance (singleton)
    */
-  public static getInstance(): RpcRateLimiter {
-    if (!RpcRateLimiter.instance) {
-      RpcRateLimiter.instance = new RpcRateLimiter();
+  public static getInstance(): RateLimiter {
+    if (!RateLimiter.instance) {
+      RateLimiter.instance = new RateLimiter();
     }
     
-    return RpcRateLimiter.instance;
+    return RateLimiter.instance;
   }
   
   /**
-   * Calculate the next reset time (midnight UTC)
+   * Reset counter if it's a new day
    */
-  private calculateNextResetTime(): Date {
+  private resetCounterIfNewDay(): void {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setUTCHours(0, 0, 0, 0);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  }
-  
-  /**
-   * Set up the daily reset of request count
-   */
-  private setupDailyReset(): void {
-    const now = new Date();
-    const timeUntilReset = this.resetTime.getTime() - now.getTime();
+    const lastDay = this.lastResetTimestamp.getDate();
+    const currentDay = now.getDate();
     
-    setTimeout(() => {
-      console.log('Resetting RPC request count');
+    if (lastDay !== currentDay) {
       this.requestCount = 0;
-      this.resetTime = this.calculateNextResetTime();
-      this.setupDailyReset();
-    }, timeUntilReset);
-  }
-  
-  /**
-   * Start processing the request queues
-   */
-  private startProcessing(): void {
-    if (this.processingInterval) {
-      return;
+      this.lastResetTimestamp = now;
+      console.log('RPC rate limit counter reset for new day');
     }
-    
-    this.processingInterval = setInterval(() => {
-      this.processNextRequest();
-    }, this.throttleDelay);
   }
   
   /**
-   * Process the next request in the queue
+   * Get current usage statistics
    */
-  private async processNextRequest(): Promise<void> {
+  public getUsageStats(): { requestCount: number, dailyLimit: number, remainingRequests: number, usagePercentage: number } {
+    return {
+      requestCount: this.requestCount,
+      dailyLimit: this.dailyLimit,
+      remainingRequests: this.dailyLimit - this.requestCount,
+      usagePercentage: (this.requestCount / this.dailyLimit) * 100
+    };
+  }
+  
+  /**
+   * Process the next item in the queue
+   */
+  private async processQueue(): Promise<void> {
     if (this.isProcessing) {
       return;
     }
     
-    // Check if we've hit the daily limit
-    if (this.requestCount >= this.dailyLimit) {
-      console.warn('Daily RPC request limit reached. Requests will be queued until reset.');
-      return;
-    }
-    
-    // First try high priority queue, then low priority
-    const nextRequest = this.highPriorityQueue.shift() || this.lowPriorityQueue.shift();
-    
-    if (!nextRequest) {
-      return;
-    }
+    this.isProcessing = true;
     
     try {
-      this.isProcessing = true;
-      this.requestCount++;
-      
-      await nextRequest();
-    } catch (error) {
-      console.error('Error processing RPC request:', error);
+      // Always process high-priority queue first
+      if (this.highPriorityQueue.length > 0) {
+        const { task, resolve, reject } = this.highPriorityQueue.shift()!;
+        
+        try {
+          const result = await task();
+          this.requestCount++;
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      } 
+      // Then process low-priority queue if we have capacity
+      else if (this.lowPriorityQueue.length > 0 && this.requestCount < (this.dailyLimit - this.highPriorityReserve)) {
+        const { task, resolve, reject } = this.lowPriorityQueue.shift()!;
+        
+        try {
+          const result = await task();
+          this.requestCount++;
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      }
     } finally {
       this.isProcessing = false;
     }
   }
   
   /**
-   * Queue a request with high priority
-   * @param request The request function to execute
-   * @returns A promise that resolves with the request result
+   * Queue a task with low priority
+   * These will be processed when there's available capacity
    */
-  public async queueHighPriority<T>(request: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const wrappedRequest = async () => {
-        try {
-          const result = await request();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      };
+  public queueLowPriority<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      // Check if we've exceeded the limit
+      if (this.requestCount >= this.dailyLimit) {
+        reject(new Error('Daily RPC request limit reached. Please try again tomorrow.'));
+        return;
+      }
       
-      this.highPriorityQueue.push(wrappedRequest);
+      // Add task to queue
+      this.lowPriorityQueue.push({ task, resolve, reject });
     });
   }
   
   /**
-   * Queue a request with low priority
-   * @param request The request function to execute
-   * @returns A promise that resolves with the request result
+   * Queue a task with high priority
+   * These will be processed before low-priority tasks
    */
-  public async queueLowPriority<T>(request: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const wrappedRequest = async () => {
-        try {
-          const result = await request();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      };
+  public queueHighPriority<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      // Check if we've exceeded the limit
+      if (this.requestCount >= this.dailyLimit) {
+        reject(new Error('Daily RPC request limit reached. Please try again tomorrow.'));
+        return;
+      }
       
-      this.lowPriorityQueue.push(wrappedRequest);
+      // Add task to queue
+      this.highPriorityQueue.push({ task, resolve, reject });
     });
   }
   
   /**
-   * Get the current status of the rate limiter
+   * Execute a task immediately, bypassing the queue
+   * Use sparingly for critical operations
    */
-  public getStatus(): RateLimiterStatus {
-    return {
-      requestCount: this.requestCount,
-      dailyLimit: this.dailyLimit,
-      remainingRequests: this.dailyLimit - this.requestCount,
-      resetTime: this.resetTime,
-      highPriorityQueueLength: this.highPriorityQueue.length,
-      lowPriorityQueueLength: this.lowPriorityQueue.length,
-      utilizationPercentage: (this.requestCount / this.dailyLimit) * 100
-    };
-  }
-  
-  /**
-   * Stop the rate limiter
-   */
-  public stop(): void {
-    if (this.processingInterval) {
-      clearInterval(this.processingInterval);
-      this.processingInterval = null;
+  public async executeImmediately<T>(task: () => Promise<T>): Promise<T> {
+    // Check if we've exceeded the limit
+    if (this.requestCount >= this.dailyLimit) {
+      throw new Error('Daily RPC request limit reached. Please try again tomorrow.');
+    }
+    
+    try {
+      const result = await task();
+      this.requestCount++;
+      return result;
+    } catch (error) {
+      throw error;
     }
   }
 }
 
-/**
- * Rate limiter status interface
- */
-export interface RateLimiterStatus {
-  requestCount: number;
-  dailyLimit: number;
-  remainingRequests: number;
-  resetTime: Date;
-  highPriorityQueueLength: number;
-  lowPriorityQueueLength: number;
-  utilizationPercentage: number;
-}
-
-// Export a singleton instance
-export default RpcRateLimiter.getInstance();
+// Create and export a singleton instance
+const rateLimiter = RateLimiter.getInstance();
+export default rateLimiter;
