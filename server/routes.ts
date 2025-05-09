@@ -6,6 +6,7 @@ import { Server } from 'http';
 import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
 import { logger } from './logger';
+import agentRouter, { handleAgentWebSocket } from './agents';
 import {
   walletSchema, 
   insertWalletSchema,
@@ -84,6 +85,9 @@ export function setupWebSocketServer(httpServer: Server) {
     };
     
     ws.send(JSON.stringify(['Solana connection status:', connectionStatus]));
+    
+    // Hook up agent WebSocket handler
+    handleAgentWebSocket(ws);
     
     // Handle messages
     ws.on('message', async (message) => {
@@ -347,6 +351,9 @@ const initializeTransformerAPI = async () => {
 
 // Initialize on startup
 initializeTransformerAPI();
+
+// Register agent routes
+router.use('/api/agents', agentRouter);
 
 // Get transformer status
 router.get('/ai/status', async (req, res) => {

@@ -8,12 +8,27 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import NotFound from './pages/not-found';
 import { useEffect, useState } from 'react';
-import useWsStore from './lib/wsClient';
-import useSolanaStore from './lib/solanaUtils';
+import { useWsContext, WebSocketProvider } from './lib/wsClient';
+import { useSolanaStore } from './lib/solanaUtils';
+import { AgentProvider, useAgentWebSocketHandlers } from './lib/agentClient';
 
-function App() {
+// AgentInitializer component for handling agent initialization
+function AgentInitializer() {
+  const { initialize } = useAgentWebSocketHandlers();
+  
+  useEffect(() => {
+    // Initialize agent websocket handlers when component mounts
+    if (initialize) {
+      initialize();
+    }
+  }, [initialize]);
+  
+  return null;
+}
+
+function AppContent() {
   const [isConnected, setIsConnected] = useState(false);
-  const { connectionState } = useWsStore();
+  const { connectionState } = useWsContext();
   const solanaStore = useSolanaStore();
   
   // Initialize Solana connection
@@ -53,6 +68,17 @@ function App() {
         <Route path="/:rest*" component={NotFound} />
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <WebSocketProvider>
+      <AgentProvider>
+        <AgentInitializer />
+        <AppContent />
+      </AgentProvider>
+    </WebSocketProvider>
   );
 }
 
