@@ -173,47 +173,163 @@ export function setupWebSocketServer(httpServer: Server) {
             break;
             
           case 'GET_LEARNING_INSIGHTS':
-            // In a real implementation, we would get insights from the agent manager's learning system
-            ws.send(JSON.stringify({
-              type: 'LEARNING_INSIGHTS',
-              data: {
-                insights: []
-              },
-              requestId: data.requestId,
-              timestamp: new Date().toISOString()
-            }));
+            try {
+              const insights = await storage.getLearningInsights();
+              ws.send(JSON.stringify({
+                type: 'LEARNING_INSIGHTS',
+                data: {
+                  insights
+                },
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            } catch (error) {
+              logger.error('Error fetching learning insights:', error);
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                error: 'Failed to fetch learning insights',
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            }
             break;
             
           case 'GET_AGENT_INSIGHTS':
-            // In a real implementation, we would get insights for the specific agent type
-            const agentType = data.agentType;
-            ws.send(JSON.stringify({
-              type: 'AGENT_INSIGHTS',
-              data: {
-                insights: [],
-                agentType
-              },
-              requestId: data.requestId,
-              timestamp: new Date().toISOString()
-            }));
+            try {
+              const agentType = data.agentType;
+              const insights = await storage.getLearningInsightsByAgentType(agentType);
+              
+              ws.send(JSON.stringify({
+                type: 'AGENT_INSIGHTS',
+                data: {
+                  insights,
+                  agentType
+                },
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            } catch (error) {
+              logger.error('Error fetching agent insights:', error);
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                error: 'Failed to fetch agent insights',
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            }
+            break;
+            
+          case 'CREATE_INSIGHT':
+            try {
+              const { 
+                description, 
+                strategy_id, 
+                agent_type, 
+                insight_type, 
+                confidence, 
+                recommendation, 
+                pair 
+              } = data;
+              
+              // Validate required fields
+              if (!description || !strategy_id || !agent_type || !insight_type || 
+                  confidence === undefined || !recommendation) {
+                ws.send(JSON.stringify({
+                  type: 'ERROR',
+                  error: 'Missing required parameters for insight creation',
+                  requestId: data.requestId,
+                  timestamp: new Date().toISOString()
+                }));
+                break;
+              }
+              
+              const insightData = {
+                description,
+                strategy_id,
+                agent_type,
+                insight_type,
+                confidence: Number(confidence),
+                recommendation,
+                pair
+              };
+              
+              const newInsight = await storage.createLearningInsight(insightData);
+              
+              ws.send(JSON.stringify({
+                type: 'INSIGHT_CREATED',
+                data: {
+                  success: true,
+                  insight: newInsight
+                },
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            } catch (error) {
+              logger.error('Error creating insight:', error);
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                error: 'Failed to create insight',
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            }
             break;
             
           case 'APPLY_INSIGHT':
-            // In a real implementation, we would apply the insight in the agent manager's learning system
-            const insightId = data.insightId;
-            const success = data.success;
-            const performanceDelta = data.performanceDelta;
-            const notes = data.notes;
-            
-            ws.send(JSON.stringify({
-              type: 'INSIGHT_APPLIED',
-              data: {
-                insightId,
-                success: true
-              },
-              requestId: data.requestId,
-              timestamp: new Date().toISOString()
-            }));
+            try {
+              const insightId = data.insightId;
+              const success = data.success;
+              const performanceDelta = data.performanceDelta;
+              const notes = data.notes;
+              
+              if (!insightId || typeof success !== 'boolean' || typeof performanceDelta !== 'number' || !notes) {
+                ws.send(JSON.stringify({
+                  type: 'ERROR',
+                  error: 'Missing required parameters',
+                  requestId: data.requestId,
+                  timestamp: new Date().toISOString()
+                }));
+                break;
+              }
+              
+              const result = {
+                success,
+                performance_delta: performanceDelta,
+                notes,
+                applied_at: new Date()
+              };
+              
+              const updatedInsight = await storage.applyLearningInsight(insightId, result);
+              
+              if (!updatedInsight) {
+                ws.send(JSON.stringify({
+                  type: 'ERROR',
+                  error: 'Insight not found',
+                  requestId: data.requestId,
+                  timestamp: new Date().toISOString()
+                }));
+                break;
+              }
+              
+              ws.send(JSON.stringify({
+                type: 'INSIGHT_APPLIED',
+                data: {
+                  insightId,
+                  success: true,
+                  insight: updatedInsight
+                },
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            } catch (error) {
+              logger.error('Error applying insight:', error);
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                error: 'Failed to apply insight',
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            }
             break;
             
           case 'GET_SOLANA_CONNECTION_INFO':
@@ -369,6 +485,93 @@ router.get('/strategies', async (req, res) => {
   }
 });
 
+// Get all learning insights
+router.get('/insights', async (req, res) => {
+  try {
+    const insights = await storage.getLearningInsights();
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get learning insights by agent type
+router.get('/insights/agent/:type', async (req, res) => {
+  try {
+    const agentType = req.params.type;
+    const insights = await storage.getLearningInsightsByAgentType(agentType);
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create learning insight
+router.post('/insights', async (req, res) => {
+  try {
+    const { 
+      description, 
+      strategy_id, 
+      agent_type, 
+      insight_type, 
+      confidence, 
+      recommendation, 
+      pair 
+    } = req.body;
+    
+    // Validate required fields
+    if (!description || !strategy_id || !agent_type || !insight_type || 
+        confidence === undefined || !recommendation) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const insightData = {
+      description,
+      strategy_id,
+      agent_type,
+      insight_type,
+      confidence: Number(confidence),
+      recommendation,
+      pair
+    };
+    
+    const newInsight = await storage.createLearningInsight(insightData);
+    
+    res.status(201).json(newInsight);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Apply insight
+router.post('/insights/:id/apply', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { success, performance_delta, notes } = req.body;
+    
+    if (typeof success !== 'boolean' || typeof performance_delta !== 'number' || !notes) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const result = {
+      success,
+      performance_delta: performance_delta,
+      notes,
+      applied_at: new Date()
+    };
+    
+    const updatedInsight = await storage.applyLearningInsight(id, result);
+    
+    if (!updatedInsight) {
+      return res.status(404).json({ error: 'Insight not found' });
+    }
+    
+    res.json(updatedInsight);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Create strategy
 router.post('/strategies', async (req, res) => {
   try {
@@ -513,9 +716,9 @@ router.use('/api/agents', agentRouter);
 // Learning insights routes
 router.get('/api/insights', async (req, res) => {
   try {
-    // In a real implementation, we would get insights from the agent manager's learning system
+    const insights = await storage.getLearningInsights();
     res.json({
-      insights: [],
+      insights,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -524,13 +727,55 @@ router.get('/api/insights', async (req, res) => {
   }
 });
 
+// Create a learning insight
+router.post('/api/insights', async (req, res) => {
+  try {
+    const { 
+      description, 
+      strategy_id, 
+      agent_type, 
+      insight_type, 
+      confidence, 
+      recommendation, 
+      pair 
+    } = req.body;
+    
+    // Validate required fields
+    if (!description || !strategy_id || !agent_type || !insight_type || 
+        confidence === undefined || !recommendation) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const insightData = {
+      description,
+      strategy_id,
+      agent_type,
+      insight_type,
+      confidence: Number(confidence),
+      recommendation,
+      pair
+    };
+    
+    const newInsight = await storage.createLearningInsight(insightData);
+    
+    res.status(201).json({
+      success: true,
+      insight: newInsight,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in POST /api/insights:", error);
+    res.status(500).json({ error: 'Failed to create insight' });
+  }
+});
+
 router.get('/api/insights/:agentType', async (req, res) => {
   try {
     const { agentType } = req.params;
     
-    // In a real implementation, we would get insights for the specific agent type
+    const insights = await storage.getLearningInsightsByAgentType(agentType);
     res.json({
-      insights: [],
+      insights,
       agentType,
       timestamp: new Date().toISOString()
     });
@@ -549,10 +794,23 @@ router.post('/api/insights/:id/apply', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
-    // In a real implementation, we would apply the insight in the agent manager's learning system
+    const result = {
+      success,
+      performance_delta,
+      notes,
+      applied_at: new Date()
+    };
+    
+    const updatedInsight = await storage.applyLearningInsight(id, result);
+    
+    if (!updatedInsight) {
+      return res.status(404).json({ error: 'Insight not found' });
+    }
+    
     res.json({ 
       success: true, 
       message: 'Insight applied successfully',
+      insight: updatedInsight,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
