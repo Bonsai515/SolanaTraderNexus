@@ -332,7 +332,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node server/index.js"
+    "dev": "tsx server/index.ts",
+    "build": "tsc",
+    "start": "node dist/server/index.js"
   },
   "keywords": [],
   "author": "",
