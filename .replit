@@ -12,7 +12,7 @@ packages = ["jq"]
 
 [deployment]
 deploymentTarget = "gce"
-build = ["sh", "-c", "npm install --no-optional && npm run build && cargo build --release"]
+build = ["sh", "-c", "/nix/store/8wybwvv517v5lg5hvg1l1ydfs97gd8hd-rust-mixed/bin/cargo build --release && npm install --no-optional && npm run build"]
 run = ["sh", "-c", "node dist/server/index.js"]
 
 [[ports]]
