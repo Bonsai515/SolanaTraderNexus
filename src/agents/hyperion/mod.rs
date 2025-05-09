@@ -1,613 +1,307 @@
-// Hyperion - Flash Arbitrage Overlord Agent
-// Architecture based on the GOAT framework for MEV capture
-
-use anyhow::{Result, anyhow, Context};
-use log::{info, warn, error, debug};
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, instruction::Instruction};
 use serde::{Serialize, Deserialize};
-use std::sync::{Arc, RwLock, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
+use log::{info, debug, warn, error};
 
-use crate::agents::{Agent, AgentConfig, AgentStatus, AgentExecutionResult};
-use crate::solana::connection::SolanaConnection;
-use crate::solana::wallet_manager::WalletManager;
-use crate::solana::transaction_manager::{TransactionManager, TransactionRequest, TransactionPriority};
-use crate::transformers::TransformerAPI;
-use crate::agents::intelligence::LLMController;
+pub mod flash_arb;
+pub mod strategy_generator;
+pub mod agent_forge;
 
-pub mod flash_strategies;
-pub mod dex_routes;
-pub mod wormhole;
-pub mod profit_engine;
-pub mod meme_factory;
-
-// DEX Route for arbitrage path
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DexRoute {
-    /// DEX name
-    pub dex_name: String,
-    
-    /// Input token
-    pub token_in: String,
-    
-    /// Output token
-    pub token_out: String,
-    
-    /// Amount in
-    pub amount_in: f64,
-    
-    /// Expected output amount
-    pub expected_out: f64,
-    
-    /// Maximum slippage (0.0 - 1.0)
-    pub max_slippage: f64,
-    
-    /// Route priority
-    pub priority: u32,
-}
-
-// Wormhole cross-chain path
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WormholePath {
-    /// Source chain
-    pub source_chain: String,
-    
-    /// Destination chain
-    pub dest_chain: String,
-    
-    /// Token address on source chain
-    pub source_token: String,
-    
-    /// Token address on destination chain
-    pub dest_token: String,
-    
-    /// Amount to transfer
-    pub amount: f64,
-    
-    /// Maximum gas cost
-    pub max_gas: f64,
-}
-
-// Cross-DEX Arbitrage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossDexArb {
-    /// DEX routes
-    pub routes: Vec<DexRoute>,
-    
-    /// Total size
-    pub total_size: f64,
-    
-    /// Expected profit
-    pub expected_profit: f64,
-    
-    /// Execution timestamp
-    pub timestamp: DateTime<Utc>,
-}
-
-// Flash Loan Result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlashLoanResult {
-    /// Borrowed amount
-    pub amount: f64,
-    
-    /// Loan fee
-    pub fee: f64,
-    
-    /// Flash loan source
-    pub source: String,
-    
-    /// Loan expiration time
-    pub expiration: DateTime<Utc>,
-}
-
-// Arbitrage result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArbResult {
-    /// Profit amount
-    pub profit: f64,
-    
-    /// Execution metrics
-    pub metrics: HashMap<String, f64>,
-    
-    /// Route performance
-    pub route_performance: Vec<DexRoutePerformance>,
-}
-
-// DEX Route Performance
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DexRoutePerformance {
-    /// DEX name
-    pub dex_name: String,
-    
-    /// Expected output
-    pub expected_out: f64,
-    
-    /// Actual output
-    pub actual_out: f64,
-    
-    /// Slippage
-    pub slippage: f64,
-    
-    /// Execution time in milliseconds
-    pub execution_time_ms: u64,
-}
-
-// Hyperion agent state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Hyperion Agent State
 pub struct HyperionState {
-    /// Strategy vault public key
-    pub strategy_vault: String,
-    
-    /// Profit tracker
-    pub profit_ledger: HashMap<String, f64>,
-    
-    /// Chain mapper for cross-chain opportunities
-    pub chain_mapper: HashMap<String, Vec<String>>,
-    
-    /// LLM brain context
-    pub llm_context: HashMap<String, String>,
+    pub strategies: Vec<StrategyDNA>,
+    pub fee_wallet: Keypair,
+    pub profit_wallet: Keypair,
+    pub strategy_vault: Pubkey,
+    pub active: bool,
+    pub last_execution: Option<DateTime<Utc>>,
+    pub total_executions: u64,
+    pub successful_executions: u64,
+    pub profit_ledger: ProfitLedger,
 }
 
-// Hyperion agent
-pub struct HyperionAgent {
-    /// Agent configuration
-    config: AgentConfig,
-    
-    /// Agent status
-    status: AgentStatus,
-    
-    /// Hyperion state
-    state: HyperionState,
-    
-    /// Solana connection
-    connection: Option<Arc<SolanaConnection>>,
-    
-    /// Wallet manager
-    wallet_manager: Option<Arc<WalletManager>>,
-    
-    /// Transaction manager
-    tx_manager: Option<Arc<TransactionManager>>,
-    
-    /// Transformer API
-    transformer_api: Option<Arc<TransformerAPI>>,
-    
-    /// LLM Controller
-    llm_controller: Option<Arc<LLMController>>,
-    
-    /// Wallet generator 
-    wallet_generator: Option<Arc<crate::agents::wallet_generator::WalletGenerator>>,
-    
-    /// Agent wallets (separated by purpose)
-    agent_wallets: HashMap<crate::agents::wallet_generator::WalletPurpose, crate::agents::wallet_generator::AgentWallet>,
+/// Profit tracking ledger
+pub struct ProfitLedger {
+    pub total_profit: f64,
+    pub profit_by_strategy: HashMap<String, f64>,
+    pub profit_by_pair: HashMap<String, f64>,
+    pub profit_by_dex: HashMap<String, f64>,
+    pub daily_profit: HashMap<String, f64>, // Format: "YYYY-MM-DD"
 }
 
-impl HyperionAgent {
-    /// Create a new Hyperion agent
-    pub fn new(config: AgentConfig) -> Result<Self> {
-        // Initialize state
-        let state = HyperionState {
-            strategy_vault: "".to_string(),
-            profit_ledger: HashMap::new(),
-            chain_mapper: HashMap::new(),
-            llm_context: HashMap::new(),
-        };
-        
-        Ok(Self {
-            config,
-            status: AgentStatus::Idle,
-            state,
-            connection: None,
-            wallet_manager: None,
-            tx_manager: None,
-            transformer_api: None,
-            llm_controller: None,
-            wallet_generator: None,
-            agent_wallets: HashMap::new(),
-        })
+/// Strategy DNA for arbitrage
+#[derive(Debug, Clone)]
+pub struct StrategyDNA {
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub target_pairs: Vec<String>,
+    pub dex_priority: Vec<String>,
+    pub min_profit_threshold: f64,
+    pub execution_speed_ms: u64,
+    pub max_slippage: f64,
+    pub risk_score: f64,
+    pub version: String,
+    pub performance_metrics: HashMap<String, f64>,
+}
+
+/// DEX route for arbitrage
+#[derive(Debug, Clone)]
+pub struct DexRoute {
+    pub dex_name: String,
+    pub pair: String,
+    pub expected_price: f64,
+    pub expected_slippage: f64,
+    pub pool_address: Option<Pubkey>,
+}
+
+/// Cross-chain route via Wormhole
+#[derive(Debug, Clone)]
+pub struct WormholePath {
+    pub source_chain: String,
+    pub destination_chain: String,
+    pub token_bridge_address: Pubkey,
+    pub target_address: [u8; 32],
+    pub swap_instructions: Vec<Instruction>,
+}
+
+/// Arbitrage execution result
+#[derive(Debug, Clone)]
+pub struct ArbResult {
+    pub success: bool,
+    pub profit: f64,
+    pub execution_time_ms: u64,
+    pub fees_paid: f64,
+    pub route_taken: Vec<String>,
+    pub signature: Option<String>,
+    pub metrics: HashMap<String, f64>,
+    pub error: Option<String>,
+}
+
+/// Market conditions for strategy generation
+#[derive(Debug, Clone)]
+pub struct MarketConditions {
+    pub volatility: HashMap<String, f64>,
+    pub volumes: HashMap<String, f64>,
+    pub spreads: HashMap<String, f64>,
+    pub memecoin_activity: f64,
+    pub cross_chain_opportunity: f64,
+}
+
+/// Implementation of the Hyperion agent
+impl HyperionState {
+    pub fn new(
+        strategy_vault: Pubkey,
+        fee_wallet: Keypair,
+        profit_wallet: Keypair,
+    ) -> Self {
+        HyperionState {
+            strategies: Vec::new(),
+            fee_wallet,
+            profit_wallet,
+            strategy_vault,
+            active: false,
+            last_execution: None,
+            total_executions: 0,
+            successful_executions: 0,
+            profit_ledger: ProfitLedger {
+                total_profit: 0.0,
+                profit_by_strategy: HashMap::new(),
+                profit_by_pair: HashMap::new(),
+                profit_by_dex: HashMap::new(),
+                daily_profit: HashMap::new(),
+            },
+        }
     }
-    
-    /// Set wallet generator
-    pub fn set_wallet_generator(&mut self, wallet_generator: Arc<crate::agents::wallet_generator::WalletGenerator>) {
-        self.wallet_generator = Some(wallet_generator);
-    }
-    
-    /// Set connection manager
-    pub fn set_connection(&mut self, connection: Arc<SolanaConnection>) {
-        self.connection = Some(connection);
-    }
-    
-    /// Set wallet manager
-    pub fn set_wallet_manager(&mut self, wallet_manager: Arc<WalletManager>) {
-        self.wallet_manager = Some(wallet_manager);
-    }
-    
-    /// Set transaction manager
-    pub fn set_transaction_manager(&mut self, tx_manager: Arc<TransactionManager>) {
-        self.tx_manager = Some(tx_manager);
-    }
-    
-    /// Set transformer API
-    pub fn set_transformer_api(&mut self, transformer_api: Arc<TransformerAPI>) {
-        self.transformer_api = Some(transformer_api);
-    }
-    
-    /// Set LLM controller
-    pub fn set_llm_controller(&mut self, llm_controller: Arc<LLMController>) {
-        self.llm_controller = Some(llm_controller);
-    }
-    
-    /// Execute zero-capital arbitrage
+
+    /// Execute a zero-capital flash arbitrage
     pub fn execute_zero_capital_arb(
         &mut self,
         dex_path: Vec<DexRoute>,
-        chain_route: Option<WormholePath>,
+        chain_route: Option<WormholePath>
     ) -> Result<ArbResult> {
-        // Check dependencies
-        let tx_manager = self.tx_manager.as_ref()
-            .ok_or_else(|| anyhow!("Transaction manager not initialized"))?;
-        
-        // Update status
-        self.status = AgentStatus::Executing;
-        
-        // 1. Calculate total size needed
-        let total_size = dex_path.iter()
-            .map(|route| route.amount_in)
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap_or(0.0);
-        
-        // 2. Execute MEV-protected flash loan
-        info!("Executing flash loan for {} SOL", total_size);
-        let flash_loan = self.execute_flash_loan(total_size, chain_route.clone())?;
-        
-        // 3. Execute cross-DEX arbitrage
-        info!("Executing cross-DEX arbitrage across {} routes", dex_path.len());
-        let arb_result = self.execute_cross_dex_arb(dex_path, flash_loan.amount)?;
-        
-        // 4. Repay flash loan
-        info!("Repaying flash loan of {} SOL with fee {}", flash_loan.amount, flash_loan.fee);
-        let repayment_amount = flash_loan.amount + flash_loan.fee;
-        
-        // Verify profit covers loan repayment
-        if arb_result.profit <= repayment_amount {
-            return Err(anyhow!("Arbitrage profit ({}) insufficient to cover flash loan repayment ({})",
-                            arb_result.profit, repayment_amount));
+        if !self.active {
+            return Err(anyhow!("Hyperion agent is not active"));
         }
+
+        self.total_executions += 1;
+        self.last_execution = Some(Utc::now());
         
-        // 5. Capture and repatriate profit
-        let net_profit = arb_result.profit - repayment_amount;
-        info!("Capturing net profit of {} SOL", net_profit);
-        self.capture_profit(net_profit)?;
+        // Call the flash arbitrage module
+        let result = flash_arb::execute_flash_arbitrage(self, dex_path, chain_route)?;
         
-        // 6. Update status and return
-        self.status = AgentStatus::Cooldown;
-        
-        // 7. Evolve strategy based on results
-        self.evolve_strategy(&arb_result)?;
-        
-        Ok(arb_result)
-    }
-    
-    /// Execute flash loan
-    fn execute_flash_loan(
-        &self,
-        amount: f64,
-        chain_route: Option<WormholePath>,
-    ) -> Result<FlashLoanResult> {
-        // Simplified implementation - in a real system this would interact with
-        // flash loan providers on Solana (e.g., Jet Protocol, Solend, etc.)
-        
-        info!("Executing flash loan for {} SOL", amount);
-        
-        let loan_fee = amount * 0.003; // 0.3% fee
-        let flash_result = FlashLoanResult {
-            amount,
-            fee: loan_fee,
-            source: "solend".to_string(),
-            expiration: Utc::now() + chrono::Duration::seconds(60),
-        };
-        
-        Ok(flash_result)
-    }
-    
-    /// Execute cross-DEX arbitrage
-    fn execute_cross_dex_arb(
-        &self,
-        routes: Vec<DexRoute>,
-        amount: f64,
-    ) -> Result<ArbResult> {
-        // Simplified implementation - in a real system this would construct and execute
-        // the actual cross-DEX trades
-        
-        let mut route_performance = Vec::new();
-        let mut current_amount = amount;
-        
-        // Execute each route in sequence
-        for route in &routes {
-            info!("Executing route: {} {} -> {} (amount: {})", 
-                 route.dex_name, route.token_in, route.token_out, current_amount);
+        // Record the execution result
+        if result.success {
+            self.successful_executions += 1;
+            self.record_profit(&result);
             
-            // Simulated execution
-            let slippage = rand::random::<f64>() * route.max_slippage;
-            let actual_out = route.expected_out * (1.0 - slippage);
-            
-            // Record performance
-            route_performance.push(DexRoutePerformance {
-                dex_name: route.dex_name.clone(),
-                expected_out: route.expected_out,
-                actual_out,
-                slippage,
-                execution_time_ms: rand::random::<u64>() % 1000 + 100, // 100-1100ms
-            });
-            
-            // Update amount for next route
-            current_amount = actual_out;
+            // Update strategies based on result
+            strategy_generator::evolve_strategy(self, result.metrics.clone())?;
         }
-        
-        // Calculate profit
-        let profit = current_amount - amount;
-        
-        // Execution metrics
-        let mut metrics = HashMap::new();
-        metrics.insert("total_slippage".to_string(), 
-                    route_performance.iter().map(|r| r.slippage).sum::<f64>());
-        metrics.insert("avg_execution_time_ms".to_string(), 
-                    route_performance.iter().map(|r| r.execution_time_ms as f64).sum::<f64>() / routes.len() as f64);
-        metrics.insert("profit_percentage".to_string(), profit / amount * 100.0);
-        
-        let result = ArbResult {
-            profit: current_amount, // Total final amount (principal + profit)
-            metrics,
-            route_performance,
-        };
         
         Ok(result)
     }
     
-    /// Capture profit
-    fn capture_profit(&mut self, amount: f64) -> Result<()> {
-        // Update profit ledger
-        let date = Utc::now().date_naive().to_string();
-        let existing_profit = *self.state.profit_ledger.get(&date).unwrap_or(&0.0);
-        self.state.profit_ledger.insert(date, existing_profit + amount);
+    /// Activate the agent
+    pub fn activate(&mut self) -> Result<()> {
+        // Initialize the first strategy if none exist
+        if self.strategies.is_empty() {
+            let default_strategy = StrategyDNA {
+                id: uuid::Uuid::new_v4().to_string(),
+                created_at: Utc::now(),
+                target_pairs: vec![
+                    "SOL/USDC".to_string(),
+                    "BTC/USDC".to_string(),
+                    "ETH/USDC".to_string(),
+                ],
+                dex_priority: vec![
+                    "jupiter".to_string(),
+                    "raydium".to_string(),
+                    "openbook".to_string(),
+                    "orca".to_string(),
+                ],
+                min_profit_threshold: 0.005, // 0.5%
+                execution_speed_ms: 1500, // 1.5 seconds
+                max_slippage: 0.01, // 1%
+                risk_score: 0.3, // Low-medium risk
+                version: "1.0.0".to_string(),
+                performance_metrics: HashMap::new(),
+            };
+            
+            self.strategies.push(default_strategy);
+        }
         
-        info!("Profit of {} SOL captured successfully. Daily total: {}", 
-              amount, existing_profit + amount);
+        self.active = true;
+        info!("Hyperion agent activated");
+        Ok(())
+    }
+    
+    /// Deactivate the agent
+    pub fn deactivate(&mut self) -> Result<()> {
+        self.active = false;
+        info!("Hyperion agent deactivated");
+        Ok(())
+    }
+    
+    /// Check if the agent is active
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+    
+    /// Record profit from a successful execution
+    fn record_profit(&mut self, result: &ArbResult) {
+        // Add to total profit
+        self.profit_ledger.total_profit += result.profit;
+        
+        // Extract strategy ID from metrics
+        if let Some(strategy_id) = result.metrics.get("strategy_id") {
+            let strategy_id = strategy_id.to_string();
+            *self.profit_ledger.profit_by_strategy.entry(strategy_id).or_insert(0.0) += result.profit;
+        }
+        
+        // Record profit by pair
+        for route in &result.route_taken {
+            if let Some(pair) = route.split(':').nth(1).map(|s| s.trim().to_string()) {
+                *self.profit_ledger.profit_by_pair.entry(pair).or_insert(0.0) += result.profit / result.route_taken.len() as f64;
+            }
+            
+            if let Some(dex) = route.split(':').next().map(|s| s.trim().to_string()) {
+                *self.profit_ledger.profit_by_dex.entry(dex).or_insert(0.0) += result.profit / result.route_taken.len() as f64;
+            }
+        }
+        
+        // Record daily profit
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        *self.profit_ledger.daily_profit.entry(today).or_insert(0.0) += result.profit;
+        
+        info!("Recorded profit of {:.6} for execution", result.profit);
+    }
+    
+    /// Generate a market-specific strategy
+    pub fn generate_market_strategy(&mut self, market_conditions: MarketConditions) -> Result<()> {
+        let new_strategy = strategy_generator::generate_market_specific_strategy(self, &market_conditions)?;
+        self.strategies.push(new_strategy);
+        
+        // Cap the number of strategies
+        if self.strategies.len() > 10 {
+            // Remove the oldest strategy
+            self.strategies.remove(0);
+        }
         
         Ok(())
     }
     
-    /// Evolve strategy based on results
-    fn evolve_strategy(&mut self, result: &ArbResult) -> Result<()> {
-        // Use LLM to improve strategy
-        if let Some(llm) = &self.llm_controller {
-            info!("Evolving strategy based on execution results");
-            
-            // Format prompt
-            let prompt = format!(
-                "Analyze this arbitrage execution and suggest improvements:\nProfit: {} SOL\nMetrics: {:?}\nRoute Performance: {:?}",
-                result.profit, result.metrics, result.route_performance
-            );
-            
-            // For now, we'll just log - in a real implementation, this would update the strategy
-            let _analysis = llm.analyze_execution_result(&prompt)?;
+    /// Get agent performance statistics
+    pub fn get_performance_stats(&self) -> HashMap<String, f64> {
+        let mut stats = HashMap::new();
+        
+        stats.insert("total_executions".to_string(), self.total_executions as f64);
+        stats.insert("successful_executions".to_string(), self.successful_executions as f64);
+        stats.insert("total_profit".to_string(), self.profit_ledger.total_profit);
+        stats.insert("strategy_count".to_string(), self.strategies.len() as f64);
+        
+        // Calculate success rate
+        if self.total_executions > 0 {
+            let success_rate = (self.successful_executions as f64) / (self.total_executions as f64) * 100.0;
+            stats.insert("success_rate".to_string(), success_rate);
+        } else {
+            stats.insert("success_rate".to_string(), 0.0);
         }
         
-        Ok(())
+        stats
     }
 }
 
-// Implement Agent trait for HyperionAgent
-impl Agent for HyperionAgent {
-    fn get_config(&self) -> AgentConfig {
-        self.config.clone()
+/// Thread-safe wrapper for the Hyperion agent
+pub struct HyperionAgent {
+    state: Arc<Mutex<HyperionState>>,
+}
+
+impl HyperionAgent {
+    pub fn new(
+        strategy_vault: Pubkey,
+        fee_wallet: Keypair,
+        profit_wallet: Keypair,
+    ) -> Self {
+        let state = HyperionState::new(strategy_vault, fee_wallet, profit_wallet);
+        HyperionAgent {
+            state: Arc::new(Mutex::new(state)),
+        }
     }
     
-    fn get_status(&self) -> AgentStatus {
-        self.status
+    pub fn execute_zero_capital_arb(
+        &self,
+        dex_path: Vec<DexRoute>,
+        chain_route: Option<WormholePath>
+    ) -> Result<ArbResult> {
+        let mut state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        state.execute_zero_capital_arb(dex_path, chain_route)
     }
     
-    fn initialize(&mut self) -> Result<()> {
-        info!("Initializing Hyperion agent: {}", self.config.name);
-        
-        // Check dependencies
-        if self.connection.is_none() {
-            warn!("Solana connection not set for Hyperion agent");
-        }
-        
-        if self.wallet_manager.is_none() {
-            warn!("Wallet manager not set for Hyperion agent");
-        }
-        
-        if self.tx_manager.is_none() {
-            warn!("Transaction manager not set for Hyperion agent");
-        }
-        
-        if self.wallet_generator.is_none() {
-            warn!("Wallet generator not set for Hyperion agent");
-            
-            // Create wallet generator if wallet_manager and tx_manager are available
-            if let (Some(wallet_manager), Some(tx_manager)) = (&self.wallet_manager, &self.tx_manager) {
-                let wallet_generator = crate::agents::wallet_generator::WalletGenerator::new(
-                    wallet_manager.clone(),
-                    tx_manager.clone(),
-                );
-                self.wallet_generator = Some(Arc::new(wallet_generator));
-                info!("Created wallet generator for Hyperion agent");
-            }
-        }
-        
-        // Initialize agent wallets if wallet generator is available
-        if let Some(wallet_generator) = &self.wallet_generator {
-            // Initialize agent wallets
-            info!("Initializing wallets for Hyperion agent");
-            wallet_generator.initialize_agent_wallets(&self.config.id)?;
-            
-            // Get wallets for different purposes
-            let trading_wallet = wallet_generator.get_wallet(
-                &self.config.id, 
-                crate::agents::wallet_generator::WalletPurpose::Trading
-            )?;
-            
-            let profit_wallet = wallet_generator.get_wallet(
-                &self.config.id, 
-                crate::agents::wallet_generator::WalletPurpose::ProfitVault
-            )?;
-            
-            let fee_wallet = wallet_generator.get_wallet(
-                &self.config.id, 
-                crate::agents::wallet_generator::WalletPurpose::FeePayment
-            )?;
-            
-            // Store wallets in agent state
-            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::Trading, trading_wallet);
-            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::ProfitVault, profit_wallet);
-            self.agent_wallets.insert(crate::agents::wallet_generator::WalletPurpose::FeePayment, fee_wallet);
-            
-            info!("Initialized {} wallets for Hyperion agent", self.agent_wallets.len());
-            
-            // Use the profit wallet pubkey as the strategy vault
-            if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
-                self.state.strategy_vault = profit_wallet.public_key.clone();
-                info!("Set strategy vault to profit wallet: {}", self.state.strategy_vault);
-            }
-        } else {
-            // Initialize state with placeholder
-            self.state.strategy_vault = "hyperion_vault".to_string(); // In real implementation, this would be a Solana pubkey
-        }
-        
-        // Initialize chain mapper
-        self.state.chain_mapper.insert("solana".to_string(), vec![
-            "ethereum".to_string(),
-            "arbitrum".to_string(),
-            "base".to_string(),
-        ]);
-        
-        Ok(())
+    pub fn activate(&self) -> Result<()> {
+        let mut state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        state.activate()
     }
     
-    fn start(&mut self) -> Result<()> {
-        info!("Starting Hyperion agent: {}", self.config.name);
-        
-        // Ensure initialized
-        if self.state.strategy_vault.is_empty() {
-            self.initialize()?;
-        }
-        
-        // Set status to scanning
-        self.status = AgentStatus::Scanning;
-        
-        Ok(())
+    pub fn deactivate(&self) -> Result<()> {
+        let mut state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        state.deactivate()
     }
     
-    fn stop(&mut self) -> Result<()> {
-        info!("Stopping Hyperion agent: {}", self.config.name);
-        
-        // Set status to idle
-        self.status = AgentStatus::Idle;
-        
-        Ok(())
+    pub fn is_active(&self) -> Result<bool> {
+        let state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        Ok(state.is_active())
     }
     
-    fn execute_strategy(&mut self) -> Result<AgentExecutionResult> {
-        info!("Executing strategy for Hyperion agent: {}", self.config.name);
-        
-        // Get trading wallet
-        let trading_wallet = match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Trading) {
-            Some(wallet) => wallet,
-            None => {
-                // If no wallet is available, try to initialize
-                if self.state.strategy_vault.is_empty() {
-                    self.initialize()?;
-                }
-                
-                // Try again
-                match self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::Trading) {
-                    Some(wallet) => wallet,
-                    None => {
-                        return Err(anyhow!("No trading wallet available for execution"));
-                    }
-                }
-            }
-        };
-        
-        info!("Using trading wallet {} for strategy execution", trading_wallet.public_key);
-        
-        // Update wallet last used timestamp if wallet generator available
-        if let Some(wallet_generator) = &self.wallet_generator {
-            wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::Trading)?;
-        }
-        
-        // Build strategy
-        let dex_routes = vec![
-            DexRoute {
-                dex_name: "raydium".to_string(),
-                token_in: "SOL".to_string(),
-                token_out: "USDC".to_string(),
-                amount_in: 10.0,
-                expected_out: 1000.0, // 100 USDC/SOL
-                max_slippage: 0.005, // 0.5%
-                priority: 1,
-            },
-            DexRoute {
-                dex_name: "orca".to_string(),
-                token_in: "USDC".to_string(),
-                token_out: "BONK".to_string(),
-                amount_in: 1000.0,
-                expected_out: 1000000000.0, // 1 million BONK
-                max_slippage: 0.01, // 1%
-                priority: 2,
-            },
-            DexRoute {
-                dex_name: "jupiter".to_string(),
-                token_in: "BONK".to_string(),
-                token_out: "SOL".to_string(),
-                amount_in: 1000000000.0,
-                expected_out: 10.3, // 10.3 SOL
-                max_slippage: 0.008, // 0.8%
-                priority: 3,
-            },
-        ];
-        
-        // Execute arbitrage using agent's trading wallet
-        let arb_result = self.execute_zero_capital_arb(dex_routes, None)?;
-        
-        // Transfer profit to profit vault if available
-        if let Some(profit_wallet) = self.agent_wallets.get(&crate::agents::wallet_generator::WalletPurpose::ProfitVault) {
-            info!("Transferring profit to profit vault: {}", profit_wallet.public_key);
-            
-            // In real implementation, this would create a transaction to transfer profits
-            // from trading wallet to profit vault
-            
-            // Update profit wallet last used timestamp
-            if let Some(wallet_generator) = &self.wallet_generator {
-                wallet_generator.update_last_used(&self.config.id, crate::agents::wallet_generator::WalletPurpose::ProfitVault)?;
-            }
-        }
-        
-        // Create execution result
-        let execution_result = AgentExecutionResult {
-            id: uuid::Uuid::new_v4().to_string(),
-            success: true,
-            profit: arb_result.profit,
-            timestamp: Utc::now().to_rfc3339(),
-            signature: None, // In real implementation, this would be the transaction signature
-            error: None,
-            metrics: arb_result.metrics,
-        };
-        
-        Ok(execution_result)
+    pub fn get_performance_stats(&self) -> Result<HashMap<String, f64>> {
+        let state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        Ok(state.get_performance_stats())
     }
     
-    fn update(&mut self) -> Result<()> {
-        // Periodic update, e.g. for scanning market conditions
-        match self.status {
-            AgentStatus::Scanning => {
-                // In a real implementation, this would scan for arbitrage opportunities
-                debug!("Hyperion scanning for arbitrage opportunities...");
-            }
-            _ => {}
-        }
-        
-        Ok(())
+    pub fn generate_market_strategy(&self, market_conditions: MarketConditions) -> Result<()> {
+        let mut state = self.state.lock().map_err(|_| anyhow!("Failed to acquire lock on Hyperion state"))?;
+        state.generate_market_strategy(market_conditions)
     }
 }

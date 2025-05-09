@@ -4,6 +4,7 @@
   "description": "A comprehensive Solana trading system powered by quantum-inspired transformers, custom AI agents, and a transaction engine to identify opportunities and execute trades on the Solana blockchain.",
   "main": "index.js",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
     "@neondatabase/serverless": "^1.0.0",
     "@solana/web3.js": "^1.98.2",
     "@stripe/react-stripe-js": "^3.7.0",

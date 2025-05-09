@@ -11,74 +11,28 @@ import { EventEmitter } from 'events';
 import { Server } from 'http';
 import { logger } from './logger';
 import { MarketData } from './priceFeedCache';
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  SignalType, 
+  SignalStrength, 
+  SignalDirection, 
+  SignalPriority, 
+  SignalSource, 
+  BaseSignal 
+} from '../shared/signalTypes';
 
-// Signal types 
-export enum SignalType {
-  PRICE_ACTION = 'price_action',
-  VOLATILITY = 'volatility',
-  LIQUIDITY_CHANGE = 'liquidity_change',
-  SOCIAL_SENTIMENT = 'social_sentiment',
-  WHALE_MOVEMENT = 'whale_movement',
-  MEV_OPPORTUNITY = 'mev_opportunity',
-  PATTERN_RECOGNITION = 'pattern_recognition',
-  CROSS_CHAIN = 'cross_chain',
-  FLASH_LOAN = 'flash_loan',
-  SANDWICH_OPPORTUNITY = 'sandwich_opportunity',
-  ARBITRAGE = 'arbitrage',
-  SNIPE = 'snipe',
-  CUSTOM = 'custom'
-}
+// Re-export the signal enums for backwards compatibility
+export { 
+  SignalType, 
+  SignalStrength, 
+  SignalDirection, 
+  SignalSource,
+  SignalPriority 
+};
 
-export enum SignalStrength {
-  WEAK = 'weak',
-  MODERATE = 'moderate',
-  STRONG = 'strong',
-  VERY_STRONG = 'very_strong'
-}
-
-export enum SignalDirection {
-  BULLISH = 'bullish',
-  BEARISH = 'bearish',
-  NEUTRAL = 'neutral',
-  MIXED = 'mixed'
-}
-
-export enum SignalSource {
-  MICRO_QHC = 'micro_qhc',
-  MEME_CORTEX = 'meme_cortex',
-  HYPERION_AGENT = 'hyperion_agent',
-  QUANTUM_OMEGA_AGENT = 'quantum_omega_agent',
-  CROSS_CHAIN_ANALYZER = 'cross_chain_analyzer',
-  AI_SYSTEM = 'ai_system',
-  EXTERNAL = 'external',
-  CUSTOM = 'custom'
-}
-
-// Signal priority affects routing and handling
-export enum SignalPriority {
-  LOW = 0,
-  NORMAL = 1,
-  HIGH = 2,
-  CRITICAL = 3
-}
-
-// Basic signal structure
-export interface Signal {
-  id: string;
-  timestamp: Date;
-  pair: string;
-  type: SignalType;
-  source: SignalSource;
-  strength: SignalStrength;
-  direction: SignalDirection;
-  priority: SignalPriority;
-  confidence: number; // 0-100
-  description: string;
-  metadata: Record<string, any>;
-  ttl?: number; // Time to live in seconds
-  relatedSignals?: string[]; // IDs of related signals
-  actionable?: boolean; // Whether this signal can be acted upon directly
-  targetComponents?: string[]; // List of components that should receive this signal
+// Basic signal structure using the shared BaseSignal
+export interface Signal extends BaseSignal {
+  // Server-specific extensions can be added here
 }
 
 // Signal processor interface - components can implement this to process signals
@@ -420,7 +374,21 @@ class SignalHub extends EventEmitter {
             priceChange: marketData.price_change_24h,
             volume: marketData.volume24h
           },
-          actionable: true
+          actionable: true,
+          token_address: marketData.token_address || '',
+          analysis: {
+            volatility: marketData.volatility || 0,
+            liquidity: marketData.liquidity || 0,
+            momentum: Math.random() * 100, // Sample momentum value
+            support: marketData.price * 0.9,
+            resistance: marketData.price * 1.1
+          },
+          metrics: {
+            volumeToMcapRatio: marketData.volume24h / (marketData.market_cap || 1),
+            priceDeviation: Math.abs(marketData.price_change_24h || 0),
+            trendStrength: Math.random() * 100
+          },
+          targetComponents: ['HyperionAgent', 'QuantumOmegaAgent']
         };
         
         await this.processSignal(signal);
@@ -447,7 +415,22 @@ class SignalHub extends EventEmitter {
             socialVolume: (marketData.volume24h * (Math.random() * 0.1)).toFixed(0),
             platforms: ['twitter', 'telegram', 'discord']
           },
-          actionable: Math.random() > 0.5
+          actionable: Math.random() > 0.5,
+          token_address: marketData.token_address || '',
+          analysis: {
+            socialMomentum: Math.random() * 100,
+            viralCoefficient: Math.random() * 5,
+            memePotential: Math.random() * 100,
+            communityStrength: Math.random() * 100,
+            influencerActivity: Math.random() * 100
+          },
+          metrics: {
+            socialVolume24h: parseInt((marketData.volume24h * (Math.random() * 0.2)).toFixed(0)),
+            mentionsCount: Math.floor(Math.random() * 10000),
+            sentimentScore: Math.random() * 100,
+            viralityIndex: Math.random() * 10
+          },
+          targetComponents: ['QuantumOmegaAgent', 'AIInsightsEngine']
         };
         
         await this.processSignal(signal);
@@ -455,6 +438,7 @@ class SignalHub extends EventEmitter {
       
       // Occasionally generate MEV opportunity signals
       if (Math.random() < 0.1) { // 10% chance
+        const profitEstimate = marketData.price * 0.005 * Math.random();
         const signal: Signal = {
           id: this.generateSignalId(),
           timestamp: new Date(),
@@ -468,13 +452,27 @@ class SignalHub extends EventEmitter {
           description: `Hyperion detected MEV opportunity in ${marketData.pair}`,
           metadata: {
             opportunityType: 'cross-dex-arb',
-            estimatedProfit: (marketData.price * 0.005 * Math.random()).toFixed(4),
+            estimatedProfit: profitEstimate.toFixed(4),
             expiresIn: Math.floor(Math.random() * 10) + 1 + 's',
             route: ['jupiter', 'raydium', 'openbook']
           },
           actionable: true,
           ttl: 10, // Short time to live
-          targetComponents: ['HyperionAgent']
+          targetComponents: ['HyperionAgent', 'TransactionEngine'],
+          token_address: marketData.token_address || '',
+          analysis: {
+            arbitrageSize: profitEstimate,
+            executionComplexity: Math.random() * 10,
+            gasEstimate: Math.random() * 0.01,
+            competitionLevel: Math.random() * 100,
+            flashLoanRequired: false
+          },
+          metrics: {
+            profitPotential: profitEstimate,
+            successProbability: Math.random() * 0.9 + 0.1,
+            timeWindow: Math.floor(Math.random() * 10) + 1,
+            gasEfficiency: Math.random() * 100
+          }
         };
         
         await this.processSignal(signal);
@@ -527,6 +525,57 @@ class SignalHub extends EventEmitter {
    */
   public offSignal(event: string, callback: (signal: Signal) => void): void {
     this.off(event, callback);
+  }
+
+  /**
+   * Get signals targeted for a specific component
+   * @param componentName The name of the component to filter by
+   * @param limit Maximum number of signals to return
+   * @returns Array of signals targeted for the component
+   */
+  public getSignalsForComponent(componentName: string, limit: number = 50): Signal[] {
+    let signals = Array.from(this.signalStore.values());
+    
+    // Filter signals targeted for this component or with no targeting
+    signals = signals.filter(signal => 
+      !signal.targetComponents || 
+      signal.targetComponents.length === 0 ||
+      signal.targetComponents.includes(componentName)
+    );
+    
+    // Sort by timestamp (newest first) and priority (highest first)
+    signals.sort((a, b) => {
+      // First sort by priority (descending)
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+      // Then sort by timestamp (newest first)
+      return b.timestamp.getTime() - a.timestamp.getTime();
+    });
+    
+    // Apply limit
+    if (limit) {
+      signals = signals.slice(0, limit);
+    }
+    
+    return signals;
+  }
+
+  /**
+   * Subscribe to signals targeted for a specific component
+   * @param componentName The name of the component 
+   * @param callback Callback function
+   */
+  public onSignalsForComponent(componentName: string, callback: (signal: Signal) => void): void {
+    // Listen for all signals
+    this.on('signal', (signal: Signal) => {
+      // Pass only signals targeted for this component or with no targeting
+      if (!signal.targetComponents || 
+          signal.targetComponents.length === 0 ||
+          signal.targetComponents.includes(componentName)) {
+        callback(signal);
+      }
+    });
   }
 }
 

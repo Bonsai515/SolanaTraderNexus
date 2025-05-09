@@ -11,6 +11,19 @@ import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, S
 import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
 import { getPerplexityService } from './ai/perplexityService';
+import { 
+  getAllDexes, 
+  getDexInfo, 
+  getDexesByCategory, 
+  getAllAnalyticsPlatforms, 
+  getAllLendingProtocols, 
+  getLiquidityPools, 
+  getAllSupportedPairs,
+  DexType,
+  DexCategory,
+  AnalyticsPlatformType,
+  LendingProtocolType
+} from './dexInfo';
 
 // Global state for transformer API initialization
 let transformerApiInitialized = false;
@@ -474,6 +487,40 @@ router.get('/signals', async (req, res) => {
   }
 });
 
+// Get signals targeted for a specific component
+router.get('/signals/component/:componentName', async (req, res) => {
+  try {
+    const { componentName } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    
+    if (!componentName) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: componentName'
+      });
+      return;
+    }
+    
+    // Get signals from the hub
+    const signals = signalHub.getSignalsForComponent(componentName, limit);
+    
+    res.json({
+      status: 'success',
+      component: componentName,
+      count: signals.length,
+      signals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching signals for component:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error fetching signals for component',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 // Get a specific signal by ID
 router.get('/signals/:id', async (req, res) => {
   try {
@@ -561,9 +608,11 @@ router.post('/external-platforms', async (req, res) => {
       url: platformData.url,
       apiKey: platformData.apiKey,
       active: true,
+      platformType: platformData.platformType || externalSignalService.PlatformType.GENERIC,
       signalTypes: platformData.signalTypes,
       signalSources: platformData.signalSources,
-      pairs: platformData.pairs
+      pairs: platformData.pairs,
+      config: platformData.config
     });
     
     res.json({
@@ -722,6 +771,56 @@ router.delete('/external-platforms/:id', (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Error removing external platform',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Manually forward a signal to external platforms
+router.post('/external-platforms/forward-signal', async (req, res) => {
+  try {
+    const { signalId, platformIds } = req.body;
+    
+    if (!signalId) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: signalId'
+      });
+      return;
+    }
+    
+    // Get the signal from the hub
+    const signal = signalHub.getSignal(signalId);
+    
+    if (!signal) {
+      res.status(404).json({
+        status: 'error',
+        message: `Signal with ID ${signalId} not found`
+      });
+      return;
+    }
+    
+    // Forward to specific platforms or all if not specified
+    let receivingPlatforms: string[];
+    
+    if (platformIds && Array.isArray(platformIds) && platformIds.length > 0) {
+      receivingPlatforms = await externalSignalService.forwardSignalToPlatforms(signal, platformIds);
+    } else {
+      receivingPlatforms = await externalSignalService.forwardSignal(signal);
+    }
+    
+    res.json({
+      status: 'success',
+      message: `Signal forwarded to ${receivingPlatforms.length} platforms`,
+      signalId,
+      platforms: receivingPlatforms,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error forwarding signal to external platforms:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error forwarding signal to external platforms',
       error: error instanceof Error ? error.message : String(error)
     });
   }
@@ -2322,6 +2421,189 @@ router.post('/api/test/populate-price-feed', async (req, res) => {
   } catch (error: any) {
     logger.error("Error in /test/populate-price-feed:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// DEX API Endpoints
+// Get all supported DEXs
+router.get('/dexes', (req, res) => {
+  try {
+    const dexes = getAllDexes();
+    
+    res.json({
+      status: 'success',
+      count: dexes.length,
+      dexes,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting all DEXes:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting DEX information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get DEX by ID
+router.get('/dexes/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: id'
+      });
+      return;
+    }
+    
+    const dex = getDexInfo(id as DexType);
+    
+    if (!dex) {
+      res.status(404).json({
+        status: 'error',
+        message: `DEX with ID ${id} not found`
+      });
+      return;
+    }
+    
+    res.json({
+      status: 'success',
+      dex,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting DEX:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting DEX information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get DEXes by category
+router.get('/dexes/category/:category', (req, res) => {
+  try {
+    const { category } = req.params;
+    
+    if (!category) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: category'
+      });
+      return;
+    }
+    
+    const dexes = getDexesByCategory(category as DexCategory);
+    
+    res.json({
+      status: 'success',
+      count: dexes.length,
+      dexes,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting DEXes by category:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting DEX information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get all supported analytics platforms
+router.get('/analytics-platforms', (req, res) => {
+  try {
+    const platforms = getAllAnalyticsPlatforms();
+    
+    res.json({
+      status: 'success',
+      count: platforms.length,
+      platforms,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting analytics platforms:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting analytics platform information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get all supported lending protocols
+router.get('/lending-protocols', (req, res) => {
+  try {
+    const protocols = getAllLendingProtocols();
+    
+    res.json({
+      status: 'success',
+      count: protocols.length,
+      protocols,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting lending protocols:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting lending protocol information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get liquidity pools
+router.get('/liquidity-pools', (req, res) => {
+  try {
+    const { dex } = req.query;
+    
+    let pools: LiquidityPoolInfo[];
+    
+    if (dex) {
+      pools = getLiquidityPools(dex as DexType);
+    } else {
+      pools = getLiquidityPools();
+    }
+    
+    res.json({
+      status: 'success',
+      count: pools.length,
+      pools,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting liquidity pools:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting liquidity pool information',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get all supported trading pairs
+router.get('/trading-pairs', (req, res) => {
+  try {
+    const pairs = getAllSupportedPairs();
+    
+    res.json({
+      status: 'success',
+      count: pairs.length,
+      pairs,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting supported trading pairs:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting trading pair information',
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
