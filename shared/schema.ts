@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { createInsertSchema } from 'drizzle-zod';
 
 // Wallet Schema
 export const walletSchema = z.object({
@@ -11,7 +10,7 @@ export const walletSchema = z.object({
 });
 
 export type Wallet = z.infer<typeof walletSchema>;
-export const insertWalletSchema = createInsertSchema(walletSchema).omit({ id: true, created_at: true });
+export const insertWalletSchema = walletSchema.omit({ id: true, created_at: true });
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
 
 // Strategy Types
@@ -38,7 +37,7 @@ export const strategySchema = z.object({
 });
 
 export type Strategy = z.infer<typeof strategySchema>;
-export const insertStrategySchema = createInsertSchema(strategySchema).omit({ id: true, created_at: true, updated_at: true });
+export const insertStrategySchema = strategySchema.omit({ id: true, created_at: true, updated_at: true });
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 
 // Signal Types
@@ -68,7 +67,7 @@ export const tradingSignalSchema = z.object({
 });
 
 export type TradingSignal = z.infer<typeof tradingSignalSchema>;
-export const insertTradingSignalSchema = createInsertSchema(tradingSignalSchema).omit({ id: true, created_at: true });
+export const insertTradingSignalSchema = tradingSignalSchema.omit({ id: true, created_at: true });
 export type InsertTradingSignal = z.infer<typeof insertTradingSignalSchema>;
 
 // Transaction Types
@@ -108,5 +107,5 @@ export const transactionSchema = z.object({
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;
-export const insertTransactionSchema = createInsertSchema(transactionSchema).omit({ id: true, created_at: true, confirmed_at: true });
+export const insertTransactionSchema = transactionSchema.omit({ id: true, created_at: true, confirmed_at: true });
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;

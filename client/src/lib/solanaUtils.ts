@@ -6,7 +6,14 @@ import { create } from 'zustand';
 const getClusterUrl = (): string => {
   // Use custom RPC URL if available
   if (import.meta.env.VITE_INSTANT_NODES_RPC_URL) {
-    return import.meta.env.VITE_INSTANT_NODES_RPC_URL;
+    let endpoint = String(import.meta.env.VITE_INSTANT_NODES_RPC_URL);
+    
+    // Ensure URL starts with http:// or https://
+    if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+      endpoint = 'https://' + endpoint;
+    }
+    
+    return endpoint;
   }
   
   // Use Helius with API key if available

@@ -33,19 +33,68 @@ router.get('/health', (req, res) => {
 // Get Solana connection status
 router.get('/solana/status', async (req, res) => {
   try {
-    // Check for Instant Nodes URL first (better performance)
-    const endpoint = process.env.INSTANT_NODES_RPC_URL || 
-      (process.env.SOLANA_RPC_API_KEY 
-        ? `https://mainnet.helius-rpc.com/?api-key=${process.env.SOLANA_RPC_API_KEY}`
-        : 'https://api.mainnet-beta.solana.com');
+    // Use public endpoint by default for reliability
+    let endpoint = 'https://api.mainnet-beta.solana.com';
+    let customRpc = false;
+    let apiKeyPresent = false;
     
-    const connection = new solanaWeb3.Connection(endpoint);
+    // Try different endpoints in order of preference
+    if (process.env.SOLANA_RPC_API_KEY) {
+      try {
+        // Use Helius with API key
+        const heliusEndpoint = `https://mainnet.helius-rpc.com/?api-key=${process.env.SOLANA_RPC_API_KEY}`;
+        logger.info(`Attempting to connect to Solana using Helius endpoint`);
+        
+        const heliusConnection = new solanaWeb3.Connection(heliusEndpoint, 'confirmed');
+        await heliusConnection.getVersion();
+        
+        // If we get here, the connection worked
+        endpoint = heliusEndpoint;
+        customRpc = true;
+        apiKeyPresent = true;
+        logger.info(`Successfully connected to Solana using Helius endpoint`);
+      } catch (heliusError) {
+        logger.error('Failed to connect using Helius:', heliusError);
+        // Continue to next option
+      }
+    }
+    
+    // Only try Instant Nodes if Helius didn't work
+    if (endpoint === 'https://api.mainnet-beta.solana.com' && process.env.INSTANT_NODES_RPC_URL) {
+      try {
+        let instantNodesUrl = process.env.INSTANT_NODES_RPC_URL;
+        
+        // Validate URL format
+        if (!instantNodesUrl.startsWith('http://') && !instantNodesUrl.startsWith('https://')) {
+          instantNodesUrl = 'https://' + instantNodesUrl;
+        }
+        
+        logger.info(`Attempting to connect to Solana using Instant Nodes endpoint: ${instantNodesUrl}`);
+        
+        const instantNodesConnection = new solanaWeb3.Connection(instantNodesUrl, 'confirmed');
+        await instantNodesConnection.getVersion();
+        
+        // If we get here, the connection worked
+        endpoint = instantNodesUrl;
+        customRpc = true;
+        apiKeyPresent = true;
+        logger.info(`Successfully connected to Solana using Instant Nodes endpoint`);
+      } catch (instantNodesError) {
+        logger.error('Failed to connect using Instant Nodes:', instantNodesError);
+        // Continue to public endpoint
+      }
+    }
+    
+    // At this point, we're using whatever endpoint succeeded, or the public one as fallback
+    logger.info(`Connecting to Solana using endpoint: ${endpoint.includes('api-key') ? endpoint.replace(/api-key=.*/, 'api-key=REDACTED') : endpoint}`);
+    
+    const connection = new solanaWeb3.Connection(endpoint, 'confirmed');
     const version = await connection.getVersion();
     
     res.json({
       status: 'operational',
-      customRpc: endpoint !== 'https://api.mainnet-beta.solana.com',
-      apiKey: endpoint.includes('api-key') || endpoint.includes('INSTANT_NODES'),
+      customRpc: customRpc,
+      apiKey: apiKeyPresent,
       network: 'mainnet-beta',
       timestamp: new Date().toISOString()
     });
@@ -76,9 +125,18 @@ export function setupWebSocketServer(httpServer: Server) {
     }));
     
     // Send initial connection status
+    // Fix and validate endpoint URLs for WS connection status
+    let customRpc = false;
+    
+    if (process.env.INSTANT_NODES_RPC_URL) {
+      customRpc = true;
+    } else if (process.env.SOLANA_RPC_API_KEY) {
+      customRpc = true;
+    }
+    
     const connectionStatus = {
       status: 'operational',
-      customRpc: process.env.INSTANT_NODES_RPC_URL || process.env.SOLANA_RPC_API_KEY ? true : false,
+      customRpc: customRpc,
       apiKey: true,
       network: 'mainnet-beta',
       timestamp: new Date().toISOString()
