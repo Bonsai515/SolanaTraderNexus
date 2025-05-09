@@ -8,6 +8,7 @@ import { getTransformerAPI, MarketData } from './transformers';
 import { logger } from './logger';
 import agentRouter, * as AgentManager from './agents';
 import { priceFeedCache } from './priceFeedCache';
+import { getPerplexityService } from './ai/perplexityService';
 
 // Global state for transformer API initialization
 let transformerApiInitialized = false;
@@ -24,7 +25,8 @@ import {
   SignalType,
   SignalStrength,
   TransactionType,
-  TransactionStatus
+  TransactionStatus,
+  InsightType
 } from '../shared/schema';
 
 const router = express.Router();
@@ -405,6 +407,252 @@ router.get('/solana/status', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to connect to Solana network',
+      error: error.message
+    });
+  }
+});
+
+// Perplexity AI API endpoints
+// Analyze trading signal with AI
+router.post('/ai/analyze-signal', async (req, res) => {
+  try {
+    const { signalId, pair } = req.body;
+    
+    if (!signalId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: signalId'
+      });
+    }
+    
+    // Get the trading signal
+    const signal = await storage.getSignal(signalId);
+    if (!signal) {
+      return res.status(404).json({
+        status: 'error',
+        message: `Trading signal not found: ${signalId}`
+      });
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(signal.pair);
+    if (!marketData) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No market data available for: ${signal.pair}`
+      });
+    }
+    
+    const perplexity = getPerplexityService();
+    const analysis = await perplexity.analyzeSignal(signal, marketData);
+    
+    res.json({
+      status: 'success',
+      signal_id: signalId,
+      pair: signal.pair,
+      analysis,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error analyzing signal with Perplexity AI:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error analyzing signal with AI',
+      error: error.message
+    });
+  }
+});
+
+// Generate market insights with AI
+router.post('/ai/market-insights', async (req, res) => {
+  try {
+    const { pair } = req.body;
+    
+    if (!pair) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    if (!marketData) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No market data available for: ${pair}`
+      });
+    }
+    
+    const perplexity = getPerplexityService();
+    const insights = await perplexity.generateMarketInsights(pair, marketData);
+    
+    res.json({
+      status: 'success',
+      pair,
+      insights,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error generating market insights with Perplexity AI:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error generating market insights with AI',
+      error: error.message
+    });
+  }
+});
+
+// Enhance trading strategy with AI recommendations
+router.post('/ai/enhance-strategy', async (req, res) => {
+  try {
+    const { strategyId } = req.body;
+    
+    if (!strategyId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: strategyId'
+      });
+    }
+    
+    // Get the strategy
+    const strategy = await storage.getStrategy(strategyId);
+    if (!strategy) {
+      return res.status(404).json({
+        status: 'error',
+        message: `Strategy not found: ${strategyId}`
+      });
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(strategy.pair);
+    if (!marketData) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No market data available for: ${strategy.pair}`
+      });
+    }
+    
+    const perplexity = getPerplexityService();
+    const enhancement = await perplexity.enhanceStrategy(strategy, marketData);
+    
+    res.json({
+      status: 'success',
+      strategy_id: strategyId,
+      pair: strategy.pair,
+      enhancement,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error enhancing strategy with Perplexity AI:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error enhancing strategy with AI',
+      error: error.message
+    });
+  }
+});
+
+// Generate market pattern analysis for a trading pair
+router.post('/ai/market-pattern', async (req, res) => {
+  try {
+    const { pair } = req.body;
+    
+    if (!pair) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    if (!marketData) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No market data available for: ${pair}`
+      });
+    }
+    
+    const perplexity = getPerplexityService();
+    const marketAnalysis = await perplexity.generateMarketInsights(pair, marketData);
+    
+    res.json({
+      status: 'success',
+      pair,
+      marketAnalysis,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error generating market pattern analysis with Perplexity AI:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error generating market pattern analysis with AI',
+      error: error.message
+    });
+  }
+});
+
+// Generate learning insight from trading history
+router.post('/ai/learning-insight', async (req, res) => {
+  try {
+    const { pair } = req.body;
+    
+    if (!pair) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    if (!marketData) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No market data available for: ${pair}`
+      });
+    }
+    
+    // Get recent trading signals for this pair
+    const signals = await storage.getSignals();
+    const pairSignals = signals.filter(signal => signal.pair === pair);
+    
+    if (pairSignals.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: `No trading signals available for: ${pair}`
+      });
+    }
+    
+    const perplexity = getPerplexityService();
+    const insight = await perplexity.generateLearningInsight(pair, marketData, pairSignals);
+    
+    // Save the learning insight to database
+    const learningInsight = await storage.createLearningInsight({
+      description: insight.insight,
+      confidence: insight.confidence,
+      recommendation: insight.applicationMethod,
+      pair,
+      agent_type: 'quantum_ai',
+      insight_type: InsightType.MARKET_PATTERN,
+      strategy_id: pairSignals[0].strategy_id || ''
+    });
+    
+    res.json({
+      status: 'success',
+      pair,
+      insight: {
+        ...insight,
+        id: learningInsight.id
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error generating learning insight with Perplexity AI:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error generating learning insight with AI',
       error: error.message
     });
   }
@@ -1272,6 +1520,54 @@ router.post('/api/insights/:id/apply', async (req, res) => {
   }
 });
 
+// Get AI market pattern analysis for a specific pair
+router.get('/api/ai/market-pattern-analysis/:pair', async (req, res) => {
+  try {
+    const { pair } = req.params;
+    
+    if (!pair) {
+      return res.status(400).json({ error: 'Missing pair parameter' });
+    }
+    
+    // Get market data from price feed cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    
+    if (!marketData) {
+      return res.status(404).json({ 
+        error: 'Market data not found for the specified pair',
+        message: 'Please populate the price feed cache first with real market data'
+      });
+    }
+    
+    // Get Perplexity service
+    const perplexityService = getPerplexityService();
+    
+    if (!perplexityService) {
+      return res.status(500).json({ 
+        error: 'Perplexity AI service not initialized',
+        message: 'Make sure the PERPLEXITY_API_KEY is set'
+      });
+    }
+    
+    // Generate market analysis using Perplexity AI
+    const marketAnalysis = await perplexityService.generateMarketInsights(pair, marketData);
+    
+    // Return the analysis
+    res.json({
+      success: true,
+      pair,
+      marketAnalysis,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error(`Error in /ai/market-pattern-analysis/${req.params.pair}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to generate market pattern analysis',
+      message: error.message
+    });
+  }
+});
+
 // Get transformer status
 router.get('/ai/status', async (req, res) => {
   try {
@@ -1372,6 +1668,82 @@ router.post('/ai/train', async (req, res) => {
     res.json({ status: 'success', metrics });
   } catch (error) {
     logger.error("Error in /ai/train:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// TEST ENDPOINT: Populate price feed cache with realistic data for testing
+router.post('/api/test/populate-price-feed', async (req, res) => {
+  try {
+    const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+    const now = Date.now();
+    
+    for (const pair of pairs) {
+      const price = pair.startsWith('SOL') ? 172.43 : 
+                     pair.startsWith('BONK') ? 0.00002184 : 
+                     pair.startsWith('JUP') ? 1.28 : 1.0;
+                     
+      // Generate price data with realistic fluctuation
+      const priceData = [];
+      const volumeData = [];
+      const orderBookData = [];
+      const macdData = [];
+      const rsiData = [];
+      
+      for (let i = 0; i < 24; i++) {
+        const timestamp = new Date(now - (23 - i) * 3600 * 1000).toISOString();
+        const noise = (Math.random() - 0.5) * 0.05; // 5% random variation
+        const adjustedPrice = price * (1 + noise);
+        priceData.push([timestamp, adjustedPrice]);
+        
+        // Volume data with some realistic patterns
+        const baseVolume = pair.startsWith('SOL') ? 1500000 : 
+                          pair.startsWith('BONK') ? 8500000000 : 
+                          pair.startsWith('JUP') ? 850000 : 100000;
+        const volumeNoise = (Math.random() - 0.3) * 0.8; // Volume has more variance
+        const volume = baseVolume * (1 + volumeNoise);
+        volumeData.push([timestamp, volume]);
+        
+        // Order book data (simplified)
+        const bids = [[adjustedPrice * 0.99, 1000], [adjustedPrice * 0.98, 5000], [adjustedPrice * 0.97, 10000]];
+        const asks = [[adjustedPrice * 1.01, 1000], [adjustedPrice * 1.02, 5000], [adjustedPrice * 1.03, 10000]];
+        orderBookData.push([timestamp, bids, asks]);
+        
+        // Technical indicators
+        const macd = Math.sin(i / 4) * 0.5;
+        macdData.push([timestamp, macd]);
+        
+        const rsi = 50 + Math.sin(i / 3) * 20;
+        rsiData.push([timestamp, rsi]);
+      }
+      
+      // Create market data object
+      const marketData = {
+        pair,
+        price: priceData[priceData.length - 1][1],
+        priceChange24h: ((priceData[priceData.length - 1][1] / priceData[0][1]) - 1) * 100,
+        priceHistory: priceData,
+        volume24h: volumeData.reduce((sum, [_, vol]) => sum + vol, 0),
+        volumeHistory: volumeData,
+        orderBooks: orderBookData,
+        indicators: {
+          macd: macdData,
+          rsi: rsiData
+        },
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Add to price feed cache
+      priceFeedCache.updateMarketData(pair, marketData);
+    }
+    
+    res.json({ 
+      status: 'success', 
+      message: 'Price feed cache populated with test data', 
+      pairs 
+    });
+  } catch (error: any) {
+    logger.error("Error in /test/populate-price-feed:", error);
     res.status(500).json({ error: error.message });
   }
 });
