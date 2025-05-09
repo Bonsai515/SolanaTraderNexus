@@ -27,7 +27,7 @@ const wss = setupWebSocketServer(httpServer);
 // Configure Vite in development mode
 configureViteServer(app, httpServer).then(() => {
   // Start the server
-  httpServer.listen(port, () => {
+  httpServer.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Server running at http://localhost:${port}`);
     console.log(`💻 WebSocket server running at ws://localhost:${port}/ws`);
   });
