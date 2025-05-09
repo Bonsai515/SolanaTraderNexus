@@ -223,7 +223,7 @@ export function useAgentWebSocketHandlers() {
     fetchExecutions();
     
     // Register handlers
-    registerHandler('agents_list', (message: any) => {
+    registerHandler('agents_list', (message: WebSocketMessage) => {
       if (message.data && message.data.agents) {
         // Update agents through the updateAgentState function
         if (Array.isArray(message.data.agents)) {
