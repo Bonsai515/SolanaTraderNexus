@@ -1,27 +1,18 @@
-modules = ["nodejs-20", "web", "postgresql-16", "rust", "python-3.11"]
-
-[env]
-REPLIT_DISABLE_PACKAGE_LAYER = "1"
-
+modules = ["nodejs-20", "web", "postgresql-16", "rust"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["jq"]
 
 [deployment]
-deploymentTarget = "gce"
-build = ["sh", "-c", "npm install && npm run build"]
-run = ["sh", "-c", "NODE_ENV=production node dist/server/index.js"]
+deploymentTarget = "cloudrun"
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
 
 [[ports]]
 localPort = 80
 externalPort = 80
-
-[[ports]]
-localPort = 3000
-externalPort = 3000
 
 [[ports]]
 localPort = 5000
@@ -31,7 +22,7 @@ externalPort = 5000
 localPort = 5904
 
 [workflows]
-runButton = "Run Rust App"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -50,12 +41,3 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Run Rust App"
-author = 39917403
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cargo run"
