@@ -109,3 +109,37 @@ export const transactionSchema = z.object({
 export type Transaction = z.infer<typeof transactionSchema>;
 export const insertTransactionSchema = transactionSchema.omit({ id: true, created_at: true, confirmed_at: true });
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+// Learning insight types - for agent self-awareness system
+export enum InsightType {
+  TIME_BASED_EXECUTION = 'TIME_BASED_EXECUTION',
+  PAIR_PERFORMANCE = 'PAIR_PERFORMANCE',
+  DEX_PREFERENCE = 'DEX_PREFERENCE',
+  FAILURE_PATTERN = 'FAILURE_PATTERN',
+  PROFIT_OPTIMIZATION = 'PROFIT_OPTIMIZATION',
+  RISK_MANAGEMENT = 'RISK_MANAGEMENT'
+}
+
+export const insightResultSchema = z.object({
+  applied_at: z.date(),
+  success: z.boolean(),
+  performance_delta: z.number(),
+  notes: z.string()
+});
+
+export const learningInsightSchema = z.object({
+  id: z.string(),
+  agent_type: z.string(),
+  strategy_id: z.string(),
+  pair: z.string().optional(),
+  insight_type: z.nativeEnum(InsightType),
+  confidence: z.number(),
+  description: z.string(),
+  recommendation: z.string(),
+  created_at: z.date(),
+  applied: z.boolean(),
+  result: insightResultSchema.optional()
+});
+
+export type LearningInsight = z.infer<typeof learningInsightSchema>;
+export type InsightResult = z.infer<typeof insightResultSchema>;

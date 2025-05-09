@@ -3,6 +3,10 @@
 mod jupiter;
 mod raydium;
 mod openbook;
+mod orca;
+mod meteora;
+mod mango;
+mod marina;
 mod rate_limiter;
 mod price_feed;
 
@@ -22,6 +26,11 @@ pub enum DexSource {
     Jupiter,
     Raydium,
     Openbook,
+    Orca,
+    Meteora,
+    Mango,
+    Marina,
+    // Add future DEXs here
 }
 
 /// Trading strategy implementation
@@ -137,7 +146,7 @@ impl DexClient {
         solana_connection: Arc<SolanaConnection>,
         wallet_manager: Arc<WalletManager>,
     ) -> Result<Self> {
-        info!("Initializing DEX client with Jupiter, Raydium, and Openbook integration");
+        info!("Initializing DEX client with multiple DEX integrations (Jupiter, Raydium, Openbook, Orca, Meteora, Mango, Marina)");
         
         // Check if we have access to all required API endpoints
         Self::check_api_access().await?;
@@ -169,6 +178,28 @@ impl DexClient {
         
         // Check Openbook API access
         openbook::check_api_access().await?;
+        
+        // Additional DEXs - attempt to connect but don't fail if unavailable
+        
+        // Check Orca API access
+        if let Err(e) = orca::check_api_access().await {
+            warn!("Orca API access check failed: {}", e);
+        }
+        
+        // Check Meteora API access
+        if let Err(e) = meteora::check_api_access().await {
+            warn!("Meteora API access check failed: {}", e);
+        }
+        
+        // Check Mango API access
+        if let Err(e) = mango::check_api_access().await {
+            warn!("Mango API access check failed: {}", e);
+        }
+        
+        // Check Marina API access
+        if let Err(e) = marina::check_api_access().await {
+            warn!("Marina API access check failed: {}", e);
+        }
         
         Ok(())
     }
@@ -274,6 +305,46 @@ impl DexClient {
             }
         }
         
+        // Fetch from Orca
+        match orca::fetch_price(pair).await {
+            Ok(price_data) => {
+                results.insert(DexSource::Orca, price_data);
+            }
+            Err(e) => {
+                debug!("Failed to fetch Orca price for {}: {}", pair.to_string(), e);
+            }
+        }
+        
+        // Fetch from Meteora
+        match meteora::fetch_price(pair).await {
+            Ok(price_data) => {
+                results.insert(DexSource::Meteora, price_data);
+            }
+            Err(e) => {
+                debug!("Failed to fetch Meteora price for {}: {}", pair.to_string(), e);
+            }
+        }
+        
+        // Fetch from Mango Markets
+        match mango::fetch_price(pair).await {
+            Ok(price_data) => {
+                results.insert(DexSource::Mango, price_data);
+            }
+            Err(e) => {
+                debug!("Failed to fetch Mango price for {}: {}", pair.to_string(), e);
+            }
+        }
+        
+        // Fetch from Marina
+        match marina::fetch_price(pair).await {
+            Ok(price_data) => {
+                results.insert(DexSource::Marina, price_data);
+            }
+            Err(e) => {
+                debug!("Failed to fetch Marina price for {}: {}", pair.to_string(), e);
+            }
+        }
+        
         if results.is_empty() {
             return Err(anyhow!("Failed to fetch prices from any DEX"));
         }
@@ -333,6 +404,26 @@ impl DexClient {
             order_books.insert(DexSource::Openbook, book);
         }
         
+        // Orca order book
+        if let Ok(book) = orca::fetch_order_book(pair).await {
+            order_books.insert(DexSource::Orca, book);
+        }
+        
+        // Meteora order book
+        if let Ok(book) = meteora::fetch_order_book(pair).await {
+            order_books.insert(DexSource::Meteora, book);
+        }
+        
+        // Mango order book
+        if let Ok(book) = mango::fetch_order_book(pair).await {
+            order_books.insert(DexSource::Mango, book);
+        }
+        
+        // Marina order book
+        if let Ok(book) = marina::fetch_order_book(pair).await {
+            order_books.insert(DexSource::Marina, book);
+        }
+        
         if order_books.is_empty() {
             return Err(anyhow!("Failed to fetch order books from any DEX"));
         }
@@ -340,6 +431,31 @@ impl DexClient {
         // For now, just log the order book data
         // In a real implementation, we would place orders on both sides of the book
         info!("Market making: Found {} order books for {}", order_books.len(), pair.to_string());
+        
+        // Find DEX with tightest spread
+        let mut best_dex = None;
+        let mut min_spread = f64::MAX;
+        
+        for (source, book) in &order_books {
+            if !book.bids.is_empty() && !book.asks.is_empty() {
+                let highest_bid = book.bids.iter().map(|(price, _)| *price).fold(0.0, f64::max);
+                let lowest_ask = book.asks.iter().map(|(price, _)| *price).fold(f64::MAX, f64::min);
+                
+                if highest_bid > 0.0 && lowest_ask < f64::MAX {
+                    let spread = (lowest_ask - highest_bid) / highest_bid;
+                    
+                    if spread < min_spread {
+                        min_spread = spread;
+                        best_dex = Some(*source);
+                    }
+                }
+            }
+        }
+        
+        if let Some(dex) = best_dex {
+            info!("Best liquidity for {} found on {:?} with spread of {:.4}%", 
+                pair.to_string(), dex, min_spread * 100.0);
+        }
         
         // Strategy implementation will be added in future iterations
         

@@ -60,16 +60,12 @@ router.get('/solana/status', async (req, res) => {
     }
     
     // Only try Instant Nodes if Helius didn't work
-    if (endpoint === 'https://api.mainnet-beta.solana.com' && process.env.INSTANT_NODES_RPC_URL) {
+    if (endpoint === 'https://api.mainnet-beta.solana.com') {
       try {
-        let instantNodesUrl = process.env.INSTANT_NODES_RPC_URL;
+        // Hardcoded Instant Nodes URL for testing
+        const instantNodesUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
         
-        // Validate URL format
-        if (!instantNodesUrl.startsWith('http://') && !instantNodesUrl.startsWith('https://')) {
-          instantNodesUrl = 'https://' + instantNodesUrl;
-        }
-        
-        logger.info(`Attempting to connect to Solana using Instant Nodes endpoint: ${instantNodesUrl}`);
+        logger.info(`Attempting to connect to Solana using Instant Nodes endpoint`);
         
         const instantNodesConnection = new solanaWeb3.Connection(instantNodesUrl, 'confirmed');
         await instantNodesConnection.getVersion();
@@ -174,6 +170,107 @@ export function setupWebSocketServer(httpServer: Server) {
               data: signals,
               timestamp: new Date().toISOString()
             }));
+            break;
+            
+          case 'GET_LEARNING_INSIGHTS':
+            // In a real implementation, we would get insights from the agent manager's learning system
+            ws.send(JSON.stringify({
+              type: 'LEARNING_INSIGHTS',
+              data: {
+                insights: []
+              },
+              requestId: data.requestId,
+              timestamp: new Date().toISOString()
+            }));
+            break;
+            
+          case 'GET_AGENT_INSIGHTS':
+            // In a real implementation, we would get insights for the specific agent type
+            const agentType = data.agentType;
+            ws.send(JSON.stringify({
+              type: 'AGENT_INSIGHTS',
+              data: {
+                insights: [],
+                agentType
+              },
+              requestId: data.requestId,
+              timestamp: new Date().toISOString()
+            }));
+            break;
+            
+          case 'APPLY_INSIGHT':
+            // In a real implementation, we would apply the insight in the agent manager's learning system
+            const insightId = data.insightId;
+            const success = data.success;
+            const performanceDelta = data.performanceDelta;
+            const notes = data.notes;
+            
+            ws.send(JSON.stringify({
+              type: 'INSIGHT_APPLIED',
+              data: {
+                insightId,
+                success: true
+              },
+              requestId: data.requestId,
+              timestamp: new Date().toISOString()
+            }));
+            break;
+            
+          case 'GET_SOLANA_CONNECTION_INFO':
+            try {
+              // Use Instant Nodes for getting connection info
+              const instantNodesUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+              
+              // Check if we have WebSocket support
+              const hasWebSocket = !!process.env.INSTANT_NODES_WS_URL;
+              
+              let connectionInfo;
+              try {
+                const connection = new solanaWeb3.Connection(instantNodesUrl, 'confirmed');
+                const versionInfo = await connection.getVersion();
+                
+                connectionInfo = {
+                  status: 'operational',
+                  customRpc: true,
+                  apiKey: true,
+                  network: 'mainnet-beta',
+                  websocket: hasWebSocket,
+                  version: versionInfo["solana-core"],
+                  timestamp: new Date().toISOString()
+                };
+              } catch (connError) {
+                // Fallback to public endpoint
+                const publicEndpoint = 'https://api.mainnet-beta.solana.com';
+                const connection = new solanaWeb3.Connection(publicEndpoint, 'confirmed');
+                const versionInfo = await connection.getVersion();
+                
+                connectionInfo = {
+                  status: 'operational',
+                  customRpc: false,
+                  apiKey: false,
+                  network: 'mainnet-beta',
+                  websocket: false,
+                  version: versionInfo["solana-core"],
+                  timestamp: new Date().toISOString()
+                };
+              }
+              
+              ws.send(JSON.stringify({
+                type: 'SOLANA_CONNECTION_INFO',
+                data: connectionInfo,
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            } catch (err) {
+              logger.error('Error getting Solana connection info:', err);
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                message: 'Failed to get Solana connection info',
+                error: err.message,
+                requestId: data.requestId,
+                timestamp: new Date().toISOString()
+              }));
+            }
             break;
             
           case 'PREDICT':
@@ -412,6 +509,57 @@ initializeTransformerAPI();
 
 // Register agent routes
 router.use('/api/agents', agentRouter);
+
+// Learning insights routes
+router.get('/api/insights', async (req, res) => {
+  try {
+    // In a real implementation, we would get insights from the agent manager's learning system
+    res.json({
+      insights: [],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/insights:", error);
+    res.status(500).json({ error: 'Failed to fetch insights' });
+  }
+});
+
+router.get('/api/insights/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    
+    // In a real implementation, we would get insights for the specific agent type
+    res.json({
+      insights: [],
+      agentType,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/insights/${req.params.agentType}:`, error);
+    res.status(500).json({ error: 'Failed to fetch insights for agent' });
+  }
+});
+
+router.post('/api/insights/:id/apply', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { success, performance_delta, notes } = req.body;
+    
+    if (typeof success !== 'boolean' || typeof performance_delta !== 'number' || !notes) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // In a real implementation, we would apply the insight in the agent manager's learning system
+    res.json({ 
+      success: true, 
+      message: 'Insight applied successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/insights/${req.params.id}/apply:`, error);
+    res.status(500).json({ error: 'Failed to apply insight' });
+  }
+});
 
 // Get transformer status
 router.get('/ai/status', async (req, res) => {

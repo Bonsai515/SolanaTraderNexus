@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import Trading from './pages/Trading';
 import Strategies from './pages/Strategies';
 import AIAgents from './pages/AIAgents';
+import AIInsights from './pages/AIInsights';
 import Wallet from './pages/Wallet';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
@@ -62,6 +63,7 @@ function AppContent() {
         <Route path="/trading" component={Trading} />
         <Route path="/strategies" component={Strategies} />
         <Route path="/ai-agents" component={AIAgents} />
+        <Route path="/ai-insights" component={AIInsights} />
         <Route path="/wallet" component={Wallet} />
         <Route path="/analytics" component={Analytics} />
         <Route path="/settings" component={Settings} />
