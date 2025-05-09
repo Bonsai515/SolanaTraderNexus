@@ -1,6 +1,6 @@
 // WebSocket client for communicating with the trading engine
 
-import { create } from "zustand";
+import { createContext, useContext, useCallback, useEffect, useState, ReactNode } from "react";
 
 // Types
 export interface WsMessage {
@@ -22,13 +22,11 @@ interface WsConnectionState {
   lastMessageTime: Date | null;
 }
 
-// WebSocket store state
+// WebSocket state interface
 interface WsState {
   socket: WebSocket | null;
   connectionState: WsConnectionState;
   messages: WsMessage[];
-  messageHandlers: Map<string, Set<MessageHandler>>;
-  pendingRequests: Map<string, [(data: any) => void, (error: Error) => void]>;
   
   // Actions
   connect: () => void;
@@ -40,88 +38,88 @@ interface WsState {
   sendRequest: <T = any>(message: Partial<WsMessage>) => Promise<T>;
 }
 
-// Create WebSocket store
-export const useWsStore = create<WsState>((set, get) => ({
-  socket: null,
-  connectionState: {
+// Create the WebSocket context
+const WebSocketContext = createContext<WsState | null>(null);
+
+// WebSocket provider props
+interface WebSocketProviderProps {
+  children: ReactNode;
+}
+
+// WebSocket provider component
+export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [connectionState, setConnectionState] = useState<WsConnectionState>({
     connected: false,
     connecting: false,
     connectionAttempts: 0,
     lastMessageTime: null,
-  },
-  messages: [],
-  messageHandlers: new Map(),
-  pendingRequests: new Map(),
+  });
+  const [messages, setMessages] = useState<WsMessage[]>([]);
+  const messageHandlers = useState<Map<string, Set<MessageHandler>>>(
+    () => new Map()
+  )[0];
+  const pendingRequests = useState<Map<string, [(data: any) => void, (error: Error) => void]>>(
+    () => new Map()
+  )[0];
   
   // Connect to WebSocket server
-  connect: () => {
-    const state = get();
-    
+  const connect = useCallback(() => {
     // Don't connect if already connected or connecting
-    if (state.connectionState.connected || state.connectionState.connecting) {
+    if (connectionState.connected || connectionState.connecting) {
       return;
     }
     
-    set((state) => ({
-      connectionState: {
-        ...state.connectionState,
-        connecting: true,
-        connectionAttempts: state.connectionState.connectionAttempts + 1,
-      },
+    setConnectionState(prev => ({
+      ...prev,
+      connecting: true,
+      connectionAttempts: prev.connectionAttempts + 1,
     }));
     
     // Setup WebSocket connection
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
-    const socket = new WebSocket(wsUrl);
+    const newSocket = new WebSocket(wsUrl);
     
-    socket.onopen = () => {
+    newSocket.onopen = () => {
       console.log("WebSocket connection established");
-      set((state) => ({
-        socket,
-        connectionState: {
-          ...state.connectionState,
-          connected: true,
-          connecting: false,
-        },
+      setSocket(newSocket);
+      setConnectionState(prev => ({
+        ...prev,
+        connected: true,
+        connecting: false,
       }));
     };
     
-    socket.onclose = () => {
+    newSocket.onclose = () => {
       console.log("WebSocket connection closed");
       
       // Check if we were previously connected
-      const wasConnected = get().connectionState.connected;
+      const wasConnected = connectionState.connected;
       
-      set((state) => ({
-        socket: null,
-        connectionState: {
-          ...state.connectionState,
-          connected: false,
-          connecting: false,
-        },
+      setSocket(null);
+      setConnectionState(prev => ({
+        ...prev,
+        connected: false,
+        connecting: false,
       }));
       
       // Attempt to reconnect after a delay
       if (wasConnected) {
-        setTimeout(() => {
-          get().connect();
-        }, 3000);
+        setTimeout(() => connect(), 3000);
       }
     };
     
-    socket.onerror = (error) => {
+    newSocket.onerror = (error) => {
       console.error("WebSocket error:", error);
-      set((state) => ({
-        connectionState: {
-          ...state.connectionState,
-          connecting: false,
-        },
+      setConnectionState(prev => ({
+        ...prev,
+        connecting: false,
       }));
     };
     
-    socket.onmessage = (event) => {
+    newSocket.onmessage = (event) => {
       try {
         // Handle both JSON object messages and JSON array messages
         const rawData = JSON.parse(event.data);
@@ -157,17 +155,15 @@ export const useWsStore = create<WsState>((set, get) => ({
         }
         
         // Update state
-        set((state) => ({
-          messages: [...state.messages, wsMessage],
-          connectionState: {
-            ...state.connectionState,
-            lastMessageTime: new Date(),
-          },
+        setMessages(prev => [...prev, wsMessage]);
+        setConnectionState(prev => ({
+          ...prev,
+          lastMessageTime: new Date(),
         }));
         
         // Check for pending request
-        if (wsMessage.requestId && get().pendingRequests.has(wsMessage.requestId)) {
-          const [resolve, reject] = get().pendingRequests.get(wsMessage.requestId)!;
+        if (wsMessage.requestId && pendingRequests.has(wsMessage.requestId)) {
+          const [resolve, reject] = pendingRequests.get(wsMessage.requestId)!;
           
           if (wsMessage.type === 'ERROR') {
             reject(new Error(wsMessage.message || 'Unknown error'));
@@ -176,19 +172,17 @@ export const useWsStore = create<WsState>((set, get) => ({
           }
           
           // Remove from pending requests
-          const pendingRequests = new Map(get().pendingRequests);
           pendingRequests.delete(wsMessage.requestId);
-          set({ pendingRequests });
         }
         
         // Notify handlers
-        const handlers = get().messageHandlers.get(wsMessage.type);
+        const handlers = messageHandlers.get(wsMessage.type);
         if (handlers) {
           handlers.forEach((handler) => handler(wsMessage));
         }
         
         // Also notify ALL handlers (with '*' type)
-        const allHandlers = get().messageHandlers.get('*');
+        const allHandlers = messageHandlers.get('*');
         if (allHandlers) {
           allHandlers.forEach((handler) => handler(wsMessage));
         }
@@ -197,55 +191,50 @@ export const useWsStore = create<WsState>((set, get) => ({
       }
     };
     
-    set({ socket });
-  },
+    setSocket(newSocket);
+  }, [connectionState.connected, connectionState.connecting, messageHandlers, pendingRequests]);
   
   // Disconnect from WebSocket server
-  disconnect: () => {
-    const { socket } = get();
+  const disconnect = useCallback(() => {
     if (socket) {
       socket.close();
-      set({ socket: null });
+      setSocket(null);
     }
-  },
+  }, [socket]);
   
   // Register handler for message type
-  registerHandler: (messageType: string, handler: MessageHandler) => {
-    const { messageHandlers } = get();
+  const registerHandler = useCallback((messageType: string, handler: MessageHandler) => {
     const handlers = messageHandlers.get(messageType) || new Set();
     handlers.add(handler);
     messageHandlers.set(messageType, handlers);
-    set({ messageHandlers: new Map(messageHandlers) });
     
     // Return unregister function
-    return () => get().unregisterHandler(messageType, handler);
-  },
+    return () => {
+      unregisterHandler(messageType, handler);
+    };
+  }, [messageHandlers]);
   
   // Unregister handler for message type
-  unregisterHandler: (messageType: string, handler: MessageHandler) => {
-    const { messageHandlers } = get();
+  const unregisterHandler = useCallback((messageType: string, handler: MessageHandler) => {
     const handlers = messageHandlers.get(messageType);
     if (handlers) {
       handlers.delete(handler);
       if (handlers.size === 0) {
         messageHandlers.delete(messageType);
       }
-      set({ messageHandlers: new Map(messageHandlers) });
     }
-  },
+  }, [messageHandlers]);
   
   // Clear all messages
-  clearMessages: () => {
-    set({ messages: [] });
-  },
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
   
   // Send message to WebSocket server
-  sendMessage: (message: Partial<WsMessage>) => {
-    const { socket, connectionState } = get();
-    
+  const sendMessage = useCallback((message: Partial<WsMessage>) => {
     if (!socket || !connectionState.connected) {
       console.error("Cannot send message: WebSocket not connected");
-      get().connect();
+      connect();
       return;
     }
     
@@ -256,15 +245,13 @@ export const useWsStore = create<WsState>((set, get) => ({
     };
     
     socket.send(JSON.stringify(fullMessage));
-  },
+  }, [socket, connectionState.connected, connect]);
   
   // Send request and wait for response
-  sendRequest: <T = any>(message: Partial<WsMessage>): Promise<T> => {
+  const sendRequest = useCallback(<T = any>(message: Partial<WsMessage>): Promise<T> => {
     return new Promise((resolve, reject) => {
-      const { socket, connectionState, pendingRequests } = get();
-      
       if (!socket || !connectionState.connected) {
-        get().connect();
+        connect();
         reject(new Error("WebSocket not connected"));
         return;
       }
@@ -279,44 +266,79 @@ export const useWsStore = create<WsState>((set, get) => ({
       };
       
       // Store promise handlers
-      const newPendingRequests = new Map(pendingRequests);
-      newPendingRequests.set(requestId, [resolve, reject]);
-      set({ pendingRequests: newPendingRequests });
+      pendingRequests.set(requestId, [resolve, reject]);
       
       // Set timeout to remove pending request
       setTimeout(() => {
-        const currentPendingRequests = get().pendingRequests;
-        if (currentPendingRequests.has(requestId)) {
-          const [, reject] = currentPendingRequests.get(requestId)!;
+        if (pendingRequests.has(requestId)) {
+          const [, reject] = pendingRequests.get(requestId)!;
           reject(new Error("Request timeout"));
-          
-          const updatedPendingRequests = new Map(currentPendingRequests);
-          updatedPendingRequests.delete(requestId);
-          set({ pendingRequests: updatedPendingRequests });
+          pendingRequests.delete(requestId);
         }
       }, 30000); // 30 second timeout
       
       // Send message
       socket.send(JSON.stringify(fullMessage));
     });
-  },
-}));
+  }, [socket, connectionState.connected, connect, pendingRequests]);
+  
+  // Connect on mount
+  useEffect(() => {
+    connect();
+    
+    // Cleanup on unmount
+    return () => {
+      if (socket) {
+        socket.close();
+      }
+    };
+  }, [connect, socket]);
+  
+  // Provided state and actions
+  const value: WsState = {
+    socket,
+    connectionState,
+    messages,
+    connect,
+    disconnect,
+    registerHandler,
+    unregisterHandler,
+    clearMessages,
+    sendMessage,
+    sendRequest,
+  };
+  
+  return (
+    <WebSocketContext.Provider value={value}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+};
 
-// Singleton instance that can be imported directly
-let wsInitialized = false;
-
-export function initializeWebSocket() {
-  if (!wsInitialized) {
-    useWsStore.getState().connect();
-    wsInitialized = true;
+// Hook to use WebSocket context
+export const useWsContext = () => {
+  const context = useContext(WebSocketContext);
+  if (!context) {
+    throw new Error('useWsContext must be used within a WebSocketProvider');
   }
-}
+  return context;
+};
 
-export function getWebSocket() {
-  if (!wsInitialized) {
-    initializeWebSocket();
-  }
-  return useWsStore.getState().socket;
-}
+// Export handler registration hook for convenience
+export const useWsHandler = (messageType: string, handler: MessageHandler) => {
+  const { registerHandler } = useWsContext();
+  
+  useEffect(() => {
+    const unregister = registerHandler(messageType, handler);
+    return unregister;
+  }, [registerHandler, messageType, handler]);
+};
 
-export default useWsStore;
+// Export simplified hook for connection state
+export const useWsConnectionState = () => {
+  const { connectionState, connect } = useWsContext();
+  return { ...connectionState, connect };
+};
+
+// Export this as the default for backwards compatibility
+export const useWsStore = useWsContext;
