@@ -36,6 +36,128 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Test endpoints for debugging access
+router.get('/test', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Test endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    initialized: transformerApiInitialized
+  });
+});
+
+// Test endpoint to populate price feed with test data
+router.post('/test/populate-price-feed', (req, res) => {
+  try {
+    // Generate test data for SOL/USDC
+    const currentTime = new Date();
+    const solPrice = 150.75 + (Math.random() * 5 - 2.5); // Random price around $150.75
+    const bonkPrice = 0.00001275 + (Math.random() * 0.0000005); // Random price around $0.00001275
+    const jupPrice = 1.25 + (Math.random() * 0.1 - 0.05); // Random price around $1.25
+    
+    // Generate price history (last 24 hours)
+    const generatePriceHistory = (basePrice: number, volatility: number) => {
+      const prices = [];
+      const volumes = [];
+      for (let i = 0; i < 24; i++) {
+        const timestamp = new Date(currentTime.getTime() - (23 - i) * 3600 * 1000).toISOString();
+        const price = basePrice * (1 + Math.sin(i / 4) * volatility * 0.5 + (Math.random() * volatility - volatility/2));
+        prices.push([timestamp, price]);
+        
+        // Generate random volume
+        const volume = Math.round(1000000 + Math.random() * 500000);
+        volumes.push([timestamp, volume]);
+      }
+      return { prices, volumes };
+    };
+    
+    // SOL/USDC Market Data
+    const solData = generatePriceHistory(solPrice, 0.05);
+    const solMarketData: MarketData = {
+      pair: 'SOL/USDC',
+      prices: solData.prices,
+      volumes: solData.volumes,
+      orderBooks: [],
+      indicators: {
+        'rsi': [[currentTime.toISOString(), 58.5]],
+        'macd': [[currentTime.toISOString(), 0.85]]
+      },
+      externalData: {}
+    };
+    
+    // BONK/USDC Market Data
+    const bonkData = generatePriceHistory(bonkPrice, 0.1);
+    const bonkMarketData: MarketData = {
+      pair: 'BONK/USDC',
+      prices: bonkData.prices,
+      volumes: bonkData.volumes,
+      orderBooks: [],
+      indicators: {
+        'rsi': [[currentTime.toISOString(), 72.3]],
+        'macd': [[currentTime.toISOString(), 1.21]]
+      },
+      externalData: {}
+    };
+    
+    // JUP/USDC Market Data
+    const jupData = generatePriceHistory(jupPrice, 0.07);
+    const jupMarketData: MarketData = {
+      pair: 'JUP/USDC',
+      prices: jupData.prices,
+      volumes: jupData.volumes,
+      orderBooks: [],
+      indicators: {
+        'rsi': [[currentTime.toISOString(), 63.8]],
+        'macd': [[currentTime.toISOString(), 0.53]]
+      },
+      externalData: {}
+    };
+    
+    // Update market data in price feed cache
+    priceFeedCache.updateMarketData('SOL/USDC', solMarketData);
+    priceFeedCache.updateMarketData('BONK/USDC', bonkMarketData);
+    priceFeedCache.updateMarketData('JUP/USDC', jupMarketData);
+    
+    // Update latest price points
+    priceFeedCache.updatePriceData({
+      pair: 'SOL/USDC',
+      price: solPrice,
+      volume: solData.volumes[solData.volumes.length - 1][1],
+      timestamp: new Date(solData.prices[solData.prices.length - 1][0]),
+      source: 'test_data'
+    });
+    
+    priceFeedCache.updatePriceData({
+      pair: 'BONK/USDC',
+      price: bonkPrice,
+      volume: bonkData.volumes[bonkData.volumes.length - 1][1],
+      timestamp: new Date(bonkData.prices[bonkData.prices.length - 1][0]),
+      source: 'test_data'
+    });
+    
+    priceFeedCache.updatePriceData({
+      pair: 'JUP/USDC',
+      price: jupPrice,
+      volume: jupData.volumes[jupData.volumes.length - 1][1],
+      timestamp: new Date(jupData.prices[jupData.prices.length - 1][0]),
+      source: 'test_data'
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'Price feed populated with test data',
+      pairs: ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error populating price feed',
+      error: error.message
+    });
+  }
+});
+
 // Transformer API endpoints
 router.get('/transformer/status', (req, res) => {
   try {

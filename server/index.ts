@@ -39,14 +39,25 @@ async function findAvailablePort(startPort: number): Promise<number> {
 }
 
 // Get preferred port from environment variables
-const preferredPort = process.env.PORT ? parseInt(process.env.PORT, 10) : DEFAULT_PORT;
+// For Replit, we should use port 5000 as the workflow expects this port, but allow overriding through env var
+const preferredPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
 // Enable CORS for API requests
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// API routes - register routes directly at the root
-app.use(routes);
+// API routes - register with '/api' prefix
+app.use('/api', routes);
+
+// Add a root health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Create HTTP server
 const httpServer = createServer(app);

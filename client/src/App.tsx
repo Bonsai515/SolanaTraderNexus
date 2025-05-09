@@ -2,31 +2,91 @@ import { Route, Link } from 'wouter';
 import NotFound from './pages/not-found';
 import { useEffect, useState } from 'react';
 
-// Temporary component for testing
-function WelcomePage() {
+// Simple Dashboard Component
+function Dashboard() {
   const [marketData, setMarketData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCachedData = async () => {
-    setLoading(true);
-    setError(null);
+  // Fetch market data from the API
+  const fetchMarketData = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/price-feed/status');
+      if (!response.ok) {
+        throw new Error(`Error fetching market data: ${response.status}`);
+      }
       const data = await response.json();
       setMarketData(data);
+      setError(null);
     } catch (err) {
-      setError('Failed to fetch market data');
       console.error('Error fetching market data:', err);
+      setError('Failed to load market data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Populate test data
+  const populateTestData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/test/populate-price-feed', {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error populating test data: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Test data populated:', result);
+      alert(`Price feed populated with test data: ${result.pairs.join(', ')}`);
+      
+      // Refresh the market data
+      fetchMarketData();
+    } catch (err) {
+      console.error('Error populating test data:', err);
+      setError('Failed to populate test data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Analyze a trading pair
+  const analyzeTradingPair = async (pair: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/ai/market-pattern', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pair })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error analyzing ${pair}: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      alert(`Analysis for ${pair}:\n${result.insights?.summary || 'No insights available'}`);
+    } catch (err) {
+      console.error(`Error analyzing ${pair}:`, err);
+      alert(`Failed to analyze ${pair}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on component mount and set up interval
   useEffect(() => {
-    fetchCachedData();
-    // Set up polling interval
-    const interval = setInterval(fetchCachedData, 10000);
+    fetchMarketData();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchMarketData, 10000);
+    
+    // Clean up interval on unmount
     return () => clearInterval(interval);
   }, []);
 
@@ -38,9 +98,10 @@ function WelcomePage() {
       </p>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Market Data Status Card */}
         <div className="p-6 rounded-lg bg-gray-800 border border-gray-700">
           <h3 className="text-xl font-semibold mb-2">Market Data Status</h3>
-          {loading ? (
+          {loading && !marketData ? (
             <div className="animate-pulse">Loading market data...</div>
           ) : error ? (
             <div className="text-red-400">{error}</div>
@@ -59,32 +120,22 @@ function WelcomePage() {
           )}
         </div>
 
+        {/* AI Analysis Card */}
         <div className="p-6 rounded-lg bg-gray-800 border border-gray-700">
           <h3 className="text-xl font-semibold mb-2">AI-Enhanced Analysis</h3>
           <p>
             Our platform leverages quantum-inspired algorithms and advanced AI to analyze trading patterns and execute strategies.
           </p>
           <button
-            onClick={() => {
-              fetch('/api/test/populate-price-feed', {
-                method: 'POST'
-              })
-                .then(res => res.json())
-                .then(data => {
-                  alert('Price feed populated with test data: ' + data.pairs.join(', '));
-                  fetchCachedData();
-                })
-                .catch(err => {
-                  console.error('Error populating price feed:', err);
-                  alert('Failed to populate price feed');
-                });
-            }}
+            onClick={populateTestData}
             className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+            disabled={loading}
           >
-            Populate Test Data
+            {loading ? 'Loading...' : 'Populate Test Data'}
           </button>
         </div>
 
+        {/* Trading Pairs Card */}
         <div className="p-6 rounded-lg bg-gray-800 border border-gray-700">
           <h3 className="text-xl font-semibold mb-2">Supported Trading Pairs</h3>
           <ul className="space-y-1">
@@ -96,6 +147,7 @@ function WelcomePage() {
         </div>
       </div>
 
+      {/* AI Market Analysis Section */}
       <div className="mt-8 p-6 rounded-lg bg-gray-800 border border-gray-700">
         <h3 className="text-xl font-semibold mb-4">AI Market Pattern Analysis</h3>
         <p className="mb-4">
@@ -106,30 +158,11 @@ function WelcomePage() {
           {['SOL/USDC', 'BONK/USDC', 'JUP/USDC'].map(pair => (
             <button
               key={pair}
-              onClick={() => {
-                setLoading(true);
-                fetch('/api/ai/market-pattern', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({ pair })
-                })
-                  .then(res => res.json())
-                  .then(data => {
-                    alert(`Analysis for ${pair}:\n${data.insights?.summary || 'No insights available'}`);
-                    setLoading(false);
-                  })
-                  .catch(err => {
-                    console.error(`Error analyzing ${pair}:`, err);
-                    alert(`Failed to analyze ${pair}`);
-                    setLoading(false);
-                  });
-              }}
+              onClick={() => analyzeTradingPair(pair)}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
               disabled={loading}
             >
-              Analyze {pair}
+              {loading ? 'Analyzing...' : `Analyze ${pair}`}
             </button>
           ))}
         </div>
@@ -148,16 +181,16 @@ function App() {
           </div>
           <nav>
             <ul className="flex space-x-6">
-              <li><Link href="/" className="hover:text-blue-400 transition-colors">Home</Link></li>
-              <li><Link href="/ai-insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
+              <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
+              <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
             </ul>
           </nav>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Route path="/" component={WelcomePage} />
-        <Route path="/ai-insights" component={WelcomePage} />
+        <Route path="/" component={Dashboard} />
+        <Route path="/insights" component={Dashboard} />
         <Route path="/:rest*" component={NotFound} />
       </main>
     </div>
