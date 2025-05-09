@@ -340,5 +340,50 @@ export const useWsConnectionState = () => {
   return { ...connectionState, connect };
 };
 
+// Hook to get Solana connection information via WebSocket
+export const useSolanaConnectionInfo = () => {
+  const { sendRequest, connectionState } = useWsContext();
+  const [connectionInfo, setConnectionInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  const fetchConnectionInfo = useCallback(async () => {
+    if (!connectionState.connected) {
+      setError(new Error("WebSocket not connected"));
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const info = await sendRequest({
+        type: 'GET_SOLANA_CONNECTION_INFO'
+      });
+      setConnectionInfo(info);
+      return info;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to fetch connection info'));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [sendRequest, connectionState.connected]);
+  
+  // Fetch connection info when WebSocket connects
+  useEffect(() => {
+    if (connectionState.connected && !connectionInfo && !loading) {
+      fetchConnectionInfo();
+    }
+  }, [connectionState.connected, connectionInfo, loading, fetchConnectionInfo]);
+  
+  return {
+    connectionInfo,
+    loading,
+    error,
+    refresh: fetchConnectionInfo
+  };
+};
+
 // Export this as the default for backwards compatibility
 export const useWsStore = useWsContext;

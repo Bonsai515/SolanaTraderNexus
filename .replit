@@ -19,10 +19,14 @@ localPort = 5000
 externalPort = 5000
 
 [[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
 localPort = 5904
 
 [workflows]
-runButton = "Project"
+runButton = "Start"
 
 [[workflows.workflow]]
 name = "Project"
@@ -41,3 +45,12 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Start"
+author = 39917403
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && npm run dev"

@@ -3,7 +3,19 @@ import * as web3 from '@solana/web3.js';
 import { create } from 'zustand';
 
 // Environment configuration
-const getClusterUrl = (): string => {
+const getClusterUrl = (useWebSocket: boolean = false): string => {
+  // Use custom WebSocket URL if available and WebSocket is requested
+  if (useWebSocket && import.meta.env.VITE_INSTANT_NODES_WS_URL) {
+    let endpoint = String(import.meta.env.VITE_INSTANT_NODES_WS_URL);
+    
+    // Ensure URL starts with wss:// or ws://
+    if (!endpoint.startsWith('wss://') && !endpoint.startsWith('ws://')) {
+      endpoint = 'wss://' + endpoint;
+    }
+    
+    return endpoint;
+  }
+  
   // Use custom RPC URL if available
   if (import.meta.env.VITE_INSTANT_NODES_RPC_URL) {
     let endpoint = String(import.meta.env.VITE_INSTANT_NODES_RPC_URL);
@@ -26,9 +38,23 @@ const getClusterUrl = (): string => {
 };
 
 // Connection utility
-const createConnection = (): web3.Connection => {
-  const endpoint = getClusterUrl();
-  return new web3.Connection(endpoint, 'confirmed');
+const createConnection = (preferWebSocket: boolean = true): web3.Connection => {
+  // For account and program subscriptions, prefer WebSocket if available
+  const endpoint = preferWebSocket ? getClusterUrl(true) : getClusterUrl(false);
+  
+  // Configure connection options
+  const commitmentLevel: web3.Commitment = 'confirmed';
+  const connectionConfig: web3.ConnectionConfig = {
+    commitment: commitmentLevel,
+    confirmTransactionInitialTimeout: 60000, // 60 seconds
+    disableRetryOnRateLimit: false,
+    wsEndpoint: preferWebSocket ? endpoint : undefined
+  };
+  
+  return new web3.Connection(
+    preferWebSocket ? getClusterUrl(false) : endpoint, // Always use HTTP for the main endpoint
+    connectionConfig
+  );
 };
 
 // Solana store state
@@ -66,11 +92,23 @@ export const useSolanaStore = create<SolanaState>((set, get) => ({
     try {
       set({ connectionStatus: 'connecting' });
       
-      const endpoint = getClusterUrl();
-      const connection = createConnection();
+      // Try WebSocket connection first
+      let connection: web3.Connection;
+      let isWebSocketConnected = false;
       
-      // Check if connection is working
-      const version = await connection.getVersion();
+      try {
+        connection = createConnection(true); // Try with WebSocket
+        await connection.getVersion();
+        isWebSocketConnected = true;
+        console.log("Connected to Solana via WebSocket endpoint");
+      } catch (wsError) {
+        console.warn("WebSocket connection failed, falling back to HTTP:", wsError);
+        // Fallback to HTTP-only connection
+        connection = createConnection(false);
+        await connection.getVersion();
+      }
+      
+      const endpoint = getClusterUrl();
       
       set({
         connection,
@@ -113,11 +151,35 @@ export const useSolanaStore = create<SolanaState>((set, get) => ({
       await get().connect();
     }
     
+    // Check if we're currently using WebSocket
+    const hasWebSocket = Boolean(
+      connection && 
+      // @ts-ignore - Access internal property to check WebSocket status
+      connection._rpcWebSocket && 
+      // @ts-ignore
+      connection._rpcWebSocket._ws && 
+      // @ts-ignore
+      connection._rpcWebSocket._ws.readyState === 1 // 1 = OPEN in WebSocket standard
+    );
+    
+    // Try to get cluster version for additional info
+    let version = "unknown";
+    try {
+      if (connection) {
+        const versionInfo = await connection.getVersion();
+        version = versionInfo["solana-core"];
+      }
+    } catch (e) {
+      console.warn("Failed to get Solana version:", e);
+    }
+    
     return {
       status: 'operational',
       customRpc: customRpcEnabled,
       apiKey: import.meta.env.VITE_SOLANA_RPC_API_KEY || import.meta.env.VITE_INSTANT_NODES_RPC_URL ? true : false,
       network: 'mainnet-beta',
+      websocket: hasWebSocket,
+      version,
       timestamp: new Date().toISOString(),
     };
   },

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import useWsStore from '../lib/wsClient';
+import useWsStore, { useWsConnectionState, useSolanaConnectionInfo } from '../lib/wsClient';
 import useSolanaStore from '../lib/solanaUtils';
+import { ReloadIcon } from '@radix-ui/react-icons';
 
 export default function Dashboard() {
   const [connectionStatus, setConnectionStatus] = useState({
@@ -10,13 +11,24 @@ export default function Dashboard() {
     customRpc: false,
     apiKey: false,
     network: '',
-    timestamp: ''
+    timestamp: '',
+    websocket: false,
+    version: ''
   });
   
   // Get WebSocket store
   const { messages, registerHandler } = useWsStore();
+  const wsConnectionState = useWsConnectionState();
   
-  // Get Solana connection status
+  // Use the enhanced Solana connection info hook
+  const { 
+    connectionInfo, 
+    loading: loadingConnectionInfo, 
+    error: connectionInfoError, 
+    refresh: refreshConnectionInfo 
+  } = useSolanaConnectionInfo();
+  
+  // Get Solana connection status from HTTP API as fallback
   const { data: solanaStatus, isLoading } = useQuery({
     queryKey: ['/api/solana/status'],
     staleTime: 60 * 1000, // 1 minute
@@ -26,12 +38,25 @@ export default function Dashboard() {
   useEffect(() => {
     const unregister = registerHandler('Solana connection status:', (message) => {
       if (message.data) {
-        setConnectionStatus(message.data);
+        setConnectionStatus(prev => ({
+          ...prev,
+          ...message.data
+        }));
       }
     });
     
     return () => unregister();
   }, [registerHandler]);
+  
+  // Update connection status when we get detailed info
+  useEffect(() => {
+    if (connectionInfo) {
+      setConnectionStatus(prev => ({
+        ...prev,
+        ...connectionInfo
+      }));
+    }
+  }, [connectionInfo]);
   
   // Get strategies from API
   const { data: strategies, isLoading: loadingStrategies } = useQuery({
@@ -72,10 +97,30 @@ export default function Dashboard() {
       {/* Status Card */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="bg-card rounded-lg shadow-md p-4 border border-border">
-          <h3 className="text-sm font-medium text-muted-foreground">Network</h3>
+          <div className="flex justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">Network</h3>
+            {wsConnectionState.connected && (
+              <button 
+                onClick={refreshConnectionInfo} 
+                className="text-primary hover:text-primary/80 transition-colors"
+                title="Refresh connection info"
+              >
+                <ReloadIcon className={`h-4 w-4 ${loadingConnectionInfo ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+          </div>
           <p className="text-2xl font-bold">{connectionStatus.network || solanaStatus?.network || 'Unknown'}</p>
-          <div className="mt-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex items-center text-xs">
+            <div className={`h-2 w-2 rounded-full mr-1.5 ${connectionStatus.websocket ? 'bg-success' : 'bg-orange-500'}`}></div>
+            <span className="text-muted-foreground">
+              {connectionStatus.websocket 
+                ? 'Using WebSocket connection' 
+                : 'Using HTTP connection'}
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
             {connectionStatus.customRpc ? 'Using custom RPC endpoint' : 'Using public RPC'}
+            {connectionStatus.version && ` · v${connectionStatus.version}`}
           </div>
         </div>
         
@@ -126,6 +171,75 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Manage quantum-inspired AI trading agents</p>
           </a>
         </Link>
+      </div>
+      
+      {/* Connection Details */}
+      <div className="bg-card rounded-lg shadow-md p-6 border border-border mb-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Connection Details</h2>
+          <div className="flex items-center space-x-2">
+            <div className={`h-2 w-2 rounded-full ${wsConnectionState.connected ? 'bg-success' : 'bg-destructive'}`}></div>
+            <span className="text-sm text-muted-foreground">
+              {wsConnectionState.connected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
+            </span>
+          </div>
+        </div>
+        
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-medium mb-2">Solana Connection</h3>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Network:</span>
+                <span>{connectionStatus.network || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">WebSocket Support:</span>
+                <span>{connectionStatus.websocket ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Custom RPC:</span>
+                <span>{connectionStatus.customRpc ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">API Key:</span>
+                <span>{connectionStatus.apiKey ? 'Present' : 'None'}</span>
+              </div>
+              {connectionStatus.version && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Version:</span>
+                  <span>{connectionStatus.version}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium mb-2">WebSocket Connection</h3>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                <span>{wsConnectionState.connected ? 'Connected' : 'Disconnected'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Connection Attempts:</span>
+                <span>{wsConnectionState.connectionAttempts}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Last Message:</span>
+                <span>
+                  {wsConnectionState.lastMessageTime 
+                    ? new Date(wsConnectionState.lastMessageTime).toLocaleTimeString() 
+                    : 'None'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Messages:</span>
+                <span>{messages.length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Recent Signals */}

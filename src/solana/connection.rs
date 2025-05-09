@@ -1,358 +1,423 @@
-// Solana connection management
-
-use anyhow::{Result, anyhow, Context};
+use std::sync::Arc;
 use log::{info, warn, error, debug};
-use serde::{Serialize, Deserialize};
-use std::sync::{Arc, RwLock, Mutex};
-use std::time::{Duration, Instant};
-use std::env;
+use anyhow::{Result, anyhow};
 
-use solana_client::rpc_client::RpcClient;
-use solana_client::client_error::ClientError;
-use solana_sdk::commitment_config::CommitmentConfig;
+use solana_client::{
+    rpc_client::RpcClient, 
+    client_error::ClientError,
+    rpc_config::{RpcTransactionConfig, RpcBlockConfig, RpcSendTransactionConfig}
+};
+use solana_sdk::{
+    commitment_config::{CommitmentConfig, CommitmentLevel},
+    signature::{Keypair, Signature},
+    transaction::Transaction,
+    pubkey::Pubkey,
+    clock::Slot
+};
+use solana_transaction_status::UiTransactionEncoding;
 
-/// Connection configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionConfig {
-    /// Primary RPC endpoint URL
-    pub primary_endpoint: Option<String>,
-    
-    /// Fallback RPC endpoint URL
-    pub fallback_endpoint: Option<String>,
-    
-    /// Commitment level
-    pub commitment: String,
-    
-    /// Connection timeout in seconds
-    pub timeout_seconds: u64,
-    
-    /// Health check interval in seconds
-    pub health_check_seconds: u64,
-}
+use crate::solana::rate_limiter::{RpcRateLimiter, RequestPriority};
 
-impl Default for ConnectionConfig {
-    fn default() -> Self {
-        Self {
-            primary_endpoint: None,
-            fallback_endpoint: None,
-            commitment: "confirmed".to_string(),
-            timeout_seconds: 30,
-            health_check_seconds: 60,
-        }
-    }
-}
-
-/// Connection status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ConnectionStatus {
-    /// Connected
-    Connected,
-    
-    /// Connecting
-    Connecting,
-    
-    /// Disconnected
-    Disconnected,
-    
-    /// Error
-    Error,
-}
-
-/// Connection health
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionHealth {
-    /// Connection status
-    pub status: ConnectionStatus,
-    
-    /// Active endpoint
-    pub active_endpoint: String,
-    
-    /// Last health check time
-    #[serde(skip)]
-    pub last_check: Instant,
-    
-    /// Error message (if any)
-    pub error: Option<String>,
-    
-    /// Version info
-    pub version: Option<String>,
-}
-
-/// Solana connection manager
+/// Custom Solana connection with added features:
+/// - RPC rate limiting
+/// - WebSocket support with graceful fallback to HTTP
+/// - Transaction monitoring
+/// - Self-healing capabilities
 pub struct SolanaConnection {
-    /// Configuration
-    config: ConnectionConfig,
+    // RPC client connections
+    primary_rpc: RpcClient,
+    backup_rpc: Option<RpcClient>,
     
-    /// RPC client
-    client: RwLock<Option<RpcClient>>,
+    // WebSocket connection details
+    ws_url: Option<String>,
     
-    /// Connection health
-    health: RwLock<ConnectionHealth>,
+    // Rate limiter
+    rate_limiter: Arc<RpcRateLimiter>,
     
-    /// Last error
-    last_error: Mutex<Option<ClientError>>,
+    // Connection health tracking
+    primary_healthy: bool,
+    consecutive_failures: u8,
+    
+    // Configuration
+    commitment: CommitmentConfig,
 }
 
 impl SolanaConnection {
     /// Create a new Solana connection
-    pub fn new(config: ConnectionConfig) -> Result<Self> {
-        // Set default endpoints if not provided
-        let primary_endpoint = config.primary_endpoint.clone().unwrap_or_else(|| {
-            // Try to get from environment
-            env::var("INSTANT_NODES_RPC_URL")
-                .or_else(|_| {
-                    // Try Helius API key
-                    env::var("SOLANA_RPC_API_KEY")
-                        .map(|key| format!("https://mainnet.helius-rpc.com/?api-key={}", key))
-                })
-                .unwrap_or_else(|_| {
-                    // Fallback to public endpoint
-                    "https://api.mainnet-beta.solana.com".to_string()
-                })
-        });
-        
-        let fallback_endpoint = config.fallback_endpoint.clone().unwrap_or_else(|| {
-            // Fallback to public endpoint
-            "https://api.mainnet-beta.solana.com".to_string()
-        });
-        
-        // Initialize connection health
-        let health = ConnectionHealth {
-            status: ConnectionStatus::Disconnected,
-            active_endpoint: primary_endpoint.clone(),
-            last_check: Instant::now(),
-            error: None,
-            version: None,
-        };
-        
-        let connection = Self {
-            config,
-            client: RwLock::new(None),
-            health: RwLock::new(health),
-            last_error: Mutex::new(None),
-        };
-        
-        Ok(connection)
-    }
-    
-    /// Initialize connection
-    pub fn initialize(&self) -> Result<()> {
-        // Get endpoint
-        let endpoint = self.get_active_endpoint();
-        
-        // Create commitment config
-        let commitment = match self.config.commitment.as_str() {
-            "processed" => CommitmentConfig::processed(),
-            "confirmed" => CommitmentConfig::confirmed(),
-            "finalized" => CommitmentConfig::finalized(),
-            _ => CommitmentConfig::confirmed(),
-        };
-        
-        // Create timeout
-        let timeout = Duration::from_secs(self.config.timeout_seconds);
-        
-        // Create RPC client
-        let client = RpcClient::new_with_timeout_and_commitment(
-            endpoint.clone(),
-            timeout,
-            commitment,
+    pub fn new(
+        primary_url: &str, 
+        backup_url: Option<&str>, 
+        ws_url: Option<&str>,
+        commitment: Option<CommitmentConfig>
+    ) -> Self {
+        // Create primary RPC client
+        let primary_rpc = RpcClient::new_with_commitment(
+            primary_url.to_string(),
+            commitment.unwrap_or(CommitmentConfig::confirmed())
         );
         
-        // Update health
-        {
-            let mut health = self.health.write().unwrap();
-            health.status = ConnectionStatus::Connecting;
-            health.active_endpoint = endpoint.clone();
-        }
+        // Create backup RPC client if URL provided
+        let backup_rpc = backup_url.map(|url| {
+            RpcClient::new_with_commitment(
+                url.to_string(),
+                commitment.unwrap_or(CommitmentConfig::confirmed())
+            )
+        });
         
-        // Store client
-        {
-            let mut client_lock = self.client.write().unwrap();
-            *client_lock = Some(client);
-        }
+        // Store WebSocket URL if provided
+        let ws_url = ws_url.map(|url| url.to_string());
         
-        // Perform health check
-        match self.check_health() {
-            Ok(_) => {
-                info!("Connected to Solana network at {}", endpoint);
-                Ok(())
-            }
-            Err(e) => {
-                // Try fallback endpoint if available
-                if endpoint != self.config.fallback_endpoint.clone().unwrap_or_default() {
-                    warn!("Failed to connect to primary endpoint: {}", e);
-                    warn!("Trying fallback endpoint");
-                    
-                    // Update active endpoint to fallback
-                    {
-                        let mut health = self.health.write().unwrap();
-                        health.active_endpoint = self.config.fallback_endpoint.clone().unwrap_or_default();
-                    }
-                    
-                    // Try again with fallback
-                    self.initialize()
+        // Create rate limiter
+        let rate_limiter = Arc::new(RpcRateLimiter::new());
+        
+        Self {
+            primary_rpc,
+            backup_rpc,
+            ws_url,
+            rate_limiter,
+            primary_healthy: true,
+            consecutive_failures: 0,
+            commitment: commitment.unwrap_or(CommitmentConfig::confirmed()),
+        }
+    }
+    
+    /// Get a clone of the rate limiter for external use
+    pub fn get_rate_limiter(&self) -> Arc<RpcRateLimiter> {
+        self.rate_limiter.clone()
+    }
+    
+    /// Get the current RPC usage statistics
+    pub fn get_rpc_stats(&self) -> String {
+        self.rate_limiter.get_stats().get_summary()
+    }
+    
+    /// Check if the connection is healthy
+    pub async fn health_check(&mut self) -> bool {
+        let result = self.rate_limiter.adaptive_request(
+            RequestPriority::Low,
+            || self.primary_rpc.get_health()
+        ).await;
+        
+        match result {
+            Ok(health) => {
+                if !health {
+                    warn!("Solana RPC reports unhealthy status");
+                    self.primary_healthy = false;
+                    self.consecutive_failures += 1;
                 } else {
-                    // Both endpoints failed
-                    error!("Failed to connect to Solana network: {}", e);
-                    Err(e)
+                    if !self.primary_healthy {
+                        info!("Solana RPC health restored");
+                    }
+                    self.primary_healthy = true;
+                    self.consecutive_failures = 0;
                 }
-            }
-        }
-    }
-    
-    /// Get RPC client
-    pub fn get_rpc_client(&self) -> Result<RpcClient> {
-        // Check if client exists
-        let client_lock = self.client.read().unwrap();
-        
-        match client_lock.as_ref() {
-            Some(client) => Ok(client.clone()),
-            None => {
-                // Initialize connection
-                drop(client_lock); // Release lock before initializing
-                self.initialize()?;
-                
-                // Get client again
-                let client_lock = self.client.read().unwrap();
-                match client_lock.as_ref() {
-                    Some(client) => Ok(client.clone()),
-                    None => Err(anyhow!("Failed to initialize Solana connection")),
-                }
-            }
-        }
-    }
-    
-    /// Get active endpoint
-    pub fn get_active_endpoint(&self) -> String {
-        let health = self.health.read().unwrap();
-        health.active_endpoint.clone()
-    }
-    
-    /// Check connection health
-    pub fn check_health(&self) -> Result<ConnectionHealth> {
-        // Get client
-        let client = self.get_rpc_client()?;
-        
-        // Check connection
-        match client.get_version() {
-            Ok(version) => {
-                // Update health
-                let mut health = self.health.write().unwrap();
-                health.status = ConnectionStatus::Connected;
-                health.last_check = Instant::now();
-                health.error = None;
-                health.version = Some(format!("{}.{}.{}", 
-                    version.solana_core.major,
-                    version.solana_core.minor,
-                    version.solana_core.patch
-                ));
-                
-                Ok(health.clone())
-            }
+                health
+            },
             Err(e) => {
-                // Update health
-                let mut health = self.health.write().unwrap();
-                health.status = ConnectionStatus::Error;
-                health.last_check = Instant::now();
-                health.error = Some(e.to_string());
+                warn!("Solana RPC health check failed: {}", e);
+                self.primary_healthy = false;
+                self.consecutive_failures += 1;
                 
-                // Store error
-                {
-                    let mut last_error = self.last_error.lock().unwrap();
-                    *last_error = Some(e.clone());
+                // Try backup if available
+                if let Some(ref backup_rpc) = self.backup_rpc {
+                    match backup_rpc.get_health() {
+                        Ok(health) => {
+                            if health {
+                                info!("Backup RPC connection is healthy");
+                                return true;
+                            }
+                        },
+                        Err(_) => {}
+                    }
                 }
                 
-                Err(anyhow!("Failed to get Solana version: {}", e))
+                false
             }
         }
     }
     
-    /// Get connection health
-    pub fn get_health(&self) -> ConnectionHealth {
-        // Check if we need to refresh health
-        let refresh = {
-            let health = self.health.read().unwrap();
-            let elapsed = health.last_check.elapsed();
-            let interval = Duration::from_secs(self.config.health_check_seconds);
-            
-            elapsed >= interval
-        };
-        
-        // Refresh health if needed
-        if refresh {
-            let _ = self.check_health();
-        }
-        
-        // Return health
-        let health = self.health.read().unwrap();
-        health.clone()
+    /// Get the current slot
+    pub async fn get_slot(&self) -> Result<Slot> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Medium,
+            || {
+                match self.primary_rpc.get_slot() {
+                    Ok(slot) => Ok(slot),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_slot().map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get slot: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get slot: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
     }
     
-    /// Get last error
-    pub fn get_last_error(&self) -> Option<ClientError> {
-        let last_error = self.last_error.lock().unwrap();
-        last_error.clone()
+    /// Get account info
+    pub async fn get_account(&self, pubkey: &Pubkey) -> Result<solana_sdk::account::Account> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Medium,
+            || {
+                match self.primary_rpc.get_account(pubkey) {
+                    Ok(account) => Ok(account),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_account(pubkey).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get account: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get account: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
     }
     
-    /// Switch to fallback endpoint
-    pub fn switch_to_fallback(&self) -> Result<()> {
-        // Check if fallback is available
-        let fallback = self.config.fallback_endpoint.clone()
-            .ok_or_else(|| anyhow!("No fallback endpoint configured"))?;
-        
-        // Check if already on fallback
-        let current = self.get_active_endpoint();
-        if current == fallback {
-            return Err(anyhow!("Already using fallback endpoint"));
-        }
-        
-        info!("Switching from {} to fallback endpoint {}", current, fallback);
-        
-        // Update health
-        {
-            let mut health = self.health.write().unwrap();
-            health.status = ConnectionStatus::Connecting;
-            health.active_endpoint = fallback.clone();
-        }
-        
-        // Reset client to force re-initialization
-        {
-            let mut client_lock = self.client.write().unwrap();
-            *client_lock = None;
-        }
-        
-        // Initialize with fallback
-        self.initialize()
+    /// Send transaction with retry and fallback
+    pub async fn send_transaction(&self, transaction: &Transaction) -> Result<Signature> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Critical,
+            || {
+                let config = RpcSendTransactionConfig {
+                    skip_preflight: false,
+                    preflight_commitment: Some(self.commitment.commitment),
+                    encoding: Some(UiTransactionEncoding::Base64),
+                    max_retries: Some(5),
+                    min_context_slot: None,
+                };
+                
+                match self.primary_rpc.send_transaction_with_config(transaction, config) {
+                    Ok(signature) => Ok(signature),
+                    Err(e) => {
+                        warn!("Primary RPC failed to send transaction: {}", e);
+                        
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.send_transaction_with_config(transaction, config).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to send transaction: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to send transaction: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
     }
     
-    /// Switch to primary endpoint
-    pub fn switch_to_primary(&self) -> Result<()> {
-        // Check if primary is available
-        let primary = self.config.primary_endpoint.clone()
-            .ok_or_else(|| anyhow!("No primary endpoint configured"))?;
+    /// Confirm transaction
+    pub async fn confirm_transaction(&self, signature: &Signature) -> Result<bool> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::High,
+            || {
+                match self.primary_rpc.confirm_transaction(signature) {
+                    Ok(confirmed) => Ok(confirmed),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.confirm_transaction(signature).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to confirm transaction: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to confirm transaction: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
+    }
+    
+    /// Get transaction details
+    pub async fn get_transaction(&self, signature: &Signature) -> Result<solana_transaction_status::EncodedConfirmedTransaction> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Medium,
+            || {
+                let config = RpcTransactionConfig {
+                    encoding: Some(UiTransactionEncoding::Base64),
+                    commitment: Some(self.commitment),
+                    max_supported_transaction_version: Some(0),
+                };
+                
+                match self.primary_rpc.get_transaction_with_config(signature, config) {
+                    Ok(tx) => Ok(tx),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_transaction_with_config(signature, config).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get transaction: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get transaction: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
+    }
+    
+    /// Get program accounts
+    pub async fn get_program_accounts(&self, program_id: &Pubkey) -> Result<Vec<(Pubkey, solana_sdk::account::Account)>> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Medium,
+            || {
+                match self.primary_rpc.get_program_accounts(program_id) {
+                    Ok(accounts) => Ok(accounts),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_program_accounts(program_id).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get program accounts: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get program accounts: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
+    }
+    
+    /// Get recent block hash
+    pub async fn get_recent_blockhash(&self) -> Result<(solana_sdk::hash::Hash, solana_sdk::fee_calculator::FeeCalculator)> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::High,
+            || {
+                match self.primary_rpc.get_recent_blockhash() {
+                    Ok(blockhash) => Ok(blockhash),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_recent_blockhash().map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get recent blockhash: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get recent blockhash: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
+    }
+    
+    /// Get balance
+    pub async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
+        self.rate_limiter.adaptive_request(
+            RequestPriority::Medium,
+            || {
+                match self.primary_rpc.get_balance(pubkey) {
+                    Ok(balance) => Ok(balance),
+                    Err(e) => {
+                        // Try backup if available
+                        if let Some(ref backup_rpc) = self.backup_rpc {
+                            backup_rpc.get_balance(pubkey).map_err(|be| {
+                                anyhow!("Both primary and backup RPC failed to get balance: {}, {}", e, be)
+                            })
+                        } else {
+                            Err(anyhow!("Failed to get balance: {}", e))
+                        }
+                    }
+                }
+            }
+        ).await
+    }
+    
+    /// Sign and send transaction
+    pub async fn sign_and_send_transaction(&self, transaction: &mut Transaction, signer: &Keypair) -> Result<Signature> {
+        // Get recent blockhash
+        let (recent_blockhash, _) = self.get_recent_blockhash().await?;
         
-        // Check if already on primary
-        let current = self.get_active_endpoint();
-        if current == primary {
-            return Err(anyhow!("Already using primary endpoint"));
+        // Update transaction with recent blockhash
+        transaction.message.recent_blockhash = recent_blockhash;
+        
+        // Sign transaction
+        transaction.sign(&[signer], recent_blockhash);
+        
+        // Send transaction
+        self.send_transaction(transaction).await
+    }
+    
+    /// Check if WebSocket connection is available
+    pub fn has_websocket(&self) -> bool {
+        self.ws_url.is_some()
+    }
+    
+    /// Get WebSocket URL if available
+    pub fn get_websocket_url(&self) -> Option<String> {
+        self.ws_url.clone()
+    }
+    
+    /// Calculate rate limits based on our RPC constraints
+    pub fn calculate_rate_limits(&self) -> String {
+        let daily_limit = 40_000;
+        let hourly_allocation = daily_limit / 24;
+        let minute_allocation = hourly_allocation / 60;
+        let second_allocation = minute_allocation / 60;
+        
+        let critical_cost = 1;
+        let high_cost = 2;
+        let medium_cost = 3;
+        let low_cost = 5;
+        
+        let critical_per_day = daily_limit / critical_cost;
+        let high_per_day = daily_limit / high_cost;
+        let medium_per_day = daily_limit / medium_cost;
+        let low_per_day = daily_limit / low_cost;
+        
+        let critical_per_hour = hourly_allocation / critical_cost;
+        let high_per_hour = hourly_allocation / high_cost;
+        let medium_per_hour = hourly_allocation / medium_cost;
+        let low_per_hour = hourly_allocation / low_cost;
+        
+        let critical_per_minute = minute_allocation / critical_cost;
+        let high_per_minute = minute_allocation / high_cost;
+        let medium_per_minute = minute_allocation / medium_cost;
+        let low_per_minute = minute_allocation / low_cost;
+        
+        format!(
+            "RPC Rate Limits with 40k daily limit:\n\
+            - Per day: {} requests\n\
+            - Per hour: {} requests\n\
+            - Per minute: {} requests\n\
+            - Per second: {} requests\n\n\
+            Request capacity by priority:\n\
+            - Critical: {}/day, {}/hour, {}/minute\n\
+            - High: {}/day, {}/hour, {}/minute\n\
+            - Medium: {}/day, {}/hour, {}/minute\n\
+            - Low: {}/day, {}/hour, {}/minute",
+            daily_limit, hourly_allocation, minute_allocation, second_allocation,
+            critical_per_day, critical_per_hour, critical_per_minute,
+            high_per_day, high_per_hour, high_per_minute,
+            medium_per_day, medium_per_hour, medium_per_minute,
+            low_per_day, low_per_hour, low_per_minute
+        )
+    }
+}
+
+impl Clone for SolanaConnection {
+    fn clone(&self) -> Self {
+        Self {
+            primary_rpc: RpcClient::new_with_commitment(
+                self.primary_rpc.url().to_string(),
+                self.commitment
+            ),
+            backup_rpc: self.backup_rpc.as_ref().map(|client| {
+                RpcClient::new_with_commitment(
+                    client.url().to_string(),
+                    self.commitment
+                )
+            }),
+            ws_url: self.ws_url.clone(),
+            rate_limiter: self.rate_limiter.clone(),
+            primary_healthy: self.primary_healthy,
+            consecutive_failures: self.consecutive_failures,
+            commitment: self.commitment,
         }
-        
-        info!("Switching from {} to primary endpoint {}", current, primary);
-        
-        // Update health
-        {
-            let mut health = self.health.write().unwrap();
-            health.status = ConnectionStatus::Connecting;
-            health.active_endpoint = primary.clone();
-        }
-        
-        // Reset client to force re-initialization
-        {
-            let mut client_lock = self.client.write().unwrap();
-            *client_lock = None;
-        }
-        
-        // Initialize with primary
-        self.initialize()
     }
 }

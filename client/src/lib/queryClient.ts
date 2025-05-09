@@ -1,100 +1,94 @@
-// TanStack Query client setup
+import { QueryClient } from '@tanstack/react-query';
 
-import {
-  QueryClient,
-  QueryClientProvider as TanStackQueryClientProvider,
-  DefaultOptions,
-} from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { useState, ReactNode } from 'react';
-
-// Default query options
-const defaultOptions: DefaultOptions = {
-  queries: {
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: 60 * 1000, // 1 minute
-  },
-};
-
-// Default fetch function for queries
-export const defaultQueryFn = async <T>({ queryKey }: { queryKey: string[] }) => {
-  const [url] = queryKey;
-  const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  if (!res.ok) {
-    let errorText = await res.text();
-    try {
-      // Try to parse as JSON first
-      const errorJson = JSON.parse(errorText);
-      throw new Error(errorJson.error || errorJson.message || `API Error: ${res.status}`);
-    } catch (e) {
-      // If not JSON, use the raw text
-      throw new Error(errorText || `API Error: ${res.status}`);
-    }
-  }
-  
-  return (await res.json()) as T;
-};
-
-// API request function for mutations
-export const apiRequest = async <T>(
-  url: string,
-  method: 'POST' | 'PATCH' | 'DELETE' | 'PUT' = 'POST',
-  data?: any
-): Promise<T> => {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: data ? JSON.stringify(data) : undefined,
-  });
-  
-  if (!res.ok) {
-    let errorText = await res.text();
-    try {
-      // Try to parse as JSON first
-      const errorJson = JSON.parse(errorText);
-      throw new Error(errorJson.error || errorJson.message || `API Error: ${res.status}`);
-    } catch (e) {
-      // If not JSON, use the raw text
-      throw new Error(errorText || `API Error: ${res.status}`);
-    }
-  }
-  
-  // For DELETE operations, we might not have a response body
-  if (method === 'DELETE' && res.status === 204) {
-    return {} as T;
-  }
-  
-  return (await res.json()) as T;
-};
-
-// Create a client
+// Configure the query client with reasonable defaults
 export const queryClient = new QueryClient({
-  defaultOptions,
-  queryCache: {},
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 30 * 1000, // 30 seconds
+    },
+  },
 });
 
-// Query client provider component
-interface QueryClientProviderProps {
-  children: ReactNode;
+// Common API request handler
+interface FetcherOptions {
+  headers?: Record<string, string>;
+  credentials?: RequestCredentials;
 }
 
-export const QueryClientProvider = ({ children }: QueryClientProviderProps) => {
-  const [client] = useState(() => queryClient);
-  
-  return (
-    <TanStackQueryClientProvider client={client}>
-      {children}
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-    </TanStackQueryClientProvider>
-  );
+// Default options for fetch requests
+const defaultOptions: FetcherOptions = {
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  credentials: 'same-origin',
 };
+
+/**
+ * Generic API request function
+ * @param url The URL to fetch from
+ * @param method The HTTP method to use
+ * @param data The data to send (for POST/PUT/PATCH)
+ * @param options Additional fetch options
+ * @returns The parsed JSON response
+ */
+export async function apiRequest<T>(
+  url: string,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
+  data?: unknown,
+  options: FetcherOptions = {}
+): Promise<T> {
+  const opts: RequestInit = {
+    method,
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...options.headers,
+    },
+  };
+
+  if (data) {
+    opts.body = JSON.stringify(data);
+  }
+
+  const response = await fetch(url, opts);
+
+  // Handle non-JSON responses
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+    return {} as T;
+  }
+
+  const json = await response.json();
+
+  // Handle API errors
+  if (!response.ok) {
+    throw new Error(json.error || `API Error: ${response.status} ${response.statusText}`);
+  }
+
+  return json as T;
+}
+
+/**
+ * Default query function for react-query
+ * @param url The URL to fetch from
+ * @returns The parsed JSON response
+ */
+export async function defaultQueryFn<T>({ queryKey }: { queryKey: (string | Record<string, unknown>)[] }): Promise<T> {
+  const url = queryKey[0] as string;
+  return apiRequest<T>(url);
+}
+
+// Configure the query client with the default query function
+queryClient.setDefaultOptions({
+  queries: {
+    queryFn: defaultQueryFn,
+  },
+});
 
 export default queryClient;
