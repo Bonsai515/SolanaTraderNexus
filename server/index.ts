@@ -24,23 +24,24 @@ const httpServer = createServer(app);
 // Set up WebSocket server using our enhanced implementation
 const wss = setupWebSocketServer(httpServer);
 
-// Configure Vite in development mode
-const startServer = () => {
-  httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Server running at http://0.0.0.0:${port}`);
-    console.log(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
-  });
-};
-
+// Configure server based on environment
 if (process.env.NODE_ENV === 'production') {
-  startServer();
+  // Serve static files in production
+  app.use(express.static('dist/client'));
+
+  // Start server
+  httpServer.listen(5000, '0.0.0.0', () => {
+    console.log('🚀 Production server running on port 5000');
+    console.log('💻 WebSocket server enabled');
+  });
 } else {
-  configureViteServer(app, httpServer).then(startServer).catch(err => {
+  // Development mode with Vite
+  configureViteServer(app, httpServer).then(() => {
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`🚀 Development server running on port ${port}`);
+      console.log(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
+    });
+  }).catch(err => {
     console.error('Failed to start server:', err);
-    process.exit(1);
   });
 }
-}).catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
