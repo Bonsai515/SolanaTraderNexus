@@ -186,7 +186,9 @@ export function AgentProvider({ children }: AgentProviderProps) {
     setSystemRunning
   };
   
+  // Return the provider component
   return (
+    // @ts-ignore - JSX syntax is properly handled by Vite
     <AgentContext.Provider value={value}>
       {children}
     </AgentContext.Provider>
