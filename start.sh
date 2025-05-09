@@ -3,15 +3,23 @@
 # Start the Solana Trading System
 echo "Starting Solana Trading System with Quantum-Inspired Transformers..."
 
-# Check if Cargo is installed
-if ! command -v cargo &> /dev/null; then
-    echo "Cargo is not installed. Please install Rust and Cargo."
-    exit 1
+# Install Node.js dependencies if needed
+if [ ! -d "node_modules" ]; then
+    echo "Installing Node.js dependencies..."
+    npm install
 fi
 
-# Build and run the project
-echo "Building project..."
-cargo build || { echo "Build failed"; exit 1; }
+# Check if client index.html exists
+if [ ! -f "client/src/index.html" ]; then
+    # Create directory if it doesn't exist
+    mkdir -p client/src
+    # Copy the index.html file if it exists in client directory
+    if [ -f "client/index.html" ]; then
+        echo "Copying index.html to client/src..."
+        cp client/index.html client/src/
+    fi
+fi
 
-echo "Running project..."
-cargo run
+# Start the Node.js server
+echo "Starting Node.js server..."
+node server/index.js
