@@ -12,8 +12,8 @@ packages = ["jq"]
 
 [deployment]
 deploymentTarget = "gce"
-build = ["sh", "-c", "/nix/store/8wybwvv517v5lg5hvg1l1ydfs97gd8hd-rust-mixed/bin/cargo build --release && npm install && npm run build"]
-run = ["sh", "-c", "node dist/server/index.js"]
+build = ["sh", "-c", "npm install && npm run build && /nix/store/8wybwvv517v5lg5hvg1l1ydfs97gd8hd-rust-mixed/bin/cargo build --release"]
+run = ["sh", "-c", "NODE_ENV=production node dist/server/index.js"]
 
 [[ports]]
 localPort = 80
