@@ -53,13 +53,17 @@
   <script>
     // Basic connectivity check while React loads
     window.addEventListener('DOMContentLoaded', () => {
-      fetch('/api/health')
+      const baseUrl = window.location.origin;
+      console.log('Checking API health at:', `${baseUrl}/api/health`);
+      
+      fetch(`${baseUrl}/api/health`)
         .then(res => res.json())
         .then(data => {
           console.log('API health check:', data);
         })
         .catch(err => {
           console.error('API health check failed:', err);
+          console.log('Server may not be accessible. Please check server logs.');
         });
     });
   </script>

@@ -5,7 +5,6 @@ import { WebSocket } from 'ws';
 import cors from 'cors';
 import routes, { setupWebSocketServer } from './routes';
 import storage from './storage';
-import { configureViteServer } from './vite';
 import { logger } from './logger';
 import net from 'net';
 
@@ -59,42 +58,63 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Add a detailed API health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    server: 'running',
+    timestamp: new Date().toISOString(),
+    clientIp: req.ip || 'unknown',
+    requestHeaders: req.headers,
+    environment: process.env.NODE_ENV || 'development',
+    port: preferredPort
+  });
+});
+
 // Create HTTP server
 const httpServer = createServer(app);
 
 // Set up WebSocket server using our enhanced implementation
 const wss = setupWebSocketServer(httpServer);
 
-// Configure server based on environment
 // Main function to start the server
 async function startServer() {
   try {
     // Find an available port
     const port = await findAvailablePort(preferredPort);
     
-    if (process.env.NODE_ENV === 'production') {
-      // Serve static files in production
-      app.use(express.static(path.join(__dirname, '../dist/client')));
-      
-      // Ensure client-side routing works
-      app.get('*', (req: any, res: any) => {
-        res.sendFile(path.join(__dirname, '../dist/client/index.html'));
-      });
-
-      // Start server
-      httpServer.listen(port, '0.0.0.0', () => {
-        logger.info(`🚀 Production server running on port ${port}`);
-        logger.info('💻 WebSocket server enabled');
-      });
-    } else {
-      // Development mode with Vite
-      await configureViteServer(app, httpServer);
-      
-      httpServer.listen(port, '0.0.0.0', () => {
-        logger.info(`🚀 Development server running on port ${port}`);
-        logger.info(`💻 WebSocket server accessible at /ws endpoint`);
-      });
-    }
+    // Serve static files from the root directory where index.html is located
+    logger.info(`Serving static files from ${path.join(__dirname, '..')}`);
+    app.use(express.static(path.join(__dirname, '..')));
+    
+    // Serve client files 
+    logger.info(`Serving client files from ${path.join(__dirname, '../client')}`);
+    app.use('/client', express.static(path.join(__dirname, '../client')));
+    
+    // Create a simple HTML page for testing
+    app.get('/test-page', (req, res) => {
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>Test Page</title></head>
+          <body>
+            <h1>Server is running!</h1>
+            <p>This is a test page to verify that the server is accessible.</p>
+            <p>Server time: ${new Date().toISOString()}</p>
+            <button onclick="fetch('/api/health').then(r=>r.json()).then(d=>alert(JSON.stringify(d)))">
+              Test API Call
+            </button>
+          </body>
+        </html>
+      `);
+    });
+    
+    // Start HTTP server
+    httpServer.listen(port, '0.0.0.0', () => {
+      logger.info(`🚀 Server running on port ${port}`);
+      logger.info(`💻 WebSocket server accessible at /ws endpoint`);
+      logger.info(`🧪 Test page available at http://localhost:${port}/test-page`);
+    });
   } catch (err: any) {
     logger.error('Failed to start server:', err);
     process.exit(1);
