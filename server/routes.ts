@@ -7,6 +7,7 @@ import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
 import { logger } from './logger';
 import agentRouter, * as AgentManager from './agents';
+import { priceFeedCache } from './priceFeedCache';
 
 // Global state for transformer API initialization
 let transformerApiInitialized = false;
@@ -34,7 +35,7 @@ router.get('/health', (req, res) => {
 });
 
 // Transformer API endpoints
-router.get('/api/transformer/status', (req, res) => {
+router.get('/transformer/status', (req, res) => {
   try {
     if (!transformerApiInitialized) {
       res.status(503).json({
@@ -57,8 +58,8 @@ router.get('/api/transformer/status', (req, res) => {
   }
 });
 
-// Make a prediction
-router.post('/api/transformer/predict', async (req, res) => {
+// Make a prediction with provided market data
+router.post('/transformer/predict', async (req, res) => {
   try {
     if (!transformerApiInitialized) {
       res.status(503).json({
@@ -105,9 +106,157 @@ router.post('/api/transformer/predict', async (req, res) => {
     });
   }
 });
+  
+// Make a prediction using cached market data
+router.post('/transformer/predict-cached', async (req, res) => {
+  try {
+    if (!transformerApiInitialized) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Transformer API not initialized yet'
+      });
+      return;
+    }
+
+    const { pair, windowSeconds } = req.body;
+    
+    if (!pair) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+      return;
+    }
+    
+    // Get market data from cache
+    const cachedData = priceFeedCache.getMarketData(pair);
+    
+    if (!cachedData) {
+      res.status(404).json({
+        status: 'error',
+        message: `No cached market data found for pair: ${pair}`
+      });
+      return;
+    }
+    
+    const transformer = getTransformerAPI(storage);
+    const prediction = await transformer.predict(
+      pair,
+      cachedData,
+      windowSeconds || 3600
+    );
+
+    res.json(prediction);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error making prediction',
+      error: error.message
+    });
+  }
+});
+
+// Add market data to price feed cache
+router.post('/price-feed/update', async (req, res) => {
+  try {
+    const { pair, marketData } = req.body;
+    
+    if (!pair || !marketData) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameters: pair and marketData'
+      });
+      return;
+    }
+    
+    // Validate market data
+    if (!marketData.prices || !Array.isArray(marketData.prices) || marketData.prices.length === 0) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Invalid market data format: missing or invalid prices array'
+      });
+      return;
+    }
+    
+    // Update market data in price feed cache
+    priceFeedCache.updateMarketData(pair, marketData);
+    
+    // Update latest price point
+    const latestPrice = marketData.prices[marketData.prices.length - 1];
+    const latestVolume = marketData.volumes && marketData.volumes.length > 0 
+      ? marketData.volumes[marketData.volumes.length - 1][1] 
+      : 0;
+    
+    priceFeedCache.updatePriceData({
+      pair,
+      price: latestPrice[1],
+      volume: latestVolume,
+      timestamp: new Date(latestPrice[0]),
+      source: 'api_update'
+    });
+    
+    res.json({
+      status: 'success',
+      message: `Price feed updated for ${pair}`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error updating price feed',
+      error: error.message
+    });
+  }
+});
+
+// Get current price feed state
+router.get('/price-feed/status', (req, res) => {
+  try {
+    // Get all price data
+    const priceData = Array.from(priceFeedCache.getAllPriceData().values());
+    
+    // Get all available market data pairs
+    const availableMarketDataPairs = [];
+    
+    // Creating a function that converts Map to an array safely
+    const pairs = [];
+    const marketDataCache = priceFeedCache.getAllMarketData();
+    
+    if (marketDataCache && typeof marketDataCache.forEach === 'function') {
+      marketDataCache.forEach((value, key) => {
+        pairs.push(key);
+      });
+    }
+    
+    // Get information about current data source and status
+    const status = {
+      activeDataSource: priceFeedCache.getActiveDataSource(),
+      usingBackupSource: priceFeedCache.isUsingBackupSource(),
+      priceDataCount: priceData.length,
+      marketDataCount: pairs.length,
+      availablePairs: pairs,
+      initialized: true
+    };
+    
+    res.json({
+      status: 'success',
+      data: {
+        prices: priceData,
+        status
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting price feed status',
+      error: error.message
+    });
+  }
+});
 
 // Update model with new data
-router.post('/api/transformer/update', async (req, res) => {
+router.post('/transformer/update', async (req, res) => {
   try {
     if (!transformerApiInitialized) {
       res.status(503).json({
@@ -145,7 +294,7 @@ router.post('/api/transformer/update', async (req, res) => {
 });
 
 // Train model with historical data
-router.post('/api/transformer/train', async (req, res) => {
+router.post('/transformer/train', async (req, res) => {
   try {
     if (!transformerApiInitialized) {
       res.status(503).json({
@@ -267,6 +416,11 @@ export function setupWebSocketServer(httpServer: Server) {
   
   logger.info('💻 WebSocket server accessible at /ws endpoint');
   
+  // Initialize price feed cache
+  priceFeedCache.initialize().catch(err => {
+    logger.error('Failed to initialize price feed cache:', err);
+  });
+  
   wss.on('connection', (ws) => {
     logger.info('Client connected to WebSocket');
     
@@ -299,6 +453,9 @@ export function setupWebSocketServer(httpServer: Server) {
     
     // Hook up agent WebSocket handler
     AgentManager.handleAgentWebSocket(ws);
+    
+    // Register client with price feed cache for real-time updates
+    priceFeedCache.addClient(ws);
     
     // Handle messages
     ws.on('message', async (message) => {

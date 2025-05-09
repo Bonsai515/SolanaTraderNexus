@@ -7,6 +7,7 @@ import { IStorage } from './storage';
 import { z } from 'zod';
 import { Strategy, SignalType, SignalStrength, TradingSignal, InsertTradingSignal } from '@shared/schema';
 import { logger } from './logger';
+import { priceFeedCache } from './priceFeedCache';
 
 // Interface for market data
 export interface MarketData {
@@ -118,19 +119,38 @@ export class TransformerAPI {
         throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
+      // Use provided market data, or try to get from price feed cache
+      let dataToUse = marketData;
+      
       // Validate market data
-      if (!marketData || 
-          !marketData.prices || 
-          !Array.isArray(marketData.prices) || 
-          marketData.prices.length === 0) {
-        logger.error(`Invalid market data for ${pair}. Cannot make prediction without real market data.`);
-        throw new Error(`Invalid market data format. Cannot make prediction for ${pair} without real market data.`);
+      if (!dataToUse || 
+          !dataToUse.prices || 
+          !Array.isArray(dataToUse.prices) || 
+          dataToUse.prices.length === 0) {
+        
+        logger.warn(`Invalid or missing market data provided for ${pair}. Attempting to use cached data.`);
+        
+        // Try to get data from cache
+        const cachedData = priceFeedCache.getMarketData(pair);
+        
+        if (cachedData) {
+          logger.info(`Using cached market data for ${pair}`);
+          dataToUse = cachedData;
+        } else {
+          logger.error(`No valid market data available for ${pair}. Cannot make prediction.`);
+          throw new Error(`No valid market data available for ${pair}. Cannot make prediction without real market data.`);
+        }
+      }
+      
+      // Update the price feed cache with this market data
+      if (dataToUse && dataToUse.prices && dataToUse.prices.length > 0) {
+        priceFeedCache.updateMarketData(pair, dataToUse);
       }
       
       // Prepare input data for trading engine
       const input = {
         pair,
-        marketData,
+        marketData: dataToUse,
         windowSeconds
       };
       
@@ -146,6 +166,15 @@ export class TransformerAPI {
       
       // Generate trading signal from prediction
       await this.generateSignalFromPrediction(prediction);
+      
+      // Update price cache with the prediction result
+      priceFeedCache.updatePriceData({
+        pair,
+        price: prediction.price,
+        volume: 0, // We don't have volume in prediction results
+        timestamp: new Date(parseFloat(prediction.timestamp) * 1000), // Convert Unix timestamp to JavaScript Date
+        source: 'transformer_prediction'
+      });
       
       logger.info(`Successfully generated prediction for ${pair} with confidence ${prediction.confidence}`);
       return prediction;
@@ -175,24 +204,60 @@ export class TransformerAPI {
         throw new Error('Critical error: Rust trading engine binary not found. The system cannot operate without the actual trading engine.');
       }
       
+      // Use provided market data, or try to get from price feed cache
+      let dataToUse = marketData;
+      
       // Validate market data
-      if (!marketData || 
-          !marketData.prices || 
-          !Array.isArray(marketData.prices) || 
-          marketData.prices.length === 0) {
-        logger.error(`Invalid market data for ${pair}. Cannot update model without real market data.`);
-        throw new Error(`Invalid market data format. Cannot update model for ${pair} without real market data.`);
+      if (!dataToUse || 
+          !dataToUse.prices || 
+          !Array.isArray(dataToUse.prices) || 
+          dataToUse.prices.length === 0) {
+        
+        logger.warn(`Invalid or missing market data provided for ${pair}. Attempting to use cached data.`);
+        
+        // Try to get data from cache
+        const cachedData = priceFeedCache.getMarketData(pair);
+        
+        if (cachedData) {
+          logger.info(`Using cached market data for ${pair}`);
+          dataToUse = cachedData;
+        } else {
+          logger.error(`No valid market data available for ${pair}. Cannot update model.`);
+          throw new Error(`No valid market data available for ${pair}. Cannot update model without real market data.`);
+        }
+      }
+      
+      // Update the price feed cache with this market data
+      if (dataToUse && dataToUse.prices && dataToUse.prices.length > 0) {
+        priceFeedCache.updateMarketData(pair, dataToUse);
       }
       
       // Prepare input data for trading engine
       const input = {
         pair,
-        marketData
+        marketData: dataToUse
       };
       
       // Execute update using real trading engine
       await this.executeRustCommand('update', input);
-      logger.info(`Successfully updated model for ${pair} with ${marketData.prices.length} data points`);
+      
+      // Update price cache with the latest price data point
+      if (dataToUse.prices && dataToUse.prices.length > 0) {
+        const latestPrice = dataToUse.prices[dataToUse.prices.length - 1];
+        const latestVolume = dataToUse.volumes && dataToUse.volumes.length > 0 
+          ? dataToUse.volumes[dataToUse.volumes.length - 1][1] 
+          : 0;
+        
+        priceFeedCache.updatePriceData({
+          pair,
+          price: latestPrice[1],
+          volume: latestVolume,
+          timestamp: new Date(latestPrice[0]),
+          source: 'market_data_update'
+        });
+      }
+      
+      logger.info(`Successfully updated model for ${pair} with ${dataToUse.prices.length} data points`);
     } catch (error) {
       logger.error(`Model update failed for ${pair}:`, error);
       // Critical error - do not silently succeed
@@ -227,6 +292,27 @@ export class TransformerAPI {
       if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
         logger.error(`Invalid market data for ${pair}. Cannot train model without real historical data.`);
         throw new Error(`Invalid market data format. Cannot train model for ${pair} without real historical data.`);
+      }
+      
+      // Update price feed cache with the latest market data in the training set
+      // This ensures we have the most recent data available in the cache
+      const latestMarketData = marketData[marketData.length - 1];
+      if (latestMarketData && latestMarketData.prices && latestMarketData.prices.length > 0) {
+        priceFeedCache.updateMarketData(pair, latestMarketData);
+        
+        // Also update the price point
+        const latestPrice = latestMarketData.prices[latestMarketData.prices.length - 1];
+        const latestVolume = latestMarketData.volumes && latestMarketData.volumes.length > 0 
+          ? latestMarketData.volumes[latestMarketData.volumes.length - 1][1] 
+          : 0;
+          
+        priceFeedCache.updatePriceData({
+          pair,
+          price: latestPrice[1],
+          volume: latestVolume,
+          timestamp: new Date(latestPrice[0]),
+          source: 'training_data'
+        });
       }
       
       // Prepare input data for trading engine
@@ -302,7 +388,8 @@ export class TransformerAPI {
           ...prediction.metrics
         },
         expires_at: new Date(
-          new Date(prediction.timestamp).getTime() + prediction.windowSeconds * 1000
+          // Convert Unix timestamp to milliseconds for JavaScript Date
+          (parseFloat(prediction.timestamp) * 1000) + (prediction.windowSeconds * 1000)
         )
       };
       

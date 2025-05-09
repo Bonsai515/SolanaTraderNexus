@@ -45,8 +45,8 @@ const preferredPort = process.env.PORT ? parseInt(process.env.PORT, 10) : DEFAUL
 app.use(cors());
 app.use(express.json());
 
-// API routes
-app.use('/api', routes);
+// API routes - register routes directly at the root
+app.use(routes);
 
 // Create HTTP server
 const httpServer = createServer(app);
