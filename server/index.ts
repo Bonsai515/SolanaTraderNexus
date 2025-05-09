@@ -28,8 +28,8 @@ const wss = setupWebSocketServer(httpServer);
 configureViteServer(app, httpServer).then(() => {
   // Start the server
   httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Server running at http://localhost:${port}`);
-    console.log(`💻 WebSocket server running at ws://localhost:${port}/ws`);
+    console.log(`🚀 Server running at http://0.0.0.0:${port}`);
+    console.log(`💻 WebSocket server running at ws://0.0.0.0:${port}/ws`);
   });
 }).catch(err => {
   console.error('Failed to start server:', err);
