@@ -12,11 +12,16 @@ function Dashboard() {
   const fetchMarketData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/price-feed/status');
+      // Get the base URL from the current location
+      const baseUrl = window.location.origin;
+      console.log('Fetching market data from:', `${baseUrl}/api/price-feed/status`);
+      
+      const response = await fetch(`${baseUrl}/api/price-feed/status`);
       if (!response.ok) {
         throw new Error(`Error fetching market data: ${response.status}`);
       }
       const data = await response.json();
+      console.log('Market data received:', data);
       setMarketData(data);
       setError(null);
     } catch (err) {
@@ -31,7 +36,10 @@ function Dashboard() {
   const populateTestData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/test/populate-price-feed', {
+      const baseUrl = window.location.origin;
+      console.log('Populating test data from:', `${baseUrl}/api/test/populate-price-feed`);
+      
+      const response = await fetch(`${baseUrl}/api/test/populate-price-feed`, {
         method: 'POST'
       });
       
@@ -57,7 +65,10 @@ function Dashboard() {
   const analyzeTradingPair = async (pair: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/ai/market-pattern', {
+      const baseUrl = window.location.origin;
+      console.log('Analyzing trading pair from:', `${baseUrl}/api/ai/market-pattern`);
+      
+      const response = await fetch(`${baseUrl}/api/ai/market-pattern`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -70,6 +81,7 @@ function Dashboard() {
       }
       
       const result = await response.json();
+      console.log('Analysis result:', result);
       alert(`Analysis for ${pair}:\n${result.insights?.summary || 'No insights available'}`);
     } catch (err) {
       console.error(`Error analyzing ${pair}:`, err);
