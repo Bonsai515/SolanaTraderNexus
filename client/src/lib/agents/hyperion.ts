@@ -119,7 +119,7 @@ export class HyperionClient {
    * Set up WebSocket connection for real-time updates.
    */
   private setupWebSocket(): void {
-    this.wsClient = new WebSocket('/agents/hyperion');
+    this.wsClient = createWebSocket('/agents/hyperion');
 
     this.wsClient.onMessage((data) => {
       // Update state based on WebSocket messages
@@ -147,8 +147,7 @@ export class HyperionClient {
    */
   async start(): Promise<boolean> {
     try {
-      const response = await apiRequest('POST', '/api/agents/hyperion/start');
-      const result = await response.json();
+      const result = await apiRequestJson<{success: boolean, state: HyperionState}>('POST', '/api/agents/hyperion/start');
       
       if (result.success) {
         this.state = result.state;
@@ -167,8 +166,7 @@ export class HyperionClient {
    */
   async stop(): Promise<boolean> {
     try {
-      const response = await apiRequest('POST', '/api/agents/hyperion/stop');
-      const result = await response.json();
+      const result = await apiRequestJson<{success: boolean, state: HyperionState}>('POST', '/api/agents/hyperion/stop');
       
       if (result.success) {
         this.state = result.state;
@@ -187,13 +185,11 @@ export class HyperionClient {
    */
   async executeZeroCapitalArb(dexPath: DexRoute[], chainRoute?: WormholePath): Promise<ArbitrageResult> {
     try {
-      const response = await apiRequest('POST', '/api/agents/hyperion/execute', {
+      return await apiRequestJson<ArbitrageResult>('POST', '/api/agents/hyperion/execute', {
         operation: 'zero_capital_arb',
         dexPath,
         chainRoute
       });
-
-      return await response.json();
     } catch (error) {
       console.error('Failed to execute zero-capital arbitrage:', error);
       return {
@@ -213,8 +209,7 @@ export class HyperionClient {
    */
   async getRecentResults(limit: number = 10): Promise<ArbitrageResult[]> {
     try {
-      const response = await apiRequest('GET', `/api/agents/hyperion/results?limit=${limit}`);
-      return await response.json();
+      return await apiRequestJson<ArbitrageResult[]>('GET', `/api/agents/hyperion/results?limit=${limit}`);
     } catch (error) {
       console.error('Failed to get recent results:', error);
       return [];
@@ -226,8 +221,10 @@ export class HyperionClient {
    */
   async getProfitHistory(days: number = 30): Promise<{ date: string, profit: number }[]> {
     try {
-      const response = await apiRequest('GET', `/api/agents/hyperion/profit-history?days=${days}`);
-      return await response.json();
+      return await apiRequestJson<{ date: string, profit: number }[]>(
+        'GET', 
+        `/api/agents/hyperion/profit-history?days=${days}`
+      );
     } catch (error) {
       console.error('Failed to get profit history:', error);
       return [];
