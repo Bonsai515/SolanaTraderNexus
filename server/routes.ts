@@ -7,6 +7,8 @@ import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
 import { logger } from './logger';
 import agentRouter, * as AgentManager from './agents';
+import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, SignalPriority } from './signalHub';
+import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
 import { getPerplexityService } from './ai/perplexityService';
 
@@ -378,6 +380,451 @@ router.get('/price-feed/status', (req, res) => {
     });
   }
 });
+
+// Signal Hub API Endpoints
+
+// Submit a signal to the signal hub
+router.post('/signals', async (req, res) => {
+  try {
+    const signalData = req.body;
+    
+    if (!signalData.pair || !signalData.type || !signalData.source) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required signal parameters: pair, type, and source are required'
+      });
+      return;
+    }
+    
+    // Set default values for missing fields
+    if (!signalData.strength) signalData.strength = SignalStrength.MODERATE;
+    if (!signalData.direction) signalData.direction = SignalDirection.NEUTRAL;
+    if (!signalData.priority) signalData.priority = SignalPriority.NORMAL;
+    if (!signalData.confidence) signalData.confidence = 50;
+    if (!signalData.description) signalData.description = `Signal for ${signalData.pair}`;
+    if (!signalData.metadata) signalData.metadata = {};
+    
+    // Submit the signal to the hub
+    const signalId = await signalHub.submitSignal(signalData);
+    
+    logger.info(`Signal submitted to hub: ${signalId}`);
+    
+    res.json({
+      status: 'success',
+      message: 'Signal submitted successfully',
+      signalId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error submitting signal:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error submitting signal',
+      error: error.message
+    });
+  }
+});
+
+// Get signals matching specific criteria
+router.get('/signals', async (req, res) => {
+  try {
+    const { 
+      types, 
+      sources, 
+      pairs, 
+      since, 
+      limit = 50 
+    } = req.query;
+    
+    // Parse the query parameters
+    const criteria: any = { limit: parseInt(limit as string, 10) };
+    
+    if (types) {
+      criteria.types = (types as string).split(',');
+    }
+    
+    if (sources) {
+      criteria.sources = (sources as string).split(',');
+    }
+    
+    if (pairs) {
+      criteria.pairs = (pairs as string).split(',');
+    }
+    
+    if (since) {
+      criteria.since = new Date(since as string);
+    }
+    
+    // Get signals from the hub
+    const signals = signalHub.getSignals(criteria);
+    
+    res.json({
+      status: 'success',
+      count: signals.length,
+      signals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting signals:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting signals',
+      error: error.message
+    });
+  }
+});
+
+// Get a specific signal by ID
+router.get('/signals/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: id'
+      });
+      return;
+    }
+    
+    // Get the signal from the hub
+    const signal = signalHub.getSignal(id);
+    
+    if (!signal) {
+      res.status(404).json({
+        status: 'error',
+        message: `Signal with ID ${id} not found`
+      });
+      return;
+    }
+    
+    // Get related signals if requested
+    if (req.query.includeRelated === 'true') {
+      const relatedSignals = signalHub.findRelatedSignals(id);
+      
+      res.json({
+        status: 'success',
+        signal,
+        relatedSignals,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.json({
+        status: 'success',
+        signal,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    logger.error('Error getting signal:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting signal',
+      error: error.message
+    });
+  }
+});
+
+// External Signal Platforms API Endpoints
+
+// Register an external platform to receive signals
+router.post('/external-platforms', async (req, res) => {
+  try {
+    const platformData = req.body;
+    
+    if (!platformData.name || !platformData.url) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameters: name and url are required'
+      });
+      return;
+    }
+    
+    // Test connectivity to the platform
+    const connectivityTest = await externalSignalService.testPlatformConnectivity(
+      platformData.url, 
+      platformData.apiKey
+    );
+    
+    if (!connectivityTest.success) {
+      res.status(400).json({
+        status: 'error',
+        message: `Failed to connect to platform: ${connectivityTest.message}`,
+        connectivityTest
+      });
+      return;
+    }
+    
+    // Register the platform
+    const platformId = externalSignalService.registerPlatform({
+      name: platformData.name,
+      url: platformData.url,
+      apiKey: platformData.apiKey,
+      active: true,
+      signalTypes: platformData.signalTypes,
+      signalSources: platformData.signalSources,
+      pairs: platformData.pairs
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'External platform registered successfully',
+      platformId,
+      connectivityTest,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error registering external platform:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error registering external platform',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get all registered external platforms
+router.get('/external-platforms', (req, res) => {
+  try {
+    const platforms = externalSignalService.getAllPlatforms();
+    
+    // Remove sensitive data like API keys from the response
+    const safeData = platforms.map(platform => ({
+      id: platform.id,
+      name: platform.name,
+      url: platform.url,
+      active: platform.active,
+      hasApiKey: !!platform.apiKey,
+      signalTypes: platform.signalTypes,
+      signalSources: platform.signalSources,
+      pairs: platform.pairs,
+      lastSent: platform.lastSent,
+      errorCount: platform.errorCount
+    }));
+    
+    res.json({
+      status: 'success',
+      count: platforms.length,
+      platforms: safeData,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting external platforms:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting external platforms',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Update an external platform
+router.put('/external-platforms/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    if (!id) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: id'
+      });
+      return;
+    }
+    
+    // Check if platform exists
+    const platform = externalSignalService.getPlatform(id);
+    
+    if (!platform) {
+      res.status(404).json({
+        status: 'error',
+        message: `External platform with ID ${id} not found`
+      });
+      return;
+    }
+    
+    // If URL is being updated, test connectivity
+    if (updates.url) {
+      const connectivityTest = await externalSignalService.testPlatformConnectivity(
+        updates.url, 
+        updates.apiKey || platform.apiKey
+      );
+      
+      if (!connectivityTest.success) {
+        res.status(400).json({
+          status: 'error',
+          message: `Failed to connect to updated platform URL: ${connectivityTest.message}`,
+          connectivityTest
+        });
+        return;
+      }
+    }
+    
+    // Update the platform
+    const success = externalSignalService.updatePlatform(id, updates);
+    
+    if (!success) {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to update external platform'
+      });
+      return;
+    }
+    
+    res.json({
+      status: 'success',
+      message: 'External platform updated successfully',
+      platformId: id,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error updating external platform:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error updating external platform',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Delete an external platform
+router.delete('/external-platforms/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: id'
+      });
+      return;
+    }
+    
+    // Remove the platform
+    const success = externalSignalService.removePlatform(id);
+    
+    if (!success) {
+      res.status(404).json({
+        status: 'error',
+        message: `External platform with ID ${id} not found`
+      });
+      return;
+    }
+    
+    res.json({
+      status: 'success',
+      message: 'External platform removed successfully',
+      platformId: id,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error removing external platform:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error removing external platform',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Test connectivity to an external platform
+router.post('/external-platforms/test-connection', async (req, res) => {
+  try {
+    const { url, apiKey } = req.body;
+    
+    if (!url) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: url'
+      });
+      return;
+    }
+    
+    // Test connectivity
+    const connectivityTest = await externalSignalService.testPlatformConnectivity(url, apiKey);
+    
+    res.json({
+      status: connectivityTest.success ? 'success' : 'error',
+      message: connectivityTest.message,
+      responseTime: connectivityTest.responseTime,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error testing platform connectivity:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error testing platform connectivity',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Manually forward a signal to external platforms
+router.post('/external-platforms/forward-signal/:signalId', async (req, res) => {
+  try {
+    const { signalId } = req.params;
+    
+    if (!signalId) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: signalId'
+      });
+      return;
+    }
+    
+    // Get the signal
+    const signal = signalHub.getSignal(signalId);
+    
+    if (!signal) {
+      res.status(404).json({
+        status: 'error',
+        message: `Signal with ID ${signalId} not found`
+      });
+      return;
+    }
+    
+    // Forward the signal
+    const platformIds = await externalSignalService.forwardSignal(signal);
+    
+    res.json({
+      status: 'success',
+      message: `Signal forwarded to ${platformIds.length} external platforms`,
+      signalId,
+      platformCount: platformIds.length,
+      platformIds,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error forwarding signal:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error forwarding signal',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Initialize the SignalHub in routes.ts
+(async () => {
+  // Initialize the signal hub
+  await signalHub.initialize();
+  
+  // Set up event handlers for market data updates
+  priceFeedCache.on('marketDataUpdated', (marketData: any) => {
+    // Process market data through the signal hub
+    signalHub.processMarketData(marketData);
+  });
+  
+  // Setup automatic forwarding of signals to external platforms
+  signalHub.onAnySignal(async (signal) => {
+    try {
+      // Forward all signals to external platforms
+      await externalSignalService.forwardSignal(signal);
+    } catch (error) {
+      logger.error('Error in automatic signal forwarding:', error);
+    }
+  });
+})();
 
 // Update model with new data
 router.post('/transformer/update', async (req, res) => {
