@@ -1,559 +1,385 @@
 /**
- * Perplexity API Service
- * Provides advanced market analysis and strategy optimization through Perplexity AI
+ * Perplexity AI Service for Strategy Analysis
+ * 
+ * This service integrates with Perplexity's AI to analyze market data,
+ * enhance trading strategies, and provide intelligent insights.
  */
 
-import rateLimiter from '../rpc/rateLimiter';
+export interface PerplexityOptions {
+  model?: string;
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  stream?: boolean;
+  presence_penalty?: number; 
+  frequency_penalty?: number;
+}
+
+export interface PerplexityMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface PerplexityRequest {
+  model: string;
+  messages: PerplexityMessage[];
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  stream?: boolean;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  return_images?: boolean;
+  return_related_questions?: boolean;
+}
+
+export interface PerplexityCitation {
+  url: string;
+}
+
+export interface PerplexityResponse {
+  id: string;
+  model: string;
+  object: string;
+  created: number;
+  citations: PerplexityCitation[];
+  choices: Array<{
+    index: number;
+    finish_reason: string;
+    message: {
+      role: string;
+      content: string;
+    };
+    delta: {
+      role: string;
+      content: string;
+    };
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface MarketDataPoint {
+  timestamp: string;
+  price: number;
+  volume: number;
+  volatility?: number;
+  rsi?: number;
+  macd?: number;
+  sentiment?: number;
+}
+
+export interface StrategyAnalysisResult {
+  recommendation: string;
+  confidence: number;
+  reasoning: string;
+  insights: string[];
+  suggested_parameters?: Record<string, any>;
+  risk_assessment: {
+    level: 'low' | 'moderate' | 'high' | 'extreme';
+    description: string;
+  };
+  citations?: string[];
+}
+
+const DEFAULT_OPTIONS: PerplexityOptions = {
+  model: 'llama-3.1-sonar-small-128k-online',
+  temperature: 0.2,
+  top_p: 0.9,
+  presence_penalty: 0,
+  frequency_penalty: 1,
+  stream: false
+};
 
 export class PerplexityService {
-  private static instance: PerplexityService;
   private apiKey: string;
-  private baseUrl: string = 'https://api.perplexity.ai';
-  private model: string = 'llama-3.1-sonar-small-128k-online';
-  
-  private constructor() {
-    this.apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY || process.env.PERPLEXITY_API_KEY || '';
-    
-    if (!this.apiKey) {
-      console.warn('Perplexity API key not found. Market analysis capabilities will not be available.');
-    } else {
-      console.log('Perplexity API service initialized');
-    }
+  private defaultOptions: PerplexityOptions;
+  private baseUrl = 'https://api.perplexity.ai/chat/completions';
+
+  constructor(apiKey: string, options: PerplexityOptions = {}) {
+    this.apiKey = apiKey;
+    this.defaultOptions = { ...DEFAULT_OPTIONS, ...options };
   }
-  
+
   /**
-   * Get the PerplexityService instance (singleton)
+   * Analyze trading strategy with market data
+   * Uses Perplexity's advanced AI to evaluate performance and suggest improvements
    */
-  public static getInstance(): PerplexityService {
-    if (!PerplexityService.instance) {
-      PerplexityService.instance = new PerplexityService();
+  async analyzeStrategy(
+    strategyName: string, 
+    strategyType: string,
+    pair: string,
+    marketData: MarketDataPoint[],
+    currentParameters: Record<string, any>,
+    pastPerformance?: {
+      profit: number;
+      win_rate: number;
+      transaction_count: number;
+      time_period: string;
     }
-    
-    return PerplexityService.instance;
-  }
-  
-  /**
-   * Check if the service is available
-   */
-  public isAvailable(): boolean {
-    return !!this.apiKey;
-  }
-  
-  /**
-   * Analyze market conditions using Perplexity AI
-   */
-  public async analyzeMarketConditions(marketData: any): Promise<MarketAnalysis> {
-    if (!this.isAvailable()) {
-      throw new Error('Perplexity service not available');
+  ): Promise<StrategyAnalysisResult> {
+    const systemPrompt = `You are a quantum-inspired AI financial analyst specializing in cryptocurrency markets on Solana blockchain.
+Analyze the provided trading strategy and market data to give insights with the following priorities:
+1. Identify clear patterns and anomalies in the market data
+2. Assess if the current strategy parameters are optimal
+3. Make specific recommendations for parameter adjustments
+4. Provide risk assessment based on volatility and market conditions
+Be precise, quantitative, and focus on actionable insights.`;
+
+    const marketDataSummary = this.summarizeMarketData(marketData);
+
+    let userPrompt = `Please analyze the following trading strategy for ${pair}:
+Strategy Name: ${strategyName}
+Strategy Type: ${strategyType}
+Current Parameters: ${JSON.stringify(currentParameters, null, 2)}
+
+Market Data Summary:
+${marketDataSummary}`;
+
+    if (pastPerformance) {
+      userPrompt += `\nPast Performance:
+- Profit: ${pastPerformance.profit.toFixed(2)}%
+- Win Rate: ${pastPerformance.win_rate.toFixed(2)}%
+- Transactions: ${pastPerformance.transaction_count}
+- Time Period: ${pastPerformance.time_period}`;
     }
-    
+
+    userPrompt += `\n\nPlease provide:
+1. Overall assessment of this strategy given recent market conditions
+2. Specific parameter adjustments that could improve performance
+3. Risk level assessment (low/moderate/high/extreme) with explanation
+4. Any critical insights about market patterns that this strategy could leverage`;
+
     try {
-      // Extract relevant data for the prompt
-      const marketDataSummary = this.extractMarketDataSummary(marketData);
-      
-      // Create the prompt for the analysis
-      const prompt = this.createMarketAnalysisPrompt(marketDataSummary);
-      
-      // Make the API call with rate limiting
-      const response = await rateLimiter.queueHighPriority(async () => {
-        return await this.callPerplexityAPI(prompt);
-      });
-      
-      // Process the response into a structured analysis
-      const analysis = this.processMarketAnalysisResponse(response);
-      
-      return analysis;
+      const messages: PerplexityMessage[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+
+      const response = await this.callPerplexityAPI(messages);
+      return this.parseAnalysisResponse(response);
     } catch (error) {
-      console.error('Error analyzing market conditions:', error);
-      
-      // Return a fallback analysis in case of error
-      return {
-        marketSentiment: 'neutral',
-        confidence: 0,
-        opportunities: [],
-        risks: [],
-        summary: 'Error occurred while analyzing market conditions',
-        timestamp: new Date()
-      };
+      console.error('Error analyzing strategy with Perplexity AI:', error);
+      throw new Error(`Failed to analyze strategy: ${error.message || 'Unknown error'}`);
     }
   }
-  
+
   /**
-   * Optimize a trading strategy using Perplexity AI
+   * Generate insights from recent market activity
+   * Creates intelligent observations about market trends, anomalies, and opportunities
    */
-  public async optimizeStrategy(strategy: any, performanceHistory: any[] = []): Promise<StrategyOptimization> {
-    if (!this.isAvailable()) {
-      throw new Error('Perplexity service not available');
-    }
-    
-    try {
-      // Create the prompt for strategy optimization
-      const prompt = this.createStrategyOptimizationPrompt(strategy, performanceHistory);
-      
-      // Make the API call with rate limiting
-      const response = await rateLimiter.queueHighPriority(async () => {
-        return await this.callPerplexityAPI(prompt);
-      });
-      
-      // Process the response into a structured optimization
-      const optimization = this.processStrategyOptimizationResponse(response);
-      
-      return optimization;
-    } catch (error) {
-      console.error('Error optimizing strategy:', error);
-      
-      // Return a fallback optimization in case of error
-      return {
-        parameterAdjustments: [],
-        reasoning: 'Error occurred while optimizing strategy',
-        confidence: 0,
-        expectedImprovements: {
-          winRate: 0,
-          profitFactor: 0,
-          drawdown: 0
-        },
-        timestamp: new Date()
-      };
-    }
-  }
-  
-  /**
-   * Make an API call to Perplexity
-   */
-  private async callPerplexityAPI(prompt: string): Promise<any> {
-    try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a sophisticated crypto trading AI specialized in Solana market analysis. Respond with accurate and precise trading insights. Include quantitative metrics when possible. Format responses in clear, concise sections focusing on actionable insights.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.2,
-          top_p: 0.9,
-          frequency_penalty: 1,
-          stream: false
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Perplexity API error: ${response.status} ${await response.text()}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error calling Perplexity API:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Extract a summary of market data for the prompt
-   */
-  private extractMarketDataSummary(marketData: any): string {
-    // In a real implementation, this would extract relevant data points
-    // and format them into a concise summary for the prompt
-    
-    let summary = '';
-    
-    if (Array.isArray(marketData)) {
-      // If it's an array of data points (e.g., historical data)
-      const recentData = marketData.slice(-10); // Last 10 data points
-      
-      summary = `Recent market data (last 10 points):\n`;
-      
-      for (const dataPoint of recentData) {
-        if (dataPoint.price && dataPoint.timestamp) {
-          summary += `${new Date(dataPoint.timestamp).toISOString()}: $${dataPoint.price}\n`;
-        }
-      }
-    } else if (typeof marketData === 'object') {
-      // If it's a single object with various properties
-      summary = `Current market data:\n`;
-      
-      if (marketData.pair) summary += `Pair: ${marketData.pair}\n`;
-      if (marketData.price) summary += `Price: $${marketData.price}\n`;
-      if (marketData.volume24h) summary += `24h Volume: $${marketData.volume24h}\n`;
-      if (marketData.change24h) summary += `24h Change: ${marketData.change24h}%\n`;
-      if (marketData.liquidityUSD) summary += `Liquidity: $${marketData.liquidityUSD}\n`;
-      
-      // Include any technical indicators if available
-      if (marketData.indicators) {
-        summary += `\nTechnical Indicators:\n`;
-        
-        for (const [key, value] of Object.entries(marketData.indicators)) {
-          summary += `${key}: ${value}\n`;
-        }
-      }
-    }
-    
-    return summary;
-  }
-  
-  /**
-   * Create a prompt for market analysis
-   */
-  private createMarketAnalysisPrompt(marketDataSummary: string): string {
-    return `
-Analyze the following Solana market data and provide insights:
+  async generateMarketInsights(
+    pair: string,
+    timeframe: string,
+    marketData: MarketDataPoint[]
+  ): Promise<string[]> {
+    const systemPrompt = `You are a quantum-inspired AI market analyst specializing in cryptocurrency analysis.
+Focus on identifying clear patterns, anomalies, support/resistance levels, and trading opportunities in the provided data.
+Be precise, quantitative, and highlight only the most significant insights that could lead to profitable trading opportunities.`;
+
+    const marketDataSummary = this.summarizeMarketData(marketData);
+
+    const userPrompt = `Please analyze the following market data for ${pair} on a ${timeframe} timeframe:
 
 ${marketDataSummary}
 
-Please provide a structured analysis including:
-1. Overall market sentiment (bullish, bearish, or neutral)
-2. Key trading opportunities with specific entry and exit points
-3. Major risks and warning signs
-4. A confidence score for your assessment (0-1)
-5. A concise summary of your analysis
+Identify the most important insights, patterns, and trading opportunities from this data. Focus on:
+1. Price action patterns
+2. Volume anomalies
+3. Technical indicator signals
+4. Support and resistance levels
+5. Breakout or breakdown potential
+6. Volatility patterns
 
-Format your response as JSON with the following structure:
-{
-  "sentiment": "bullish/bearish/neutral",
-  "confidence": 0.8,
-  "opportunities": [
-    {
-      "type": "entry/exit",
-      "price": 123.45,
-      "timeframe": "immediate/short-term/long-term",
-      "reasoning": "Brief explanation"
-    }
-  ],
-  "risks": [
-    {
-      "type": "price/liquidity/volatility",
-      "severity": "low/medium/high",
-      "description": "Brief explanation"
-    }
-  ],
-  "summary": "Concise overall analysis"
-}
-`;
-  }
-  
-  /**
-   * Create a prompt for strategy optimization
-   */
-  private createStrategyOptimizationPrompt(strategy: any, performanceHistory: any[]): string {
-    // Format the strategy details
-    let strategyDetails = `
-Strategy Name: ${strategy.name || 'Unnamed Strategy'}
-Description: ${strategy.description || 'No description provided'}
+Provide each insight as a separate point, ranked by importance for trading decisions.`;
 
-Parameters:
-`;
-    
-    if (strategy.parameters) {
-      for (const [key, value] of Object.entries(strategy.parameters)) {
-        strategyDetails += `- ${key}: ${value}\n`;
-      }
-    }
-    
-    strategyDetails += `\nEntry Conditions:\n`;
-    
-    if (Array.isArray(strategy.entryConditions)) {
-      for (const condition of strategy.entryConditions) {
-        strategyDetails += `- ${condition}\n`;
-      }
-    }
-    
-    strategyDetails += `\nExit Conditions:\n`;
-    
-    if (Array.isArray(strategy.exitConditions)) {
-      for (const condition of strategy.exitConditions) {
-        strategyDetails += `- ${condition}\n`;
-      }
-    }
-    
-    strategyDetails += `\nRisk Management:\n`;
-    
-    if (strategy.riskManagement) {
-      for (const [key, value] of Object.entries(strategy.riskManagement)) {
-        strategyDetails += `- ${key}: ${value}\n`;
-      }
-    }
-    
-    // Format performance history if available
-    let performanceDetails = '';
-    
-    if (performanceHistory && performanceHistory.length > 0) {
-      performanceDetails = `\nPerformance History:\n`;
-      
-      for (const performance of performanceHistory.slice(-10)) { // Last 10 performances
-        performanceDetails += `- Date: ${new Date(performance.timestamp).toISOString()}\n`;
-        performanceDetails += `  Profit/Loss: ${performance.profitLoss}\n`;
-        performanceDetails += `  Win/Loss: ${performance.success ? 'Win' : 'Loss'}\n`;
-        if (performance.notes) performanceDetails += `  Notes: ${performance.notes}\n`;
-        performanceDetails += '\n';
-      }
-    }
-    
-    return `
-Optimize the following trading strategy based on its performance history:
-
-${strategyDetails}
-${performanceDetails}
-
-Please provide specific parameter adjustments to improve the strategy's performance.
-Focus on improving win rate, profit factor, and reducing drawdown.
-
-Format your response as JSON with the following structure:
-{
-  "adjustments": [
-    {
-      "parameter": "Parameter name",
-      "currentValue": "Current value",
-      "suggestedValue": "Suggested value",
-      "reasoning": "Brief explanation"
-    }
-  ],
-  "expectedImprovements": {
-    "winRate": "+5%",
-    "profitFactor": "+0.3",
-    "drawdown": "-2%"
-  },
-  "confidence": 0.8,
-  "reasoning": "Overall explanation of optimizations"
-}
-`;
-  }
-  
-  /**
-   * Process the response from market analysis
-   */
-  private processMarketAnalysisResponse(response: any): MarketAnalysis {
     try {
-      // Extract the content from the response
+      const messages: PerplexityMessage[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+
+      const response = await this.callPerplexityAPI(messages);
       const content = response.choices[0].message.content;
       
-      // Try to parse the JSON from the content
-      let parsedContent;
+      // Extract insights as separate points
+      const insights = content
+        .split(/\d+\./)
+        .filter(line => line.trim().length > 0)
+        .map(line => line.trim());
       
-      try {
-        // Look for JSON in the content
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('No JSON found in response');
-        }
-      } catch (parseError) {
-        console.warn('Error parsing JSON from Perplexity response:', parseError);
-        
-        // Extract information using regex as a fallback
-        const sentimentMatch = content.match(/sentiment[\"']?\s*:\s*[\"']([^\"']+)[\"']/i);
-        const confidenceMatch = content.match(/confidence[\"']?\s*:\s*([0-9.]+)/i);
-        const summaryMatch = content.match(/summary[\"']?\s*:\s*[\"']([^\"']+)[\"']/i);
-        
-        parsedContent = {
-          sentiment: sentimentMatch ? sentimentMatch[1].toLowerCase() : 'neutral',
-          confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5,
-          opportunities: [],
-          risks: [],
-          summary: summaryMatch ? summaryMatch[1] : 'No summary available'
-        };
-      }
-      
-      // Map the parsed content to our MarketAnalysis interface
-      return {
-        marketSentiment: parsedContent.sentiment || 'neutral',
-        confidence: parsedContent.confidence || 0.5,
-        opportunities: (parsedContent.opportunities || []).map((opp: any) => ({
-          type: opp.type || 'unknown',
-          price: opp.price || 0,
-          timeframe: opp.timeframe || 'unknown',
-          description: opp.reasoning || 'No description available'
-        })),
-        risks: (parsedContent.risks || []).map((risk: any) => ({
-          type: risk.type || 'unknown',
-          severity: risk.severity || 'medium',
-          description: risk.description || 'No description available'
-        })),
-        summary: parsedContent.summary || 'No summary available',
-        timestamp: new Date()
-      };
+      return insights;
     } catch (error) {
-      console.error('Error processing market analysis response:', error);
-      
-      // Return a fallback analysis in case of error
-      return {
-        marketSentiment: 'neutral',
-        confidence: 0,
-        opportunities: [],
-        risks: [],
-        summary: 'Error processing market analysis response',
-        timestamp: new Date()
-      };
+      console.error('Error generating market insights with Perplexity AI:', error);
+      throw new Error(`Failed to generate market insights: ${error.message || 'Unknown error'}`);
     }
   }
-  
-  /**
-   * Process the response from strategy optimization
-   */
-  private processStrategyOptimizationResponse(response: any): StrategyOptimization {
-    try {
-      // Extract the content from the response
-      const content = response.choices[0].message.content;
-      
-      // Try to parse the JSON from the content
-      let parsedContent;
-      
-      try {
-        // Look for JSON in the content
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('No JSON found in response');
-        }
-      } catch (parseError) {
-        console.warn('Error parsing JSON from Perplexity response:', parseError);
-        
-        // Extract information using regex as a fallback
-        const confidenceMatch = content.match(/confidence[\"']?\s*:\s*([0-9.]+)/i);
-        const reasoningMatch = content.match(/reasoning[\"']?\s*:\s*[\"']([^\"']+)[\"']/i);
-        
-        parsedContent = {
-          adjustments: [],
-          expectedImprovements: {
-            winRate: '+0%',
-            profitFactor: '+0',
-            drawdown: '+0%'
-          },
-          confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5,
-          reasoning: reasoningMatch ? reasoningMatch[1] : 'No reasoning available'
-        };
-      }
-      
-      // Map the parsed content to our StrategyOptimization interface
-      return {
-        parameterAdjustments: (parsedContent.adjustments || []).map((adj: any) => ({
-          parameter: adj.parameter || 'unknown',
-          currentValue: adj.currentValue || 'unknown',
-          suggestedValue: adj.suggestedValue || 'unknown',
-          reasoning: adj.reasoning || 'No reasoning available'
-        })),
-        reasoning: parsedContent.reasoning || 'No reasoning available',
-        confidence: parsedContent.confidence || 0.5,
-        expectedImprovements: {
-          winRate: this.parsePercentageChange(parsedContent.expectedImprovements?.winRate || '+0%'),
-          profitFactor: this.parseNumberChange(parsedContent.expectedImprovements?.profitFactor || '+0'),
-          drawdown: this.parsePercentageChange(parsedContent.expectedImprovements?.drawdown || '+0%')
-        },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      console.error('Error processing strategy optimization response:', error);
-      
-      // Return a fallback optimization in case of error
-      return {
-        parameterAdjustments: [],
-        reasoning: 'Error processing strategy optimization response',
-        confidence: 0,
-        expectedImprovements: {
-          winRate: 0,
-          profitFactor: 0,
-          drawdown: 0
-        },
-        timestamp: new Date()
-      };
-    }
-  }
-  
-  /**
-   * Parse a percentage change string into a number
-   */
-  private parsePercentageChange(percentageChange: string): number {
-    try {
-      const match = percentageChange.match(/([\+\-])?(\d+(?:\.\d+)?)%/);
-      
-      if (match) {
-        const sign = match[1] === '-' ? -1 : 1;
-        const value = parseFloat(match[2]);
-        
-        return sign * value / 100;
-      }
-      
-      return 0;
-    } catch (error) {
-      return 0;
-    }
-  }
-  
-  /**
-   * Parse a number change string into a number
-   */
-  private parseNumberChange(numberChange: string): number {
-    try {
-      const match = numberChange.match(/([\+\-])?(\d+(?:\.\d+)?)/);
-      
-      if (match) {
-        const sign = match[1] === '-' ? -1 : 1;
-        const value = parseFloat(match[2]);
-        
-        return sign * value;
-      }
-      
-      return 0;
-    } catch (error) {
-      return 0;
-    }
-  }
-}
 
-/**
- * Market analysis interface
- */
-export interface MarketAnalysis {
-  marketSentiment: 'bullish' | 'bearish' | 'neutral';
-  confidence: number; // 0-1 scale
-  opportunities: {
-    type: string;
-    price: number;
-    timeframe: string;
-    description: string;
-  }[];
-  risks: {
-    type: string;
-    severity: 'low' | 'medium' | 'high';
-    description: string;
-  }[];
-  summary: string;
-  timestamp: Date;
-}
+  /**
+   * Convert market data to a summarized format for the AI
+   */
+  private summarizeMarketData(marketData: MarketDataPoint[]): string {
+    if (!marketData || marketData.length === 0) {
+      return 'No market data available';
+    }
 
-/**
- * Strategy optimization interface
- */
-export interface StrategyOptimization {
-  parameterAdjustments: {
-    parameter: string;
-    currentValue: string | number;
-    suggestedValue: string | number;
-    reasoning: string;
-  }[];
-  reasoning: string;
-  confidence: number; // 0-1 scale
-  expectedImprovements: {
-    winRate: number;
-    profitFactor: number;
-    drawdown: number;
-  };
-  timestamp: Date;
+    // Get first and last points for timeframe
+    const startTime = new Date(marketData[0].timestamp);
+    const endTime = new Date(marketData[marketData.length - 1].timestamp);
+    
+    // Calculate key metrics
+    const currentPrice = marketData[marketData.length - 1].price;
+    const startPrice = marketData[0].price;
+    const percentChange = ((currentPrice - startPrice) / startPrice) * 100;
+    
+    // Calculate average volume
+    const averageVolume = marketData.reduce((sum, point) => sum + point.volume, 0) / marketData.length;
+    
+    // Find min/max values
+    const prices = marketData.map(point => point.price);
+    const maxPrice = Math.max(...prices);
+    const minPrice = Math.min(...prices);
+    
+    // Calculate volatility if not provided
+    let avgVolatility = 'N/A';
+    if (marketData[0].volatility !== undefined) {
+      avgVolatility = (marketData.reduce((sum, point) => sum + (point.volatility || 0), 0) / marketData.length).toFixed(2);
+    }
+    
+    // Create summary
+    let summary = `Timeframe: ${startTime.toISOString()} to ${endTime.toISOString()}
+Data Points: ${marketData.length}
+Price Range: ${minPrice.toFixed(2)} to ${maxPrice.toFixed(2)}
+Current Price: ${currentPrice.toFixed(2)}
+Price Change: ${percentChange.toFixed(2)}%
+Average Volume: ${Math.round(averageVolume).toLocaleString()}
+Average Volatility: ${avgVolatility}
+
+Recent Price Action:`;
+
+    // Add most recent price points (last 5)
+    const recentPoints = marketData.slice(-5);
+    recentPoints.forEach(point => {
+      const date = new Date(point.timestamp);
+      summary += `\n${date.toISOString()}: $${point.price.toFixed(2)}, Vol: ${Math.round(point.volume).toLocaleString()}`;
+    });
+    
+    return summary;
+  }
+
+  /**
+   * Make the actual API call to Perplexity
+   */
+  private async callPerplexityAPI(messages: PerplexityMessage[]): Promise<PerplexityResponse> {
+    if (!this.apiKey) {
+      throw new Error('Perplexity API key is not set');
+    }
+
+    const requestBody: PerplexityRequest = {
+      model: this.defaultOptions.model || DEFAULT_OPTIONS.model,
+      messages,
+      temperature: this.defaultOptions.temperature,
+      top_p: this.defaultOptions.top_p,
+      presence_penalty: this.defaultOptions.presence_penalty,
+      frequency_penalty: this.defaultOptions.frequency_penalty,
+      stream: false,
+      return_images: false,
+      return_related_questions: false,
+    };
+
+    if (this.defaultOptions.max_tokens) {
+      requestBody.max_tokens = this.defaultOptions.max_tokens;
+    }
+
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Perplexity API error (${response.status}): ${errorText}`);
+    }
+
+    return await response.json() as PerplexityResponse;
+  }
+
+  /**
+   * Parse the AI response into a structured analysis result
+   */
+  private parseAnalysisResponse(response: PerplexityResponse): StrategyAnalysisResult {
+    const content = response.choices[0].message.content;
+    
+    // Extract the main sections using a simple heuristic approach
+    // In a real implementation, this would use more robust parsing
+    const confidenceMatch = content.match(/confidence[:\s]+(\d+(?:\.\d+)?%?)/i);
+    const confidence = confidenceMatch 
+      ? parseFloat(confidenceMatch[1].replace('%', '')) / 100
+      : 0.7; // default if not found
+    
+    // Extract risk level
+    let riskLevel: 'low' | 'moderate' | 'high' | 'extreme' = 'moderate';
+    if (content.match(/risk[:\s]+high/i) || content.match(/high risk/i)) {
+      riskLevel = 'high';
+    } else if (content.match(/risk[:\s]+low/i) || content.match(/low risk/i)) {
+      riskLevel = 'low';
+    } else if (content.match(/risk[:\s]+extreme/i) || content.match(/extreme risk/i)) {
+      riskLevel = 'extreme';
+    }
+    
+    // Extract risk description - find sentence containing risk assessment
+    const riskMatch = content.match(/risk[^.!?]*[.!?]/i);
+    const riskDescription = riskMatch ? riskMatch[0].trim() : 'Moderate risk based on current market conditions.';
+    
+    // Extract insights by looking for numbered points or bullet points
+    const insightsRegex = /(?:\d+\.\s*|\*\s*|\-\s*)([^.!?]*(?:[.!?][^.!?]*)*[.!?])/g;
+    const insights: string[] = [];
+    let insightMatch;
+    while ((insightMatch = insightsRegex.exec(content)) !== null) {
+      insights.push(insightMatch[1].trim());
+    }
+    
+    // Fallback if no insights found
+    if (insights.length === 0) {
+      // Split content by sentences and take a few as insights
+      const sentences = content.match(/[^.!?]*[.!?]/g) || [];
+      for (let i = 0; i < Math.min(3, sentences.length); i++) {
+        if (sentences[i].trim().length > 10) { // Avoid very short sentences
+          insights.push(sentences[i].trim());
+        }
+      }
+    }
+    
+    // Create the final result
+    const result: StrategyAnalysisResult = {
+      recommendation: content.substring(0, 200) + '...', // First part of the content as recommendation
+      confidence,
+      reasoning: content,
+      insights: insights.slice(0, 5), // Take up to 5 insights
+      risk_assessment: {
+        level: riskLevel,
+        description: riskDescription
+      },
+      citations: response.citations ? response.citations.map(c => c.url) : undefined
+    };
+    
+    return result;
+  }
 }
 
 // Create and export a singleton instance
-const perplexityService = PerplexityService.getInstance();
-export default perplexityService;
+export default function getPerplexityService(): PerplexityService {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) {
+    throw new Error('PERPLEXITY_API_KEY environment variable is not set');
+  }
+  
+  return new PerplexityService(apiKey);
+}

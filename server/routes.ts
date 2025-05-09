@@ -6,7 +6,10 @@ import { Server } from 'http';
 import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
 import { logger } from './logger';
-import agentRouter, { handleAgentWebSocket } from './agents';
+import agentRouter, * as AgentManager from './agents';
+
+// Global state for transformer API initialization
+let transformerApiInitialized = false;
 import {
   walletSchema, 
   insertWalletSchema,
@@ -28,6 +31,160 @@ const router = express.Router();
 // API Health check
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Transformer API endpoints
+router.get('/api/transformer/status', (req, res) => {
+  try {
+    if (!transformerApiInitialized) {
+      res.status(503).json({
+        status: 'initializing',
+        message: 'Transformer API is initializing'
+      });
+      return;
+    }
+
+    res.json({
+      status: transformerApiInitialized ? 'operational' : 'initializing',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting transformer status',
+      error: error.message
+    });
+  }
+});
+
+// Make a prediction
+router.post('/api/transformer/predict', async (req, res) => {
+  try {
+    if (!transformerApiInitialized) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Transformer API not initialized yet'
+      });
+      return;
+    }
+
+    const { pair, marketData, windowSeconds } = req.body;
+    
+    if (!pair) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+      return;
+    }
+
+    const transformer = getTransformerAPI(storage);
+    
+    // For testing without market data, create minimal data structure
+    const testMarketData: MarketData = marketData || {
+      pair,
+      prices: [[new Date().toISOString(), 0]],
+      volumes: [[new Date().toISOString(), 0]],
+      orderBooks: [],
+      indicators: {},
+      externalData: {}
+    };
+    
+    const prediction = await transformer.predict(
+      pair,
+      testMarketData,
+      windowSeconds || 3600
+    );
+
+    res.json(prediction);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error making prediction',
+      error: error.message
+    });
+  }
+});
+
+// Update model with new data
+router.post('/api/transformer/update', async (req, res) => {
+  try {
+    if (!transformerApiInitialized) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Transformer API not initialized yet'
+      });
+      return;
+    }
+
+    const { pair, marketData } = req.body;
+    
+    if (!pair || !marketData) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameters: pair and marketData'
+      });
+      return;
+    }
+
+    const transformer = getTransformerAPI(storage);
+    await transformer.updateModel(pair, marketData as MarketData);
+
+    res.json({
+      status: 'success',
+      message: `Model updated for ${pair}`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error updating model',
+      error: error.message
+    });
+  }
+});
+
+// Train model with historical data
+router.post('/api/transformer/train', async (req, res) => {
+  try {
+    if (!transformerApiInitialized) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Transformer API not initialized yet'
+      });
+      return;
+    }
+
+    const { pair, marketData, config } = req.body;
+    
+    if (!pair || !marketData) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameters: pair and marketData'
+      });
+      return;
+    }
+
+    const transformer = getTransformerAPI(storage);
+    const metrics = await transformer.trainModel(
+      pair,
+      marketData as MarketData[],
+      config || {}
+    );
+
+    res.json({
+      status: 'success',
+      message: `Model trained for ${pair}`,
+      metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Error training model',
+      error: error.message
+    });
+  }
 });
 
 // Get Solana connection status
@@ -141,7 +298,7 @@ export function setupWebSocketServer(httpServer: Server) {
     ws.send(JSON.stringify(['Solana connection status:', connectionStatus]));
     
     // Hook up agent WebSocket handler
-    handleAgentWebSocket(ws);
+    AgentManager.handleAgentWebSocket(ws);
     
     // Handle messages
     ws.on('message', async (message) => {
@@ -693,7 +850,6 @@ router.patch('/transactions/:id/status', async (req, res) => {
 // AI Transformer endpoints
 
 // Initialize transformer API
-let transformerApiInitialized = false;
 const initializeTransformerAPI = async () => {
   if (!transformerApiInitialized) {
     try {
@@ -710,8 +866,148 @@ const initializeTransformerAPI = async () => {
 // Initialize on startup
 initializeTransformerAPI();
 
+// Define agent router
+const agentRouter = express.Router();
+
+// Get all agents
+agentRouter.get('/', (req, res) => {
+  try {
+    const agents = AgentManager.getAgents();
+    res.json({
+      agents,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents:", error);
+    res.status(500).json({ error: 'Failed to fetch agents' });
+  }
+});
+
+// Get agent system status
+agentRouter.get('/status', (req, res) => {
+  try {
+    const isRunning = AgentManager.isRunning();
+    res.json({
+      status: isRunning ? 'running' : 'stopped',
+      message: isRunning ? 'Agent system is running' : 'Agent system is stopped',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/status:", error);
+    res.status(500).json({ error: 'Failed to get agent system status' });
+  }
+});
+
+// Start agent system
+agentRouter.post('/start', async (req, res) => {
+  try {
+    const success = await AgentManager.startAgentSystem();
+    res.json({
+      success,
+      message: success ? 'Agent system started successfully' : 'Failed to start agent system',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/start:", error);
+    res.status(500).json({ error: 'Failed to start agent system' });
+  }
+});
+
+// Stop agent system
+agentRouter.post('/stop', async (req, res) => {
+  try {
+    const success = await AgentManager.stopAgentSystem();
+    res.json({
+      success,
+      message: success ? 'Agent system stopped successfully' : 'Failed to stop agent system',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Error in /api/agents/stop:", error);
+    res.status(500).json({ error: 'Failed to stop agent system' });
+  }
+});
+
+// Get specific agent
+agentRouter.get('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = AgentManager.getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    
+    res.json({
+      agent,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}:`, error);
+    res.status(500).json({ error: 'Failed to fetch agent' });
+  }
+});
+
+// Activate agent
+agentRouter.post('/:id/activate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = AgentManager.getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    
+    if (agent.status !== 'idle') {
+      return res.status(400).json({ error: `Agent is ${agent.status}, must be idle to activate` });
+    }
+    
+    agent.active = true;
+    agent.status = 'scanning';
+    
+    AgentManager.broadcastAgentUpdate(agent);
+    
+    res.json({
+      success: true,
+      agent,
+      message: `Agent ${id} activated successfully`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}/activate:`, error);
+    res.status(500).json({ error: 'Failed to activate agent' });
+  }
+});
+
+// Deactivate agent
+agentRouter.post('/:id/deactivate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const agent = AgentManager.getAgent(id);
+    
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    
+    agent.active = false;
+    agent.status = 'idle';
+    
+    AgentManager.broadcastAgentUpdate(agent);
+    
+    res.json({
+      success: true,
+      agent,
+      message: `Agent ${id} deactivated successfully`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/agents/${req.params.id}/deactivate:`, error);
+    res.status(500).json({ error: 'Failed to deactivate agent' });
+  }
+});
+
 // Register agent routes
-router.use('/api/agents', agentRouter);
+router.use('/agents', agentRouter);
 
 // Learning insights routes
 router.get('/api/insights', async (req, res) => {
@@ -922,5 +1218,21 @@ router.post('/ai/train', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Initialize transformer API
+(async () => {
+  try {
+    if (!transformerApiInitialized) {
+      logger.info('Initializing transformer API with pairs: SOL/USDC, BONK/USDC');
+      const transformer = getTransformerAPI(storage);
+      await transformer.initialize();
+      transformerApiInitialized = true;
+      logger.info('Transformer API initialized successfully');
+    }
+  } catch (error) {
+    logger.error("Failed to initialize transformer API:", error);
+    transformerApiInitialized = false;
+  }
+})();
 
 export default router;

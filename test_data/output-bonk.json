@@ -1,0 +1,16 @@
+{
+  "pair": "BONK/USDC",
+  "price": 0.00000831,
+  "confidence": 0.85,
+  "windowSeconds": 3600,
+  "timestamp": "1746821642.0834415",
+  "priceChange": 0.035,
+  "volatility": 0.015,
+  "direction": 0.8,
+  "metrics": {
+    "momentum": 0.75,
+    "volume_change": 0.3,
+    "liquidity_score": 0.8,
+    "reason": "Strong buying pressure detected with increasing volume"
+  }
+}
