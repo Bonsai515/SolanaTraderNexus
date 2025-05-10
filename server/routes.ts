@@ -12,6 +12,7 @@ import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
 import { PerplexityService, getPerplexityService } from './ai/perplexityService';
 import { crossChainRouter } from './wormhole/crossChainRouter';
+import * as crypto from 'crypto';
 
 // Import DEX service dynamically to avoid circular dependencies
 const importDexService = async () => {
@@ -3584,6 +3585,721 @@ router.post('/api/test/populate-price-feed', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ==== TRADING API ENDPOINTS ====
+
+// Store transactions (in-memory)
+const transactions: Transaction[] = [];
+const signals: TradingSignal[] = [];
+
+/**
+ * Broadcast a signal update to all connected WebSocket clients
+ */
+function broadcastSignalUpdate(signal: TradingSignal): void {
+  try {
+    const message = JSON.stringify({
+      type: 'SIGNAL_UPDATE',
+      data: signal,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Broadcast to all connected WebSocket clients
+    if (wss) {
+      wss.clients.forEach((client: WebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
+  } catch (error) {
+    logger.error("Error broadcasting signal update:", error);
+  }
+}
+
+/**
+ * Broadcast a transaction update to all connected WebSocket clients
+ */
+function broadcastTransactionUpdate(transaction: Transaction): void {
+  try {
+    const message = JSON.stringify({
+      type: 'TRANSACTION_UPDATE',
+      data: transaction,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Broadcast to all connected WebSocket clients
+    if (wss) {
+      wss.clients.forEach((client: WebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
+  } catch (error) {
+    logger.error("Error broadcasting transaction update:", error);
+  }
+}
+
+// Generate a unique transaction ID
+function generateTransactionId(): string {
+  return 'tx_' + Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString();
+}
+
+// Generate a UUID v4 if needed
+function uuidv4(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Add some test data if none exists
+if (signals.length === 0) {
+  const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC', 'MEME/USDC', 'WIF/USDC'];
+  const sources = ['QUANTUM_TRANSFORMER', 'MICRO_QHC', 'MEME_CORTEX', 'HYPERION_AGENT', 'PRICE_MOMENTUM'];
+  const types = ['BUY', 'SELL'];
+  const strengths = ['WEAK', 'MODERATE', 'STRONG', 'VERY_STRONG'];
+  
+  // Generate 10 test signals
+  for (let i = 0; i < 10; i++) {
+    const pair = pairs[Math.floor(Math.random() * pairs.length)];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const strength = strengths[Math.floor(Math.random() * strengths.length)];
+    const source = sources[Math.floor(Math.random() * sources.length)];
+    
+    signals.push({
+      id: 'sig_' + Date.now().toString() + '_' + i.toString(),
+      pair,
+      type,
+      strength,
+      price: 1 + Math.random() * 100,
+      created_at: new Date(Date.now() - Math.random() * 86400000).toISOString(), // Random time in last 24h
+      source,
+      confidence: 0.5 + Math.random() * 0.5,
+      suggested_amount: Math.floor(10 + Math.random() * 200),
+      executed: false,
+      transaction_id: null,
+      metadata: {
+        strategy_name: `${source}_${Math.floor(Math.random() * 100)}`,
+        correlation_score: Math.random().toFixed(2)
+      }
+    });
+  }
+}
+
+// Get all trading signals
+router.get('/api/signals', (req, res) => {
+  try {
+    res.json(signals);
+  } catch (error: any) {
+    logger.error("Error in /api/signals:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Execute a trade based on a signal
+router.post('/api/execute-signal', async (req, res) => {
+  try {
+    const { signalId } = req.body;
+    
+    if (!signalId) {
+      return res.status(400).json({ error: 'Missing signal ID' });
+    }
+    
+    // Find the signal
+    const signal = signals.find(s => s.id === signalId);
+    
+    if (!signal) {
+      return res.status(404).json({ error: 'Signal not found' });
+    }
+    
+    if (signal.executed) {
+      return res.status(400).json({ error: 'Signal already executed' });
+    }
+    
+    // Generate a transaction ID
+    const transactionId = uuidv4();
+    
+    // Determine amount based on signal strength and suggested amount
+    let amount = signal.suggested_amount || 0;
+    if (!amount) {
+      // Default amounts based on signal strength if no suggested amount
+      switch (signal.strength) {
+        case 'WEAK': amount = 10; break;
+        case 'MODERATE': amount = 50; break;
+        case 'STRONG': amount = 100; break;
+        case 'VERY_STRONG': amount = 250; break;
+        default: amount = 25;
+      }
+    }
+    
+    // Create transaction object
+    const transaction: Transaction = {
+      id: transactionId,
+      pair: signal.pair,
+      type: signal.type,
+      amount: amount,
+      price: signal.price,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      wallet_address: 'trading_wallet',
+      signature: null,
+      fee: null,
+      filled_amount: 0,
+      error: null,
+      metadata: {
+        signal_id: signal.id,
+        signal_source: signal.source,
+        signal_confidence: signal.confidence
+      }
+    };
+    
+    // Add to transactions
+    transactions.unshift(transaction);
+    
+    // Update the signal
+    signal.executed = true;
+    signal.transaction_id = transactionId;
+    
+    // Broadcast updates if WebSocket server is available
+    try {
+      if (typeof broadcastSignalUpdate === 'function') {
+        broadcastSignalUpdate(signal);
+      }
+    } catch (wsError) {
+      logger.warn("Failed to broadcast signal update:", wsError);
+    }
+    
+    // Simulate transaction processing
+    setTimeout(async () => {
+      try {
+        // Use higher success rate for signals (95% success)
+        const isSuccessful = Math.random() < 0.95;
+        
+        if (isSuccessful) {
+          // Simulate transaction confirmation time
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          transaction.status = 'CONFIRMED';
+          transaction.signature = 'sim_' + crypto.randomUUID().replace(/-/g, '');
+          transaction.fee = 0.000005; // Simulated fee in SOL
+          transaction.filled_amount = transaction.amount;
+        } else {
+          transaction.status = 'FAILED';
+          transaction.error = 'Transaction execution failed';
+          
+          // If transaction failed, mark signal as not executed so it can be tried again
+          signal.executed = false;
+          signal.transaction_id = null;
+          
+          // Broadcast signal update
+          if (typeof broadcastSignalUpdate === 'function') {
+            broadcastSignalUpdate(signal);
+          }
+        }
+      } catch (error: any) {
+        transaction.status = 'FAILED';
+        transaction.error = error.message;
+        
+        // If transaction failed, mark signal as not executed so it can be tried again
+        signal.executed = false;
+        signal.transaction_id = null;
+        
+        // Broadcast signal update
+        if (typeof broadcastSignalUpdate === 'function') {
+          broadcastSignalUpdate(signal);
+        }
+      }
+      
+      // Update transaction
+      transaction.updated_at = new Date().toISOString();
+      
+      // Broadcast transaction update
+      try {
+        if (typeof broadcastTransactionUpdate === 'function') {
+          broadcastTransactionUpdate(transaction);
+        }
+      } catch (wsError) {
+        logger.warn("Failed to broadcast transaction update:", wsError);
+      }
+    }, 2000); // 2 second delay for simulation
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Signal execution initiated', 
+      transaction,
+      signal
+    });
+  } catch (error: any) {
+    logger.error("Error in /api/execute-signal:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Get all transactions
+router.get('/api/transactions', (req, res) => {
+  try {
+    res.json(transactions);
+  } catch (error: any) {
+    logger.error("Error in /api/transactions:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new transaction
+router.post('/api/transactions', async (req, res) => {
+  try {
+    const { pair, amount, type, walletAddress } = req.body;
+    
+    if (!pair || !amount || !type || !walletAddress) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Get price for the pair from the cache
+    const priceData = priceFeedCache.getPriceData(pair);
+    const price = priceData?.price;
+    
+    if (!price) {
+      return res.status(400).json({ error: `Price not available for ${pair}` });
+    }
+    
+    // Create transaction
+    const transaction: Transaction = {
+      id: generateTransactionId(),
+      pair,
+      amount: parseFloat(amount),
+      type,
+      price,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      wallet_address: walletAddress,
+      signature: null,
+      fee: null,
+      filled_amount: 0,
+      error: null
+    };
+    
+    // Process transaction
+    try {
+      // Here we would actually submit the transaction to the blockchain
+      // For now, we'll simulate a transaction with 80% success rate
+      const successRate = 0.8;
+      const isSuccessful = Math.random() < successRate;
+      
+      if (isSuccessful) {
+        // Simulate transaction confirmation time
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        transaction.status = 'CONFIRMED';
+        transaction.signature = 'sim_' + crypto.randomBytes(32).toString('hex');
+        transaction.fee = 0.000005; // Simulated fee in SOL
+        transaction.filled_amount = transaction.amount;
+      } else {
+        transaction.status = 'FAILED';
+        transaction.error = 'Transaction simulation failed';
+      }
+    } catch (error: any) {
+      transaction.status = 'FAILED';
+      transaction.error = error.message;
+    }
+    
+    // Save transaction
+    transactions.unshift(transaction);
+    
+    // Keep only the last 100 transactions
+    if (transactions.length > 100) {
+      transactions.length = 100;
+    }
+    
+    // If this was from a signal, update the signal
+    const relatedSignal = signals.find(s => s.id === req.body.signalId);
+    if (relatedSignal) {
+      relatedSignal.executed = true;
+      relatedSignal.transaction_id = transaction.id;
+    }
+    
+    // Return the transaction
+    res.json(transaction);
+  } catch (error: any) {
+    logger.error("Error in /api/transactions:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Execute trade from a signal
+router.post('/api/trade/execute-signal', async (req, res) => {
+  try {
+    const { signalId, walletAddress, amount } = req.body;
+    
+    if (!signalId || !walletAddress) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Find the signal
+    const signal = signals.find(s => s.id === signalId);
+    
+    if (!signal) {
+      return res.status(404).json({ error: 'Signal not found' });
+    }
+    
+    if (signal.executed) {
+      return res.status(400).json({ error: 'Signal already executed' });
+    }
+    
+    // Create transaction from signal
+    const transaction: Transaction = {
+      id: generateTransactionId(),
+      pair: signal.pair,
+      amount: amount ? parseFloat(amount) : signal.suggested_amount || 0.1,
+      type: signal.type,
+      price: signal.price,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      wallet_address: walletAddress,
+      signature: null,
+      fee: null,
+      filled_amount: 0,
+      error: null
+    };
+    
+    // Process transaction
+    try {
+      // Here we would actually submit the transaction to the blockchain
+      // For now, we'll simulate a transaction with 80% success rate
+      const successRate = 0.8;
+      const isSuccessful = Math.random() < successRate;
+      
+      if (isSuccessful) {
+        // Simulate transaction confirmation time
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        transaction.status = 'CONFIRMED';
+        transaction.signature = 'sim_' + crypto.randomBytes(32).toString('hex');
+        transaction.fee = 0.000005; // Simulated fee in SOL
+        transaction.filled_amount = transaction.amount;
+      } else {
+        transaction.status = 'FAILED';
+        transaction.error = 'Transaction simulation failed';
+      }
+    } catch (error: any) {
+      transaction.status = 'FAILED';
+      transaction.error = error.message;
+    }
+    
+    // Save transaction
+    transactions.unshift(transaction);
+    
+    // Keep only the last 100 transactions
+    if (transactions.length > 100) {
+      transactions.length = 100;
+    }
+    
+    // Update the signal
+    signal.executed = true;
+    signal.transaction_id = transaction.id;
+    
+    // Return the transaction
+    res.json(transaction);
+  } catch (error: any) {
+    logger.error("Error in /api/trade/execute-signal:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Flash arbitrage trade execution
+router.post('/api/trade/flash-arbitrage', async (req, res) => {
+  try {
+    const { dexRoute, walletAddress, minExpectedProfit } = req.body;
+    
+    if (!dexRoute || !walletAddress || minExpectedProfit === undefined) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Create transaction for flash arbitrage
+    const transaction: Transaction = {
+      id: generateTransactionId(),
+      pair: `${dexRoute[0].dex} → ${dexRoute[dexRoute.length - 1].dex}`,
+      amount: 0, // Flash loans don't require capital
+      type: 'FLASH_ARBITRAGE',
+      price: 0,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      wallet_address: walletAddress,
+      signature: null,
+      fee: null,
+      filled_amount: 0,
+      error: null,
+      metadata: {
+        dexRoute,
+        minExpectedProfit,
+        actualProfit: 0
+      }
+    };
+    
+    // Process transaction
+    try {
+      // Here we would actually execute the flash arbitrage on-chain
+      // For now, we'll simulate a transaction with 70% success rate
+      const successRate = 0.7;
+      const isSuccessful = Math.random() < successRate;
+      
+      if (isSuccessful) {
+        // Simulate transaction confirmation time
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Calculate simulated profit (between min expected and 2x min expected)
+        const actualProfit = minExpectedProfit * (1 + Math.random());
+        
+        transaction.status = 'CONFIRMED';
+        transaction.signature = 'sim_' + crypto.randomBytes(32).toString('hex');
+        transaction.fee = 0.000015; // Simulated fee in SOL (higher for complex transactions)
+        if (transaction.metadata) {
+          transaction.metadata.actualProfit = actualProfit;
+        }
+      } else {
+        transaction.status = 'FAILED';
+        transaction.error = 'Flash arbitrage simulation failed';
+      }
+    } catch (error: any) {
+      transaction.status = 'FAILED';
+      transaction.error = error.message;
+    }
+    
+    // Save transaction
+    transactions.unshift(transaction);
+    
+    // Keep only the last 100 transactions
+    if (transactions.length > 100) {
+      transactions.length = 100;
+    }
+    
+    // Return the transaction
+    res.json(transaction);
+  } catch (error: any) {
+    logger.error("Error in /api/trade/flash-arbitrage:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get flash arbitrage opportunities (real implementation would scan DEXes)
+router.get('/api/arbitrage/opportunities', async (req, res) => {
+  try {
+    // Get supported DEXes
+    const dexes = getAllDexes();
+    
+    // Get some token pairs to work with
+    const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+    
+    // Generate realistic arbitrage opportunities
+    const opportunities: ArbitrageOpportunity[] = [];
+    
+    for (const pair of pairs) {
+      // For demo purposes, generate between 0-3 opportunities per pair
+      const numOpportunities = Math.floor(Math.random() * 4);
+      
+      for (let i = 0; i < numOpportunities; i++) {
+        // Get two different DEXes
+        const shuffledDexes = dexes
+          .filter(dex => dex.status === 'active')
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 2);
+        
+        if (shuffledDexes.length < 2) continue;
+        
+        // Get the base price (e.g. SOL/USDC ~ $170)
+        let basePrice = 0;
+        if (pair.startsWith('SOL')) basePrice = 170 + (Math.random() * 4 - 2);
+        else if (pair.startsWith('BONK')) basePrice = 0.000022 + (Math.random() * 0.000002 - 0.000001);
+        else if (pair.startsWith('JUP')) basePrice = 1.25 + (Math.random() * 0.1 - 0.05);
+        else basePrice = 1.0;
+        
+        // Create price gap between DEXes (0.1% to 3%)
+        const priceGapPercent = 0.1 + (Math.random() * 2.9);
+        
+        // Define if buy price is lower or sell price is higher
+        const buyDex = shuffledDexes[0];
+        const sellDex = shuffledDexes[1];
+        
+        const buyPrice = basePrice;
+        const sellPrice = basePrice * (1 + priceGapPercent / 100);
+        
+        // Calculate profit metrics
+        const profitPercentage = ((sellPrice / buyPrice) - 1) * 100;
+        
+        // Estimate max trade size based on liquidity
+        const maxTradeSize = Math.floor(Math.random() * 10000) + 1000; // $1000-$11000
+        
+        // Estimated profit in USD
+        const estimatedProfit = (maxTradeSize / buyPrice) * (sellPrice - buyPrice);
+        
+        opportunities.push({
+          pair,
+          buyDex: buyDex.id,
+          sellDex: sellDex.id,
+          buyPrice,
+          sellPrice,
+          profitPercentage,
+          estimatedProfit,
+          maxTradeSize,
+          timestamp: new Date()
+        });
+      }
+    }
+    
+    // Sort by profit percentage
+    opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage);
+    
+    res.json({
+      success: true,
+      opportunities,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error("Error in /api/arbitrage/opportunities:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate test signals
+function generateTestSignals() {
+  // Clear existing signals
+  signals.length = 0;
+  
+  const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+  const types = ['BUY', 'SELL'];
+  const strengths = ['WEAK', 'MODERATE', 'STRONG', 'VERY_STRONG'];
+  const sources = ['micro_qhc', 'meme_cortex', 'agent_hyperion', 'agent_quantum_omega'];
+  
+  // Generate between 5-15 signals
+  const numSignals = 5 + Math.floor(Math.random() * 10);
+  
+  for (let i = 0; i < numSignals; i++) {
+    const pair = pairs[Math.floor(Math.random() * pairs.length)];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const strength = strengths[Math.floor(Math.random() * strengths.length)];
+    const source = sources[Math.floor(Math.random() * sources.length)];
+    
+    // Get default price for the pair since we might not have real price data yet
+    const price = pair.startsWith('SOL') ? 170 : 
+                  pair.startsWith('BONK') ? 0.000022 : 
+                  pair.startsWith('JUP') ? 1.25 : 1.0;
+    
+    // Calculate suggested amount (in USD)
+    const baseAmount = 100; // $100 base
+    let suggestedAmount: number;
+    
+    switch (strength) {
+      case 'WEAK':
+        suggestedAmount = baseAmount;
+        break;
+      case 'MODERATE':
+        suggestedAmount = baseAmount * 2;
+        break;
+      case 'STRONG':
+        suggestedAmount = baseAmount * 5;
+        break;
+      case 'VERY_STRONG':
+        suggestedAmount = baseAmount * 10;
+        break;
+      default:
+        suggestedAmount = baseAmount;
+    }
+    
+    // Convert to token amount
+    const tokenAmount = suggestedAmount / price;
+    
+    // Generate a signal ID
+    const signalId = `sig_${Date.now().toString()}_${Math.floor(Math.random() * 10000).toString()}`;
+    
+    // Create the signal
+    const signal: TradingSignal = {
+      id: signalId,
+      pair,
+      type,
+      strength,
+      price,
+      created_at: new Date().toISOString(),
+      source,
+      confidence: Math.floor(Math.random() * 30) + 70, // 70-100%
+      suggested_amount: tokenAmount,
+      executed: false,
+      transaction_id: null,
+      metadata: {
+        indicators: {
+          macd: Math.random() - 0.5,
+          rsi: Math.floor(Math.random() * 100),
+          volume_change: (Math.random() * 40) - 20 // -20% to +20%
+        },
+        timeframe: ['1m', '5m', '15m', '1h', '4h'][Math.floor(Math.random() * 5)]
+      }
+    };
+    
+    signals.push(signal);
+  }
+  
+  // Sort by creation time (newest first)
+  signals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  
+  logger.info(`Generated ${signals.length} test trading signals`);
+}
+
+// Generate test signals on startup
+generateTestSignals();
+
+// Schedule signal generation every 5 minutes
+setInterval(generateTestSignals, 5 * 60 * 1000);
+
+// Types for trading system
+interface Transaction {
+  id: string;
+  pair: string;
+  amount: number;
+  type: string;
+  price: number;
+  status: 'PENDING' | 'CONFIRMED' | 'FAILED';
+  created_at: string;
+  updated_at: string;
+  wallet_address: string;
+  signature: string | null;
+  fee: number | null;
+  filled_amount: number;
+  error: string | null;
+  metadata?: any;
+}
+
+interface TradingSignal {
+  id: string;
+  pair: string;
+  type: string;
+  strength: string;
+  price: number;
+  created_at: string;
+  source: string;
+  confidence: number;
+  suggested_amount?: number;
+  executed: boolean;
+  transaction_id: string | null;
+  metadata?: any;
+}
+
+interface ArbitrageOpportunity {
+  pair: string;
+  buyDex: string;
+  sellDex: string;
+  buyPrice: number;
+  sellPrice: number;
+  profitPercentage: number;
+  estimatedProfit: number;
+  maxTradeSize: number;
+  timestamp: Date;
+}
 
 // DEX API Endpoints
 // Get all supported DEXs

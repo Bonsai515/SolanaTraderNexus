@@ -1,35 +1,109 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import useWsStore from '../lib/wsClient';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import useWsStore from '../lib/wsStore';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Trading() {
   const [activeTab, setActiveTab] = useState('signals');
-  const { messages, sendMessage } = useWsStore();
+  const { connected, signals: wsSignals, transactions: wsTransactions, sendMessage } = useWsStore();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  // Get signals from API
-  const { data: signals, isLoading: loadingSignals } = useQuery({
+  // Get signals from API (fallback if WebSocket isn't working)
+  const { data: apiSignals, isLoading: loadingApiSignals } = useQuery({
     queryKey: ['/api/signals'],
     staleTime: 10 * 1000, // 10 seconds
+    // Don't fetch if we already have WebSocket data
+    enabled: wsSignals.length === 0,
   });
   
-  // Get transactions from API
-  const { data: transactions, isLoading: loadingTransactions } = useQuery({
+  // Get transactions from API (fallback if WebSocket isn't working)
+  const { data: apiTransactions, isLoading: loadingApiTransactions } = useQuery({
     queryKey: ['/api/transactions'],
     staleTime: 10 * 1000, // 10 seconds
+    // Don't fetch if we already have WebSocket data
+    enabled: wsTransactions.length === 0,
   });
   
-  // Request real-time signals through WebSocket
+  // Combine WebSocket and API data
+  const signals = wsSignals.length > 0 
+    ? wsSignals.map(msg => msg.data) 
+    : apiSignals || [];
+    
+  const transactions = wsTransactions.length > 0 
+    ? wsTransactions.map(msg => msg.data) 
+    : apiTransactions || [];
+    
+  const loadingSignals = wsSignals.length === 0 && loadingApiSignals;
+  const loadingTransactions = wsTransactions.length === 0 && loadingApiTransactions;
+  
+  // Mutation for executing a trade based on a signal
+  const executeSignalMutation = useMutation({
+    mutationFn: async (signalId: string) => {
+      const response = await apiRequest('POST', '/api/execute-signal', { 
+        signalId 
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute trade');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Trade executed successfully',
+        description: `Transaction ID: ${data.transaction.id.substring(0, 8)}...`,
+        variant: 'success'
+      });
+      // Invalidate the relevant query keys to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/signals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to execute trade',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Function to execute a signal
+  const executeSignal = (signalId: string) => {
+    executeSignalMutation.mutate(signalId);
+  };
+
+  // Request real-time signals and transactions through WebSocket
   useEffect(() => {
-    // Request signals on mount
-    sendMessage({ type: 'GET_SIGNALS' });
-    
-    // Periodic refresh
-    const interval = setInterval(() => {
+    // Only request data if we're connected to the WebSocket server
+    if (connected) {
+      // Request initial data on mount or when connection is established
       sendMessage({ type: 'GET_SIGNALS' });
-    }, 30000); // Every 30 seconds
+      sendMessage({ type: 'GET_TRANSACTIONS' });
+      
+      // Get market data for the UI
+      sendMessage({ type: 'GET_MARKET_DATA', pairs: ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'] });
+      
+      // Request agent status information
+      sendMessage({ type: 'GET_AGENT_STATUS' });
+    }
     
-    return () => clearInterval(interval);
-  }, [sendMessage]);
+    // Connection status indicator
+    const connectionStatus = connected ? 'connected' : 'disconnected';
+    console.log(`WebSocket status: ${connectionStatus}`);
+    
+    // Show toast for disconnections
+    if (!connected) {
+      toast({
+        title: 'WebSocket Disconnected',
+        description: 'Real-time updates unavailable. Using API fallback.',
+        variant: 'warning'
+      });
+    }
+    
+    // No need for an interval here as our WebSocket store handles refresh automatically
+  }, [connected, sendMessage, toast]);
 
   return (
     <div className="space-y-6">
@@ -96,8 +170,12 @@ export default function Trading() {
                         {new Date(signal.created_at).toLocaleTimeString()}
                       </td>
                       <td className="py-3 px-4">
-                        <button className="text-sm px-2 py-1 bg-primary text-primary-foreground rounded">
-                          Execute
+                        <button
+                          className="text-sm px-2 py-1 bg-primary text-primary-foreground rounded"
+                          onClick={() => executeSignal(signal.id)}
+                          disabled={signal.executed}
+                        >
+                          {signal.executed ? 'Executed' : 'Execute'}
                         </button>
                       </td>
                     </tr>
