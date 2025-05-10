@@ -18,6 +18,10 @@ class WebSocketClient {
   private connectionCallbacks: ((connected: boolean) => void)[] = [];
   private messageQueue: any[] = [];
   private connecting: boolean = false;
+  private pingInterval: number | null = null;
+  private lastPingTime: number = 0;
+  private lastPongTime: number = 0;
+  private connectionCheckInterval: number | null = null;
   
   private constructor() {
     // Initialize WebSocket connection
@@ -26,12 +30,19 @@ class WebSocketClient {
     // Add window event listeners for visibility change
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this.handleOnline());
+      window.addEventListener('offline', () => {
+        console.log('Network connection lost');
+        this.notifyConnectionCallbacks(false);
+      });
       window.addEventListener('focus', () => this.checkConnection());
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           this.checkConnection();
         }
       });
+      
+      // Set up regular connection check interval
+      this.connectionCheckInterval = window.setInterval(() => this.checkConnection(), 15000) as unknown as number;
     }
   }
   
@@ -57,11 +68,19 @@ class WebSocketClient {
     this.connecting = true;
     
     try {
+      // Make sure we have the right protocol
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
       
-      console.log(`Connecting to WebSocket server at ${wsUrl}`);
+      // Get the host from the current URL
+      const host = window.location.host;
       
+      // Construct the WebSocket URL
+      const wsUrl = `${protocol}//${host}/ws`;
+      
+      console.log(`Attempting WebSocket connection to: ${wsUrl}`);
+      console.log(`Current window location: ${window.location.href}`);
+      
+      // Try a direct connection to the WebSocket
       this.socket = new WebSocket(wsUrl);
       
       this.socket.onopen = () => {
@@ -75,9 +94,25 @@ class WebSocketClient {
           const message = this.messageQueue.shift();
           this.sendImmediately(message);
         }
+        
+        // Set up ping interval
+        this.setupPingInterval();
       };
       
       this.socket.onmessage = (event) => {
+        // Try to parse message for PONG detection
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.type === 'PONG') {
+            this.lastPongTime = Date.now();
+            const latency = this.lastPongTime - this.lastPingTime;
+            console.log(`Received PONG response, latency: ${latency}ms`);
+          }
+        } catch (e) {
+          // Not JSON or not a PONG message, that's fine
+        }
+        
+        // Forward to all callbacks
         this.notifyMessageCallbacks(event.data);
       };
       
@@ -130,6 +165,31 @@ class WebSocketClient {
   }
   
   /**
+   * Set up ping interval for connection monitoring
+   */
+  private setupPingInterval(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+    
+    this.pingInterval = window.setInterval(() => {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        try {
+          this.lastPingTime = Date.now();
+          const pingMessage = {
+            type: 'PING',
+            timestamp: new Date().toISOString()
+          };
+          this.sendImmediately(pingMessage);
+          console.log('Sent PING to server');
+        } catch (error) {
+          console.error('Error sending ping:', error);
+        }
+      }
+    }, 30000) as unknown as number; // Send ping every 30 seconds
+  }
+  
+  /**
    * Check the WebSocket connection and reconnect if necessary
    */
   private checkConnection(): void {
@@ -137,6 +197,15 @@ class WebSocketClient {
       console.log('WebSocket disconnected. Reconnecting...');
       this.reconnectAttempts = 0;
       this.connect();
+      return;
+    }
+    
+    // Check if connection is stale (last ping was sent but no pong received within 60 seconds)
+    if (this.lastPingTime > 0 && 
+        this.lastPongTime < this.lastPingTime && 
+        Date.now() - this.lastPingTime > 60000) {
+      console.log('WebSocket connection appears stale (no PONG response). Resetting connection...');
+      this.reset();
     }
   }
   
@@ -247,6 +316,18 @@ class WebSocketClient {
    * Close the WebSocket connection
    */
   public close(): void {
+    // Clear all intervals
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+    
+    // Close the socket
     if (this.socket) {
       this.socket.close(1000, 'Normal closure');
       this.socket = null;
@@ -259,7 +340,31 @@ class WebSocketClient {
   public reset(): void {
     this.close();
     this.reconnectAttempts = 0;
+    this.lastPingTime = 0;
+    this.lastPongTime = 0;
+    
+    // Recreate interval for connection checking
+    if (!this.connectionCheckInterval && typeof window !== 'undefined') {
+      this.connectionCheckInterval = window.setInterval(() => this.checkConnection(), 15000) as unknown as number;
+    }
+    
     this.connect();
+  }
+  
+  /**
+   * Get connection diagnostics info
+   */
+  public getDiagnostics(): any {
+    return {
+      connected: this.isConnected(),
+      socketState: this.socket ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.socket.readyState] : 'NO_SOCKET',
+      reconnectAttempts: this.reconnectAttempts,
+      maxReconnectAttempts: this.maxReconnectAttempts,
+      lastPingTime: this.lastPingTime ? new Date(this.lastPingTime).toISOString() : null,
+      lastPongTime: this.lastPongTime ? new Date(this.lastPongTime).toISOString() : null,
+      pingLatency: this.lastPingTime && this.lastPongTime ? (this.lastPongTime - this.lastPingTime) + 'ms' : 'unknown',
+      queuedMessages: this.messageQueue.length
+    };
   }
 }
 
