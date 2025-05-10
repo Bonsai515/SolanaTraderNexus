@@ -10,8 +10,34 @@ import agentRouter, * as AgentManager from './agents';
 import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, SignalPriority } from './signalHub';
 import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
-import { getPerplexityService } from './ai/perplexityService';
+import { PerplexityService, getPerplexityService } from './ai/perplexityService';
 import { crossChainRouter } from './wormhole/crossChainRouter';
+
+// Import DEX service dynamically to avoid circular dependencies
+const importDexService = async () => {
+  try {
+    const module = await import('../client/src/lib/dex/dexService');
+    
+    if (!module || !module.default) {
+      logger.error('DEX service module import failed - module or default export is missing');
+      return {
+        getSupportedDexes: () => ['raydium', 'orca', 'openbook', 'jupiter'],
+        getDexAdapter: () => null,
+        findArbitrageOpportunities: () => Promise.resolve([])
+      };
+    }
+    
+    return module.default;
+  } catch (error) {
+    logger.error('Error importing DEX service:', error);
+    // Return a minimal implementation to prevent errors
+    return {
+      getSupportedDexes: () => ['raydium', 'orca', 'openbook', 'jupiter'],
+      getDexAdapter: () => null,
+      findArbitrageOpportunities: () => Promise.resolve([])
+    };
+  }
+};
 import { 
   getAllDexes, 
   getDexInfo, 
@@ -2548,6 +2574,235 @@ agentRouter.post('/:id/deactivate', async (req, res) => {
 // Register agent routes
 router.use('/agents', agentRouter);
 
+// DEX Service API endpoints
+router.get('/dex/supported', async (req, res) => {
+  try {
+    const dexService = await importDexService();
+    const supportedDexes = dexService.getSupportedDexes();
+    
+    res.json({
+      dexes: supportedDexes,
+      count: supportedDexes.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching supported DEXes:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch supported DEXes',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Static DEX Information API endpoints that don't rely on dynamic imports
+// Get all DEXes information
+router.get('/dex/all', (req, res) => {
+  try {
+    const allDexes = getAllDexes();
+    
+    res.json({
+      status: 'success',
+      count: allDexes.length,
+      dexes: allDexes,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting all DEXes:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting all DEXes',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get all supported pairs
+router.get('/dex/pairs', (req, res) => {
+  try {
+    const pairs = getAllSupportedPairs();
+    
+    res.json({
+      status: 'success',
+      count: pairs.length,
+      pairs,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting supported pairs:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting supported pairs',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get DEX by ID
+router.get('/dex/info/:dexId', (req, res) => {
+  try {
+    const { dexId } = req.params;
+    const dexInfo = getDexInfo(dexId as DexType);
+    
+    if (!dexInfo) {
+      return res.status(404).json({
+        status: 'error',
+        message: `DEX with ID ${dexId} not found`
+      });
+    }
+    
+    res.json({
+      status: 'success',
+      dex: dexInfo,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting DEX info:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting DEX information',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get all lending protocols
+router.get('/lending/protocols', (req, res) => {
+  try {
+    const protocols = getAllLendingProtocols();
+    
+    res.json({
+      status: 'success',
+      count: protocols.length,
+      protocols,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting lending protocols:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting lending protocols',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get all analytics platforms
+router.get('/analytics/platforms', (req, res) => {
+  try {
+    const platforms = getAllAnalyticsPlatforms();
+    
+    res.json({
+      status: 'success',
+      count: platforms.length,
+      platforms,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting analytics platforms:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting analytics platforms',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/dex/:dex/pools/:pair', async (req, res) => {
+  try {
+    const { dex, pair } = req.params;
+    const dexService = await importDexService();
+    
+    // Get the DEX adapter
+    const adapter = dexService.getDexAdapter(dex);
+    
+    if (!adapter) {
+      return res.status(404).json({
+        status: 'error',
+        message: `DEX '${dex}' is not supported`
+      });
+    }
+    
+    // Get pools for the pair
+    const pools = await adapter.getPools(pair);
+    
+    res.json({
+      dex,
+      pair,
+      pools,
+      count: pools.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error fetching pools for ${req.params.dex}/${req.params.pair}:`, error);
+    res.status(500).json({
+      status: 'error',
+      message: `Failed to fetch pools for ${req.params.dex}/${req.params.pair}`,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/dex/:dex/pool/:poolId', async (req, res) => {
+  try {
+    const { dex, poolId } = req.params;
+    const dexService = await importDexService();
+    
+    // Get the DEX adapter
+    const adapter = dexService.getDexAdapter(dex);
+    
+    if (!adapter) {
+      return res.status(404).json({
+        status: 'error',
+        message: `DEX '${dex}' is not supported`
+      });
+    }
+    
+    // Get pool info
+    const poolInfo = await adapter.getPoolInfo(poolId);
+    
+    res.json({
+      dex,
+      poolId,
+      ...poolInfo,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error fetching pool info for ${req.params.dex}/${req.params.poolId}:`, error);
+    res.status(500).json({
+      status: 'error',
+      message: `Failed to fetch pool info for ${req.params.dex}/${req.params.poolId}`,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/dex/arbitrage/:pair', async (req, res) => {
+  try {
+    const { pair } = req.params;
+    const minProfitPct = parseFloat(req.query.minProfit as string) || 1.0;
+    
+    const dexService = await importDexService();
+    
+    // Find arbitrage opportunities
+    const opportunities = await dexService.findArbitrageOpportunities(pair, minProfitPct);
+    
+    res.json({
+      pair,
+      opportunities,
+      count: opportunities.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error finding arbitrage opportunities for ${req.params.pair}:`, error);
+    res.status(500).json({
+      status: 'error',
+      message: `Failed to find arbitrage opportunities for ${req.params.pair}`,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Learning insights routes
 router.get('/api/insights', async (req, res) => {
   try {
@@ -2698,6 +2953,454 @@ router.get('/api/ai/market-pattern-analysis/:pair', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to generate market pattern analysis',
       message: error.message
+    });
+  }
+});
+
+// Get AI token fundamental analysis 
+router.get('/api/ai/token-analysis/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Missing token parameter' });
+    }
+    
+    logger.info(`Processing token analysis request for ${token}`);
+
+    // Check if we should use mock data for faster testing
+    const useMockData = req.query.mock === 'true' || process.env.USE_MOCK_DATA === 'true';
+    
+    if (useMockData) {
+      logger.info(`Using mock data for token analysis of ${token}`);
+      
+      // Return mock analysis based on token
+      let mockAnalysis;
+      
+      if (token.toUpperCase() === 'SOL') {
+        mockAnalysis = {
+          token_info: {
+            name: "Solana",
+            symbol: "SOL",
+            category: "layer 1 blockchain",
+            blockchain: "Solana",
+            contract_security: "native token",
+            age: "launched in April 2020"
+          },
+          tokenomics: {
+            total_supply: "569,537,769 SOL",
+            circulating_supply: "approximately 425 million SOL",
+            distribution: {
+              team: "12.5%",
+              investors: "37.5%",
+              community: "40%",
+              other: "10%"
+            },
+            inflation_rate: "approximately 8% annually, decreasing over time",
+            burn_mechanisms: "transaction fee burning"
+          },
+          market_position: {
+            market_cap: "$73.3 billion",
+            rank: "5",
+            liquidity: "very high",
+            trading_volume_trend: "increasing"
+          },
+          community_and_social: {
+            community_strength: "very strong and growing",
+            social_sentiment: "positive",
+            social_volume: "high",
+            developer_activity: "high"
+          },
+          use_case_and_utility: {
+            primary_use_case: "high-performance Layer 1 blockchain platform",
+            real_world_applications: "DeFi, NFTs, Web3 gaming, high-frequency trading",
+            adoption_metrics: "growing ecosystem with thousands of applications"
+          },
+          risk_assessment: {
+            overall_risk: "medium",
+            specific_risks: [
+              "competition from other Layer 1 blockchains",
+              "technical challenges related to scaling and decentralization",
+              "regulatory uncertainty"
+            ],
+            regulatory_concerns: "similar to other major cryptocurrencies"
+          },
+          investment_outlook: {
+            short_term: "positive",
+            long_term: "positive",
+            key_catalysts: [
+              "increasing institutional adoption",
+              "ecosystem growth",
+              "technical improvements and upgrades"
+            ],
+            key_risks: [
+              "overall crypto market volatility",
+              "competition from other Layer 1 blockchains",
+              "potential regulatory changes"
+            ]
+          }
+        };
+      } else if (token.toUpperCase() === 'BONK') {
+        mockAnalysis = {
+          token_info: {
+            name: "Bonk",
+            symbol: "BONK",
+            category: "meme",
+            blockchain: "Solana",
+            contract_security: "audited",
+            age: "launched in December 2022"
+          },
+          tokenomics: {
+            total_supply: "100 trillion BONK",
+            circulating_supply: "approximately 59.5 trillion BONK",
+            distribution: {
+              team: "5%",
+              investors: "0%",
+              community: "85%",
+              other: "10%"
+            },
+            inflation_rate: "no further inflation",
+            burn_mechanisms: "community-led burns and utility burns"
+          },
+          market_position: {
+            market_cap: "approximately $1.4 billion",
+            rank: "80-100 range",
+            liquidity: "high for a meme token",
+            trading_volume_trend: "fluctuating, tied to market sentiment"
+          },
+          community_and_social: {
+            community_strength: "very strong and active",
+            social_sentiment: "positive",
+            social_volume: "high",
+            developer_activity: "moderate"
+          },
+          use_case_and_utility: {
+            primary_use_case: "Solana ecosystem meme token with growing utility",
+            real_world_applications: "tipping, gaming, staking, merchandise",
+            adoption_metrics: "significant adoption within Solana ecosystem"
+          },
+          risk_assessment: {
+            overall_risk: "high",
+            specific_risks: [
+              "high volatility due to meme coin status",
+              "competition from other meme coins",
+              "potentially limited long-term value proposition"
+            ],
+            regulatory_concerns: "potential regulatory scrutiny of meme coins"
+          },
+          investment_outlook: {
+            short_term: "volatile but potential for gains",
+            long_term: "uncertain",
+            key_catalysts: [
+              "increasing utility implementation",
+              "Solana ecosystem growth",
+              "viral marketing and community expansion"
+            ],
+            key_risks: [
+              "market sentiment shifts",
+              "new competing meme coins",
+              "regulatory actions against meme coins"
+            ]
+          }
+        };
+      } else if (token.toUpperCase() === 'JUP') {
+        mockAnalysis = {
+          token_info: {
+            name: "Jupiter",
+            symbol: "JUP",
+            category: "defi",
+            blockchain: "Solana",
+            contract_security: "audited",
+            age: "launched in January 2024"
+          },
+          tokenomics: {
+            total_supply: "10 billion JUP",
+            circulating_supply: "approximately 1.3 billion JUP",
+            distribution: {
+              team: "20%",
+              investors: "15%",
+              community: "40%",
+              other: "25%"
+            },
+            inflation_rate: "locked with vesting schedules",
+            burn_mechanisms: "potential for fee-based burns"
+          },
+          market_position: {
+            market_cap: "approximately $1.8 billion",
+            rank: "60-70 range",
+            liquidity: "high",
+            trading_volume_trend: "stable to increasing"
+          },
+          community_and_social: {
+            community_strength: "strong and growing",
+            social_sentiment: "positive",
+            social_volume: "medium to high",
+            developer_activity: "high"
+          },
+          use_case_and_utility: {
+            primary_use_case: "governance and utility token for Jupiter DEX",
+            real_world_applications: "governance, fee sharing, trading incentives",
+            adoption_metrics: "strong adoption due to Jupiter's dominant position"
+          },
+          risk_assessment: {
+            overall_risk: "medium",
+            specific_risks: [
+              "competition from other DEX aggregators",
+              "dependence on Solana ecosystem health",
+              "regulatory uncertainty around DeFi"
+            ],
+            regulatory_concerns: "potential DeFi-specific regulations"
+          },
+          investment_outlook: {
+            short_term: "positive",
+            long_term: "positive",
+            key_catalysts: [
+              "Jupiter's dominant market position in Solana",
+              "new product launches",
+              "potential revenue sharing implementation"
+            ],
+            key_risks: [
+              "DEX competition",
+              "Solana ecosystem risks",
+              "broader crypto market volatility"
+            ]
+          }
+        };
+      } else {
+        // Generic analysis for other tokens
+        mockAnalysis = {
+          token_info: {
+            name: token.toUpperCase(),
+            symbol: token.toUpperCase(),
+            category: "unknown",
+            blockchain: "likely Solana",
+            contract_security: "unknown",
+            age: "unknown"
+          },
+          tokenomics: {
+            total_supply: "unknown",
+            circulating_supply: "unknown",
+            distribution: {
+              team: "unknown",
+              investors: "unknown",
+              community: "unknown",
+              other: "unknown"
+            },
+            inflation_rate: "unknown",
+            burn_mechanisms: "unknown"
+          },
+          market_position: {
+            market_cap: "unknown",
+            rank: "unknown",
+            liquidity: "unknown",
+            trading_volume_trend: "unknown"
+          },
+          community_and_social: {
+            community_strength: "unknown",
+            social_sentiment: "unknown",
+            social_volume: "unknown",
+            developer_activity: "unknown"
+          },
+          use_case_and_utility: {
+            primary_use_case: "unknown",
+            real_world_applications: "unknown",
+            adoption_metrics: "unknown"
+          },
+          risk_assessment: {
+            overall_risk: "high",
+            specific_risks: [
+              "insufficient information available",
+              "potential low liquidity",
+              "unknown project fundamentals"
+            ],
+            regulatory_concerns: "unknown"
+          },
+          investment_outlook: {
+            short_term: "uncertain",
+            long_term: "uncertain",
+            key_catalysts: [
+              "unknown"
+            ],
+            key_risks: [
+              "insufficient information",
+              "potentially low liquidity",
+              "unknown development status"
+            ]
+          }
+        };
+      }
+      
+      return res.json({
+        success: true,
+        token,
+        tokenAnalysis: mockAnalysis,
+        timestamp: new Date().toISOString(),
+        source: "mock_data"
+      });
+    }
+    
+    // Continue with real Perplexity API call
+    const perplexityService = getPerplexityService();
+    
+    if (!perplexityService.isAvailable()) {
+      logger.warn('Perplexity AI service not available - PERPLEXITY_API_KEY may not be set');
+      return res.status(503).json({ 
+        error: 'Perplexity AI service not initialized',
+        message: 'Make sure the PERPLEXITY_API_KEY is set'
+      });
+    }
+    
+    // Set a timeout for the entire operation
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Token analysis operation timed out'));
+      }, 25000); // 25 second timeout
+    });
+    
+    // Generate token analysis using Perplexity AI with timeout
+    const analysisPromise = perplexityService.analyzeTokenFundamentals(token);
+    
+    // Race between the analysis and the timeout
+    const tokenAnalysis = await Promise.race([
+      analysisPromise,
+      timeoutPromise
+    ]);
+    
+    // Return the analysis
+    res.json({
+      success: true,
+      token,
+      tokenAnalysis,
+      timestamp: new Date().toISOString(),
+      source: "perplexity_api"
+    });
+  } catch (error: any) {
+    logger.error(`Error in /ai/token-analysis/${req.params.token}:`, error);
+    
+    // Provide a basic response structure even when the API fails
+    res.status(200).json({ 
+      success: false,
+      token: req.params.token,
+      tokenAnalysis: {
+        error: 'AI service temporarily unavailable',
+        message: error.message,
+        fallback_data: {
+          token_info: {
+            name: req.params.token,
+            symbol: req.params.token
+          },
+          tokenomics: {
+            note: "AI analysis currently unavailable - please try again later"
+          },
+          market_position: {
+            note: "Market data temporarily unavailable"
+          },
+          community_and_social: {
+            note: "Social analysis temporarily unavailable"
+          },
+          use_case_and_utility: {
+            note: "Utility analysis temporarily unavailable"
+          },
+          risk_assessment: {
+            note: "Risk assessment temporarily unavailable"
+          },
+          investment_outlook: {
+            note: "Investment outlook temporarily unavailable"
+          }
+        }
+      },
+      timestamp: new Date().toISOString(),
+      source: "error_fallback"
+    });
+  }
+});
+
+// Generate AI strategy recommendations based on signals
+router.post('/api/ai/strategy-recommendations', async (req, res) => {
+  try {
+    const { signals } = req.body;
+    
+    if (!signals || !Array.isArray(signals) || signals.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid signals parameter' });
+    }
+    
+    logger.info(`Processing strategy recommendations request with ${signals.length} signals`);
+    
+    // Get Perplexity service
+    const perplexityService = getPerplexityService();
+    
+    if (!perplexityService.isAvailable()) {
+      logger.warn('Perplexity AI service not available - PERPLEXITY_API_KEY may not be set');
+      return res.status(503).json({ 
+        error: 'Perplexity AI service not initialized',
+        message: 'Make sure the PERPLEXITY_API_KEY is set'
+      });
+    }
+    
+    // Set a timeout for the entire operation
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Strategy recommendations operation timed out'));
+      }, 25000); // 25 second timeout
+    });
+    
+    // Generate strategy recommendations using Perplexity AI with timeout
+    const recommendationsPromise = perplexityService.generateStrategyRecommendations(signals);
+    
+    // Race between the analysis and the timeout
+    const strategyRecommendations = await Promise.race([
+      recommendationsPromise,
+      timeoutPromise
+    ]);
+    
+    // Return the recommendations
+    res.json({
+      success: true,
+      strategyRecommendations,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('Error in /ai/strategy-recommendations:', error);
+    
+    // Provide a basic response structure even when the API fails
+    res.status(200).json({ 
+      success: false,
+      strategyRecommendations: {
+        error: 'AI service temporarily unavailable',
+        message: error.message,
+        fallback_data: {
+          strategy_recommendations: [
+            {
+              name: "Basic trend following",
+              description: "Generic strategy based on detected signals",
+              signal_correlation: 65,
+              recommended_pairs: signals.map(s => s.pair || "SOL/USDC"),
+              execution_parameters: {
+                entry_conditions: "AI analysis temporarily unavailable - please try again later",
+                exit_conditions: "AI analysis temporarily unavailable - please try again later",
+                position_sizing: "AI analysis temporarily unavailable - please try again later",
+                risk_management: "AI analysis temporarily unavailable - please try again later"
+              },
+              expected_performance: {
+                win_rate: 50,
+                risk_reward: 1.5,
+                expected_return: 10
+              },
+              confidence: 50
+            }
+          ],
+          market_conditions: {
+            assessment: "AI analysis temporarily unavailable - please try again later",
+            volatility: "medium",
+            liquidity: "medium"
+          },
+          risk_assessment: {
+            overall_risk: "medium",
+            specific_risks: ["AI analysis temporarily unavailable - please try again later"]
+          }
+        }
+      },
+      timestamp: new Date().toISOString()
     });
   }
 });

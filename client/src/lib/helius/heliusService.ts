@@ -13,13 +13,17 @@ export class HeliusService {
   private webhookUrl: string | null = null;
   
   private constructor() {
+    // Try to get the API key from multiple places
     this.apiKey = import.meta.env.VITE_HELIUS_API_KEY || process.env.HELIUS_API_KEY || '';
-    this.rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${this.apiKey}`;
     
-    if (!this.apiKey) {
-      console.warn('Helius API key not found. Enhanced RPC capabilities will not be available.');
-    } else {
+    // Only set RPC URL if we have a valid API key
+    if (this.apiKey && this.apiKey.length > 10) {
+      this.rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${this.apiKey}`;
       this.initializeConnection();
+    } else {
+      this.apiKey = '';
+      this.rpcUrl = '';
+      console.warn('Helius API key not found or invalid. Enhanced RPC capabilities will not be available.');
     }
   }
   
