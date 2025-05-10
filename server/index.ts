@@ -7,6 +7,8 @@ import routes, { setupWebSocketServer } from './routes';
 import storage from './storage';
 import { logger } from './logger';
 import net from 'net';
+import { createServer as createViteServer } from 'vite';
+import * as fs from 'fs';
 
 const app = express();
 const DEFAULT_PORT = 5000;
@@ -53,43 +55,12 @@ app.use(express.urlencoded({ extended: true }));
 // API routes - register with '/api' prefix
 app.use('/api', routes);
 
-// Add a root endpoint
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Solana Quantum Trading Platform</title>
-        <style>
-          body { font-family: Arial, sans-serif; background: #0f172a; color: white; padding: 20px; }
-          h1 { color: #38bdf8; }
-          .card { background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          button { background: #3b82f6; color: white; border: none; padding: 10px 20px; 
-                  border-radius: 4px; cursor: pointer; }
-          pre { background: #0f172a; padding: 10px; border-radius: 4px; overflow-x: auto; }
-        </style>
-      </head>
-      <body>
-        <h1>Solana Quantum Trading Platform</h1>
-        <div class="card">
-          <h2>Server Status</h2>
-          <p>Server time: ${new Date().toISOString()}</p>
-          <button onclick="fetch('/api/health').then(r=>r.json()).then(d=>{
-            document.getElementById('result').textContent = JSON.stringify(d, null, 2);
-          })">Check API Health</button>
-          <pre id="result"></pre>
-        </div>
-        <div class="card">
-          <h2>Test Data</h2>
-          <button onclick="fetch('/api/test/populate-price-feed', {method:'POST'})
-            .then(r=>r.json()).then(d=>{
-              document.getElementById('test-result').textContent = JSON.stringify(d, null, 2);
-            })">Populate Test Data</button>
-          <pre id="test-result"></pre>
-        </div>
-      </body>
-    </html>
-  `);
+// Root endpoint - serve the React application 
+// Let Vite middleware handle serving the index.html in development
+app.get('/', (req, res, next) => {
+  // We'll let the middleware chain continue so Vite can handle it
+  logger.info(`Serving React app at path: / (letting middleware handle it)`);
+  next();
 });
 
 // Add a health check
@@ -121,17 +92,73 @@ async function startServer() {
     // Find an available port
     const port = await findAvailablePort(preferredPort);
     
-    // Serve static files from the root directory where index.html is located
+    // Set up Vite in development mode - this is critical for our React app
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        // Create Vite server in middleware mode with specific configuration for proper HMR
+        const vite = await createViteServer({
+          server: { 
+            middlewareMode: true,
+            fs: {
+              strict: false, // Allow serving files from outside the root directory
+              allow: [path.join(__dirname, '..')] // Allow serving files from project root
+            },
+            hmr: {
+              server: httpServer,
+              port: port,
+              protocol: 'ws',
+              host: 'localhost',
+              clientPort: port // Ensure client and server use the same port
+            }
+          },
+          root: path.join(__dirname, '../client'),
+          base: '/',
+          appType: 'spa',
+          optimizeDeps: {
+            force: true, // Force dependency optimization
+            entries: [path.join(__dirname, '../client/index.html')]
+          },
+          build: {
+            outDir: path.join(__dirname, '../dist')
+          }
+        });
+        
+        // Use vite's connect instance as middleware (must come before other static files)
+        app.use(vite.middlewares);
+        logger.info('Vite development server middleware initialized with HMR support');
+      } catch (error) {
+        logger.error('Failed to initialize Vite middleware:', error);
+        logger.info('Falling back to static file serving');
+      }
+    }
+    
+    // Serve client assets from public directory
+    logger.info(`Serving client public assets from ${path.join(__dirname, '../client/public')}`);
+    app.use(express.static(path.join(__dirname, '../client/public')));
+    
+    // Serve API documentation and other static files
     logger.info(`Serving static files from ${path.join(__dirname, '..')}`);
     app.use(express.static(path.join(__dirname, '..')));
     
-    // Serve client files 
+    // Serve client src directory for development
     logger.info(`Serving client files from ${path.join(__dirname, '../client')}`);
     app.use('/client', express.static(path.join(__dirname, '../client')));
     
     // Handle all routes for the React app - this needs to come before more specific routes
-    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet'], (req, res) => {
-      res.sendFile(path.join(__dirname, '../client/index.html'));
+    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet'], async (req, res, next) => {
+      try {
+        // Read the index.html from client directory
+        let template = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf-8');
+        
+        // Log the path being accessed
+        logger.info(`Serving React app at path: ${req.path}`);
+        
+        // Return the index.html for client-side routing
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        logger.error(`Error serving React route ${req.path}:`, e);
+        next(e);
+      }
     });
     
     // Create a simple HTML page for testing
@@ -153,15 +180,32 @@ async function startServer() {
     });
     
     // Catch-all route to handle all other React routes
-    app.get('*', (req, res) => {
+    app.get('*', async (req, res, next) => {
       // Only handle paths that look like frontend routes (not API or static assets)
       if (!req.path.startsWith('/api/') && 
           !req.path.includes('.') && 
           req.path !== '/health' && 
           req.path !== '/test-page') {
-        res.sendFile(path.join(__dirname, '../client/index.html'));
+        try {
+          // Read the index.html from client directory
+          let template = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf-8');
+          
+          // Log the path being accessed
+          logger.info(`Serving React app at path: ${req.path}`);
+          
+          // Return the index.html for client-side routing
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        } catch (e) {
+          logger.error(`Error serving React route ${req.path}:`, e);
+          next(e);
+        }
+      } else if (!req.path.startsWith('/api/') && req.path.includes('.')) {
+        // This is likely a static file request that wasn't found
+        logger.warn(`Static file not found: ${req.path}`);
+        res.status(404).send('File not found');
       } else {
         // For any routes not handled, pass to the next middleware (which will 404)
+        logger.warn(`Route not found: ${req.path}`);
         res.status(404).send('Not found');
       }
     });
