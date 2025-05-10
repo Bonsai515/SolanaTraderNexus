@@ -1,357 +1,623 @@
-import { Keypair } from '@solana/web3.js';
-import transactionEngine from '../transactionEngine';
-import walletManager, { AgentType, WalletType } from '../walletManager';
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * Hyperion Flash Arbitrage Agent
- * Specialized in executing zero-capital flash loan arbitrage across DEXs
+ * Hyperion Flash Arbitrage Agent Client
+ *
+ * This module provides a client interface for the Hyperion flash arbitrage agent,
+ * enabling monitoring and control of the agent from the front-end.
  */
-export class HyperionAgent {
-  private id: string;
-  private name: string;
-  private status: AgentStatus;
-  private active: boolean;
-  
-  private wallets: {
-    trading?: string;
-    profit?: string;
-    fee?: string;
-    stealth: string[];
-  };
-  
-  private metrics: {
-    totalExecutions: number;
-    successRate: number;
-    totalProfit: number;
-    lastExecution?: Date;
-  };
-  
-  private lastError?: string;
-  private strategies: Map<string, ArbitrageStrategy>;
-  
-  constructor(name: string) {
-    this.id = uuidv4();
-    this.name = name;
-    this.status = AgentStatus.IDLE;
-    this.active = false;
-    this.wallets = {
-      stealth: []
-    };
-    this.metrics = {
-      totalExecutions: 0,
-      successRate: 0,
-      totalProfit: 0
-    };
-    this.strategies = new Map();
-    
-    // Initialize wallets and strategies
-    this.initialize();
-  }
-  
-  /**
-   * Initialize the agent with required wallets and default strategies
-   */
-  private async initialize() {
-    try {
-      this.status = AgentStatus.INITIALIZING;
-      
-      // Create required wallets
-      this.wallets.trading = walletManager.createAgentWallet(
-        AgentType.HYPERION, 
-        `${this.name} Trading`
-      );
-      
-      this.wallets.profit = walletManager.createAgentWallet(
-        AgentType.HYPERION, 
-        `${this.name} Profit`
-      );
-      
-      this.wallets.fee = walletManager.createAgentWallet(
-        AgentType.HYPERION, 
-        `${this.name} Fee`
-      );
-      
-      // Create stealth wallets
-      for (let i = 0; i < 3; i++) {
-        const stealthAddress = walletManager.createWallet(
-          `${this.name} Stealth ${i+1}`,
-          WalletType.STEALTH
-        );
-        this.wallets.stealth.push(stealthAddress);
-      }
-      
-      // Create default strategies
-      this.addStrategy({
-        id: uuidv4(),
-        name: 'Raydium-Orca USDC-SOL Arbitrage',
-        description: 'Flash arbitrage between Raydium and Orca USDC-SOL pools',
-        dexPath: [
-          { dex: 'raydium', poolId: 'usdc-sol-raydium-pool' },
-          { dex: 'orca', poolId: 'usdc-sol-orca-pool' }
-        ],
-        minProfitThreshold: 0.05, // 5% profit threshold
-        maxCapitalAtRisk: 100,    // Max $100 at risk
-        active: false,
-        executionCount: 0,
-        successCount: 0,
-        totalProfit: 0,
-        lastExecutionTime: undefined
-      });
-      
-      this.status = AgentStatus.IDLE;
-    } catch (error) {
-      this.status = AgentStatus.ERROR;
-      this.lastError = error instanceof Error ? error.message : 'Unknown initialization error';
-      console.error('Failed to initialize Hyperion agent:', error);
-    }
-  }
-  
-  /**
-   * Get agent state
-   */
-  getState() {
-    return {
-      id: this.id,
-      name: this.name,
-      type: AgentType.HYPERION,
-      status: this.status,
-      active: this.active,
-      wallets: this.wallets,
-      metrics: this.metrics,
-      lastError: this.lastError
-    };
-  }
-  
-  /**
-   * Activate the agent
-   */
-  activate() {
-    this.active = true;
-    return this.active;
-  }
-  
-  /**
-   * Deactivate the agent
-   */
-  deactivate() {
-    this.active = false;
-    return this.active;
-  }
-  
-  /**
-   * Add a new arbitrage strategy
-   */
-  addStrategy(strategy: ArbitrageStrategy) {
-    this.strategies.set(strategy.id, strategy);
-  }
-  
-  /**
-   * Get all strategies
-   */
-  getStrategies() {
-    return Array.from(this.strategies.values());
-  }
-  
-  /**
-   * Toggle a strategy's active status
-   */
-  toggleStrategy(strategyId: string) {
-    const strategy = this.strategies.get(strategyId);
-    
-    if (!strategy) {
-      throw new Error(`Strategy not found: ${strategyId}`);
-    }
-    
-    strategy.active = !strategy.active;
-    return strategy;
-  }
-  
-  /**
-   * Execute an arbitrage strategy
-   * Implements the flash loan arbitrage architecture from the document
-   */
-  async executeStrategy(strategyId: string): Promise<ExecutionResult> {
-    try {
-      const strategy = this.strategies.get(strategyId);
-      
-      if (!strategy) {
-        throw new Error(`Strategy not found: ${strategyId}`);
-      }
-      
-      if (!this.active) {
-        throw new Error('Agent is not active');
-      }
-      
-      // Update status
-      this.status = AgentStatus.EXECUTING;
-      
-      // Get keypair for execution
-      const randomIndex = Math.floor(Math.random() * this.wallets.stealth.length);
-      const stealthWalletAddress = this.wallets.stealth[randomIndex];
-      const executionKeypair = walletManager.getKeypair(stealthWalletAddress);
-      
-      // Execute the flash arbitrage
-      const result = await transactionEngine.executeFlashArbitrage(
-        executionKeypair,
-        strategy.dexPath,
-        strategy.minProfitThreshold
-      );
-      
-      // Update metrics
-      this.metrics.totalExecutions++;
-      strategy.executionCount++;
-      
-      if (result.success) {
-        this.metrics.totalProfit += result.profit;
-        strategy.totalProfit += result.profit;
-        strategy.successCount++;
-        this.metrics.successRate = 
-          (this.metrics.totalExecutions > 0) ? 
-            (strategy.successCount / this.metrics.totalExecutions) * 100 : 0;
-      }
-      
-      // Update timestamps
-      const now = new Date();
-      this.metrics.lastExecution = now;
-      strategy.lastExecutionTime = now;
-      
-      // Update status
-      this.status = AgentStatus.COOLDOWN;
-      setTimeout(() => {
-        if (this.status === AgentStatus.COOLDOWN) {
-          this.status = AgentStatus.IDLE;
-        }
-      }, 5000);
-      
-      // Return the execution result
-      return {
-        id: uuidv4(),
-        agentId: this.id,
-        success: result.success,
-        profit: result.profit,
-        timestamp: now,
-        strategy: strategy.name,
-        metrics: {
-          executionTimeMs: 0, // In a real implementation, we would track this
-          slippage: 0,        // In a real implementation, we would calculate this
-          dexFees: 0          // In a real implementation, we would extract this
-        },
-        signature: result.signature,
-        error: undefined
-      };
-    } catch (error) {
-      // Handle errors
-      this.status = AgentStatus.ERROR;
-      this.lastError = error instanceof Error ? error.message : 'Unknown execution error';
-      
-      return {
-        id: uuidv4(),
-        agentId: this.id,
-        success: false,
-        profit: 0,
-        timestamp: new Date(),
-        strategy: strategyId,
-        metrics: {},
-        signature: undefined,
-        error: this.lastError
-      };
-    }
-  }
-  
-  /**
-   * Scan for profitable arbitrage opportunities
-   */
-  async scanForOpportunities(): Promise<ArbitrageOpportunity[]> {
-    try {
-      if (!this.active) {
-        return [];
-      }
-      
-      this.status = AgentStatus.SCANNING;
-      
-      // In a real implementation, this would scan DEXs for price differences
-      // and identify profitable arbitrage opportunities
-      
-      // For the purpose of this implementation, we'll return a simulated opportunity
-      const opportunity: ArbitrageOpportunity = {
-        id: uuidv4(),
-        dexPath: [
-          { dex: 'raydium', poolId: 'usdc-sol-raydium-pool' },
-          { dex: 'orca', poolId: 'usdc-sol-orca-pool' }
-        ],
-        estimatedProfit: 0.1, // 10% profit
-        confidence: 0.85,     // 85% confidence
-        expirationTime: new Date(Date.now() + 30000) // Expires in 30 seconds
-      };
-      
-      this.status = AgentStatus.IDLE;
-      
-      return [opportunity];
-    } catch (error) {
-      this.status = AgentStatus.ERROR;
-      this.lastError = error instanceof Error ? error.message : 'Unknown scanning error';
-      return [];
-    }
-  }
-}
 
-/**
- * Agent status enum
- */
+import { apiRequest } from '../queryClient';
+import { wsClient } from '../wsClient';
+
+// Agent status
 export enum AgentStatus {
   IDLE = 'idle',
-  INITIALIZING = 'initializing',
   SCANNING = 'scanning',
   EXECUTING = 'executing',
-  COOLDOWN = 'cooldown',
   ERROR = 'error'
 }
 
-/**
- * Arbitrage strategy interface
- */
-export interface ArbitrageStrategy {
+// Agent configuration
+export interface HyperionConfiguration {
+  active: boolean;
+  tradingWallets: string[];
+  maxSlippageBps: number;
+  minProfitThresholdUsd: number;
+  maxPositionSizeUsd: number;
+  targetDexes: string[];
+  tradingPairs: string[];
+  executionSpeed: 'normal' | 'fast' | 'turbo';
+  riskLevel: 'conservative' | 'balanced' | 'aggressive';
+  parallelExecutions: number;
+  useRouteOptimization: boolean;
+  revertOnFailedExecution: boolean;
+  useMEVProtection: boolean;
+  liquiditySourcePriority: Record<string, number>;
+  detectionAlgorithm: 'basic' | 'advanced' | 'quantum';
+  webhookNotifications: boolean;
+  webhookUrl?: string;
+}
+
+// Agent status response
+export interface HyperionStatusResponse {
+  id: string;
+  status: AgentStatus;
+  active: boolean;
+  lastScan: string;
+  lastExecution: string;
+  successRate: number;
+  totalExecutions: number;
+  totalProfit: number;
+  averageExecutionTimeMs: number;
+  activeConnections: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  pendingTransactions: number;
+  detectedOpportunities: number;
+  missedOpportunities: number;
+  currentVersion: string;
+}
+
+// Arbitrage opportunity
+export interface ArbitrageOpportunity {
+  id: string;
+  timestamp: string;
+  pair: string;
+  sourceExchange: string;
+  targetExchange: string;
+  entryPrice: number;
+  exitPrice: number;
+  spread: number;
+  spreadPercentage: number;
+  estimatedProfitUsd: number;
+  estimatedFeeUsd: number;
+  estimatedNetProfitUsd: number;
+  confidence: number;
+  executionTimeMs: number;
+  status: 'detected' | 'executing' | 'completed' | 'failed';
+  routeHops: number;
+  executionPath: string[];
+  riskScore: number;
+  volumeAvailable: number;
+  slippageImpact: number;
+  urgency: 'low' | 'medium' | 'high';
+  successProbability: number;
+  transactionSignature?: string;
+}
+
+// Performance metrics
+export interface PerformanceMetrics {
+  timeframe: string;
+  totalOpportunities: number;
+  executedOpportunities: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+  totalProfit: number;
+  totalFees: number;
+  netProfit: number;
+  averageProfitPerTrade: number;
+  medianProfitPerTrade: number;
+  largestProfit: number;
+  smallestProfit: number;
+  averageExecutionTimeMs: number;
+  successRate: number;
+  profitDistribution: Array<{
+    range: string;
+    count: number;
+    percentage: number;
+  }>;
+  volumeByPair: Record<string, number>;
+  profitByPair: Record<string, number>;
+  profitByExchangePair: Record<string, number>;
+  timeOfDayDistribution: Record<string, number>;
+  weekdayDistribution: Record<string, string>;
+  missedProfit: number;
+  missedOpportunities: number;
+  detectionLatencyMs: {
+    average: number;
+    median: number;
+    p95: number;
+    min: number;
+    max: number;
+  };
+}
+
+// Detection pattern
+export interface DetectionPattern {
   id: string;
   name: string;
   description: string;
-  dexPath: Array<{ dex: string; poolId: string }>;
-  minProfitThreshold: number;
-  maxCapitalAtRisk: number;
+  exchanges: string[];
+  pairs: string[];
+  profitability: 'low' | 'medium' | 'high';
+  frequencyPerDay: number;
+  avgProfitUsd: number;
+  reliabilityScore: number;
+  timeWindowMs: number;
+  volumeRequirement: number;
+  patternSignature: string;
+  firstDetected: string;
+  lastDetected: string;
+  successRate: number;
+  totalDetections: number;
+  totalExecutions: number;
+  totalProfitUsd: number;
   active: boolean;
-  executionCount: number;
-  successCount: number;
-  totalProfit: number;
-  lastExecutionTime?: Date;
 }
 
-/**
- * Arbitrage opportunity interface
- */
-export interface ArbitrageOpportunity {
-  id: string;
-  dexPath: Array<{ dex: string; poolId: string }>;
-  estimatedProfit: number;
-  confidence: number;
-  expirationTime: Date;
-}
-
-/**
- * Execution result interface
- */
-export interface ExecutionResult {
-  id: string;
-  agentId: string;
+// Simulation result
+export interface SimulationResult {
   success: boolean;
-  profit: number;
-  timestamp: Date;
-  strategy: string;
-  metrics: Record<string, number>;
-  signature?: string;
-  error?: string;
+  estimatedProfit: number;
+  estimatedFees: number;
+  netProfit: number;
+  executionPath: string[];
+  executionTimeMs: number;
+  slippageImpact: number;
+  successProbability: number;
 }
 
-// Export a factory function to create HyperionAgent instances
-export function createHyperionAgent(name: string) {
-  return new HyperionAgent(name);
+// Price anomaly
+export interface PriceAnomaly {
+  pair: string;
+  timestamp: string;
+  exchange: string;
+  price: number;
+  percentageDeviation: number;
+  anomalyScore: number;
+  durationMs: number;
+  impactLevel: 'low' | 'medium' | 'high';
+  profitOpportunity: boolean;
+  explanation: string;
 }
+
+// Liquidity analysis
+export interface LiquidityAnalysis {
+  [pair: string]: {
+    pair: string;
+    timestamp: string;
+    exchanges: {
+      [exchange: string]: {
+        exchange: string;
+        buyDepth: number;
+        sellDepth: number;
+        bestBid: number;
+        bestAsk: number;
+        spread: number;
+        slippageMap: Record<string, number>;
+        volumeLast24h: number;
+        liquidityScore: number;
+      };
+    };
+    aggregatedLiquidityScore: number;
+    recommendedMaxPositionSize: number;
+    arbitrageOpportunityScore: number;
+  };
+}
+
+// Algorithm settings
+export interface AlgorithmSettings {
+  algorithm: 'basic' | 'advanced' | 'quantum';
+  parameters: {
+    opportunityThreshold: number;
+    minSpreadPercentage: number;
+    maxExecutionTimeMs: number;
+    riskFactorWeight: number;
+    confidenceThreshold: number;
+    anomalyDetectionSensitivity: number;
+    volumeRequirementMultiplier: number;
+    gasFeeOptimizationLevel: number;
+  };
+  sensitivityLevel: number;
+  thresholdSettings: {
+    minProfitUsd: number;
+    maxSlippageBps: number;
+    minReliabilityScore: number;
+    maxRiskScore: number;
+  };
+  adaptiveParameters: boolean;
+  adaptiveSettings: {
+    enabled: boolean;
+    learningRate: number;
+    historyWindowSize: number;
+    adjustmentFrequency: 'hourly' | 'daily' | 'weekly';
+    maxAdjustmentPercentage: number;
+  };
+  customFilters: {
+    excludeHighVolumeImpact: boolean;
+    excludeLowLiquidityPairs: boolean;
+    preferHigherSuccessProbability: boolean;
+  };
+  neuralModelVersion: string;
+  processingMode: 'serial' | 'parallel';
+  prioritizationRules: {
+    profitAmount: number;
+    executionSpeed: number;
+    successProbability: number;
+    volumeAvailability: number;
+    historicalReliability: number;
+  };
+}
+
+// Manual arbitrage result
+export interface ManualArbitrageResult {
+  success: boolean;
+  transactionSignature: string;
+  entryPrice: number;
+  exitPrice: number;
+  profit: number;
+  fees: number;
+  netProfit: number;
+  executionTimeMs: number;
+}
+
+/**
+ * Hyperion Agent Client
+ */
+class HyperionAgentClient {
+  private static instance: HyperionAgentClient;
+  private baseUrl: string = '/api/agent/hyperion';
+  private opportunityCallbacks: ((opportunity: ArbitrageOpportunity) => void)[] = [];
+  private statusCallbacks: ((status: HyperionStatusResponse) => void)[] = [];
+  
+  private constructor() {
+    this.setupWebSocketHandlers();
+  }
+  
+  /**
+   * Get singleton instance
+   */
+  public static getInstance(): HyperionAgentClient {
+    if (!HyperionAgentClient.instance) {
+      HyperionAgentClient.instance = new HyperionAgentClient();
+    }
+    return HyperionAgentClient.instance;
+  }
+  
+  /**
+   * Set up WebSocket event handlers
+   */
+  private setupWebSocketHandlers(): void {
+    wsClient.onMessage((message) => {
+      try {
+        const data = JSON.parse(message);
+        
+        if (data.type === 'HYPERION_OPPORTUNITY') {
+          this.notifyOpportunityCallbacks(data.data);
+        } else if (data.type === 'HYPERION_STATUS_UPDATE') {
+          this.notifyStatusCallbacks(data.data);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+  }
+  
+  /**
+   * Subscribe to arbitrage opportunity updates
+   * @param callback Function to call with opportunity updates
+   * @returns Object with unsubscribe method
+   */
+  public subscribeToOpportunities(callback: (opportunity: ArbitrageOpportunity) => void): { unsubscribe: () => void } {
+    // Subscribe if this is the first subscription
+    if (this.opportunityCallbacks.length === 0) {
+      wsClient.send({
+        type: 'SUBSCRIBE',
+        channel: 'HYPERION_OPPORTUNITIES'
+      });
+    }
+    
+    this.opportunityCallbacks.push(callback);
+    
+    return {
+      unsubscribe: () => {
+        this.opportunityCallbacks = this.opportunityCallbacks.filter(cb => cb !== callback);
+        
+        // Unsubscribe if this was the last subscription
+        if (this.opportunityCallbacks.length === 0) {
+          wsClient.send({
+            type: 'UNSUBSCRIBE',
+            channel: 'HYPERION_OPPORTUNITIES'
+          });
+        }
+      }
+    };
+  }
+  
+  /**
+   * Subscribe to agent status updates
+   * @param callback Function to call with status updates
+   * @returns Object with unsubscribe method
+   */
+  public subscribeToStatusUpdates(callback: (status: HyperionStatusResponse) => void): { unsubscribe: () => void } {
+    // Subscribe if this is the first subscription
+    if (this.statusCallbacks.length === 0) {
+      wsClient.send({
+        type: 'SUBSCRIBE',
+        channel: 'HYPERION_STATUS'
+      });
+    }
+    
+    this.statusCallbacks.push(callback);
+    
+    return {
+      unsubscribe: () => {
+        this.statusCallbacks = this.statusCallbacks.filter(cb => cb !== callback);
+        
+        // Unsubscribe if this was the last subscription
+        if (this.statusCallbacks.length === 0) {
+          wsClient.send({
+            type: 'UNSUBSCRIBE',
+            channel: 'HYPERION_STATUS'
+          });
+        }
+      }
+    };
+  }
+  
+  /**
+   * Notify all opportunity subscribers
+   * @param opportunity Opportunity data
+   */
+  private notifyOpportunityCallbacks(opportunity: ArbitrageOpportunity): void {
+    this.opportunityCallbacks.forEach(callback => {
+      try {
+        callback(opportunity);
+      } catch (error) {
+        console.error('Error in opportunity callback:', error);
+      }
+    });
+  }
+  
+  /**
+   * Notify all status subscribers
+   * @param status Status data
+   */
+  private notifyStatusCallbacks(status: HyperionStatusResponse): void {
+    this.statusCallbacks.forEach(callback => {
+      try {
+        callback(status);
+      } catch (error) {
+        console.error('Error in status callback:', error);
+      }
+    });
+  }
+  
+  /**
+   * Get agent status
+   * @returns Promise resolving to agent status
+   */
+  public async getStatus(): Promise<HyperionStatusResponse> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/status`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting agent status:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get agent configuration
+   * @returns Promise resolving to agent configuration
+   */
+  public async getConfiguration(): Promise<HyperionConfiguration> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/configuration`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting agent configuration:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update agent configuration
+   * @param config Configuration updates
+   * @returns Promise resolving to updated configuration
+   */
+  public async updateConfiguration(config: Partial<HyperionConfiguration>): Promise<HyperionConfiguration> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/configuration`, config);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error updating agent configuration:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Start the agent
+   * @returns Promise resolving to success status
+   */
+  public async start(): Promise<{ status: string; message: string }> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/start`);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error starting agent:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Stop the agent
+   * @returns Promise resolving to success status
+   */
+  public async stop(): Promise<{ status: string; message: string }> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/stop`);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error stopping agent:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get recent opportunities
+   * @param limit Maximum number of opportunities to retrieve
+   * @returns Promise resolving to array of opportunities
+   */
+  public async getRecentOpportunities(limit: number = 10): Promise<ArbitrageOpportunity[]> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/opportunities?limit=${limit}`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting recent opportunities:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get performance metrics
+   * @param timeframe Timeframe for metrics (24h, 7d, 30d, all)
+   * @returns Promise resolving to performance metrics
+   */
+  public async getPerformanceMetrics(timeframe: string = '24h'): Promise<PerformanceMetrics> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/metrics?timeframe=${timeframe}`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting performance metrics:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get detection patterns
+   * @param activeOnly Only return active patterns
+   * @returns Promise resolving to array of detection patterns
+   */
+  public async getDetectionPatterns(activeOnly: boolean = true): Promise<DetectionPattern[]> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/patterns?active=${activeOnly}`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting detection patterns:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Run arbitrage simulation
+   * @param params Simulation parameters
+   * @returns Promise resolving to simulation results
+   */
+  public async runSimulation(params: {
+    pair: string;
+    amount: number;
+    sourceExchange: string;
+    targetExchange: string;
+    executionSpeed?: 'normal' | 'fast' | 'turbo';
+  }): Promise<SimulationResult> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/simulate`, params);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error running simulation:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get price anomalies
+   * @param days Number of days to look back
+   * @returns Promise resolving to array of price anomalies
+   */
+  public async getPriceAnomalies(days: number = 7): Promise<PriceAnomaly[]> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/anomalies?days=${days}`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting price anomalies:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get liquidity analysis
+   * @param pairs Array of trading pairs to analyze
+   * @returns Promise resolving to liquidity analysis
+   */
+  public async getLiquidityAnalysis(pairs: string[]): Promise<LiquidityAnalysis> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/liquidity-analysis`, { pairs });
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting liquidity analysis:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get algorithm settings
+   * @returns Promise resolving to algorithm settings
+   */
+  public async getAlgorithmSettings(): Promise<AlgorithmSettings> {
+    try {
+      const response = await apiRequest('GET', `${this.baseUrl}/algorithm-settings`);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error getting algorithm settings:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update algorithm settings
+   * @param settings Settings to update
+   * @returns Promise resolving to updated settings
+   */
+  public async updateAlgorithmSettings(settings: Partial<AlgorithmSettings>): Promise<{
+    success: boolean;
+    message: string;
+    updatedSettings: AlgorithmSettings;
+  }> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/algorithm-settings`, settings);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error updating algorithm settings:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Execute manual arbitrage
+   * @param params Manual arbitrage parameters
+   * @returns Promise resolving to execution result
+   */
+  public async executeManualArbitrage(params: {
+    pair: string;
+    amount: number;
+    sourceExchange: string;
+    targetExchange: string;
+    maxSlippageBps?: number;
+    executionSpeed?: 'normal' | 'fast' | 'turbo';
+    wallet?: string;
+  }): Promise<ManualArbitrageResult> {
+    try {
+      const response = await apiRequest('POST', `${this.baseUrl}/execute-manual`, params);
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error executing manual arbitrage:', error);
+      throw error;
+    }
+  }
+}
+
+export const hyperionAgent = HyperionAgentClient.getInstance();

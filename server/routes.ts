@@ -11,6 +11,7 @@ import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, S
 import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
 import { getPerplexityService } from './ai/perplexityService';
+import { crossChainRouter } from './wormhole/crossChainRouter';
 import { 
   getAllDexes, 
   getDexInfo, 
