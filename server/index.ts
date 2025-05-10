@@ -145,7 +145,7 @@ async function startServer() {
     app.use('/client', express.static(path.join(__dirname, '../client')));
     
     // Handle all routes for the React app - this needs to come before more specific routes
-    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet'], async (req, res, next) => {
+    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet', '/ws-test'], async (req, res, next) => {
       try {
         // Read the index.html from client directory
         let template = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf-8');
