@@ -41,30 +41,48 @@ export default function Trading() {
     enabled: wsMarketData.length === 0,
   });
 
+  // Function to fetch signals from the API
+  const fetchSignals = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['/api/signals'] });
+  };
+
+  // Function to fetch transactions from the API
+  const fetchTransactions = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+  };
+
   // Combine WebSocket and API data
-  const signals = wsSignals.length > 0 
-    ? wsSignals.map(msg => msg.data) 
-    : apiSignals || [];
+  const signals = Array.isArray(wsSignals) && wsSignals.length > 0 
+    ? wsSignals.map((msg: any) => msg.data) 
+    : (apiSignals || []);
     
-  const transactions = wsTransactions.length > 0 
-    ? wsTransactions.map(msg => msg.data) 
-    : apiTransactions || [];
+  const transactions = Array.isArray(wsTransactions) && wsTransactions.length > 0 
+    ? wsTransactions.map((msg: any) => msg.data) 
+    : (apiTransactions || []);
   
   // Extract market data for the selected pair
   const getPairMarketData = (pair: string) => {
     // First try to get data from WebSocket
-    const wsData = wsMarketData.find(msg => 
+    const wsData = Array.isArray(wsMarketData) ? wsMarketData.find((msg: any) => 
       msg.data?.pair === pair || 
       (msg.data?.pairs && msg.data.pairs[pair])
-    );
+    ) : null;
     
     if (wsData?.data) {
       return wsData.data.pairs ? wsData.data.pairs[pair] : wsData.data;
     }
     
     // Fall back to API data if available
-    if (apiMarketData?.data?.pairData && apiMarketData.data.pairData[pair]) {
-      return apiMarketData.data.pairData[pair];
+    if (apiMarketData && 
+        typeof apiMarketData === 'object' && 
+        'data' in apiMarketData && 
+        apiMarketData.data && 
+        typeof apiMarketData.data === 'object' && 
+        'pairData' in apiMarketData.data && 
+        apiMarketData.data.pairData && 
+        typeof apiMarketData.data.pairData === 'object' &&
+        pair in (apiMarketData.data.pairData as Record<string, any>)) {
+      return (apiMarketData.data.pairData as Record<string, any>)[pair];
     }
     
     // Return empty data structure if nothing is available
@@ -696,17 +714,44 @@ export default function Trading() {
       {/* Signals Tab */}
       {activeTab === 'signals' && (
         <div className="bg-card rounded-lg shadow-md p-6 border border-border">
-          <h2 className="text-xl font-semibold mb-4">Trading Signals</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Trading Signals</h2>
+            <div className="flex gap-2">
+              <select 
+                className="px-2 py-1 rounded-md border border-border text-sm bg-background"
+                onChange={(e) => {
+                  // Filter signals by pair if implemented
+                }}
+              >
+                <option value="all">All Pairs</option>
+                <option value="SOL/USDC">SOL/USDC</option>
+                <option value="BONK/USDC">BONK/USDC</option>
+                <option value="JUP/USDC">JUP/USDC</option>
+              </select>
+              <button 
+                className="text-xs flex items-center gap-1 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                onClick={() => fetchSignals()}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
           
           {loadingSignals ? (
-            <div className="text-center py-4">Loading signals...</div>
-          ) : signals?.length > 0 ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          ) : (Array.isArray(signals) && signals.length > 0) ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="text-left py-2 px-4">Source</th>
                     <th className="text-left py-2 px-4">Pair</th>
-                    <th className="text-left py-2 px-4">Type</th>
+                    <th className="text-left py-2 px-4">Signal</th>
                     <th className="text-left py-2 px-4">Strength</th>
                     <th className="text-left py-2 px-4">Price</th>
                     <th className="text-left py-2 px-4">Time</th>
@@ -714,31 +759,114 @@ export default function Trading() {
                   </tr>
                 </thead>
                 <tbody>
-                  {signals.map(signal => (
-                    <tr key={signal.id} className="border-b border-border hover:bg-accent/20">
-                      <td className="py-3 px-4">{signal.pair}</td>
+                  {Array.isArray(signals) && signals.map((signal: any) => (
+                    <tr key={signal.id} className="border-b border-border hover:bg-accent/10 transition-colors">
                       <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                          signal.type === 'BUY' ? 'bg-success/20 text-success' : 
-                          signal.type === 'SELL' ? 'bg-destructive/20 text-destructive' : 
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {signal.type}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {signal.source === 'hyperion' ? (
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          ) : signal.source === 'quantum_omega' ? (
+                            <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                          ) : signal.source === 'transformer' ? (
+                            <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                          ) : (
+                            <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                          )}
+                          <span className="font-medium text-sm capitalize">
+                            {signal.source || 'System'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-3 px-4">{signal.strength}</td>
-                      <td className="py-3 px-4">{signal.price}</td>
+                      <td className="py-3 px-4 font-medium">{signal.pair}</td>
                       <td className="py-3 px-4">
-                        {new Date(signal.created_at).toLocaleTimeString()}
+                        <div className="flex gap-1.5 items-center">
+                          {signal.type === 'BUY' ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            signal.type === 'BUY' ? 'bg-success/20 text-success' : 
+                            signal.type === 'SELL' ? 'bg-destructive/20 text-destructive' : 
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {signal.type}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3 px-4">
-                        <button
-                          className="text-sm px-2 py-1 bg-primary text-primary-foreground rounded"
-                          onClick={() => executeSignal(signal.id)}
-                          disabled={signal.executed}
-                        >
-                          {signal.executed ? 'Executed' : 'Execute'}
-                        </button>
+                        <div className="flex gap-1 items-center">
+                          {/* Visual representation of signal strength */}
+                          {Array.from({ length: parseInt(signal.strength) || 1 }).map((_, i) => (
+                            <span key={i} className={`inline-block w-1.5 h-4 rounded-sm ${
+                              signal.strength >= 3 ? 'bg-success' :
+                              signal.strength >= 2 ? 'bg-amber-500' : 'bg-gray-400'
+                            }`}></span>
+                          ))}
+                          <span className="ml-1 text-sm">{signal.strength}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono">${parseFloat(signal.price).toFixed(4)}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          {signal.created_at && (
+                            <>
+                              <span className="text-xs">{new Date(signal.created_at).toLocaleTimeString()}</span>
+                              <span className="text-xs text-muted-foreground">{new Date(signal.created_at).toLocaleDateString()}</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-2">
+                          <button 
+                            className={`text-xs flex items-center gap-1 px-3 py-1.5 ${
+                              signal.executed 
+                                ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                                : 'bg-primary/90 hover:bg-primary text-white'
+                            } rounded-md transition-colors`}
+                            onClick={() => executeSignal(signal.id)}
+                            disabled={signal.executed}
+                          >
+                            {signal.executed ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                Executed
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+                                </svg>
+                                Execute
+                              </>
+                            )}
+                          </button>
+                          {!signal.executed && (
+                            <button 
+                              className="text-xs flex items-center gap-1 px-2 py-1.5 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                              onClick={() => {
+                                // Pre-fill trade form with signal data
+                                setSelectedPair(signal.pair);
+                                setTradeType(signal.type.toLowerCase());
+                                setAmount(signal.amount || '');
+                                setPrice(signal.price || '');
+                                setActiveTab('trade');
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -746,7 +874,22 @@ export default function Trading() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-4 text-muted-foreground">No signals available</div>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-4 text-muted" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <p className="text-lg font-medium">No trading signals available</p>
+              <p className="text-sm">Signals will appear here when detected by transformers</p>
+              <button 
+                className="mt-4 text-sm flex items-center gap-1 px-4 py-2 bg-primary/90 hover:bg-primary text-white rounded-md transition-colors"
+                onClick={() => fetchSignals()}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Refresh Signals
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -754,42 +897,186 @@ export default function Trading() {
       {/* Transactions Tab */}
       {activeTab === 'transactions' && (
         <div className="bg-card rounded-lg shadow-md p-6 border border-border">
-          <h2 className="text-xl font-semibold mb-4">Transactions</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Transactions</h2>
+            <div className="flex gap-2">
+              <select 
+                className="px-2 py-1 rounded-md border border-border text-sm bg-background"
+                onChange={(e) => {
+                  // Filter transactions by status
+                }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PENDING">Pending</option>
+                <option value="FAILED">Failed</option>
+              </select>
+              <button 
+                className="text-xs flex items-center gap-1 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                onClick={() => fetchTransactions()}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
           
           {loadingTransactions ? (
-            <div className="text-center py-4">Loading transactions...</div>
-          ) : transactions?.length > 0 ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          ) : (Array.isArray(transactions) && transactions.length > 0) ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 px-4">ID</th>
-                    <th className="text-left py-2 px-4">Type</th>
-                    <th className="text-left py-2 px-4">Pair</th>
-                    <th className="text-left py-2 px-4">Amount</th>
-                    <th className="text-left py-2 px-4">Status</th>
-                    <th className="text-left py-2 px-4">Time</th>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left py-3 px-4">ID / Signature</th>
+                    <th className="text-left py-3 px-4">Type</th>
+                    <th className="text-left py-3 px-4">Pair</th>
+                    <th className="text-left py-3 px-4">Amount</th>
+                    <th className="text-left py-3 px-4">Price</th>
+                    <th className="text-left py-3 px-4">Status</th>
+                    <th className="text-left py-3 px-4">Time</th>
+                    <th className="text-left py-3 px-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map(tx => (
-                    <tr key={tx.id} className="border-b border-border hover:bg-accent/20">
-                      <td className="py-3 px-4 font-mono text-xs">{tx.id.substring(0, 8)}...</td>
-                      <td className="py-3 px-4">{tx.type}</td>
-                      <td className="py-3 px-4">{tx.pair}</td>
-                      <td className="py-3 px-4">{tx.amount}</td>
+                  {Array.isArray(transactions) && transactions.map((tx: any) => (
+                    <tr key={tx.id} className="border-b border-border hover:bg-accent/10 transition-colors">
                       <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs">{tx.id.substring(0, 8)}...</span>
+                          {tx.signature && (
+                            <a 
+                              href={`https://solscan.io/tx/${tx.signature}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-500 hover:underline mt-1 inline-flex items-center gap-1"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                              </svg>
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5">
+                          {tx.type === 'BUY' ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          <span className={`font-medium ${
+                            tx.type === 'BUY' ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {tx.type}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-medium">{tx.pair}</td>
+                      <td className="py-3 px-4 font-mono">
+                        <span>{parseFloat(tx.amount).toFixed(4)}</span>
+                        <span className="text-xs text-muted-foreground ml-1">{tx.pair?.split('/')[0]}</span>
+                      </td>
+                      <td className="py-3 px-4 font-mono">
+                        {tx.price ? (
+                          <span>${parseFloat(tx.price).toFixed(4)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Market</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
                           tx.status === 'CONFIRMED' ? 'bg-success/20 text-success' : 
-                          tx.status === 'PENDING' ? 'bg-warning/20 text-warning' : 
+                          tx.status === 'PENDING' ? 'bg-amber-500/20 text-amber-500' : 
                           tx.status === 'FAILED' ? 'bg-destructive/20 text-destructive' : 
                           'bg-muted text-muted-foreground'
                         }`}>
+                          {tx.status === 'PENDING' && (
+                            <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          )}
+                          {tx.status === 'CONFIRMED' && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          {tx.status === 'FAILED' && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          )}
                           {tx.status}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {new Date(tx.created_at).toLocaleTimeString()}
+                        <div className="flex flex-col">
+                          {tx.created_at && (
+                            <>
+                              <span className="text-xs">{new Date(tx.created_at).toLocaleTimeString()}</span>
+                              <span className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1">
+                          {tx.signature && (
+                            <button 
+                              className="text-xs flex items-center gap-1 px-2 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                              onClick={() => window.open(`https://solscan.io/tx/${tx.signature}`, '_blank')}
+                              title="View on Solscan"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
+                          
+                          {tx.status === 'FAILED' && tx.error && (
+                            <button 
+                              className="text-xs flex items-center gap-1 px-2 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                              onClick={() => alert(`Error: ${tx.error}`)}
+                              title="View Error Details"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-destructive" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
+                          
+                          {tx.status === 'FAILED' && (
+                            <button 
+                              className="text-xs flex items-center gap-1 px-2 py-1 bg-primary/90 hover:bg-primary text-white rounded-md transition-colors"
+                              onClick={() => {
+                                // Pre-fill trade form with transaction data
+                                setSelectedPair(tx.pair);
+                                setTradeType(tx.type.toLowerCase());
+                                setAmount(tx.amount.toString() || '');
+                                if (tx.price) setPrice(tx.price.toString() || '');
+                                setActiveTab('trade');
+                              }}
+                              title="Retry Transaction"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                              </svg>
+                              Retry
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -797,7 +1084,22 @@ export default function Trading() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-4 text-muted-foreground">No transactions available</div>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-4 text-muted" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" />
+              </svg>
+              <p className="text-lg font-medium">No transactions available</p>
+              <p className="text-sm">Your past transactions will appear here</p>
+              <button 
+                className="mt-4 text-sm flex items-center gap-1 px-4 py-2 bg-primary/90 hover:bg-primary text-white rounded-md transition-colors"
+                onClick={() => setActiveTab('trade')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Start Trading
+              </button>
+            </div>
           )}
         </div>
       )}
