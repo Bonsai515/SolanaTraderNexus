@@ -11,6 +11,9 @@ import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, S
 import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
 import { PerplexityService, getPerplexityService } from './ai/perplexityService';
+import { getDeepSeekService } from './ai/deepSeekService';
+import { getNeuralHybridService } from './ai/neuralHybridService';
+import aiRouter from './ai/aiRouter';
 import { crossChainRouter } from './wormhole/crossChainRouter';
 import * as crypto from 'crypto';
 
@@ -2574,6 +2577,9 @@ agentRouter.post('/:id/deactivate', async (req, res) => {
 
 // Register agent routes
 router.use('/agents', agentRouter);
+
+// Mount AI router
+router.use('/ai', aiRouter);
 
 // DEX Service API endpoints
 router.get('/dex/supported', async (req, res) => {

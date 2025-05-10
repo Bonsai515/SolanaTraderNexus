@@ -1,401 +1,419 @@
 /**
- * AI Router
- * 
- * This module provides API routes for accessing the Neural Hybrid System's
- * AI capabilities, including market insights, strategy enhancement, and code generation.
+ * AI Router - Handles AI-related API routes
  */
 
 import express from 'express';
 import { logger } from '../logger';
-import { Strategy, TradingSignal, Transaction } from '@shared/schema';
+import { getPerplexityService } from './perplexityService';
+import { getDeepSeekService } from './deepSeekService';
+import { getNeuralHybridService } from './neuralHybridService';
 import { priceFeedCache } from '../priceFeedCache';
-import { storage } from '../storage';
-import { 
-  neuralHybridSystem, 
-  AIProvider, 
-  TaskType, 
-  AIModelCapability 
-} from './neuralHybridSystem';
 
-export const aiRouter = express.Router();
+const router = express.Router();
 
-// Get available AI models and their capabilities
-aiRouter.get('/models', (req, res) => {
-  try {
-    const models = neuralHybridSystem.getModelCapabilities();
-    
-    res.json({
-      status: 'success',
-      models
-    });
-  } catch (error: any) {
-    logger.error('Error getting AI model capabilities:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Error retrieving AI model capabilities',
-      error: error.message
-    });
-  }
+// Check AI services status
+router.get('/status', (req, res) => {
+  const perplexityService = getPerplexityService();
+  const deepSeekService = getDeepSeekService();
+  const neuralHybridService = getNeuralHybridService();
+  
+  res.json({
+    status: 'operational',
+    services: {
+      perplexity: {
+        available: perplexityService.isAvailable(),
+        status: perplexityService.isAvailable() ? 'operational' : 'unavailable'
+      },
+      deepseek: {
+        available: deepSeekService.isAvailable(),
+        status: deepSeekService.isAvailable() ? 'operational' : 'unavailable'
+      },
+      neural_hybrid: {
+        available: neuralHybridService.isAvailable(),
+        status: neuralHybridService.isAvailable() ? 'operational' : 'unavailable'
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Generate market insights
-aiRouter.post('/market-insights', async (req, res) => {
+// Generate market insights using Perplexity
+router.post('/market-insights', async (req, res) => {
   try {
-    const { pair, provider } = req.body;
+    const { pair } = req.body;
     
     if (!pair) {
-      return res.status(400).json({
+      res.status(400).json({
         status: 'error',
         message: 'Missing required parameter: pair'
       });
+      return;
+    }
+    
+    const perplexityService = getPerplexityService();
+    
+    if (!perplexityService.isAvailable()) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Perplexity AI service is not available'
+      });
+      return;
     }
     
     // Get market data from cache
     const marketData = priceFeedCache.getMarketData(pair);
+    
     if (!marketData) {
-      return res.status(404).json({
+      res.status(404).json({
         status: 'error',
-        message: `No market data available for: ${pair}`
+        message: `No market data found for pair: ${pair}`
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
+    // Ensure we have current price and 24h stats
+    const latestPrice = marketData.prices[marketData.prices.length - 1][1];
     
-    // Generate insights
-    const result = await neuralHybridSystem.generateMarketInsights(marketData, aiProvider);
+    // Prepare market data with required fields
+    const enhancedMarketData = {
+      ...marketData,
+      currentPrice: latestPrice,
+      volume24h: marketData.volumes && marketData.volumes.length > 0 
+        ? marketData.volumes[marketData.volumes.length - 1][1] : 0,
+      priceChange24h: 0, // Calculate if time series has enough data
+      priceChangePct24h: 0,
+      highPrice24h: latestPrice * 1.05, // Estimate if not available
+      lowPrice24h: latestPrice * 0.95, // Estimate if not available
+      source: marketData.source || 'price-feed-cache',
+      lastUpdated: marketData.prices[marketData.prices.length - 1][0]
+    };
+    
+    // Calculate price change if we have enough data
+    if (marketData.prices.length > 24) {
+      const prevDayPrice = marketData.prices[marketData.prices.length - 25][1];
+      enhancedMarketData.priceChange24h = latestPrice - prevDayPrice;
+      enhancedMarketData.priceChangePct24h = (enhancedMarketData.priceChange24h / prevDayPrice) * 100;
+    }
+    
+    // Get insights from Perplexity
+    logger.info(`Generating market insights for ${pair}...`);
+    const insights = await perplexityService.generateMarketInsights(pair, enhancedMarketData);
     
     res.json({
       status: 'success',
-      insights: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      pair,
+      insights,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error generating market insights with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error generating market insights:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error generating market insights with AI',
-      error: error.message
+      message: 'Error generating market insights',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Enhance trading strategy
-aiRouter.post('/enhance-strategy', async (req, res) => {
+// Pattern recognition using DeepSeek
+router.post('/pattern-recognition', async (req, res) => {
   try {
-    const { strategyId, provider } = req.body;
+    const { pair } = req.body;
     
-    if (!strategyId) {
-      return res.status(400).json({
+    if (!pair) {
+      res.status(400).json({
         status: 'error',
-        message: 'Missing required parameter: strategyId'
+        message: 'Missing required parameter: pair'
       });
+      return;
     }
     
-    // Get the strategy
-    const strategy = await storage.getStrategy(strategyId);
-    if (!strategy) {
-      return res.status(404).json({
+    const deepSeekService = getDeepSeekService();
+    
+    if (!deepSeekService.isAvailable()) {
+      res.status(503).json({
         status: 'error',
-        message: `Strategy not found: ${strategyId}`
+        message: 'DeepSeek AI service is not available'
       });
+      return;
     }
     
     // Get market data from cache
-    const marketData = priceFeedCache.getMarketData(strategy.pair);
+    const marketData = priceFeedCache.getMarketData(pair);
+    
     if (!marketData) {
-      return res.status(404).json({
+      res.status(404).json({
         status: 'error',
-        message: `No market data available for: ${strategy.pair}`
+        message: `No market data found for pair: ${pair}`
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
-    
-    // Generate enhancements
-    const result = await neuralHybridSystem.enhanceStrategy(strategy, marketData, aiProvider);
+    // Get pattern recognition from DeepSeek
+    logger.info(`Recognizing patterns for ${pair}...`);
+    const patterns = await deepSeekService.recognizePatterns(pair, marketData);
     
     res.json({
       status: 'success',
-      strategy_id: strategyId,
-      pair: strategy.pair,
-      enhancement: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      pair,
+      patterns,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error enhancing strategy with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error recognizing patterns:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error enhancing strategy with AI',
-      error: error.message
+      message: 'Error recognizing patterns',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Generate implementation code for a strategy
-aiRouter.post('/generate-implementation', async (req, res) => {
+// Generate trading decision using neural hybrid engine
+router.post('/trading-decision', async (req, res) => {
   try {
-    const { strategyId, provider } = req.body;
+    const { pair } = req.body;
     
-    if (!strategyId) {
-      return res.status(400).json({
+    if (!pair) {
+      res.status(400).json({
         status: 'error',
-        message: 'Missing required parameter: strategyId'
+        message: 'Missing required parameter: pair'
       });
+      return;
     }
     
-    // Get the strategy
-    const strategy = await storage.getStrategy(strategyId);
-    if (!strategy) {
-      return res.status(404).json({
+    const neuralHybridService = getNeuralHybridService();
+    
+    if (!neuralHybridService.isAvailable()) {
+      res.status(503).json({
         status: 'error',
-        message: `Strategy not found: ${strategyId}`
+        message: 'Neural Hybrid service is not available'
       });
-    }
-    
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
-    
-    // Generate implementation
-    const result = await neuralHybridSystem.generateStrategyImplementation(strategy, aiProvider);
-    
-    res.json({
-      status: 'success',
-      strategy_id: strategyId,
-      implementation: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
-    });
-  } catch (error: any) {
-    logger.error('Error generating implementation with Neural Hybrid System:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Error generating implementation with AI',
-      error: error.message
-    });
-  }
-});
-
-// Evaluate a trading signal
-aiRouter.post('/evaluate-signal', async (req, res) => {
-  try {
-    const { signalId, provider } = req.body;
-    
-    if (!signalId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameter: signalId'
-      });
-    }
-    
-    // Get the signal
-    const signal = await storage.getSignal(signalId);
-    if (!signal) {
-      return res.status(404).json({
-        status: 'error',
-        message: `Signal not found: ${signalId}`
-      });
+      return;
     }
     
     // Get market data from cache
-    const marketData = priceFeedCache.getMarketData(signal.pair);
+    const marketData = priceFeedCache.getMarketData(pair);
+    
     if (!marketData) {
-      return res.status(404).json({
+      res.status(404).json({
         status: 'error',
-        message: `No market data available for: ${signal.pair}`
+        message: `No market data found for pair: ${pair}`
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
-    
-    // Evaluate signal
-    const result = await neuralHybridSystem.evaluateSignal(signal, marketData, aiProvider);
+    // Generate trading decision
+    logger.info(`Generating trading decision for ${pair}...`);
+    const decision = await neuralHybridService.makeDecision(pair, marketData);
     
     res.json({
       status: 'success',
-      signal_id: signalId,
-      evaluation: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      pair,
+      decision,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error evaluating signal with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error generating trading decision:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error evaluating signal with AI',
-      error: error.message
+      message: 'Error generating trading decision',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Analyze transaction patterns
-aiRouter.post('/analyze-transactions', async (req, res) => {
+// Generate trading strategy
+router.post('/generate-strategy', async (req, res) => {
   try {
-    const { limit, provider } = req.body;
+    const { parameters } = req.body;
     
-    // Get recent transactions
-    const transactions = await storage.getTransactions();
-    
-    // Limit the number of transactions if specified
-    const limitedTransactions = limit && limit > 0 ? 
-      transactions.slice(0, limit) : transactions;
-    
-    if (limitedTransactions.length === 0) {
-      return res.status(404).json({
+    if (!parameters) {
+      res.status(400).json({
         status: 'error',
-        message: 'No transactions found for analysis'
+        message: 'Missing required parameter: parameters'
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
+    const neuralHybridService = getNeuralHybridService();
     
-    // Analyze transactions
-    const result = await neuralHybridSystem.analyzeTransactionPatterns(limitedTransactions, aiProvider);
+    if (!neuralHybridService.isAvailable()) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Neural Hybrid service is not available'
+      });
+      return;
+    }
+    
+    // Generate trading strategy
+    logger.info(`Generating trading strategy with parameters: ${JSON.stringify(parameters)}`);
+    const strategy = await neuralHybridService.createStrategy(parameters);
     
     res.json({
       status: 'success',
-      transaction_count: limitedTransactions.length,
-      analysis: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      strategy,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error analyzing transactions with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error generating trading strategy:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error analyzing transactions with AI',
-      error: error.message
+      message: 'Error generating trading strategy',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Optimize code
-aiRouter.post('/optimize-code', async (req, res) => {
+// Analyze token fundamentals
+router.post('/token-analysis', async (req, res) => {
   try {
-    const { code, requirements, context, provider } = req.body;
+    const { token } = req.body;
     
-    if (!code) {
-      return res.status(400).json({
+    if (!token) {
+      res.status(400).json({
         status: 'error',
-        message: 'Missing required parameter: code'
+        message: 'Missing required parameter: token'
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
+    const perplexityService = getPerplexityService();
     
-    // Optimize code
-    const result = await neuralHybridSystem.optimizeCode(
-      code,
-      requirements || 'Optimize for performance and reliability',
-      context || 'Solana trading platform running on Node.js in production environment',
-      aiProvider
-    );
+    if (!perplexityService.isAvailable()) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Perplexity AI service is not available'
+      });
+      return;
+    }
+    
+    // Analyze token fundamentals
+    logger.info(`Analyzing token fundamentals for ${token}...`);
+    const analysis = await perplexityService.analyzeTokenFundamentals(token);
     
     res.json({
       status: 'success',
-      optimization: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      token,
+      analysis,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error optimizing code with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error analyzing token fundamentals:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error optimizing code with AI',
-      error: error.message
+      message: 'Error analyzing token fundamentals',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Generate diagnostic code
-aiRouter.post('/generate-diagnostic', async (req, res) => {
+// Detect market anomalies
+router.post('/anomaly-detection', async (req, res) => {
   try {
-    const { issue, code, context, provider } = req.body;
+    const { pair } = req.body;
     
-    if (!issue || !code) {
-      return res.status(400).json({
+    if (!pair) {
+      res.status(400).json({
         status: 'error',
-        message: 'Missing required parameters: issue and code'
+        message: 'Missing required parameter: pair'
       });
+      return;
     }
     
-    // Use the specified provider or default
-    const aiProvider = provider ? AIProvider[provider as keyof typeof AIProvider] : undefined;
+    const deepSeekService = getDeepSeekService();
     
-    // Generate diagnostic code
-    const result = await neuralHybridSystem.generateDiagnosticCode(
-      issue,
-      code,
-      context || 'Solana trading platform running on Node.js in production environment',
-      aiProvider
-    );
+    if (!deepSeekService.isAvailable()) {
+      res.status(503).json({
+        status: 'error',
+        message: 'DeepSeek AI service is not available'
+      });
+      return;
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    
+    if (!marketData) {
+      res.status(404).json({
+        status: 'error',
+        message: `No market data found for pair: ${pair}`
+      });
+      return;
+    }
+    
+    // Detect anomalies
+    logger.info(`Detecting anomalies for ${pair}...`);
+    const anomalies = await deepSeekService.detectAnomalies(pair, marketData);
     
     res.json({
       status: 'success',
-      diagnostic: result.result,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence,
-      processingTime: result.processingTime,
-      tokenUsage: result.tokenUsage
+      pair,
+      anomalies,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error generating diagnostic code with Neural Hybrid System:', error);
+  } catch (error) {
+    logger.error('Error detecting anomalies:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error generating diagnostic code with AI',
-      error: error.message
+      message: 'Error detecting anomalies',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// Debug AI models and capabilities
-aiRouter.get('/debug', (req, res) => {
+// Generate quantum strategy
+router.post('/quantum-strategy', async (req, res) => {
   try {
-    const capabilities = neuralHybridSystem.getModelCapabilities();
-    const supportedTasks = Object.values(TaskType).map(task => ({
-      task,
-      supported: neuralHybridSystem.isTaskSupported(task),
-      bestProvider: neuralHybridSystem.getBestProviderForTask(task)
-    }));
+    const { pair, riskTolerance } = req.body;
+    
+    if (!pair) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameter: pair'
+      });
+      return;
+    }
+    
+    const deepSeekService = getDeepSeekService();
+    
+    if (!deepSeekService.isAvailable()) {
+      res.status(503).json({
+        status: 'error',
+        message: 'DeepSeek AI service is not available'
+      });
+      return;
+    }
+    
+    // Get market data from cache
+    const marketData = priceFeedCache.getMarketData(pair);
+    
+    if (!marketData) {
+      res.status(404).json({
+        status: 'error',
+        message: `No market data found for pair: ${pair}`
+      });
+      return;
+    }
+    
+    // Generate quantum strategy
+    logger.info(`Generating quantum strategy for ${pair}...`);
+    const strategy = await deepSeekService.generateQuantumStrategy(pair, marketData, riskTolerance as any);
     
     res.json({
       status: 'success',
-      capabilities,
-      supportedTasks,
-      perplexityAvailable: !!process.env.PERPLEXITY_API_KEY,
-      deepseekAvailable: !!process.env.DEEPSEEK_API_KEY
+      pair,
+      strategy,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    logger.error('Error in AI debug endpoint:', error);
+  } catch (error) {
+    logger.error('Error generating quantum strategy:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Error in AI debug endpoint',
-      error: error.message
+      message: 'Error generating quantum strategy',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
+
+export default router;

@@ -47,6 +47,48 @@ export class PerplexityService {
       logger.info('Perplexity AI service initialized successfully');
     }
   }
+  
+  /**
+   * Parse a potentially markdown-formatted JSON response
+   * @param completion The raw text completion from Perplexity
+   * @returns Parsed JSON object or error object
+   */
+  private parseJsonResponse(completion: string): any {
+    try {
+      // Check if the response starts with a markdown code block
+      const jsonMatch = completion.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch && jsonMatch[1]) {
+        // Extract JSON from markdown code block
+        return JSON.parse(jsonMatch[1].trim());
+      } else {
+        // Try to parse directly
+        return JSON.parse(completion);
+      }
+    } catch (parseError) {
+      logger.error('Error parsing Perplexity AI response:', parseError);
+      
+      // Try again with a more aggressive approach
+      try {
+        // Remove all backticks, "json" words, and try to find a valid JSON substring
+        const sanitized = completion.replace(/```json|```/g, '').trim();
+        // Find the first '{' and the last '}'
+        const firstBrace = sanitized.indexOf('{');
+        const lastBrace = sanitized.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonSubstring = sanitized.substring(firstBrace, lastBrace + 1);
+          return JSON.parse(jsonSubstring);
+        }
+      } catch (secondError) {
+        // If all parsing attempts fail, return error
+      }
+      
+      return {
+        error: "Failed to parse AI response",
+        raw_response: completion
+      };
+    }
+  }
 
   /**
    * Get the singleton instance
