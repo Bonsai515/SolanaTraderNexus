@@ -163,7 +163,16 @@ class SignalHub extends EventEmitter {
    * @param signal Signal to process
    */
   public async processSignal(signal: Signal): Promise<void> {
+    const startTime = Date.now();
+    let validationTime = 0;
+    let broadcastTime = 0;
+    let processingTime = 0;
+    
     try {
+      // Import here to avoid circular dependency
+      const { signalValidator } = require('./signalValidator');
+      const { signalMonitoring } = require('./signalMonitoring');
+      
       // Generate ID if not provided
       if (!signal.id) {
         signal.id = this.generateSignalId();
@@ -173,6 +182,53 @@ class SignalHub extends EventEmitter {
       if (!signal.timestamp) {
         signal.timestamp = new Date();
       }
+      
+      // Start validation time tracking
+      const validationStartTime = Date.now();
+      
+      // Validate the signal
+      const validationResult = signalValidator.validate(signal);
+      
+      // End validation time tracking
+      validationTime = Date.now() - validationStartTime;
+      signalMonitoring.trackLatency(signal.id, 'validation', validationTime);
+      
+      // Only process valid signals
+      if (!validationResult.valid) {
+        logger.warn(`Signal validation failed for signal ${signal.id}: ${validationResult.errors.map(e => e.message).join(', ')}`);
+        
+        // Still store invalid signals but mark them
+        signal.metadata = {
+          ...signal.metadata,
+          validationFailed: true,
+          validationErrors: validationResult.errors.filter(e => e.severity === 'error').map(e => e.message)
+        };
+        
+        // Store the invalid signal but don't process it further
+        this.signalStore.set(signal.id, signal);
+        
+        // Track invalid signal
+        signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
+        return;
+      }
+      
+      // Add validation warnings if any
+      if (validationResult.errors.length > 0) {
+        signal.metadata = {
+          ...signal.metadata,
+          validationWarnings: validationResult.errors.filter(e => e.severity === 'warning').map(e => e.message)
+        };
+      }
+      
+      // Add performance metrics tracking
+      signal.metadata = {
+        ...signal.metadata,
+        performance: {
+          generatedAt: signal.timestamp.getTime(),
+          processedAt: Date.now(),
+          validationTimeMs: validationTime
+        }
+      };
       
       // Add to signal store
       this.signalStore.set(signal.id, signal);
@@ -194,21 +250,73 @@ class SignalHub extends EventEmitter {
       this.emit(`signal:${signal.pair}`, signal);
       
       // Broadcast to WebSocket clients
+      const broadcastStartTime = Date.now();
       this.broadcastSignal(signal);
+      broadcastTime = Date.now() - broadcastStartTime;
+      
+      // Track broadcast latency
+      signalMonitoring.trackLatency(signal.id, 'delivery', broadcastTime);
       
       // Process through registered processors
+      const processingStartTime = Date.now();
+      let processingSuccess = true;
+      
       for (const processor of this.processors) {
         if (processor.supportedSignalTypes.includes(signal.type) || 
             processor.supportedSignalTypes.includes(SignalType.CUSTOM)) {
           try {
+            const componentStartTime = Date.now();
             await processor.process(signal);
+            const componentProcessingTime = Date.now() - componentStartTime;
+            
+            // Track component health
+            signalMonitoring.trackComponentHealth(
+              processor.name,
+              true,
+              componentProcessingTime
+            );
           } catch (processorError) {
+            processingSuccess = false;
             logger.error(`Error in signal processor ${processor.name}:`, processorError);
+            
+            // Track component error
+            signalMonitoring.trackComponentHealth(
+              processor.name,
+              false,
+              0
+            );
           }
         }
       }
       
-      logger.debug(`Processed signal ${signal.id} of type ${signal.type} from ${signal.source}`);
+      processingTime = Date.now() - processingStartTime;
+      
+      // Track processing latency
+      signalMonitoring.trackLatency(signal.id, 'processing', processingTime);
+      
+      // Calculate generation time (time between signal timestamp and when it was received)
+      const generationTime = signal.timestamp.getTime() < startTime ? 
+        startTime - signal.timestamp.getTime() : 0;
+      
+      // Track generation latency
+      signalMonitoring.trackLatency(signal.id, 'generation', generationTime);
+      
+      // Update signal with performance data
+      signal.metadata.performance = {
+        ...signal.metadata.performance,
+        totalTimeMs: Date.now() - startTime,
+        broadcastTimeMs: broadcastTime,
+        processingTimeMs: processingTime,
+        generationTimeMs: generationTime
+      };
+      
+      // Update signal store with final performance data
+      this.signalStore.set(signal.id, signal);
+      
+      // Track entire signal processing
+      signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
+      
+      logger.debug(`Processed signal ${signal.id} of type ${signal.type} from ${signal.source} in ${Date.now() - startTime}ms`);
     } catch (error) {
       logger.error('Error processing signal:', error);
     }

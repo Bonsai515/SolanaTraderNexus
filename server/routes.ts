@@ -572,6 +572,175 @@ router.get('/signals/:id', async (req, res) => {
   }
 });
 
+// Signal Monitoring API Endpoints
+
+// Get signal monitoring metrics and performance data
+router.get('/signal-monitoring/metrics', async (req, res) => {
+  try {
+    // Import signalMonitoring here to avoid circular dependencies
+    const { signalMonitoring } = require('./signalMonitoring');
+    
+    const metrics = signalMonitoring.getMetrics();
+    
+    res.json({
+      status: 'success',
+      data: metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting signal monitoring metrics:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting signal monitoring metrics',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get signal validation statistics
+router.get('/signal-monitoring/validation', async (req, res) => {
+  try {
+    // Import signalValidator here to avoid circular dependencies
+    const { signalValidator } = require('./signalValidator');
+    
+    const validationStats = signalValidator.getStats();
+    
+    res.json({
+      status: 'success',
+      data: validationStats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting signal validation stats:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting signal validation stats',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get component health information
+router.get('/signal-monitoring/components', async (req, res) => {
+  try {
+    // Import signalMonitoring here to avoid circular dependencies
+    const { signalMonitoring } = require('./signalMonitoring');
+    
+    const metrics = signalMonitoring.getMetrics();
+    
+    res.json({
+      status: 'success',
+      data: metrics.components,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting component health info:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting component health info',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Get system health dashboard data
+router.get('/signal-monitoring/dashboard', async (req, res) => {
+  try {
+    // Import signalMonitoring here to avoid circular dependencies
+    const { signalMonitoring } = require('./signalMonitoring');
+    
+    const metrics = signalMonitoring.getMetrics();
+    
+    // Calculate summary metrics for dashboard
+    const lastHourStats = metrics.lastHour;
+    const last24HourStats = metrics.last24Hours;
+    
+    // Calculate performance trends
+    const signalTrend = lastHourStats.total > 0 ? 
+      (lastHourStats.total / (last24HourStats.total / 24 || 1)) : 0;
+      
+    const validationTrend = lastHourStats.validRatio > 0 && last24HourStats.validRatio > 0 ?
+      (lastHourStats.validRatio / last24HourStats.validRatio) : 1;
+      
+    const latencyTrend = metrics.validation.latency.average.total > 0 ?
+      1 : 0; // We don't have historical data yet
+    
+    // Identify unhealthy components
+    const unhealthyComponents = metrics.components
+      .filter((c: any) => c.status === 'error' || c.status === 'degraded')
+      .map((c: any) => ({
+        name: c.name,
+        status: c.status,
+        errorRate: c.errorRate,
+        lastActive: c.lastActive
+      }));
+    
+    res.json({
+      status: 'success',
+      data: {
+        summary: {
+          signalsLastHour: lastHourStats.total,
+          validRatio: lastHourStats.validRatio,
+          actionableRatio: lastHourStats.total > 0 ? 
+            (lastHourStats.actionable / lastHourStats.total) : 0,
+          averageLatencyMs: metrics.validation.latency.average.total,
+          p95LatencyMs: metrics.validation.latency.p95,
+          activeComponents: metrics.components.filter((c: any) => c.status === 'healthy').length,
+          totalComponents: metrics.components.length
+        },
+        trends: {
+          signal: signalTrend,
+          validation: validationTrend,
+          latency: latencyTrend
+        },
+        health: {
+          systemStatus: unhealthyComponents.length === 0 ? 'healthy' : 'degraded',
+          unhealthyComponents
+        },
+        topSignalTypes: Object.entries(lastHourStats.byType)
+          .sort((a: any, b: any) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([type, count]) => ({ type, count })),
+        topSignalSources: Object.entries(lastHourStats.bySource)
+          .sort((a: any, b: any) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([source, count]) => ({ source, count }))
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error getting dashboard data:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error getting dashboard data',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Reset metrics (for testing and monitoring recovery)
+router.post('/signal-monitoring/reset', async (req, res) => {
+  try {
+    // Import signalMonitoring here to avoid circular dependencies
+    const { signalMonitoring } = require('./signalMonitoring');
+    
+    signalMonitoring.resetMetrics();
+    
+    res.json({
+      status: 'success',
+      message: 'Signal monitoring metrics reset successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error resetting metrics:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error resetting metrics',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 // External Signal Platforms API Endpoints
 
 // Register an external platform to receive signals
@@ -1345,6 +1514,93 @@ export function setupWebSocketServer(httpServer: Server) {
     logger.error('Failed to initialize price feed cache:', err);
   });
   
+  // Set up periodic signal monitoring broadcasts
+  setInterval(() => {
+    try {
+      const { signalMonitoring } = require('./signalMonitoring');
+      const metrics = signalMonitoring.getMetrics();
+      
+      // Broadcast to all connected WebSocket clients based on their subscriptions
+      wss.clients.forEach((client: WebSocket) => {
+        if (client.readyState !== WebSocket.OPEN) {
+          return;
+        }
+        
+        const clientInfo = (client as any).clientInfo;
+        if (!clientInfo || !clientInfo.subscribedMonitoring) {
+          return;
+        }
+        
+        // Check subscriptions and send relevant updates
+        if (clientInfo.subscribedMonitoring.has('metrics')) {
+          client.send(JSON.stringify({
+            type: 'metrics',
+            data: metrics,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        if (clientInfo.subscribedMonitoring.has('validation')) {
+          client.send(JSON.stringify({
+            type: 'validation',
+            data: metrics.validation,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        if (clientInfo.subscribedMonitoring.has('component-health')) {
+          client.send(JSON.stringify({
+            type: 'component-health',
+            data: metrics.components,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        if (clientInfo.subscribedMonitoring.has('system-health')) {
+          // Count unhealthy components
+          const unhealthyComponentCount = metrics.components
+            .filter((c: any) => c.status === 'error' || c.status === 'degraded')
+            .length;
+          
+          // Determine system status
+          let systemStatus = 'optimal';
+          
+          if (unhealthyComponentCount > 0) {
+            systemStatus = unhealthyComponentCount > metrics.components.length / 3 ? 
+              'degraded' : 'warning';
+          }
+          
+          if (metrics.lastMinute.validRatio < 0.8) {
+            systemStatus = 'critical';
+          }
+          
+          client.send(JSON.stringify({
+            type: 'system-health',
+            data: {
+              status: systemStatus,
+              lastUpdated: new Date(),
+              signalFlow: metrics.lastMinute.total > 0 ? 'active' : 'inactive',
+              validationRate: metrics.lastMinute.validRatio,
+              componentHealth: {
+                healthy: metrics.components.filter((c: any) => c.status === 'healthy').length,
+                degraded: metrics.components.filter((c: any) => c.status === 'degraded').length,
+                error: metrics.components.filter((c: any) => c.status === 'error').length,
+                inactive: metrics.components.filter((c: any) => c.status === 'inactive').length,
+              },
+              alertCount: 
+                (metrics.lastHour.validRatio < 0.8 ? 1 : 0) + 
+                unhealthyComponentCount +
+                (metrics.validation.latency.average.total > 1000 ? 1 : 0)
+            },
+            timestamp: new Date().toISOString()
+          }));
+        }
+      });
+    } catch (error) {
+      logger.error('Error broadcasting signal monitoring updates:', error);
+    }
+  }, 5000); // Every 5 seconds
+  
   wss.on('connection', (ws) => {
     logger.info('Client connected to WebSocket');
     
@@ -1385,6 +1641,121 @@ export function setupWebSocketServer(httpServer: Server) {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
+        
+        // Handle signal monitoring subscriptions
+        if (data.type === 'subscribe') {
+          // Set up client info if not already present
+          if (!(ws as any).clientInfo) {
+            (ws as any).clientInfo = {
+              subscribedTypes: new Set(),
+              subscribedSources: new Set(),
+              subscribedPairs: new Set(),
+              subscribedMonitoring: new Set()
+            };
+          }
+          
+          const clientInfo = (ws as any).clientInfo;
+          
+          // Handle different subscription types
+          if (data.subscriptionType === 'metrics') {
+            // Subscribe to metrics updates
+            clientInfo.subscribedMonitoring.add('metrics');
+            logger.debug('Client subscribed to signal metrics');
+            
+            // Send initial metrics data
+            const { signalMonitoring } = require('./signalMonitoring');
+            const metrics = signalMonitoring.getMetrics();
+            
+            ws.send(JSON.stringify({
+              type: 'metrics',
+              data: metrics,
+              timestamp: new Date().toISOString()
+            }));
+          } 
+          else if (data.subscriptionType === 'validation') {
+            // Subscribe to validation updates
+            clientInfo.subscribedMonitoring.add('validation');
+            logger.debug('Client subscribed to validation updates');
+            
+            // Send initial validation data
+            const { signalValidator } = require('./signalValidator');
+            const validationStats = signalValidator.getStats();
+            
+            ws.send(JSON.stringify({
+              type: 'validation',
+              data: validationStats,
+              timestamp: new Date().toISOString()
+            }));
+          }
+          else if (data.subscriptionType === 'component-health') {
+            // Subscribe to component health updates
+            clientInfo.subscribedMonitoring.add('component-health');
+            logger.debug('Client subscribed to component health updates');
+            
+            // Send initial component health data
+            const { signalMonitoring } = require('./signalMonitoring');
+            const metrics = signalMonitoring.getMetrics();
+            
+            ws.send(JSON.stringify({
+              type: 'component-health',
+              data: metrics.components,
+              timestamp: new Date().toISOString()
+            }));
+          }
+          else if (data.subscriptionType === 'system-health') {
+            // Subscribe to system health updates
+            clientInfo.subscribedMonitoring.add('system-health');
+            logger.debug('Client subscribed to system health updates');
+            
+            // Calculate and send system health
+            const { signalMonitoring } = require('./signalMonitoring');
+            const metrics = signalMonitoring.getMetrics();
+            
+            // Count unhealthy components
+            const unhealthyComponentCount = metrics.components
+              .filter((c: any) => c.status === 'error' || c.status === 'degraded')
+              .length;
+            
+            // Determine system status
+            let systemStatus = 'optimal';
+            
+            if (unhealthyComponentCount > 0) {
+              systemStatus = unhealthyComponentCount > metrics.components.length / 3 ? 
+                'degraded' : 'warning';
+            }
+            
+            if (metrics.lastMinute.validRatio < 0.8) {
+              systemStatus = 'critical';
+            }
+            
+            ws.send(JSON.stringify({
+              type: 'system-health',
+              data: {
+                status: systemStatus,
+                lastUpdated: new Date(),
+                signalFlow: metrics.lastMinute.total > 0 ? 'active' : 'inactive',
+                validationRate: metrics.lastMinute.validRatio,
+                componentHealth: {
+                  healthy: metrics.components.filter((c: any) => c.status === 'healthy').length,
+                  degraded: metrics.components.filter((c: any) => c.status === 'degraded').length,
+                  error: metrics.components.filter((c: any) => c.status === 'error').length,
+                  inactive: metrics.components.filter((c: any) => c.status === 'inactive').length,
+                },
+                alertCount: 
+                  (metrics.lastHour.validRatio < 0.8 ? 1 : 0) + 
+                  unhealthyComponentCount +
+                  (metrics.validation.latency.average.total > 1000 ? 1 : 0)
+              },
+              timestamp: new Date().toISOString()
+            }));
+          }
+        }
+        else if (data.type === 'unsubscribe' && data.subscriptionType) {
+          if ((ws as any).clientInfo && (ws as any).clientInfo.subscribedMonitoring) {
+            (ws as any).clientInfo.subscribedMonitoring.delete(data.subscriptionType);
+            logger.debug(`Client unsubscribed from ${data.subscriptionType}`);
+          }
+        }
         
         // Handle different message types
         switch(data.type) {
