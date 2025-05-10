@@ -1536,6 +1536,36 @@ export function setupWebSocketServer(httpServer: Server) {
       try {
         const parsedMessage = JSON.parse(message.toString());
         logger.info(`Received WebSocket message: ${JSON.stringify(parsedMessage)}`);
+        
+        // Handle PING messages with a PONG response for connection health checks
+        if (parsedMessage.type === 'PING') {
+          try {
+            ws.send(JSON.stringify({
+              type: 'PONG',
+              timestamp: new Date().toISOString(),
+              echo: parsedMessage.timestamp // Echo back the original timestamp for latency calculation
+            }));
+            logger.debug('Sent PONG response to client');
+          } catch (err) {
+            logger.error('Error sending PONG response:', err);
+          }
+        }
+        
+        // Handle TEST_CONNECTION messages with echo response 
+        if (parsedMessage.type === 'TEST_CONNECTION') {
+          try {
+            ws.send(JSON.stringify({
+              type: 'TEST_CONNECTION_RESPONSE',
+              message: `Echo: ${parsedMessage.message || 'No message provided'}`,
+              timestamp: new Date().toISOString(),
+              success: true
+            }));
+            logger.info('Responded to TEST_CONNECTION message');
+          } catch (err) {
+            logger.error('Error sending TEST_CONNECTION_RESPONSE:', err);
+          }
+        }
+        
       } catch (e) {
         logger.info(`Received non-JSON WebSocket message: ${message}`);
       }
@@ -1691,6 +1721,17 @@ export function setupWebSocketServer(httpServer: Server) {
       try {
         const data = JSON.parse(message.toString());
         
+        // Handle PING messages with PONG responses for connection monitoring
+        if (data.type === 'PING') {
+          logger.debug('Received PING, sending PONG response');
+          ws.send(JSON.stringify({
+            type: 'PONG',
+            timestamp: new Date().toISOString(),
+            echo: data.timestamp // Echo back the timestamp for latency calculation
+          }));
+          return;
+        }
+        
         // Handle signal monitoring subscriptions
         if (data.type === 'subscribe') {
           // Set up client info if not already present
@@ -1808,9 +1849,6 @@ export function setupWebSocketServer(httpServer: Server) {
         
         // Handle different message types
         switch(data.type) {
-          case 'PING':
-            ws.send(JSON.stringify({ type: 'PONG', timestamp: new Date().toISOString() }));
-            break;
             
           case 'GET_STRATEGIES':
             const strategies = await storage.getStrategies();

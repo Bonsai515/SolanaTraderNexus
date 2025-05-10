@@ -77,11 +77,34 @@ class WebSocketClient {
       // Construct the WebSocket URL
       const wsUrl = `${protocol}//${host}/ws`;
       
-      console.log(`Attempting WebSocket connection to: ${wsUrl}`);
-      console.log(`Current window location: ${window.location.href}`);
+      console.log(`🔌 Attempting WebSocket connection to: ${wsUrl}`);
+      console.log(`🌐 Current window location: ${window.location.href}`);
+      console.log(`📝 Full environment details:`, {
+        protocol: window.location.protocol,
+        host: window.location.host,
+        hostname: window.location.hostname, 
+        pathname: window.location.pathname,
+        search: window.location.search,
+        origin: window.location.origin
+      });
       
-      // Try a direct connection to the WebSocket
-      this.socket = new WebSocket(wsUrl);
+      // In Replit environment, ensure we're connecting properly
+      try {
+        // Check if we're in Replit environment
+        const isReplitEnv = window.location.hostname.includes('replit');
+        console.log(`Environment check: ${isReplitEnv ? 'Replit detected' : 'Not in Replit'}`);
+        
+        // Get Replit domain if available
+        const replitDomain = isReplitEnv ? window.location.hostname : null;
+        console.log(`Replit domain: ${replitDomain || 'N/A'}`);
+        
+        // Try a direct connection to the WebSocket
+        this.socket = new WebSocket(wsUrl);
+        console.log(`Socket created successfully`);
+      } catch (err) {
+        console.error(`⚠️ Error creating WebSocket:`, err);
+        throw err;
+      }
       
       this.socket.onopen = () => {
         console.log('WebSocket connection established');

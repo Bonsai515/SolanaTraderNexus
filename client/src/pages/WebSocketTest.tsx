@@ -70,21 +70,112 @@ export default function WebSocketTest() {
   const handleSubscribeToMetrics = () => {
     wsClient.send({
       type: 'subscribe',
-      subscriptionType: 'metrics',
-      channel: 'system_metrics'
+      subscriptionType: 'metrics'
     });
   };
 
   const handleSubscribeToComponentHealth = () => {
     wsClient.send({
       type: 'subscribe',
-      subscriptionType: 'component_health',
-      channel: 'component_status'
+      subscriptionType: 'component-health'
+    });
+  };
+  
+  const handleSubscribeToSystemHealth = () => {
+    wsClient.send({
+      type: 'subscribe',
+      subscriptionType: 'system-health'
     });
   };
 
   const handleResetConnection = () => {
     wsClient.reset();
+  };
+  
+  // Test WebSocket connection directly
+  const testWebSocketConnection = () => {
+    try {
+      // Detect environment
+      const isReplitEnv = window.location.hostname.includes('replit');
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      const wsUrl = `${protocol}//${host}/ws`;
+      
+      setMessages(prev => [...prev, `🧪 Testing WebSocket connection to: ${wsUrl}`]);
+      setMessages(prev => [...prev, `🌐 Environment: ${isReplitEnv ? 'Replit' : 'Local'}`]);
+      console.log(`🧪 Testing direct WebSocket connection to: ${wsUrl}`);
+      
+      // Create a new WebSocket directly (not using our client)
+      const testSocket = new WebSocket(wsUrl);
+      
+      // Set up listeners for this test connection
+      testSocket.onopen = () => {
+        console.log(`✅ Test socket connected successfully!`);
+        setMessages(prev => [...prev, `✅ Test connection successful to ${wsUrl}`]);
+        
+        // Send a test message
+        const testMessage = {
+          type: 'TEST_CONNECTION',
+          timestamp: new Date().toISOString(),
+          message: 'This is a direct test connection from React'
+        };
+        
+        try {
+          testSocket.send(JSON.stringify(testMessage));
+          setMessages(prev => [...prev, `📤 Sent test message: ${JSON.stringify(testMessage)}`]);
+        } catch (sendError) {
+          setMessages(prev => [...prev, `❌ Error sending message: ${sendError.message}`]);
+        }
+        
+        // Also send a PING to test that mechanism
+        setTimeout(() => {
+          try {
+            const pingMessage = {
+              type: 'PING',
+              timestamp: new Date().toISOString()
+            };
+            testSocket.send(JSON.stringify(pingMessage));
+            setMessages(prev => [...prev, `📤 Sent PING message`]);
+          } catch (pingError) {
+            setMessages(prev => [...prev, `❌ Error sending PING: ${pingError.message}`]);
+          }
+        }, 1000);
+        
+        // Close after 5 seconds
+        setTimeout(() => {
+          try {
+            testSocket.close(1000, 'Test completed');
+            setMessages(prev => [...prev, `🔒 Test completed and connection closed`]);
+          } catch (closeError) {
+            setMessages(prev => [...prev, `❌ Error closing connection: ${closeError.message}`]);
+          }
+        }, 5000);
+      };
+      
+      testSocket.onmessage = (event) => {
+        console.log(`📨 Test socket received:`, event.data);
+        try {
+          // Try to parse and format JSON messages
+          const parsedData = JSON.parse(event.data);
+          setMessages(prev => [...prev, `📨 Received: ${parsedData.type || 'Unknown type'} - ${JSON.stringify(parsedData).substring(0, 100)}${JSON.stringify(parsedData).length > 100 ? '...' : ''}`]);
+        } catch (e) {
+          setMessages(prev => [...prev, `📨 Received non-JSON: ${event.data.toString().substring(0, 100)}${event.data.toString().length > 100 ? '...' : ''}`]);
+        }
+      };
+      
+      testSocket.onerror = (error) => {
+        console.error(`❌ Test socket error:`, error);
+        setMessages(prev => [...prev, `❌ Test connection error: ${error.toString()}`]);
+      };
+      
+      testSocket.onclose = (event) => {
+        console.log(`🔒 Test socket closed: ${event.code} ${event.reason}`);
+        setMessages(prev => [...prev, `🔒 Test connection closed: ${event.code} ${event.reason || 'No reason provided'}`]);
+      };
+    } catch (error) {
+      console.error(`❌ Error creating test WebSocket:`, error);
+      setMessages(prev => [...prev, `❌ Error creating test WebSocket: ${error.message}`]);
+    }
   };
 
   return (
@@ -108,7 +199,19 @@ export default function WebSocketTest() {
           <p>WebSocket URL: {`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`}</p>
           <p>Protocol: {window.location.protocol}</p>
           <p>Host: {window.location.host}</p>
+          <p>Hostname: {window.location.hostname}</p>
+          <p>Origin: {window.location.origin}</p>
           <p>Pathname: {window.location.pathname}</p>
+          <p>Replit Environment: {window.location.hostname.includes('replit') ? 'Yes' : 'No'}</p>
+          <div className="mt-2 p-2 bg-gray-800 rounded">
+            <p className="font-semibold text-amber-400">Connection Troubleshooting:</p>
+            <ul className="pl-4 list-disc space-y-1 mt-1">
+              <li>Check browser console for connection errors</li>
+              <li>Ensure the server is running on port 5000</li>
+              <li>Verify WebSocket endpoint is accessible at /ws</li>
+              <li>Check if CORS is properly configured for WebSockets</li>
+            </ul>
+          </div>
         </div>
         
         {/* Detailed Diagnostics */}
@@ -147,7 +250,7 @@ export default function WebSocketTest() {
           </div>
         )}
         
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button 
             onClick={handleResetConnection}
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
@@ -167,13 +270,20 @@ export default function WebSocketTest() {
           >
             Send Ping
           </button>
+          
+          <button 
+            onClick={testWebSocketConnection}
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 rounded-md transition-colors"
+          >
+            Test Direct Connection
+          </button>
         </div>
       </div>
 
       {/* Quick Actions */}
       <div className="p-4 rounded-lg bg-gray-800 border border-gray-700">
         <h3 className="text-xl font-semibold mb-2">Quick Actions</h3>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button 
             onClick={handleSubscribeToMetrics}
             className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
@@ -187,6 +297,13 @@ export default function WebSocketTest() {
             disabled={!connected}
           >
             Subscribe to Component Health
+          </button>
+          <button 
+            onClick={handleSubscribeToSystemHealth}
+            className="px-3 py-1 bg-teal-600 hover:bg-teal-700 rounded-md transition-colors"
+            disabled={!connected}
+          >
+            Subscribe to System Health
           </button>
         </div>
       </div>
