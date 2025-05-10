@@ -8,7 +8,7 @@
  * - Support for multiple data sources with failover
  */
 
-import { MarketData } from './transformers';
+import { MarketData, PriceData } from '../shared/signalTypes';
 import { logger } from './logger';
 import { WebSocket } from 'ws';
 import fs from 'fs/promises';
@@ -20,14 +20,6 @@ const CACHE_DIR = path.join(process.cwd(), 'data/price_cache');
 // Refresh intervals
 const CACHE_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-interface PriceData {
-  pair: string;
-  price: number;
-  volume: number;
-  timestamp: Date;
-  source: string;
-}
 
 interface CachedMarketData {
   pair: string;
@@ -345,30 +337,75 @@ class PriceFeedCache {
     logger.debug('Refreshing price feed cache');
     
     try {
-      // Determine which data source to use
-      switch (this.activeDataSource) {
-        case 'helius':
-          await this.fetchHeliusData();
-          break;
-        case 'instant_nodes':
-          await this.fetchInstantNodesData();
-          break;
-        case 'jupiter_api':
-          await this.fetchJupiterData();
-          break;
-        case 'alchemy_rpc':
-          await this.fetchAlchemyData();
-          break;
-        case 'public_rpc':
-          await this.fetchPublicRpcData();
-          break;
-        case 'cached_backup':
-          await this.loadFromBackup();
-          break;
-        default:
-          logger.warn(`Unknown data source: ${this.activeDataSource}, falling back to Jupiter API`);
-          this.activeDataSource = 'jupiter_api';
-          await this.fetchJupiterData();
+      // First try current data source
+      let success = false;
+      
+      try {
+        // Determine which data source to use
+        switch (this.activeDataSource) {
+          case 'helius':
+            await this.fetchHeliusData();
+            success = true;
+            break;
+          case 'instant_nodes':
+            await this.fetchInstantNodesData();
+            success = true;
+            break;
+          case 'jupiter_api':
+            await this.fetchJupiterData();
+            success = true;
+            break;
+          case 'alchemy_rpc':
+            await this.fetchAlchemyData();
+            success = true;
+            break;
+          case 'public_rpc':
+            await this.fetchPublicRpcData();
+            success = true;
+            break;
+          case 'cached_backup':
+            await this.loadFromBackup();
+            success = true;
+            break;
+          default:
+            logger.warn(`Unknown data source: ${this.activeDataSource}, falling back to parallel fetching`);
+        }
+      } catch (sourceError) {
+        logger.error(`Error with source ${this.activeDataSource}:`, sourceError);
+        success = false;
+      }
+      
+      // If current source failed, try parallel fetching from all sources
+      if (!success) {
+        logger.info('Primary source failed, attempting parallel fetch from all sources');
+        
+        // Try all sources in parallel and use the first one that succeeds
+        const fetchPromises = [
+          this.safeFetch('jupiter_api', () => this.fetchJupiterData()),
+          this.safeFetch('helius', () => this.fetchHeliusData()),
+          this.safeFetch('instant_nodes', () => this.fetchInstantNodesData()),
+          this.safeFetch('alchemy_rpc', () => this.fetchAlchemyData()),
+          this.safeFetch('public_rpc', () => this.fetchPublicRpcData())
+        ];
+        
+        try {
+          // Race all fetches and use the first one that resolves
+          const firstSource = await Promise.any(fetchPromises);
+          logger.info(`Successfully fetched data from ${firstSource}`);
+          this.activeDataSource = firstSource;
+          success = true;
+        } catch (aggregateError) {
+          logger.error('All data sources failed in parallel fetch');
+          // Try to load from cached backup as last resort
+          try {
+            await this.loadFromBackup();
+            this.activeDataSource = 'cached_backup';
+            success = true;
+          } catch (backupError) {
+            logger.error('Even backup loading failed:', backupError);
+            success = false;
+          }
+        }
       }
       
       // If cache is still empty, try to load from backup
@@ -854,6 +891,20 @@ class PriceFeedCache {
     } catch (error) {
       logger.error('Failed to create cache directory:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Safe fetch wrapper to handle errors gracefully
+   * @private
+   */
+  private async safeFetch(sourceName: string, fetchFunction: () => Promise<void>): Promise<string> {
+    try {
+      await fetchFunction();
+      return sourceName;
+    } catch (error) {
+      logger.error(`Error fetching from ${sourceName}:`, error);
+      throw new Error(`Failed to fetch from ${sourceName}`);
     }
   }
 

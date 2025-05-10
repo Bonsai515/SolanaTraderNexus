@@ -1,9 +1,44 @@
 /**
- * Shared Signal Types
+ * Shared Types for System Communication
  * 
- * This file contains shared enum types used for signals throughout the application.
- * These types ensure consistency between the server and client code.
+ * This file contains shared types used throughout the application.
+ * These ensure consistency between the server and client code.
  */
+
+/**
+ * Market Data Type
+ * 
+ * Represents comprehensive market data for a trading pair including
+ * price history, volume history, and other key metrics.
+ */
+export interface MarketData {
+  pair: string;
+  prices: Array<[string, number]>; // [timestamp, price]
+  volumes: Array<[string, number]>; // [timestamp, volume]
+  currentPrice: number;
+  volume24h: number;
+  priceChange24h: number;
+  priceChangePct24h: number;
+  lastUpdated: Date;
+  highPrice24h: number;
+  lowPrice24h: number;
+  source: string;
+  orderBooks?: Array<[string, Array<[number, number]>, Array<[number, number]>]>; // [timestamp, bids, asks] where bids/asks are [price, size]
+  indicators?: Record<string, Array<[string, number]>>; // [indicator name, [timestamp, value]]
+}
+
+/**
+ * Price Data Type
+ * 
+ * Represents the latest price point for a trading pair.
+ */
+export interface PriceData {
+  pair: string;
+  price: number;
+  volume: number;
+  timestamp: Date;
+  source: string;
+}
 
 // Signal type classification
 export enum SignalType {
