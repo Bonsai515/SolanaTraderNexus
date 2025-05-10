@@ -211,6 +211,7 @@ async function startServer() {
     });
     
     // Start HTTP server
+    // Make sure to bind to 0.0.0.0 to allow external connections
     httpServer.listen(port, '0.0.0.0', () => {
       logger.info(`🚀 Server running on port ${port}`);
       logger.info(`💻 WebSocket server accessible at /ws endpoint`);
@@ -218,7 +219,14 @@ async function startServer() {
       
       // Print additional debugging information
       logger.info('🔍 DEBUG: Server details:');
-      logger.info(`- Server address: ${httpServer.address()}`);
+      const addr = httpServer.address();
+      if (addr && typeof addr === 'object') {
+        logger.info(`- Server listening on ${addr.address}:${addr.port}`);
+      } else if (addr && typeof addr === 'string') {
+        logger.info(`- Server listening on pipe/socket: ${addr}`);
+      } else {
+        logger.info('- Server address not available');
+      }
       logger.info(`- Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`- Replit URL: ${process.env.REPL_SLUG || 'Not in Replit'}`);
       logger.info(`- Process ID: ${process.pid}`);

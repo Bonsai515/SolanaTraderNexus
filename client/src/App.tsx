@@ -1,6 +1,7 @@
 import { Route, Link } from 'wouter';
 import NotFound from './pages/not-found';
 import SystemDashboard from './pages/SystemDashboard';
+import WebSocketTest from './pages/WebSocketTest';
 import { useEffect, useState } from 'react';
 
 // Simple Dashboard Component
@@ -197,6 +198,7 @@ function App() {
               <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
               <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
               <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
+              <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
             </ul>
           </nav>
         </div>
@@ -206,6 +208,7 @@ function App() {
         <Route path="/" component={Dashboard} />
         <Route path="/insights" component={Dashboard} />
         <Route path="/system" component={SystemDashboard} />
+        <Route path="/ws-test" component={WebSocketTest} />
         <Route path="/:rest*" component={NotFound} />
       </main>
     </div>

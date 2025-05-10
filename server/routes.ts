@@ -1506,9 +1506,57 @@ router.post('/ai/learning-insight', async (req, res) => {
 
 // Setup WebSocket server
 export function setupWebSocketServer(httpServer: Server) {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    // Explicitly allowing connections from any origin
+    verifyClient: () => true,
+  });
   
   logger.info('💻 WebSocket server accessible at /ws endpoint');
+  
+  // Log server address details properly
+  const addr = httpServer.address();
+  if (addr) {
+    if (typeof addr === 'string') {
+      logger.info(`Server listening on pipe/socket: ${addr}`);
+    } else {
+      logger.info(`Server listening on ${addr.address}:${addr.port}`);
+    }
+  } else {
+    logger.info('Server address not available yet - waiting for it to start listening')
+  }
+  
+  // Connection handling with detailed logging
+  wss.on('connection', (ws, req) => {
+    const clientIp = req.socket.remoteAddress;
+    logger.info(`New WebSocket connection from ${clientIp}`);
+    
+    ws.on('message', (message) => {
+      try {
+        const parsedMessage = JSON.parse(message.toString());
+        logger.info(`Received WebSocket message: ${JSON.stringify(parsedMessage)}`);
+      } catch (e) {
+        logger.info(`Received non-JSON WebSocket message: ${message}`);
+      }
+    });
+    
+    ws.on('close', (code, reason) => {
+      logger.info(`WebSocket connection closed: ${code} ${reason}`);
+    });
+    
+    ws.on('error', (error) => {
+      logger.error(`WebSocket error: ${error.message}`);
+    });
+    
+    // Send a welcome message
+    ws.send(JSON.stringify({
+      type: 'connection_status',
+      status: 'connected',
+      message: 'Welcome to the Solana Quantum Trading Platform WebSocket Server',
+      timestamp: new Date().toISOString()
+    }));
+  });
   
   // Initialize price feed cache
   priceFeedCache.initialize().catch(err => {
@@ -2984,19 +3032,31 @@ router.get('/trading-pairs', (req, res) => {
   try {
     if (!transformerApiInitialized) {
       logger.info('Initializing transformer API with pairs: SOL/USDC, BONK/USDC');
-      const transformer = getTransformerAPI(storage);
+      const transformer = getTransformerAPI();
       
-      // Check if the initialization method exists and call it
-      if (typeof transformer.initializeTransformersAPI === 'function') {
-        // Use the proper initialization method
+      // Check if the initialize method exists and call it
+      if (typeof transformer.initialize === 'function') {
+        // Use the new initialization method
+        const defaultPairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+        const success = transformer.initialize(defaultPairs);
+        transformerApiInitialized = success;
+        if (success) {
+          logger.info('Transformer API initialized successfully');
+        } else {
+          logger.warn('Transformer API initialization returned false');
+        }
+      } 
+      // Try legacy initialization method as fallback
+      else if (typeof transformer.initializeTransformersAPI === 'function') {
+        // Use the legacy initialization method
         const defaultPairs = ['SOL/USDC', 'BONK/USDC'];
-        await transformer.initializeTransformersAPI(defaultPairs);
-        transformerApiInitialized = true;
-        logger.info('Transformer API initialized successfully');
+        const success = transformer.initializeTransformersAPI(defaultPairs);
+        transformerApiInitialized = success;
+        logger.info('Transformer API initialized successfully via legacy method');
       } else {
         // Mark as initialized to avoid blocking other features
         transformerApiInitialized = true;
-        logger.warn('Transformer API object missing required initialization method');
+        logger.warn('Transformer API object missing required initialization methods');
       }
     }
   } catch (error) {
