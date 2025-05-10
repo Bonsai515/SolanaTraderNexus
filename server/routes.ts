@@ -27,7 +27,12 @@ const importDexService = async () => {
       return {
         getSupportedDexes: () => ['raydium', 'orca', 'openbook', 'jupiter'],
         getDexAdapter: () => null,
-        findArbitrageOpportunities: () => Promise.resolve([])
+        findArbitrageOpportunities: () => Promise.resolve([]),
+        executeTrade: () => Promise.resolve({
+          success: false, 
+          message: 'DEX service not available',
+          error: 'Module import failed'
+        })
       };
     }
     
@@ -38,7 +43,12 @@ const importDexService = async () => {
     return {
       getSupportedDexes: () => ['raydium', 'orca', 'openbook', 'jupiter'],
       getDexAdapter: () => null,
-      findArbitrageOpportunities: () => Promise.resolve([])
+      findArbitrageOpportunities: () => Promise.resolve([]),
+      executeTrade: () => Promise.resolve({
+        success: false, 
+        message: 'DEX service not available',
+        error: 'Module import failed'
+      })
     };
   }
 };
@@ -90,6 +100,236 @@ router.get('/test', (req, res) => {
     timestamp: new Date().toISOString(),
     initialized: transformerApiInitialized
   });
+});
+
+// Live trading endpoints
+router.post('/trade/execute', async (req, res) => {
+  try {
+    const { 
+      pair, 
+      amount, 
+      type, 
+      price, 
+      walletAddress, 
+      dex = 'jupiter', 
+      slippage = 0.5 
+    } = req.body;
+    
+    if (!pair || !amount || !type || !walletAddress) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required parameters',
+        requiredParams: ['pair', 'amount', 'type', 'walletAddress']
+      });
+    }
+    
+    logger.info(`Executing ${type} trade for ${amount} ${pair} on ${dex}`);
+    
+    // Create a transaction ID
+    const transactionId = uuidv4();
+    
+    // Create initial transaction record
+    const transaction = {
+      id: transactionId,
+      pair,
+      amount: parseFloat(amount),
+      type: type.toUpperCase(),
+      price: price ? parseFloat(price) : null,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      wallet_address: walletAddress,
+      signature: null,
+      fee: null,
+      filled_amount: 0,
+      error: null,
+      metadata: {
+        dex,
+        slippage
+      }
+    };
+    
+    // Broadcast the transaction to all connected clients
+    broadcastTransactionUpdate(transaction);
+    
+    try {
+      // Get DEX service
+      const dexService = await importDexService();
+      
+      // Execute the trade
+      const tradeResult = await dexService.executeTrade({
+        pair,
+        amount: parseFloat(amount),
+        type: type.toUpperCase(),
+        price: price ? parseFloat(price) : null,
+        walletAddress,
+        dex,
+        slippage
+      });
+      
+      // Update transaction with result
+      transaction.status = tradeResult.success ? 'CONFIRMED' : 'FAILED';
+      transaction.signature = tradeResult.signature || null;
+      transaction.fee = tradeResult.fee || null;
+      transaction.filled_amount = tradeResult.filledAmount || 0;
+      transaction.error = tradeResult.error || null;
+      transaction.updated_at = new Date().toISOString();
+      transaction.metadata = {
+        ...transaction.metadata,
+        ...tradeResult.metadata
+      };
+      
+      // Broadcast the updated transaction
+      broadcastTransactionUpdate(transaction);
+      
+      // Return the result
+      return res.json({
+        status: 'success',
+        transaction,
+        tradeResult
+      });
+    } catch (tradingError) {
+      logger.error('Error executing trade:', tradingError);
+      
+      // Update transaction as failed
+      transaction.status = 'FAILED';
+      transaction.error = tradingError.message || 'Unknown trading error';
+      transaction.updated_at = new Date().toISOString();
+      
+      // Broadcast the failed transaction
+      broadcastTransactionUpdate(transaction);
+      
+      // Return error response
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to execute trade',
+        error: tradingError.message || 'Unknown trading error',
+        transaction
+      });
+    }
+  } catch (error) {
+    logger.error('Error processing trade request:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error processing trade request',
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Get transaction by ID
+router.get('/trade/transaction/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // For now, we'll return a mock transaction
+    // In a real implementation, this would fetch from a database
+    
+    return res.json({
+      status: 'success',
+      transaction: {
+        id,
+        status: 'PENDING',
+        pair: 'SOL/USDC',
+        amount: 1.0,
+        type: 'BUY',
+        price: 150.25,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        wallet_address: 'DummyWalletAddress',
+        signature: null,
+        fee: null,
+        filled_amount: 0,
+        error: null
+      }
+    });
+  } catch (error) {
+    logger.error('Error retrieving transaction:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error retrieving transaction',
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Live trading wallet management
+router.post('/trade/wallet/connect', async (req, res) => {
+  try {
+    const { walletAddress, walletType = 'phantom' } = req.body;
+    
+    if (!walletAddress) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing wallet address'
+      });
+    }
+    
+    // Return success response
+    return res.json({
+      status: 'success',
+      message: 'Wallet connected successfully',
+      wallet: {
+        address: walletAddress,
+        type: walletType,
+        connected: true,
+        connected_at: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error connecting wallet:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error connecting wallet',
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Get recent transactions
+router.get('/trade/transactions', async (req, res) => {
+  try {
+    const { wallet, limit = 10, offset = 0 } = req.query;
+    
+    // For now, we'll return mock transactions
+    // In a real implementation, this would fetch from a database
+    
+    const mockTransactions = [];
+    const statuses = ['CONFIRMED', 'PENDING', 'FAILED'];
+    const types = ['BUY', 'SELL'];
+    const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+    
+    for (let i = 0; i < Math.min(parseInt(limit as string), 20); i++) {
+      mockTransactions.push({
+        id: uuidv4(),
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        pair: pairs[Math.floor(Math.random() * pairs.length)],
+        amount: Math.random() * 10,
+        type: types[Math.floor(Math.random() * types.length)],
+        price: 150.25 + (Math.random() * 10 - 5),
+        created_at: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+        updated_at: new Date().toISOString(),
+        wallet_address: wallet || 'DummyWalletAddress',
+        signature: Math.random() > 0.3 ? `mockSignature${i}` : null,
+        fee: Math.random() * 0.01,
+        filled_amount: Math.random() * 10,
+        error: Math.random() > 0.8 ? 'Mock error for testing' : null
+      });
+    }
+    
+    return res.json({
+      status: 'success',
+      count: mockTransactions.length,
+      transactions: mockTransactions
+    });
+  } catch (error) {
+    logger.error('Error retrieving transactions:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error retrieving transactions',
+      error: error.message || 'Unknown error'
+    });
+  }
 });
 
 // Test endpoint to populate price feed with test data
