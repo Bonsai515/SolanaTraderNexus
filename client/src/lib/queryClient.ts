@@ -111,10 +111,11 @@ export async function apiRequestJson<T>(
 
 /**
  * Default query function for react-query
- * @param queryKey The query key (first element should be the endpoint)
+ * @param context The query context with queryKey
  * @returns The parsed JSON response
  */
-export async function defaultQueryFn<T>({ queryKey }: { queryKey: (string | Record<string, unknown>)[] }): Promise<T> {
+export async function defaultQueryFn<T>(context: any): Promise<T> {
+  const { queryKey } = context;
   const endpoint = queryKey[0] as string;
   const response = await apiRequest('GET', endpoint);
   return response.json() as Promise<T>;
@@ -129,11 +130,7 @@ queryClient.setDefaultOptions({
 
 // Export a direct replacement for QueryClientProvider
 export function QueryClientProvider({ children }: { children: ReactNode }) {
-  return (
-    <TanStackQueryClientProvider client={queryClient}>
-      {children}
-    </TanStackQueryClientProvider>
-  );
+  return TanStackQueryClientProvider({ client: queryClient, children });
 }
 
 export default queryClient;
