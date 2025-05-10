@@ -4,7 +4,7 @@
  * This is a simple toast notification hook using a custom implementation
  * since we don't have shadcn/ui or other toast libraries installed.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export type ToastVariant = 'default' | 'success' | 'warning' | 'destructive';
 
@@ -33,7 +33,7 @@ export function useToast() {
   const [state, setState] = useState<ToastState[]>(toasts);
 
   // Add listener on mount, remove on unmount
-  useState(() => {
+  useEffect(() => {
     const listener = (newToasts: ToastState[]) => {
       setState([...newToasts]);
     };
@@ -43,7 +43,7 @@ export function useToast() {
     return () => {
       listeners = listeners.filter(l => l !== listener);
     };
-  });
+  }, []);
 
   const toast = useCallback((options: ToastOptions) => {
     const id = Date.now().toString();

@@ -1,56 +1,90 @@
 import { useEffect, useState, useRef } from 'react';
-import { wsClient } from '../lib/wsClient';
+import useWsStore from '../lib/wsStore';
 
 export default function WebSocketTest() {
-  const [connected, setConnected] = useState(false);
-  const [messages, setMessages] = useState<string[]>([]);
+  // Use the Zustand WebSocket store 
+  const { 
+    connected,
+    messages: wsMessages,
+    signals,
+    transactions,
+    marketData,
+    insights,
+    sendMessage,
+    reconnect,
+    clearMessages
+  } = useWsStore();
+  
+  // Local state for the test page
+  const [localMessages, setLocalMessages] = useState<string[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
   const diagnosticsIntervalRef = useRef<number | null>(null);
+  
+  // Previous message count to detect changes
+  const prevMessageCountRef = useRef<number>(0);
 
+  // Connection status effect
   useEffect(() => {
-    // Subscribe to connection changes
-    const unsubscribeConn = wsClient.onConnectionChange((isConnected) => {
-      console.log('WebSocket connection status changed:', isConnected);
-      setConnected(isConnected);
-    });
-
-    // Subscribe to incoming messages
-    const unsubscribeMsg = wsClient.onMessage((message) => {
-      console.log('Received WebSocket message:', message);
-      try {
-        // Try to parse JSON for pretty display
-        const parsed = JSON.parse(message);
-        setMessages(prev => [...prev, JSON.stringify(parsed, null, 2)]);
-      } catch (e) {
-        // If not JSON, display as-is
-        setMessages(prev => [...prev, message]);
+    setLocalMessages(prev => [
+      ...prev, 
+      `WebSocket ${connected ? 'connected' : 'disconnected'} at ${new Date().toLocaleTimeString()}`
+    ]);
+  }, [connected]);
+  
+  // WebSocket messages monitoring effect
+  useEffect(() => {
+    if (wsMessages.length > prevMessageCountRef.current) {
+      // We have new messages
+      for (let i = prevMessageCountRef.current; i < wsMessages.length; i++) {
+        const message = wsMessages[i];
+        setLocalMessages(prev => [
+          ...prev, 
+          `📨 ${message.type}: ${JSON.stringify(message.data || {}).substring(0, 100)}${JSON.stringify(message.data || {}).length > 100 ? '...' : ''}`
+        ]);
       }
-    });
-    
+      // Update the counter reference
+      prevMessageCountRef.current = wsMessages.length;
+    }
+  }, [wsMessages]);
+  
+  // Diagnostics effect
+  useEffect(() => {
     // Set up diagnostics refreshing
     const updateDiagnostics = () => {
-      if (wsClient.getDiagnostics) {
-        setDiagnostics(wsClient.getDiagnostics());
-      }
+      // Create diagnostics info from our Zustand store data
+      const diagnosticsInfo = {
+        connected,
+        socketState: connected ? 'OPEN' : 'CLOSED',
+        reconnectAttempts: 0, // This would need to be exposed from the store
+        maxReconnectAttempts: 5,
+        messageCount: wsMessages.length,
+        signalCount: signals.length,
+        transactionCount: transactions.length,
+        marketDataCount: marketData.length,
+        insightCount: insights.length,
+        lastMessageTime: wsMessages.length > 0 
+          ? new Date(wsMessages[wsMessages.length - 1].timestamp || Date.now()).toLocaleTimeString() 
+          : 'Never'
+      };
+      
+      setDiagnostics(diagnosticsInfo);
     };
     
     // Update immediately
     updateDiagnostics();
     
-    // Set up interval
+    // Set up interval for updating diagnostics
     diagnosticsIntervalRef.current = window.setInterval(updateDiagnostics, 1000) as unknown as number;
 
-    // Cleanup subscriptions
+    // Cleanup interval on component unmount
     return () => {
-      unsubscribeConn();
-      unsubscribeMsg();
       if (diagnosticsIntervalRef.current) {
         clearInterval(diagnosticsIntervalRef.current);
         diagnosticsIntervalRef.current = null;
       }
     };
-  }, []);
+  }, [connected, wsMessages.length, signals.length, transactions.length, marketData.length, insights.length]);
 
   const handleSendMessage = () => {
     if (!messageInput.trim()) return;
@@ -58,38 +92,52 @@ export default function WebSocketTest() {
     try {
       // Try to send as JSON if it's a valid JSON string
       const parsed = JSON.parse(messageInput);
-      wsClient.send(parsed);
+      sendMessage(parsed);
+      
+      // Add to local message log
+      setLocalMessages(prev => [...prev, `📤 Sent: ${JSON.stringify(parsed).substring(0, 100)}`]);
     } catch (e) {
-      // If not valid JSON, send as plain text
-      wsClient.send(messageInput);
+      // If not valid JSON, wrap as a message object
+      sendMessage({
+        type: 'TEXT_MESSAGE',
+        data: messageInput,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Add to local message log
+      setLocalMessages(prev => [...prev, `📤 Sent text: ${messageInput}`]);
     }
 
     setMessageInput('');
   };
 
   const handleSubscribeToMetrics = () => {
-    wsClient.send({
-      type: 'subscribe',
-      subscriptionType: 'metrics'
+    sendMessage({
+      type: 'GET_METRICS'
     });
+    
+    setLocalMessages(prev => [...prev, '📤 Requested metrics']);
   };
 
   const handleSubscribeToComponentHealth = () => {
-    wsClient.send({
-      type: 'subscribe',
-      subscriptionType: 'component-health'
+    sendMessage({
+      type: 'GET_COMPONENT_HEALTH'
     });
+    
+    setLocalMessages(prev => [...prev, '📤 Requested component health']);
   };
   
   const handleSubscribeToSystemHealth = () => {
-    wsClient.send({
-      type: 'subscribe',
-      subscriptionType: 'system-health'
+    sendMessage({
+      type: 'GET_SYSTEM_HEALTH'
     });
+    
+    setLocalMessages(prev => [...prev, '📤 Requested system health']);
   };
 
   const handleResetConnection = () => {
-    wsClient.reset();
+    reconnect();
+    setLocalMessages(prev => [...prev, '🔄 Reconnecting WebSocket...']);
   };
   
   // Test WebSocket connection directly
@@ -101,17 +149,17 @@ export default function WebSocketTest() {
       const host = window.location.host;
       const wsUrl = `${protocol}//${host}/ws`;
       
-      setMessages(prev => [...prev, `🧪 Testing WebSocket connection to: ${wsUrl}`]);
-      setMessages(prev => [...prev, `🌐 Environment: ${isReplitEnv ? 'Replit' : 'Local'}`]);
+      setLocalMessages(prev => [...prev, `🧪 Testing WebSocket connection to: ${wsUrl}`]);
+      setLocalMessages(prev => [...prev, `🌐 Environment: ${isReplitEnv ? 'Replit' : 'Local'}`]);
       console.log(`🧪 Testing direct WebSocket connection to: ${wsUrl}`);
       
-      // Create a new WebSocket directly (not using our client)
+      // Create a new WebSocket directly (not using our store)
       const testSocket = new WebSocket(wsUrl);
       
       // Set up listeners for this test connection
       testSocket.onopen = () => {
         console.log(`✅ Test socket connected successfully!`);
-        setMessages(prev => [...prev, `✅ Test connection successful to ${wsUrl}`]);
+        setLocalMessages(prev => [...prev, `✅ Test connection successful to ${wsUrl}`]);
         
         // Send a test message
         const testMessage = {
@@ -122,22 +170,22 @@ export default function WebSocketTest() {
         
         try {
           testSocket.send(JSON.stringify(testMessage));
-          setMessages(prev => [...prev, `📤 Sent test message: ${JSON.stringify(testMessage)}`]);
-        } catch (sendError) {
-          setMessages(prev => [...prev, `❌ Error sending message: ${sendError.message}`]);
+          setLocalMessages(prev => [...prev, `📤 Sent test message: ${JSON.stringify(testMessage)}`]);
+        } catch (sendError: any) {
+          setLocalMessages(prev => [...prev, `❌ Error sending message: ${sendError.message}`]);
         }
         
-        // Also send a PING to test that mechanism
+        // Also send a ping signal request
         setTimeout(() => {
           try {
-            const pingMessage = {
-              type: 'PING',
+            const signalRequest = {
+              type: 'GET_SIGNALS',
               timestamp: new Date().toISOString()
             };
-            testSocket.send(JSON.stringify(pingMessage));
-            setMessages(prev => [...prev, `📤 Sent PING message`]);
-          } catch (pingError) {
-            setMessages(prev => [...prev, `❌ Error sending PING: ${pingError.message}`]);
+            testSocket.send(JSON.stringify(signalRequest));
+            setLocalMessages(prev => [...prev, `📤 Sent signal request`]);
+          } catch (pingError: any) {
+            setLocalMessages(prev => [...prev, `❌ Error sending signal request: ${pingError.message}`]);
           }
         }, 1000);
         
@@ -145,9 +193,9 @@ export default function WebSocketTest() {
         setTimeout(() => {
           try {
             testSocket.close(1000, 'Test completed');
-            setMessages(prev => [...prev, `🔒 Test completed and connection closed`]);
-          } catch (closeError) {
-            setMessages(prev => [...prev, `❌ Error closing connection: ${closeError.message}`]);
+            setLocalMessages(prev => [...prev, `🔒 Test completed and connection closed`]);
+          } catch (closeError: any) {
+            setLocalMessages(prev => [...prev, `❌ Error closing connection: ${closeError.message}`]);
           }
         }, 5000);
       };
@@ -157,24 +205,24 @@ export default function WebSocketTest() {
         try {
           // Try to parse and format JSON messages
           const parsedData = JSON.parse(event.data);
-          setMessages(prev => [...prev, `📨 Received: ${parsedData.type || 'Unknown type'} - ${JSON.stringify(parsedData).substring(0, 100)}${JSON.stringify(parsedData).length > 100 ? '...' : ''}`]);
+          setLocalMessages(prev => [...prev, `📨 Received: ${parsedData.type || 'Unknown type'} - ${JSON.stringify(parsedData).substring(0, 100)}${JSON.stringify(parsedData).length > 100 ? '...' : ''}`]);
         } catch (e) {
-          setMessages(prev => [...prev, `📨 Received non-JSON: ${event.data.toString().substring(0, 100)}${event.data.toString().length > 100 ? '...' : ''}`]);
+          setLocalMessages(prev => [...prev, `📨 Received non-JSON: ${event.data.toString().substring(0, 100)}${event.data.toString().length > 100 ? '...' : ''}`]);
         }
       };
       
-      testSocket.onerror = (error) => {
-        console.error(`❌ Test socket error:`, error);
-        setMessages(prev => [...prev, `❌ Test connection error: ${error.toString()}`]);
+      testSocket.onerror = (event) => {
+        console.error(`❌ Test socket error:`, event);
+        setLocalMessages(prev => [...prev, `❌ Test connection error: WebSocket error event`]);
       };
       
       testSocket.onclose = (event) => {
         console.log(`🔒 Test socket closed: ${event.code} ${event.reason}`);
-        setMessages(prev => [...prev, `🔒 Test connection closed: ${event.code} ${event.reason || 'No reason provided'}`]);
+        setLocalMessages(prev => [...prev, `🔒 Test connection closed: ${event.code} ${event.reason || 'No reason provided'}`]);
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Error creating test WebSocket:`, error);
-      setMessages(prev => [...prev, `❌ Error creating test WebSocket: ${error.message}`]);
+      setLocalMessages(prev => [...prev, `❌ Error creating test WebSocket: ${error.message}`]);
     }
   };
 
@@ -260,10 +308,11 @@ export default function WebSocketTest() {
           
           <button 
             onClick={() => {
-              wsClient.send({
+              sendMessage({
                 type: 'PING',
                 timestamp: new Date().toISOString()
               });
+              setLocalMessages(prev => [...prev, "📤 Sent PING message"]);
             }}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-md transition-colors"
             disabled={!connected}
@@ -330,15 +379,103 @@ export default function WebSocketTest() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* WebSocket Store Data */}
       <div className="p-4 rounded-lg bg-gray-800 border border-gray-700">
-        <h3 className="text-xl font-semibold mb-2">Received Messages</h3>
+        <h3 className="text-xl font-semibold mb-2">WebSocket Store Data</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h4 className="font-medium text-blue-400 mb-1">Signals ({signals.length})</h4>
+            <div className="max-h-40 overflow-y-auto bg-gray-900 p-2 rounded">
+              {signals.length === 0 ? (
+                <p className="text-gray-500 text-xs">No signals received yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {signals.map((signal, index) => (
+                    <li key={index} className="text-xs">
+                      <span className="text-green-400">{signal.data?.type || 'unknown'}</span>: {signal.data?.pair || 'n/a'} 
+                      {signal.data?.price ? ` @ $${signal.data.price}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-purple-400 mb-1">Transactions ({transactions.length})</h4>
+            <div className="max-h-40 overflow-y-auto bg-gray-900 p-2 rounded">
+              {transactions.length === 0 ? (
+                <p className="text-gray-500 text-xs">No transactions received yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {transactions.map((tx, index) => (
+                    <li key={index} className="text-xs">
+                      <span className={tx.data?.status === 'CONFIRMED' ? 'text-green-400' : 
+                                       tx.data?.status === 'PENDING' ? 'text-yellow-400' : 'text-red-400'}>
+                        {tx.data?.status || 'unknown'}
+                      </span>: {tx.data?.pair || 'n/a'} 
+                      {tx.data?.amount ? ` (${tx.data.amount})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-amber-400 mb-1">Market Data ({marketData.length})</h4>
+            <div className="max-h-40 overflow-y-auto bg-gray-900 p-2 rounded">
+              {marketData.length === 0 ? (
+                <p className="text-gray-500 text-xs">No market data received yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {marketData.map((data, index) => (
+                    <li key={index} className="text-xs">
+                      {data.type}: {Object.keys(data.data || {}).length} data points
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-indigo-400 mb-1">AI Insights ({insights.length})</h4>
+            <div className="max-h-40 overflow-y-auto bg-gray-900 p-2 rounded">
+              {insights.length === 0 ? (
+                <p className="text-gray-500 text-xs">No insights received yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {insights.map((insight, index) => (
+                    <li key={index} className="text-xs">
+                      {insight.type}: {insight.data?.summary || 'No summary'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 flex justify-end">
+          <button 
+            onClick={clearMessages}
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+          >
+            Clear All Data
+          </button>
+        </div>
+      </div>
+      
+      {/* Messages Log */}
+      <div className="p-4 rounded-lg bg-gray-800 border border-gray-700">
+        <h3 className="text-xl font-semibold mb-2">Message Log</h3>
         <div className="max-h-96 overflow-y-auto">
-          {messages.length === 0 ? (
-            <p className="text-gray-500">No messages received yet.</p>
+          {localMessages.length === 0 ? (
+            <p className="text-gray-500">No messages in log yet.</p>
           ) : (
             <ul className="space-y-2">
-              {messages.map((msg, index) => (
+              {localMessages.map((msg, index) => (
                 <li key={index} className="p-2 bg-gray-700 rounded">
                   <pre className="whitespace-pre-wrap text-xs">{msg}</pre>
                 </li>
