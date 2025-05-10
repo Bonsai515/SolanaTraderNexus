@@ -129,8 +129,11 @@ queryClient.setDefaultOptions({
 
 // Export a direct replacement for QueryClientProvider
 export function QueryClientProvider({ children }: { children: ReactNode }) {
-  // Return the children directly for now to avoid build issues
-  return children;
+  return (
+    <TanStackQueryClientProvider client={queryClient}>
+      {children}
+    </TanStackQueryClientProvider>
+  );
 }
 
 export default queryClient;

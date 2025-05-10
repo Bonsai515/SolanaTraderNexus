@@ -1,5 +1,6 @@
 import { Route, Link } from 'wouter';
 import NotFound from './pages/not-found';
+import SystemDashboard from './pages/SystemDashboard';
 import { useEffect, useState } from 'react';
 
 // Simple Dashboard Component
@@ -195,6 +196,7 @@ function App() {
             <ul className="flex space-x-6">
               <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
               <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
+              <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
             </ul>
           </nav>
         </div>
@@ -203,6 +205,7 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         <Route path="/" component={Dashboard} />
         <Route path="/insights" component={Dashboard} />
+        <Route path="/system" component={SystemDashboard} />
         <Route path="/:rest*" component={NotFound} />
       </main>
     </div>

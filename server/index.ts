@@ -129,6 +129,11 @@ async function startServer() {
     logger.info(`Serving client files from ${path.join(__dirname, '../client')}`);
     app.use('/client', express.static(path.join(__dirname, '../client')));
     
+    // Handle all routes for the React app - this needs to come before more specific routes
+    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet'], (req, res) => {
+      res.sendFile(path.join(__dirname, '../client/index.html'));
+    });
+    
     // Create a simple HTML page for testing
     app.get('/test-page', (req, res) => {
       res.send(`
@@ -145,6 +150,20 @@ async function startServer() {
           </body>
         </html>
       `);
+    });
+    
+    // Catch-all route to handle all other React routes
+    app.get('*', (req, res) => {
+      // Only handle paths that look like frontend routes (not API or static assets)
+      if (!req.path.startsWith('/api/') && 
+          !req.path.includes('.') && 
+          req.path !== '/health' && 
+          req.path !== '/test-page') {
+        res.sendFile(path.join(__dirname, '../client/index.html'));
+      } else {
+        // For any routes not handled, pass to the next middleware (which will 404)
+        res.status(404).send('Not found');
+      }
     });
     
     // Start HTTP server
