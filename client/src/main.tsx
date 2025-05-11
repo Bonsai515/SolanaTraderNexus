@@ -16,7 +16,7 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement || document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider>
-      <App />
+        <App />
     </QueryClientProvider>
   </React.StrictMode>
 );

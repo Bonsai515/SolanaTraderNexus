@@ -1780,10 +1780,18 @@ export function setupWebSocketServer(httpServer: Server) {
     server: httpServer, 
     path: '/ws',
     // Explicitly allowing connections from any origin
-    verifyClient: () => true,
+    verifyClient: (info) => {
+      logger.info(`WebSocket connection request from origin: ${info.origin}`);
+      return true; // Accept all connections
+    },
   });
   
   logger.info('💻 WebSocket server accessible at /ws endpoint');
+  
+  // Set up event listeners for the WebSocket server itself
+  wss.on('error', (error) => {
+    logger.error('WebSocket server error:', error);
+  });
   
   // Log server address details properly
   const addr = httpServer.address();
@@ -1797,15 +1805,36 @@ export function setupWebSocketServer(httpServer: Server) {
     logger.info('Server address not available yet - waiting for it to start listening')
   }
   
+  // Log the total number of connections periodically
+  setInterval(() => {
+    logger.debug(`Active WebSocket connections: ${wss.clients.size}`);
+  }, 30000);
+  
   // Connection handling with detailed logging
   wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
-    logger.info(`New WebSocket connection from ${clientIp}`);
+    const origin = req.headers.origin || 'unknown';
+    logger.info(`New WebSocket connection from ${clientIp} (origin: ${origin})`);
+    
+    // Initial connection success message
+    try {
+      ws.send(JSON.stringify({
+        type: 'CONNECTED',
+        timestamp: new Date().toISOString(),
+        message: 'Successfully connected to trading platform WebSocket'
+      }));
+    } catch (err) {
+      logger.error('Error sending welcome message:', err);
+    }
+    
+    // Register with agent system
+    AgentManager.addWsClient(ws);
     
     ws.on('message', (message) => {
       try {
         const parsedMessage = JSON.parse(message.toString());
-        logger.info(`Received WebSocket message: ${JSON.stringify(parsedMessage)}`);
+        logger.info(`Received WebSocket message type: ${parsedMessage.type}`);
+        logger.debug(`Message content: ${JSON.stringify(parsedMessage).substring(0, 200)}${JSON.stringify(parsedMessage).length > 200 ? '...' : ''}`);
         
         // Handle PING messages with a PONG response for connection health checks
         if (parsedMessage.type === 'PING') {
@@ -1833,6 +1862,56 @@ export function setupWebSocketServer(httpServer: Server) {
             logger.info('Responded to TEST_CONNECTION message');
           } catch (err) {
             logger.error('Error sending TEST_CONNECTION_RESPONSE:', err);
+          }
+        }
+        
+        // Handle GET_MARKET_DATA messages
+        if (parsedMessage.type === 'GET_MARKET_DATA') {
+          try {
+            // Get requested pairs or default to main pairs
+            const requestedPairs = parsedMessage.pairs || ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+            logger.info(`Market data requested for pairs: ${requestedPairs.join(', ')}`);
+            
+            // Import PriceFeedCache if needed
+            const { priceFeedCache } = require('./priceFeedCache');
+            
+            // Get market data for each requested pair
+            const priceFeedData = {};
+            
+            // Check if we have market data for each requested pair
+            for (const pair of requestedPairs) {
+              const marketData = priceFeedCache.getMarketData(pair);
+              if (marketData) {
+                priceFeedData[pair] = marketData;
+              }
+            }
+            
+            // Send the market data response
+            ws.send(JSON.stringify({
+              type: 'MARKET_DATA',
+              timestamp: new Date().toISOString(),
+              requestId: parsedMessage.requestId, // Echo back the request ID if provided
+              data: {
+                pairs: priceFeedData
+              }
+            }));
+            
+            logger.debug(`Sent market data for ${Object.keys(priceFeedData).length} pairs via WebSocket`);
+          } catch (err) {
+            logger.error('Error sending market data response:', err);
+            
+            // Send error response
+            try {
+              ws.send(JSON.stringify({
+                type: 'ERROR',
+                timestamp: new Date().toISOString(),
+                requestId: parsedMessage.requestId,
+                error: 'Failed to retrieve market data',
+                message: err instanceof Error ? err.message : String(err)
+              }));
+            } catch (sendError) {
+              logger.error('Error sending error response:', sendError);
+            }
           }
         }
         
@@ -2663,11 +2742,15 @@ const initializeTransformerAPI = async () => {
   if (!transformerApiInitialized) {
     try {
       const transformer = getTransformerAPI(storage);
-      await transformer.initialize();
+      if (!transformer) {
+        throw new Error('Failed to get transformer API instance');
+      }
+      await transformer.initialize(['SOL/USDC', 'BONK/USDC', 'JUP/USDC']);
       transformerApiInitialized = true;
       logger.info("Transformer API initialized successfully");
     } catch (error) {
       logger.error("Failed to initialize transformer API:", error);
+      throw error; // Re-throw to handle in caller
     }
   }
 };
