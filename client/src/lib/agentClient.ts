@@ -1,7 +1,4 @@
-` tags. I will pay close attention to the TypeScript errors mentioned in the intention and ensure the final code is syntactically correct and complete.
 
-```typescript
-<replit_final_file>
 import { useCallback, useContext, createContext, useState, useEffect, ReactNode } from 'react';
 import { useWsContext } from './wsClient';
 import { apiRequest } from './queryClient';
@@ -43,7 +40,6 @@ export interface AgentState {
   lastError?: string;
 }
 
-// Agent store state interface
 interface AgentStoreState {
   agents: Record<string, AgentState>;
   isLoading: boolean;
@@ -53,7 +49,6 @@ interface AgentStoreState {
   selectAgent: (id: string) => void;
 }
 
-// Provider props interface
 interface AgentProviderProps {
   children: ReactNode;
 }
@@ -67,8 +62,9 @@ export function AgentProvider({ children }: AgentProviderProps) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const wsContext = useWsContext();
 
-  const refreshAgents = async () => {
+  const refreshAgents = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await apiRequest<AgentState[]>('/api/agents');
@@ -83,11 +79,17 @@ export function AgentProvider({ children }: AgentProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const selectAgent = (id: string) => {
+  const selectAgent = useCallback((id: string) => {
     setSelectedAgent(id);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (wsContext?.connected) {
+      refreshAgents();
+    }
+  }, [wsContext?.connected, refreshAgents]);
 
   const value: AgentStoreState = {
     agents,
@@ -108,11 +110,11 @@ export function AgentProvider({ children }: AgentProviderProps) {
 // Hook to use agent context
 export function useAgentStore(): AgentStoreState {
   const context = useContext(AgentContext);
-
+  
   if (!context) {
     throw new Error('useAgentStore must be used within an AgentProvider');
   }
-
+  
   return context;
 }
 
