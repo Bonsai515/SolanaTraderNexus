@@ -23,7 +23,12 @@ export default function NeuralConnector() {
   } = useQuery({
     queryKey: ['/api/neural/status'],
     queryFn: () => neuralConnectorClient.getStatus(),
-    refetchInterval: 5000 // Refresh every 5 seconds
+    refetchInterval: 5000, // Refresh every 5 seconds
+    retry: 3,
+    retryDelay: 1000,
+    onError: (error) => {
+      console.error('Error fetching neural connector status:', error);
+    }
   });
 
   // Run latency test
