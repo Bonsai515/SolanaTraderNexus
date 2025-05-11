@@ -8,10 +8,16 @@ export default defineConfig({
     port: 5000,
     open: false,
     proxy: {
-      '/api': 'http://localhost:5000',
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      },
       '/ws': {
         target: 'ws://localhost:5000',
-        ws: true
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
       }
     }
   },
