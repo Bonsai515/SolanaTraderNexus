@@ -9,6 +9,7 @@ import { logger } from './logger';
 import net from 'net';
 import { createServer as createViteServer } from 'vite';
 import * as fs from 'fs';
+import signalMonitoring from './signalMonitoring';
 
 // Set the InstantNodes URLs for the 2-day trial
 process.env.INSTANT_NODES_RPC_URL = 'https://solana-grpc-geyser.instantnodes.io:443';
@@ -87,6 +88,10 @@ app.get('/api/health', (req, res) => {
 
 // Create HTTP server
 const httpServer = createServer(app);
+
+// Initialize signal monitoring service
+signalMonitoring.initializeSignalMonitoring();
+logger.info('Signal monitoring service initialized');
 
 // Set up WebSocket server using our enhanced implementation
 const wss = setupWebSocketServer(httpServer);
