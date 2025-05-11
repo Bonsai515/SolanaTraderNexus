@@ -33,14 +33,15 @@ export function getSolanaConnection(
     const instantNodesWsUrl = env.VITE_INSTANT_NODES_WS_URL || 
       (typeof process !== 'undefined' && process.env ? process.env.INSTANT_NODES_WS_URL : '');
     
-    if (instantNodesRpcUrl && instantNodesRpcUrl.length > 10) {
-      console.log('Using InstantNodes RPC endpoint');
-      return new Connection(instantNodesRpcUrl, {
-        commitment,
-        wsEndpoint: instantNodesWsUrl,
-        confirmTransactionInitialTimeout: 60000, // 60 seconds
-      });
-    }
+    // Always use the hardcoded InstantNodes URL for 2-day trial
+    const trialInstantNodesRpcUrl = 'https://solana-grpc-geyser.instantnodes.io:443';
+    const trialInstantNodesWsUrl = 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+    console.log('Using InstantNodes trial RPC endpoint with WebSocket');
+    return new Connection(trialInstantNodesRpcUrl, {
+      commitment,
+      wsEndpoint: trialInstantNodesWsUrl,
+      confirmTransactionInitialTimeout: 60000, // 60 seconds
+    });
   } catch (error) {
     console.warn('Failed to connect to InstantNodes RPC. Falling back to public endpoint.', error);
   }
