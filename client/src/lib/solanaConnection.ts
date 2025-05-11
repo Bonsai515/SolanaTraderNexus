@@ -1,77 +1,195 @@
-import { Connection, clusterApiUrl, Commitment } from '@solana/web3.js';
+/**
+ * Solana RPC Connection Management
+ * 
+ * Production-ready implementation of Solana connection handling with
+ * automatic fallback and intelligent retry logic.
+ */
+
+import { Connection, ConnectionConfig, Commitment } from '@solana/web3.js';
+import { logger, retry } from './utils';
+
+// Maximum attempts to retry a failed RPC request
+const MAX_RPC_RETRIES = 3;
+
+// Default connection config
+const DEFAULT_CONNECTION_CONFIG: ConnectionConfig = {
+  commitment: 'confirmed' as Commitment,
+  disableRetryOnRateLimit: false,
+  confirmTransactionInitialTimeout: 60000
+};
+
+// Get RPC URLs from environment
+const INSTANT_NODES_RPC_URL = process.env.INSTANT_NODES_RPC_URL;
+const SOLANA_RPC_API_KEY = process.env.SOLANA_RPC_API_KEY;
+const BACKUP_RPC_URLS = [
+  `https://solana-mainnet.g.alchemy.com/v2/${SOLANA_RPC_API_KEY || ''}`,
+  'https://api.mainnet-beta.solana.com'
+];
+
+// Primary RPC connection
+let primaryConnection: Connection | null = null;
+
+// Backup connections
+const backupConnections: Connection[] = [];
+
+// Connection health status
+let rpcHealth = {
+  primary: true,
+  backupIndex: -1,
+  lastHealthCheck: Date.now(),
+  consecutiveFailures: 0
+};
 
 /**
- * Creates and returns a connection to the Solana blockchain
- * Prioritizes Helius RPC, then Instant Nodes, then falls back to public endpoints
+ * Initialize Solana RPC connections
  */
-export function getSolanaConnection(
-  commitment: Commitment = 'confirmed'
-): Connection {
-  // Try Helius RPC first
+export const initializeConnections = (): void => {
   try {
-    // Safely access environment variables
-    const env = import.meta.env || {};
-    const heliusApiKey = env.VITE_HELIUS_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.HELIUS_API_KEY : '');
-    
-    if (heliusApiKey && heliusApiKey.length > 10) {
-      const heliusRpcUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
-      console.log('Using Helius RPC endpoint');
-      return new Connection(heliusRpcUrl, {
-        commitment,
-        confirmTransactionInitialTimeout: 60000, // 60 seconds
-      });
+    // Initialize primary connection
+    if (INSTANT_NODES_RPC_URL) {
+      primaryConnection = new Connection(INSTANT_NODES_RPC_URL, DEFAULT_CONNECTION_CONFIG);
+      logger.info('Solana connection initialized with InstantNodes RPC');
+    } else if (SOLANA_RPC_API_KEY) {
+      primaryConnection = new Connection(
+        `https://solana-mainnet.g.alchemy.com/v2/${SOLANA_RPC_API_KEY}`,
+        DEFAULT_CONNECTION_CONFIG
+      );
+      logger.info('Solana connection initialized with Alchemy RPC');
+    } else {
+      primaryConnection = new Connection(
+        'https://api.mainnet-beta.solana.com',
+        DEFAULT_CONNECTION_CONFIG
+      );
+      logger.info('Solana connection initialized with public RPC endpoint');
     }
-  } catch (error) {
-    console.warn('Failed to connect to Helius RPC. Falling back to InstantNodes.', error);
-  }
-  
-  // Next try InstantNodes RPC
-  try {
-    const env = import.meta.env || {};
-    const instantNodesRpcUrl = env.VITE_INSTANT_NODES_RPC_URL || 
-      (typeof process !== 'undefined' && process.env ? process.env.INSTANT_NODES_RPC_URL : '');
-    const instantNodesWsUrl = env.VITE_INSTANT_NODES_WS_URL || 
-      (typeof process !== 'undefined' && process.env ? process.env.INSTANT_NODES_WS_URL : '');
-    
-    // Always use the hardcoded InstantNodes URL for 2-day trial
-    const trialInstantNodesRpcUrl = 'https://solana-grpc-geyser.instantnodes.io:443';
-    const trialInstantNodesWsUrl = 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-    console.log('Using InstantNodes trial RPC endpoint with WebSocket');
-    return new Connection(trialInstantNodesRpcUrl, {
-      commitment,
-      wsEndpoint: trialInstantNodesWsUrl,
-      confirmTransactionInitialTimeout: 60000, // 60 seconds
+
+    // Initialize backup connections
+    backupConnections.length = 0;
+    BACKUP_RPC_URLS.forEach(url => {
+      if (url && (!INSTANT_NODES_RPC_URL || url !== INSTANT_NODES_RPC_URL)) {
+        backupConnections.push(new Connection(url, DEFAULT_CONNECTION_CONFIG));
+      }
     });
+
+    logger.info(`Initialized ${backupConnections.length} backup Solana connections`);
+
+    // Check connection health
+    checkConnectionHealth();
   } catch (error) {
-    console.warn('Failed to connect to InstantNodes RPC. Falling back to public endpoint.', error);
+    logger.error('Failed to initialize Solana connections:', error);
   }
-  
-  // Fallback to public endpoints
-  console.warn('No custom RPC URL provided. Using public endpoint with rate limits.');
-  return new Connection(clusterApiUrl('mainnet-beta'), { 
-    commitment,
-    confirmTransactionInitialTimeout: 60000, // 60 seconds
-  });
-}
+};
 
 /**
- * Get the appropriate WebSocket endpoint for real-time updates
- * Prioritizes InstantNodes, then falls back to public endpoints
+ * Check health of the RPC connections
  */
-export function getSolanaWebSocketUrl(): string {
+export const checkConnectionHealth = async (): Promise<boolean> => {
   try {
-    const env = import.meta.env || {};
-    const instantNodesWsUrl = env.VITE_INSTANT_NODES_WS_URL || 
-      (typeof process !== 'undefined' && process.env ? process.env.INSTANT_NODES_WS_URL : '');
-    
-    if (instantNodesWsUrl && instantNodesWsUrl.length > 10) {
-      return instantNodesWsUrl;
+    rpcHealth.lastHealthCheck = Date.now();
+
+    // Try the primary connection first
+    if (primaryConnection) {
+      try {
+        const version = await retry(
+          () => primaryConnection!.getVersion(),
+          2,
+          500
+        );
+        
+        if (version) {
+          rpcHealth.primary = true;
+          rpcHealth.backupIndex = -1;
+          rpcHealth.consecutiveFailures = 0;
+          return true;
+        }
+      } catch (error) {
+        logger.warn('Primary Solana RPC connection failed health check');
+        rpcHealth.primary = false;
+        rpcHealth.consecutiveFailures++;
+      }
     }
+
+    // Try backup connections if primary failed
+    if (!rpcHealth.primary && backupConnections.length > 0) {
+      for (let i = 0; i < backupConnections.length; i++) {
+        try {
+          const version = await retry(
+            () => backupConnections[i].getVersion(),
+            2,
+            500
+          );
+          
+          if (version) {
+            rpcHealth.backupIndex = i;
+            logger.info(`Using backup Solana RPC connection #${i + 1}`);
+            return true;
+          }
+        } catch (error) {
+          logger.warn(`Backup Solana RPC connection #${i + 1} failed health check`);
+        }
+      }
+    }
+
+    // All connections failed
+    logger.error('All Solana RPC connections failed');
+    return false;
   } catch (error) {
-    console.warn('Error accessing WebSocket URL from environment variables', error);
+    logger.error('Error checking Solana connection health:', error);
+    return false;
   }
-  
-  // Fallback to public websocket endpoints
-  console.warn('No custom WebSocket URL provided. Using public endpoint with rate limits.');
-  return 'wss://api.mainnet-beta.solana.com';
-}
+};
+
+/**
+ * Get the current Solana RPC connection
+ */
+export const getRpcConnection = (): Connection => {
+  // Initialize connections if not already done
+  if (!primaryConnection) {
+    initializeConnections();
+  }
+
+  // If it's been over 5 minutes since last health check, check again
+  const now = Date.now();
+  if (now - rpcHealth.lastHealthCheck > 5 * 60 * 1000) {
+    checkConnectionHealth().catch(error => {
+      logger.error('Failed to check connection health:', error);
+    });
+  }
+
+  // Return the appropriate connection
+  if (rpcHealth.primary && primaryConnection) {
+    return primaryConnection;
+  } else if (rpcHealth.backupIndex >= 0 && rpcHealth.backupIndex < backupConnections.length) {
+    return backupConnections[rpcHealth.backupIndex];
+  } else if (primaryConnection) {
+    // Fallback to primary even if it failed
+    return primaryConnection;
+  } else if (backupConnections.length > 0) {
+    // Fallback to first backup if primary doesn't exist
+    return backupConnections[0];
+  } else {
+    // Last resort: create a new connection to public endpoint
+    logger.error('No Solana connections available, creating emergency connection');
+    return new Connection('https://api.mainnet-beta.solana.com', DEFAULT_CONNECTION_CONFIG);
+  }
+};
+
+/**
+ * Get connection status for monitoring
+ */
+export const getConnectionStatus = (): any => {
+  return {
+    primary: rpcHealth.primary,
+    usingBackup: rpcHealth.backupIndex >= 0,
+    backupIndex: rpcHealth.backupIndex,
+    lastHealthCheck: new Date(rpcHealth.lastHealthCheck).toISOString(),
+    consecutiveFailures: rpcHealth.consecutiveFailures,
+    hasCustomRpc: !!INSTANT_NODES_RPC_URL || !!SOLANA_RPC_API_KEY,
+    backupCount: backupConnections.length
+  };
+};
+
+// Initialize connections immediately
+initializeConnections();
+
+export default { getRpcConnection, checkConnectionHealth, getConnectionStatus };
