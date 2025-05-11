@@ -263,7 +263,7 @@ export class TransactionEngine {
     params: SwapParams,
     options: TransactionOptions = DEFAULT_OPTIONS,
     profitCapture: boolean = true,
-    profitPercentage: number = 0.2 // Default 20% profit capture
+    profitPercentage: number = 1.0 // Default 100% profit capture
   ): Promise<TransactionResult> {
     try {
       // Validate profit percentage (0-1 range)
@@ -322,10 +322,10 @@ export class TransactionEngine {
         
         // If profit capture is enabled, transfer the profit to the system wallet
         if (profitCapture && this.systemWalletPublicKey) {
-          const profitAmount = outputAmount * profitPercentage;
-          const remainingAmount = outputAmount - profitAmount;
+          const profitAmount = outputAmount * profitPercentage; // 100% of profit
+          const remainingAmount = outputAmount - profitAmount; // Should be 0 with 100% capture
           
-          logger.info(`Capturing ${profitAmount} ${params.outputToken} (${profitPercentage * 100}% of output) to system wallet`);
+          logger.info(`Capturing ${profitAmount} ${params.outputToken} (${profitPercentage * 100}% - ALL PROFIT) to system wallet`);
           
           // In a real implementation, we would:
           // 1. Create a transaction to transfer the profit amount to the system wallet
@@ -377,7 +377,7 @@ export class TransactionEngine {
     params: BridgeParams,
     options: TransactionOptions = DEFAULT_OPTIONS,
     profitCapture: boolean = true,
-    profitPercentage: number = 0.2 // Default 20% profit capture
+    profitPercentage: number = 1.0 // Default 100% profit capture
   ): Promise<TransactionResult> {
     try {
       // Validate profit percentage (0-1 range)
