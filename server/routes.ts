@@ -1,7 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import storage from './storage';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
@@ -849,7 +849,7 @@ router.get('/signals/:id', async (req, res) => {
 router.get('/signal-monitoring/metrics', async (req, res) => {
   try {
     // Import signalMonitoring here to avoid circular dependencies
-    const { signalMonitoring } = require('./signalMonitoring');
+    const signalMonitoring = require('./signalMonitoring').default;
     
     const metrics = signalMonitoring.getMetrics();
     
@@ -895,7 +895,7 @@ router.get('/signal-monitoring/validation', async (req, res) => {
 router.get('/signal-monitoring/components', async (req, res) => {
   try {
     // Import signalMonitoring here to avoid circular dependencies
-    const { signalMonitoring } = require('./signalMonitoring');
+    const signalMonitoring = require('./signalMonitoring').default;
     
     const metrics = signalMonitoring.getMetrics();
     
@@ -918,7 +918,7 @@ router.get('/signal-monitoring/components', async (req, res) => {
 router.get('/signal-monitoring/dashboard', async (req, res) => {
   try {
     // Import signalMonitoring here to avoid circular dependencies
-    const { signalMonitoring } = require('./signalMonitoring');
+    const signalMonitoring = require('./signalMonitoring').default;
     
     const metrics = signalMonitoring.getMetrics();
     
@@ -993,7 +993,7 @@ router.get('/signal-monitoring/dashboard', async (req, res) => {
 router.post('/signal-monitoring/reset', async (req, res) => {
   try {
     // Import signalMonitoring here to avoid circular dependencies
-    const { signalMonitoring } = require('./signalMonitoring');
+    const signalMonitoring = require('./signalMonitoring').default;
     
     signalMonitoring.resetMetrics();
     
@@ -1816,6 +1816,10 @@ export function setupWebSocketServer(httpServer: Server) {
     const origin = req.headers.origin || 'unknown';
     logger.info(`New WebSocket connection from ${clientIp} (origin: ${origin})`);
     
+    // Register with signal monitoring service
+    const signalMonitoring = require('./signalMonitoring').default;
+    signalMonitoring.addSignalMonitoringClient(ws);
+    
     // Initial connection success message
     try {
       ws.send(JSON.stringify({
@@ -1955,6 +1959,10 @@ export function setupWebSocketServer(httpServer: Server) {
     
     ws.on('close', (code, reason) => {
       logger.info(`WebSocket connection closed: ${code} ${reason}`);
+      
+      // Unregister from signal monitoring service
+      const signalMonitoring = require('./signalMonitoring').default;
+      signalMonitoring.removeSignalMonitoringClient(ws);
     });
     
     ws.on('error', (error) => {
@@ -1978,7 +1986,15 @@ export function setupWebSocketServer(httpServer: Server) {
   // Set up periodic signal monitoring broadcasts
   setInterval(() => {
     try {
-      const { signalMonitoring } = require('./signalMonitoring');
+      // Import the signalMonitoring module properly with all exported methods
+      const signalMonitoring = require('./signalMonitoring').default;
+      
+      // Check if getMetrics is defined before calling it
+      if (!signalMonitoring || typeof signalMonitoring.getMetrics !== 'function') {
+        logger.error('Signal monitoring module or getMetrics function not available');
+        return;
+      }
+      
       const metrics = signalMonitoring.getMetrics();
       
       // Broadcast to all connected WebSocket clients based on their subscriptions
@@ -2064,6 +2080,10 @@ export function setupWebSocketServer(httpServer: Server) {
   
   wss.on('connection', (ws) => {
     logger.info('Client connected to WebSocket');
+    
+    // Register with signal monitoring service
+    const signalMonitoring = require('./signalMonitoring').default;
+    signalMonitoring.addSignalMonitoringClient(ws);
     
     // Send welcome message
     ws.send(JSON.stringify({
@@ -2509,6 +2529,10 @@ export function setupWebSocketServer(httpServer: Server) {
     // Handle close
     ws.on('close', () => {
       logger.info('Client disconnected from WebSocket');
+      
+      // Unregister from signal monitoring service
+      const signalMonitoring = require('./signalMonitoring').default;
+      signalMonitoring.removeSignalMonitoringClient(ws);
     });
     
     // Handle errors
