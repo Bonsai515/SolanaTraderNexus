@@ -1,21 +1,6 @@
-// Simple placeholder for class-variance-authority
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
-export interface VariantProps<T> {
-  [key: string]: any;
-}
-
-export function cva(base: string, config: any = {}) {
-  return function(props: any = {}) {
-    const classes = [base];
-    
-    if (config.variants) {
-      for (const variant in config.variants) {
-        if (props[variant] && config.variants[variant][props[variant]]) {
-          classes.push(config.variants[variant][props[variant]]);
-        }
-      }
-    }
-    
-    return classes.join(' ');
-  };
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs))
 }

@@ -1,104 +1,199 @@
 /**
- * Neural Connector Client
+ * Client-side Neural Connector Interface
  * 
- * Provides client-side interface to the ultra-low latency neural connector
- * that links transformers and AI trading agents with minimal overhead.
+ * Provides a client-side interface to the server-side neural connector service
+ * for ultra-low latency communication between transformers and AI agents.
  */
 
 import { apiRequest } from './queryClient';
 
-export interface NeuralSignal {
-  id: string;
-  timestamp: string;
-  type: string;
-  pair: string;
+// Neural path between transformer and agent
+export type NeuralPath = {
   source: string;
-  target: string | string[];
-  priority: string;
-  data: {
-    confidence: number;
-    metadata: Record<string, any>;
-    signals?: any[];
-    timing?: {
-      latencyMs: number;
-      processingTimeMs: number;
-    }
-  };
-}
+  target: string;
+  latencyMs: number;
+  status: 'active' | 'inactive';
+  priority: 'high' | 'normal' | 'low';
+};
 
-interface NeuralConnectorStatus {
-  status: 'disconnected' | 'connecting' | 'connected' | 'error';
-  paths: number;
-  clients: number;
+// Neural connector status
+export type NeuralStatus = {
+  active: boolean;
+  paths: NeuralPath[];
+  metricsMs: {
+    avgLatency: number;
+    minLatency: number;
+    maxLatency: number;
+  };
+  uptime: number;
+  lastActivityTimestamp: string;
+};
+
+// Signal priority
+export type SignalPriority = 'critical' | 'high' | 'normal' | 'low';
+
+// Signal options
+export type SignalOptions = {
+  priority?: SignalPriority;
+  confidenceThreshold?: number;
+  maxLatencyMs?: number;
+  tracking?: {
+    id: string;
+    timestamp: number;
+  };
+};
+
+// Neural signal
+export type NeuralSignal = {
+  id?: string;
+  source: string;
+  target: string;
+  type: string;
+  data: any;
+  options?: SignalOptions;
+  timestamp?: string;
+};
+
+// Neural response
+export type NeuralResponse = {
+  success: boolean;
   timestamp: string;
-}
+  latencyMs: number;
+  receiverId?: string;
+  responseData?: any;
+  error?: string;
+};
+
+// Test result
+export type TestResult = {
+  path: NeuralPath;
+  latencyMs: number;
+  success: boolean;
+  timestamp: string;
+  message?: string;
+};
 
 class NeuralConnectorClient {
-  private pathsCache: Map<string, any> = new Map();
-  
-  // Get neural connector status
-  async getStatus(): Promise<NeuralConnectorStatus> {
+  // Get the status of the neural connector
+  async getStatus(): Promise<NeuralStatus> {
     try {
       const response = await apiRequest('GET', '/api/neural/status');
       const data = await response.json();
-      return data.data;
+      
+      if (data.status === 'success' && data.data) {
+        return data.data;
+      } else {
+        throw new Error(data.message || 'Failed to get neural connector status');
+      }
     } catch (error) {
-      console.error('Error getting neural connector status:', error);
-      return {
-        status: 'error',
-        paths: 0,
-        clients: 0,
-        timestamp: new Date().toISOString()
-      };
+      console.error('Failed to get neural connector status:', error instanceof Error ? error.message : String(error));
+      throw error;
     }
   }
-  
-  // Send a neural signal from source to target
-  async sendSignal(source: string, target: string, pair: string, data: any): Promise<{ success: boolean; signalId?: string; message?: string }> {
+
+  // Send a signal through a neural pathway
+  async sendSignal(signal: NeuralSignal): Promise<NeuralResponse> {
     try {
-      const response = await apiRequest('POST', '/api/neural/signal', {
+      const response = await apiRequest('POST', '/api/neural/signal', signal);
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data) {
+        return data.data;
+      } else {
+        throw new Error(data.error || data.message || 'Failed to send neural signal');
+      }
+    } catch (error) {
+      console.error('Failed to send neural signal:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  // Update a neural path
+  async updatePath(path: NeuralPath): Promise<{ success: boolean }> {
+    try {
+      const response = await apiRequest('POST', '/api/neural/path', path);
+      const data = await response.json();
+      
+      return { 
+        success: data.status === 'success'
+      };
+    } catch (error) {
+      console.error('Failed to update neural path:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  // Delete a neural path
+  async deletePath(source: string, target: string): Promise<{ success: boolean }> {
+    try {
+      const response = await apiRequest('DELETE', '/api/neural/path', { source, target });
+      const data = await response.json();
+      
+      return { 
+        success: data.status === 'success'
+      };
+    } catch (error) {
+      console.error('Failed to delete neural path:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  // Test the latency of a neural path
+  async testLatency(source: string, target: string, iterations: number = 10): Promise<TestResult[]> {
+    try {
+      const response = await apiRequest('POST', '/api/neural/test-latency', {
         source,
         target,
-        pair,
-        data
+        iterations
       });
       
-      const result = await response.json();
-      return {
-        success: result.status === 'success',
-        signalId: result.signalId,
-        message: result.message
-      };
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data && data.data.results) {
+        return data.data.results;
+      } else {
+        throw new Error(data.error || data.message || 'Failed to test neural path latency');
+      }
     } catch (error) {
-      console.error('Error sending neural signal:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : String(error)
-      };
+      console.error('Failed to test neural path latency:', error instanceof Error ? error.message : String(error));
+      throw error;
     }
   }
-  
-  // Send a neural signal from MicroQHC to Hyperion
-  async sendHyperionFlashSignal(pair: string, profitEstimate: number, metadata: any = {}): Promise<{ success: boolean; signalId?: string; message?: string }> {
-    return this.sendSignal('micro_qhc', 'hyperion-1', pair, {
-      ...metadata,
-      profitEstimate,
-      signalType: 'flash_arbitrage',
-      neuralLatencyMs: 0.3,
-      detectionMethod: 'neural-quantum-pattern-recognition'
-    });
+
+  // Get all available transformers
+  async getTransformers(): Promise<string[]> {
+    try {
+      const response = await apiRequest('GET', '/api/neural/transformers');
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data && data.data.transformers) {
+        return data.data.transformers;
+      } else {
+        throw new Error(data.message || 'Failed to get transformers');
+      }
+    } catch (error) {
+      console.error('Failed to get transformers:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
-  
-  // Send a neural signal from MEME Cortex to Quantum Omega
-  async sendQuantumOmegaMemecoinSignal(pair: string, metadata: any = {}): Promise<{ success: boolean; signalId?: string; message?: string }> {
-    return this.sendSignal('meme_cortex', 'quantum-omega-1', pair, {
-      ...metadata,
-      signalType: 'memecoin_opportunity',
-      neuralLatencyMs: 0.5,
-      detectionMethod: 'neural-social-volume-correlation'
-    });
+
+  // Get all available agents
+  async getAgents(): Promise<string[]> {
+    try {
+      const response = await apiRequest('GET', '/api/neural/agents');
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data && data.data.agents) {
+        return data.data.agents;
+      } else {
+        throw new Error(data.message || 'Failed to get agents');
+      }
+    } catch (error) {
+      console.error('Failed to get agents:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 }
 
-// Export singleton instance
-export const neuralConnector = new NeuralConnectorClient();
+// Singleton instance
+export const neuralConnectorClient = new NeuralConnectorClient();
