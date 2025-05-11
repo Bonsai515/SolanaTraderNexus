@@ -59,8 +59,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API routes - register with '/api' prefix
-app.use('/api', routes);
+// API routes - register without '/api' prefix
+app.use('/', routes);
 
 // Root endpoint is now included in the React app routes handler below
 
