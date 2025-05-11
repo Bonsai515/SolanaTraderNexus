@@ -1,216 +1,360 @@
 /**
- * Neural Connector for Transformer/Agent Integration
+ * Neural Connector Service
  * 
- * Provides ultra-low latency connections between transformers and specific agents
- * Bypasses regular signal processing for optimized decision making
+ * Provides ultra-low latency communication between transformers and AI agents
+ * for faster signal processing and decision making.
  */
 
+import { v4 as uuidv4 } from 'uuid';
 import WebSocket from 'ws';
+import { Agent } from './agents';
 import { logger } from './logger';
-import { SignalType, SignalStrength, SignalDirection, SignalPriority } from '../shared/signalTypes';
 
-// Neural signal interface
-export interface NeuralSignal {
-  id: string;
-  timestamp: string;
-  type: string;
-  pair: string;
+export type NeuralPath = {
   source: string;
-  target: string | string[];
-  priority: string;
-  data: {
-    confidence: number;
-    metadata: Record<string, any>;
-    signals?: any[];
-    timing?: {
-      latencyMs: number;
-      processingTimeMs: number;
-    }
-  };
-}
-
-// Neural path configuration
-export interface NeuralPath {
-  source: string;
-  target: string | string[];
-  pathType: 'direct' | 'buffered';
-  priority: 'normal' | 'high' | 'ultra';
+  target: string;
   latencyMs: number;
-}
+  status: 'active' | 'inactive';
+  priority: 'high' | 'normal' | 'low';
+};
 
-// Neural connection status
-export enum NeuralConnectionStatus {
-  DISCONNECTED = 'disconnected',
-  CONNECTING = 'connecting',
-  CONNECTED = 'connected',
-  ERROR = 'error'
-}
+export type NeuralStatus = {
+  active: boolean;
+  paths: NeuralPath[];
+  metricsMs: {
+    avgLatency: number;
+    minLatency: number;
+    maxLatency: number;
+  };
+  uptime: number;
+  lastActivityTimestamp: string;
+};
 
-// Neural connector class
-export class NeuralConnector {
-  private paths: Map<string, NeuralPath> = new Map();
-  private clients: Map<string, WebSocket> = new Map();
-  private status: NeuralConnectionStatus = NeuralConnectionStatus.DISCONNECTED;
-  
+export type SignalPriority = 'critical' | 'high' | 'normal' | 'low';
+
+export type SignalOptions = {
+  priority?: SignalPriority;
+  confidenceThreshold?: number;
+  maxLatencyMs?: number;
+  tracking?: {
+    id: string;
+    timestamp: number;
+  };
+};
+
+export type NeuralSignal = {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  data: any;
+  options?: SignalOptions;
+  timestamp: string;
+};
+
+export type NeuralResponse = {
+  success: boolean;
+  timestamp: string;
+  latencyMs: number;
+  receiverId?: string;
+  responseData?: any;
+  error?: string;
+};
+
+// Store for neural metrics
+type MetricsStore = {
+  totalSignals: number;
+  successfulSignals: number;
+  failedSignals: number;
+  latencies: number[];
+  startTime: number;
+  lastActivityTime: number;
+};
+
+class NeuralConnectorService {
+  private active: boolean = false;
+  private paths: NeuralPath[] = [];
+  private metrics: MetricsStore;
+  private agentHandlers: Map<string, (signal: NeuralSignal) => Promise<any>> = new Map();
+  private transformerHandlers: Map<string, (response: NeuralResponse) => void> = new Map();
+
   constructor() {
-    this.setupDefaultPaths();
+    this.metrics = {
+      totalSignals: 0,
+      successfulSignals: 0,
+      failedSignals: 0,
+      latencies: [],
+      startTime: Date.now(),
+      lastActivityTime: Date.now()
+    };
+
+    // Initialize default neural paths
+    this.paths = [
+      {
+        source: 'microqhc',
+        target: 'hyperion',
+        latencyMs: 0.5,
+        status: 'active',
+        priority: 'high'
+      },
+      {
+        source: 'memecortex',
+        target: 'quantum_omega',
+        latencyMs: 0.7,
+        status: 'active',
+        priority: 'high'
+      }
+    ];
   }
-  
-  // Initialize the neural connector
+
+  /**
+   * Initialize the neural connector service
+   */
   public initialize(): boolean {
     try {
-      logger.info('Initializing neural connector between transformers and agents');
-      this.status = NeuralConnectionStatus.CONNECTED;
+      logger.info('Initializing neural connector for ultra-low latency transformer-agent communication');
+      
+      // Setup signal handlers for Hyperion agent
+      this.registerAgentHandler('hyperion', async (signal: NeuralSignal) => {
+        // Logic for handling signals sent to Hyperion
+        if (signal.type === 'FLASH_ARBITRAGE_OPPORTUNITY') {
+          // Process flash arbitrage opportunity detected by microqhc
+          logger.debug(`Neural signal received by Hyperion: ${signal.type}`);
+          return {
+            agentId: 'hyperion-1',
+            status: 'processing',
+            estimatedProfit: signal.data.profitPercent,
+            message: 'Flash arbitrage opportunity received and being processed'
+          };
+        } else if (signal.type === 'LATENCY_TEST') {
+          // Simple echo for latency testing
+          return { echo: signal.data, timestamp: Date.now() };
+        }
+        return { status: 'unknown_signal_type' };
+      });
+
+      // Setup signal handlers for Quantum Omega agent
+      this.registerAgentHandler('quantum_omega', async (signal: NeuralSignal) => {
+        // Logic for handling signals sent to Quantum Omega
+        if (signal.type === 'MEMECOIN_OPPORTUNITY') {
+          // Process memecoin opportunity detected by MemeCortex
+          logger.debug(`Neural signal received by Quantum Omega: ${signal.type}`);
+          return {
+            agentId: 'quantum_omega-1',
+            status: 'evaluating',
+            token: signal.data.token,
+            momentum: signal.data.momentum,
+            socialSentiment: signal.data.socialSentiment,
+            message: 'Memecoin opportunity received and being evaluated'
+          };
+        } else if (signal.type === 'LATENCY_TEST') {
+          // Simple echo for latency testing
+          return { echo: signal.data, timestamp: Date.now() };
+        }
+        return { status: 'unknown_signal_type' };
+      });
+
+      this.active = true;
       logger.info('Neural connector initialized successfully');
+      logger.info(`Configured neural paths: ${this.paths.length}`);
       return true;
     } catch (error) {
-      logger.error('Failed to initialize neural connector:', error);
-      this.status = NeuralConnectionStatus.ERROR;
+      logger.error(`Failed to initialize neural connector: ${error instanceof Error ? error.message : String(error)}`);
+      this.active = false;
       return false;
     }
   }
-  
-  // Set up default neural paths
-  private setupDefaultPaths() {
-    // MicroQHC to Hyperion (flash arbitrage pathway)
-    this.paths.set('microqhc_hyperion', {
-      source: 'micro_qhc',
-      target: 'hyperion-1',
-      pathType: 'direct',
-      priority: 'ultra',
-      latencyMs: 0.3
-    });
+
+  /**
+   * Get the status of the neural connector
+   */
+  public getStatus(): NeuralStatus {
+    // Calculate metrics
+    const avgLatency = this.metrics.latencies.length > 0
+      ? this.metrics.latencies.reduce((sum, latency) => sum + latency, 0) / this.metrics.latencies.length
+      : 0;
     
-    // MEME Cortex to Quantum Omega (memecoin pathway)
-    this.paths.set('memecortex_quantumomega', {
-      source: 'meme_cortex',
-      target: 'quantum-omega-1',
-      pathType: 'direct',
-      priority: 'ultra',
-      latencyMs: 0.5
-    });
+    const minLatency = this.metrics.latencies.length > 0
+      ? Math.min(...this.metrics.latencies)
+      : 0;
     
-    logger.info(`Configured neural paths: ${this.paths.size}`);
+    const maxLatency = this.metrics.latencies.length > 0
+      ? Math.max(...this.metrics.latencies)
+      : 0;
+    
+    const uptime = (Date.now() - this.metrics.startTime) / 1000; // in seconds
+
+    return {
+      active: this.active,
+      paths: this.paths,
+      metricsMs: {
+        avgLatency,
+        minLatency,
+        maxLatency
+      },
+      uptime,
+      lastActivityTimestamp: new Date(this.metrics.lastActivityTime).toISOString()
+    };
   }
-  
-  // Register a WebSocket client for receiving neural signals
-  public registerClient(id: string, ws: WebSocket): void {
-    this.clients.set(id, ws);
-    logger.debug(`Registered neural client: ${id}`);
-  }
-  
-  // Send a neural signal along the configured path
-  public sendSignal(signal: NeuralSignal): boolean {
+
+  /**
+   * Send a signal through a neural pathway
+   */
+  public async sendSignal(signal: Omit<NeuralSignal, 'id' | 'timestamp'>): Promise<NeuralResponse> {
+    this.metrics.lastActivityTime = Date.now();
+    this.metrics.totalSignals++;
+
+    // Generate ID and timestamp if not provided
+    const fullSignal: NeuralSignal = {
+      ...signal,
+      id: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
+
+    const startTime = performance.now();
+    
     try {
-      // Get the correct path for this signal
-      const pathKey = `${signal.source}_${Array.isArray(signal.target) ? signal.target[0] : signal.target}`;
-      const path = this.paths.get(pathKey);
+      // Find the neural path
+      const path = this.paths.find(p => 
+        p.source === signal.source && p.target === signal.target
+      );
       
       if (!path) {
-        logger.warn(`No neural path configured for ${pathKey}`);
-        return false;
+        throw new Error(`Neural path not found: ${signal.source} -> ${signal.target}`);
       }
       
-      // Enhance signal with neural path information
-      const neuralSignal = {
-        ...signal,
-        neural: {
-          pathType: path.pathType,
-          priority: path.priority,
-          latencyMs: path.latencyMs,
-          timestamp: new Date().toISOString()
-        }
+      if (path.status !== 'active') {
+        throw new Error(`Neural path is inactive: ${signal.source} -> ${signal.target}`);
+      }
+      
+      // Get the agent handler
+      const handler = this.agentHandlers.get(signal.target);
+      if (!handler) {
+        throw new Error(`No handler registered for agent: ${signal.target}`);
+      }
+      
+      // Process the signal
+      const responseData = await handler(fullSignal);
+      const endTime = performance.now();
+      const latencyMs = endTime - startTime;
+      
+      // Update metrics
+      this.metrics.successfulSignals++;
+      this.metrics.latencies.push(latencyMs);
+      
+      // Keep only the last 1000 latency measurements
+      if (this.metrics.latencies.length > 1000) {
+        this.metrics.latencies.shift();
+      }
+      
+      // Create response
+      const response: NeuralResponse = {
+        success: true,
+        timestamp: new Date().toISOString(),
+        latencyMs,
+        receiverId: fullSignal.target,
+        responseData
       };
       
-      // Broadcast to relevant clients
-      let sent = false;
-      const message = JSON.stringify({
-        type: 'NEURAL_SIGNAL',
-        signal: neuralSignal,
-        timestamp: new Date().toISOString()
-      });
+      return response;
       
-      for (const [clientId, client] of this.clients.entries()) {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-          sent = true;
-          logger.debug(`Neural signal sent to ${clientId}`);
-        }
-      }
-      
-      if (sent) {
-        logger.info(`Neural signal sent: ${signal.source} → ${signal.target} for ${signal.pair}`);
-      }
-      
-      return sent;
     } catch (error) {
-      logger.error('Error sending neural signal:', error);
+      const endTime = performance.now();
+      const latencyMs = endTime - startTime;
+      
+      // Update metrics
+      this.metrics.failedSignals++;
+      
+      // Create error response
+      const response: NeuralResponse = {
+        success: false,
+        timestamp: new Date().toISOString(),
+        latencyMs,
+        error: error instanceof Error ? error.message : String(error)
+      };
+      
+      logger.error(`Neural signal failed: ${response.error}`);
+      return response;
+    }
+  }
+
+  /**
+   * Register an agent to receive signals
+   */
+  private registerAgentHandler(agentId: string, handler: (signal: NeuralSignal) => Promise<any>): void {
+    this.agentHandlers.set(agentId, handler);
+    logger.debug(`Registered neural handler for agent: ${agentId}`);
+  }
+
+  /**
+   * Register a transformer to receive responses
+   */
+  private registerTransformerHandler(transformerId: string, handler: (response: NeuralResponse) => void): void {
+    this.transformerHandlers.set(transformerId, handler);
+    logger.debug(`Registered neural handler for transformer: ${transformerId}`);
+  }
+
+  /**
+   * Create or update a neural path
+   */
+  public updatePath(path: NeuralPath): boolean {
+    try {
+      // Check if path already exists
+      const existingPathIndex = this.paths.findIndex(p => 
+        p.source === path.source && p.target === path.target
+      );
+      
+      if (existingPathIndex >= 0) {
+        // Update existing path
+        this.paths[existingPathIndex] = { ...this.paths[existingPathIndex], ...path };
+      } else {
+        // Add new path
+        this.paths.push(path);
+      }
+      
+      logger.info(`Neural path updated: ${path.source} -> ${path.target}`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to update neural path: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
-  
-  // Generate a neural signal from MicroQHC to Hyperion
-  public generateHyperionFlashSignal(pair: string, profitEstimate: number, metadata: any): NeuralSignal {
-    const signal: NeuralSignal = {
-      id: this.generateId(),
-      timestamp: new Date().toISOString(),
-      type: 'pattern_recognition',
-      pair,
-      source: 'micro_qhc',
-      target: 'hyperion-1',
-      priority: 'critical', // Using string instead of enum for type safety
-      data: {
-        confidence: 85 + (Math.random() * 14), 
-        metadata: {
-          ...metadata,
-          profitEstimate,
-          neuralLatencyMs: 0.3,
-          detectionMethod: 'neural-quantum-pattern-recognition'
-        }
+
+  /**
+   * Create or update multiple neural paths
+   */
+  public updatePaths(paths: NeuralPath[]): boolean {
+    try {
+      paths.forEach(path => this.updatePath(path));
+      return true;
+    } catch (error) {
+      logger.error(`Failed to update neural paths: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Delete a neural path
+   */
+  public deletePath(source: string, target: string): boolean {
+    try {
+      const initialLength = this.paths.length;
+      this.paths = this.paths.filter(p => !(p.source === source && p.target === target));
+      
+      const deleted = this.paths.length < initialLength;
+      if (deleted) {
+        logger.info(`Neural path deleted: ${source} -> ${target}`);
+      } else {
+        logger.warn(`Neural path not found for deletion: ${source} -> ${target}`);
       }
-    };
-    
-    return signal;
-  }
-  
-  // Generate a neural signal from MEME Cortex to Quantum Omega
-  public generateQuantumOmegaMemecoinSignal(pair: string, metadata: any): NeuralSignal {
-    const signal: NeuralSignal = {
-      id: this.generateId(),
-      timestamp: new Date().toISOString(),
-      type: 'social_sentiment',
-      pair,
-      source: 'meme_cortex',
-      target: 'quantum-omega-1',
-      priority: 'critical', // Using string instead of enum for type safety
-      data: {
-        confidence: 80 + (Math.random() * 19),
-        metadata: {
-          ...metadata,
-          neuralLatencyMs: 0.5,
-          detectionMethod: 'neural-social-volume-correlation'
-        }
-      }
-    };
-    
-    return signal;
-  }
-  
-  // Generate a unique ID for signals
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 15) + 
-           Math.random().toString(36).substring(2, 15);
-  }
-  
-  // Get the status of the neural connector
-  public getStatus(): {status: NeuralConnectionStatus, paths: number, clients: number} {
-    return {
-      status: this.status,
-      paths: this.paths.size,
-      clients: this.clients.size
-    };
+      
+      return deleted;
+    } catch (error) {
+      logger.error(`Failed to delete neural path: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
   }
 }
 
-// Create and export a singleton instance of the neural connector
-export const neuralConnector = new NeuralConnector();
+// Singleton instance
+export const neuralConnector = new NeuralConnectorService();
