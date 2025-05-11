@@ -4911,6 +4911,241 @@ router.get('/trading-pairs', (req, res) => {
           logger.info('Neural connector initialized successfully');
           
           // Add neural connector API endpoints
+          // Add endpoints with /api/neural prefix for client compatibility
+          router.get('/api/neural/status', (req, res) => {
+            try {
+              const status = neuralConnector.getStatus();
+              res.json({
+                status: 'success',
+                data: status,
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to get neural connector status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Send a signal through a neural pathway
+          router.post('/api/neural/signal', async (req, res) => {
+            try {
+              const { source, target, type, data, options } = req.body;
+              
+              if (!source || !target || !type) {
+                return res.status(400).json({
+                  status: 'error',
+                  message: 'Missing required fields: source, target, or type',
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              const response = await neuralConnector.sendSignal({ source, target, type, data, options });
+              
+              res.json({
+                status: 'success',
+                data: response,
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to send neural signal: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Update or create a neural path
+          router.post('/api/neural/path', (req, res) => {
+            try {
+              const { source, target, latencyMs, status, priority } = req.body;
+              
+              if (!source || !target) {
+                return res.status(400).json({
+                  status: 'error',
+                  message: 'Missing required fields: source or target',
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              const success = neuralConnector.updatePath({
+                source,
+                target,
+                latencyMs: latencyMs || 0,
+                status: status || 'active',
+                priority: priority || 'normal'
+              });
+              
+              res.json({
+                status: success ? 'success' : 'error',
+                message: success ? 'Neural path updated successfully' : 'Failed to update neural path',
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to update neural path: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Delete a neural path
+          router.delete('/api/neural/path', (req, res) => {
+            try {
+              const { source, target } = req.body;
+              
+              if (!source || !target) {
+                return res.status(400).json({
+                  status: 'error',
+                  message: 'Missing required fields: source or target',
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              const success = neuralConnector.deletePath(source, target);
+              
+              res.json({
+                status: success ? 'success' : 'error',
+                message: success ? 'Neural path deleted successfully' : 'Failed to delete neural path',
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to delete neural path: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Test the latency of a neural path
+          router.post('/api/neural/test-latency', async (req, res) => {
+            try {
+              const { source, target, iterations } = req.body;
+              
+              if (!source || !target) {
+                return res.status(400).json({
+                  status: 'error',
+                  message: 'Missing required fields: source or target',
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              const testIterations = iterations && !isNaN(parseInt(iterations)) ? parseInt(iterations) : 10;
+              
+              // Simple implementation for latency testing
+              const results = [];
+              const path = {
+                source,
+                target,
+                latencyMs: 0,
+                status: 'active',
+                priority: 'normal'
+              };
+              
+              for (let i = 0; i < testIterations; i++) {
+                const startTime = performance.now();
+                
+                try {
+                  // Send a test signal and wait for response
+                  await neuralConnector.sendSignal({
+                    source,
+                    target,
+                    type: 'TEST_LATENCY',
+                    data: { iteration: i, timestamp: Date.now() }
+                  });
+                  
+                  const endTime = performance.now();
+                  const latencyMs = endTime - startTime;
+                  
+                  results.push({
+                    path: { ...path, latencyMs },
+                    latencyMs,
+                    success: true,
+                    timestamp: new Date().toISOString(),
+                    message: `Test ${i + 1} completed successfully`
+                  });
+                } catch (error) {
+                  results.push({
+                    path,
+                    latencyMs: 0,
+                    success: false,
+                    timestamp: new Date().toISOString(),
+                    message: `Test ${i + 1} failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                  });
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              
+              res.json({
+                status: 'success',
+                data: {
+                  source,
+                  target,
+                  iterations: testIterations,
+                  results
+                },
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to test neural path latency: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Get all available transformers
+          router.get('/api/neural/transformers', (req, res) => {
+            try {
+              // Simple implementation for now, would connect to transformer registry
+              const transformers = ['microqhc', 'meme_cortex', 'momentum_flux', 'social_signal', 'quantum_pattern'];
+              
+              res.json({
+                status: 'success',
+                data: {
+                  transformers
+                },
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to get transformers: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
+          // Get all available agents
+          router.get('/api/neural/agents', (req, res) => {
+            try {
+              // Simple implementation for now, would connect to agent registry
+              const agents = ['hyperion', 'quantum_omega', 'singularity'];
+              
+              res.json({
+                status: 'success',
+                data: {
+                  agents
+                },
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              res.status(500).json({
+                status: 'error',
+                message: `Failed to get agents: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+          
           // Keep the original '/neural' routes for backward compatibility
           router.get('/neural/status', (req, res) => {
             try {
