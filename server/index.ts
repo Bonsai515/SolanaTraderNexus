@@ -10,6 +10,12 @@ import net from 'net';
 import { createServer as createViteServer } from 'vite';
 import * as fs from 'fs';
 
+// Set the InstantNodes URLs for the 2-day trial
+process.env.INSTANT_NODES_RPC_URL = 'https://solana-grpc-geyser.instantnodes.io:443';
+process.env.INSTANT_NODES_WS_URL = 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+logger.info(`Using InstantNodes trial RPC URL: ${process.env.INSTANT_NODES_RPC_URL}`);
+logger.info(`Using InstantNodes trial WebSocket URL: ${process.env.INSTANT_NODES_WS_URL}`);
+
 const app = express();
 const DEFAULT_PORT = 5000;
 
