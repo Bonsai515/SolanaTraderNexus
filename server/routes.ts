@@ -1868,35 +1868,68 @@ export function setupWebSocketServer(httpServer: Server) {
         // Handle GET_MARKET_DATA messages
         if (parsedMessage.type === 'GET_MARKET_DATA') {
           try {
-            // Get requested pairs or default to main pairs
-            const requestedPairs = parsedMessage.pairs || ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
-            logger.info(`Market data requested for pairs: ${requestedPairs.join(', ')}`);
-            
             // Import PriceFeedCache if needed
             const { priceFeedCache } = require('./priceFeedCache');
             
-            // Get market data for each requested pair
-            const priceFeedData = {};
-            
-            // Check if we have market data for each requested pair
-            for (const pair of requestedPairs) {
+            // Handle both single pair and multiple pairs requests
+            if (parsedMessage.pair) {
+              // Single pair request
+              const pair = parsedMessage.pair;
+              logger.info(`Market data requested for single pair: ${pair}`);
+              
               const marketData = priceFeedCache.getMarketData(pair);
               if (marketData) {
-                priceFeedData[pair] = marketData;
+                // Send single pair data
+                ws.send(JSON.stringify({
+                  type: 'MARKET_DATA',
+                  timestamp: new Date().toISOString(),
+                  requestId: parsedMessage.requestId, // Echo back the request ID if provided
+                  data: {
+                    pair: pair,
+                    ...marketData
+                  }
+                }));
+                
+                logger.debug(`Sent market data for single pair ${pair} via WebSocket`);
+              } else {
+                // Send error response for missing pair
+                ws.send(JSON.stringify({
+                  type: 'ERROR',
+                  timestamp: new Date().toISOString(),
+                  requestId: parsedMessage.requestId,
+                  error: `No market data available for pair: ${pair}`
+                }));
+                
+                logger.warn(`No market data available for requested pair: ${pair}`);
               }
+            } else {
+              // Multiple pairs request
+              const requestedPairs = parsedMessage.pairs || ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
+              logger.info(`Market data requested for pairs: ${requestedPairs.join(', ')}`);
+              
+              // Get market data for each requested pair
+              const priceFeedData = {};
+              
+              // Check if we have market data for each requested pair
+              for (const pair of requestedPairs) {
+                const marketData = priceFeedCache.getMarketData(pair);
+                if (marketData) {
+                  priceFeedData[pair] = marketData;
+                }
+              }
+              
+              // Send the market data response
+              ws.send(JSON.stringify({
+                type: 'MARKET_DATA',
+                timestamp: new Date().toISOString(),
+                requestId: parsedMessage.requestId, // Echo back the request ID if provided
+                data: {
+                  pairs: priceFeedData
+                }
+              }));
+              
+              logger.debug(`Sent market data for ${Object.keys(priceFeedData).length} pairs via WebSocket`);
             }
-            
-            // Send the market data response
-            ws.send(JSON.stringify({
-              type: 'MARKET_DATA',
-              timestamp: new Date().toISOString(),
-              requestId: parsedMessage.requestId, // Echo back the request ID if provided
-              data: {
-                pairs: priceFeedData
-              }
-            }));
-            
-            logger.debug(`Sent market data for ${Object.keys(priceFeedData).length} pairs via WebSocket`);
           } catch (err) {
             logger.error('Error sending market data response:', err);
             

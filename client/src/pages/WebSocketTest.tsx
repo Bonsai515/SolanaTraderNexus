@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/Toasts";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 
 const WebSocketTest: React.FC = () => {
   const wsStore = useStore();
@@ -113,19 +113,20 @@ const WebSocketTest: React.FC = () => {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <span>Status:</span>
-              <Badge
-                variant={
+              <div 
+                className={cn(
+                  "px-2 py-1 rounded-md text-xs font-medium",
                   connectionStatus === "connected"
-                    ? "success"
+                    ? "bg-green-900 text-green-100"
                     : connectionStatus === "connecting"
-                    ? "info"
+                    ? "bg-blue-900 text-blue-100"
                     : connectionStatus === "error"
-                    ? "destructive"
-                    : "secondary"
-                }
+                    ? "bg-red-900 text-red-100"
+                    : "bg-gray-700 text-gray-100"
+                )}
               >
                 {connectionStatus.toUpperCase()}
-              </Badge>
+              </div>
             </div>
             
             {lastConnected && (
@@ -167,14 +168,18 @@ const WebSocketTest: React.FC = () => {
             <div className="flex flex-wrap gap-2 mb-4">
               <span className="mr-2">Select Pair:</span>
               {supportedPairs.map(pair => (
-                <Badge
+                <div
                   key={pair}
-                  className="cursor-pointer"
-                  variant={pair === selectedPair ? "default" : "secondary"}
+                  className={cn(
+                    "inline-flex px-2 py-1 rounded-md text-xs font-medium cursor-pointer", 
+                    pair === selectedPair 
+                      ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                      : "bg-gray-700 hover:bg-gray-600 text-white"
+                  )}
                   onClick={() => setSelectedPair(pair)}
                 >
                   {pair}
-                </Badge>
+                </div>
               ))}
             </div>
             
@@ -222,7 +227,7 @@ const WebSocketTest: React.FC = () => {
                 {[...marketData].reverse().map((msg, index) => (
                   <div key={index} className="text-sm p-2 border border-gray-700 rounded">
                     <div className="flex justify-between">
-                      <Badge variant="secondary">{msg.type}</Badge>
+                      <div className="bg-gray-700 px-2 py-0.5 rounded-md text-xs font-medium text-white">{msg.type}</div>
                       <span className="text-xs text-gray-400">
                         {msg.timestamp ? formatDate(new Date(msg.timestamp)) : 'No timestamp'}
                       </span>

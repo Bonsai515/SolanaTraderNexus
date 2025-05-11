@@ -4,7 +4,7 @@ import SystemDashboard from './pages/SystemDashboard';
 import WebSocketTest from './pages/WebSocketTest';
 import Trading from './pages/Trading';
 import { useEffect, useState } from 'react';
-import Toasts from './components/ui/Toasts';
+import { ToastProvider } from './components/ui/Toasts';
 
 // Simple Dashboard Component
 function Dashboard() {
@@ -189,36 +189,35 @@ function Dashboard() {
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="border-b border-gray-800 py-4">
-        <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-blue-400">Solana Quantum Trading</h1>
+    <ToastProvider>
+      <div className="min-h-screen bg-gray-900 text-white">
+        <header className="border-b border-gray-800 py-4">
+          <div className="container mx-auto px-4 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-blue-400">Solana Quantum Trading</h1>
+            </div>
+            <nav>
+              <ul className="flex space-x-6">
+                <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
+                <li><Link href="/trading" className="hover:text-blue-400 transition-colors">Trading</Link></li>
+                <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
+                <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
+                <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
+              </ul>
+            </nav>
           </div>
-          <nav>
-            <ul className="flex space-x-6">
-              <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
-              <li><Link href="/trading" className="hover:text-blue-400 transition-colors">Trading</Link></li>
-              <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
-              <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
-              <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
-            </ul>
-          </nav>
-        </div>
-      </header>
+        </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <Route path="/" component={Dashboard} />
-        <Route path="/trading" component={Trading} />
-        <Route path="/insights" component={Dashboard} />
-        <Route path="/system" component={SystemDashboard} />
-        <Route path="/ws-test" component={WebSocketTest} />
-        <Route path="/:rest*" component={NotFound} />
-      </main>
-      
-      {/* Global toast notifications */}
-      <Toasts />
-    </div>
+        <main className="container mx-auto px-4 py-8">
+          <Route path="/" component={Dashboard} />
+          <Route path="/trading" component={Trading} />
+          <Route path="/insights" component={Dashboard} />
+          <Route path="/system" component={SystemDashboard} />
+          <Route path="/ws-test" component={WebSocketTest} />
+          <Route path="/:rest*" component={NotFound} />
+        </main>
+      </div>
+    </ToastProvider>
   );
 }
 

@@ -252,12 +252,11 @@ function initWebSocket() {
   store._handleConnectionChange(false, 'connecting');
   
   // Get the correct WebSocket URL
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Use the current host (Replit or localhost)
-  const host = window.location.host;
-  const wsUrl = `${protocol}//${host}/ws`;
+  // For Replit environment, we need to use the relative URL
+  const baseUrl = window.location.origin;
+  const wsUrl = `${baseUrl}/ws`;
   
-  console.log(`Connecting to WebSocket at ${wsUrl} (protocol: ${protocol}, host: ${host})`);
+  console.log(`Connecting to WebSocket at ${wsUrl} (baseUrl: ${baseUrl})`);
   
   try {
     // Create new WebSocket

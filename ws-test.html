@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #1a1a2e;
+      color: #ffffff;
+    }
+    h1 {
+      color: #38bdf8;
+    }
+    .card {
+      background-color: #16213e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    pre {
+      background-color: #0f172a;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      color: #a3e635;
+    }
+    button {
+      background-color: #38bdf8;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover {
+      background-color: #0284c7;
+    }
+    .log {
+      height: 200px;
+      overflow-y: auto;
+    }
+    .status {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status.online {
+      background-color: #22c55e;
+    }
+    .status.offline {
+      background-color: #ef4444;
+    }
+    .market-data {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+    }
+    .pair-card {
+      background-color: #1e293b;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .price {
+      font-size: 24px;
+      font-weight: bold;
+      color: #38bdf8;
+    }
+    .timestamp {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+    .debug-info {
+      background-color: #0f172a;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Solana Quantum Trading Platform - WebSocket Test Page</h1>
+  
+  <div class="card">
+    <h2>WebSocket Connection</h2>
+    <div>
+      <span class="status offline" id="ws-status"></span>
+      <span id="ws-status-text">Disconnected</span>
+    </div>
+    <div class="debug-info" id="debug-info">
+      Location: <span id="location-info"></span><br>
+      WebSocket URL: <span id="ws-url-info"></span>
+    </div>
+    <div style="margin-top: 16px;">
+      <button id="connect-ws">Connect</button>
+      <button id="disconnect-ws">Disconnect</button>
+      <button id="send-ping">Send Ping</button>
+      <button id="get-market-data-solana">Request SOL/USDC</button>
+      <button id="get-market-data-bonk">Request BONK/USDC</button>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Market Data</h2>
+    <div class="market-data" id="market-data-container">
+      <!-- Market data will be displayed here -->
+      <div class="pair-card">
+        <div>SOL/USDC</div>
+        <div class="price">---.--</div>
+        <div class="timestamp">No data available</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>WebSocket Messages</h2>
+    <pre class="log" id="ws-messages"></pre>
+    <button id="clear-log">Clear Log</button>
+  </div>
+  
+  <div class="card">
+    <h2>API Test</h2>
+    <button id="test-api">Test API</button>
+    <pre id="api-result">Click Test API to check server connectivity</pre>
+  </div>
+  
+  <script>
+    // Debug info update
+    const locationInfo = document.getElementById('location-info');
+    const wsUrlInfo = document.getElementById('ws-url-info');
+    locationInfo.textContent = window.location.href;
+    
+    const wsStatusEl = document.getElementById('ws-status');
+    const wsStatusTextEl = document.getElementById('ws-status-text');
+    const wsMessages = document.getElementById('ws-messages');
+    const apiResult = document.getElementById('api-result');
+    const marketDataContainer = document.getElementById('market-data-container');
+    const debugInfo = document.getElementById('debug-info');
+    
+    // Market data storage
+    const marketData = {};
+    
+    // Update market data card
+    function updateMarketDataCard(pair, data) {
+      let pairCard = document.getElementById(`pair-card-${pair.replace('/', '-')}`);
+      
+      if (!pairCard) {
+        pairCard = document.createElement('div');
+        pairCard.id = `pair-card-${pair.replace('/', '-')}`;
+        pairCard.className = 'pair-card';
+        marketDataContainer.appendChild(pairCard);
+      }
+      
+      const price = data.price || data.currentPrice || (data.prices ? data.prices[data.prices.length - 1][1] : 'N/A');
+      
+      pairCard.innerHTML = `
+        <div>${pair}</div>
+        <div class="price">${typeof price === 'number' ? price.toFixed(6) : price}</div>
+        <div class="timestamp">Updated: ${new Date().toLocaleTimeString()}</div>
+      `;
+    }
+    
+    // Setup default pairs
+    ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'].forEach(pair => {
+      updateMarketDataCard(pair, { price: null });
+    });
+    
+    // WebSocket connection
+    let ws = null;
+    
+    document.getElementById('connect-ws').addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      
+      // Use direct relative URL 
+      const wsUrl = window.location.origin + '/ws';
+      wsUrlInfo.textContent = wsUrl;
+      
+      wsMessages.textContent = `Connecting to ${wsUrl}...\n` + wsMessages.textContent;
+      debugInfo.innerHTML += `<div>Connection attempt at ${new Date().toISOString()}</div>`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          wsStatusEl.className = 'status online';
+          wsStatusTextEl.textContent = 'Connected';
+          wsMessages.textContent = `Connected to WebSocket server\n` + wsMessages.textContent;
+          debugInfo.innerHTML += `<div>Connected at ${new Date().toISOString()}</div>`;
+        };
+        
+        ws.onclose = (event) => {
+          wsStatusEl.className = 'status offline';
+          wsStatusTextEl.textContent = 'Disconnected';
+          wsMessages.textContent = `Disconnected from WebSocket server (code: ${event.code})\n` + wsMessages.textContent;
+          debugInfo.innerHTML += `<div>Disconnected at ${new Date().toISOString()} with code ${event.code}</div>`;
+        };
+        
+        ws.onerror = (error) => {
+          wsStatusEl.className = 'status offline';
+          wsStatusTextEl.textContent = 'Error';
+          wsMessages.textContent = `WebSocket error occurred\n` + wsMessages.textContent;
+          debugInfo.innerHTML += `<div>Error at ${new Date().toISOString()}: ${error}</div>`;
+          console.error('WebSocket error:', error);
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            const messageString = JSON.stringify(message, null, 2);
+            wsMessages.textContent = `Received [${new Date().toLocaleTimeString()}]:\n${messageString.substring(0, 300)}${messageString.length > 300 ? '...' : ''}\n\n` + wsMessages.textContent;
+            
+            // Handle market data
+            if (message.type === 'MARKET_DATA' && message.data) {
+              if (message.data.pair) {
+                // Single pair data
+                marketData[message.data.pair] = message.data;
+                updateMarketDataCard(message.data.pair, message.data);
+              }
+            }
+          } catch (error) {
+            wsMessages.textContent = `Error parsing message: ${error.message}\n${event.data}\n` + wsMessages.textContent;
+          }
+        };
+      } catch (error) {
+        debugInfo.innerHTML += `<div>Connection creation error at ${new Date().toISOString()}: ${error.message}</div>`;
+        wsMessages.textContent = `Error creating WebSocket: ${error.message}\n` + wsMessages.textContent;
+      }
+    });
+    
+    document.getElementById('disconnect-ws').addEventListener('click', () => {
+      if (!ws) return;
+      ws.close();
+      ws = null;
+    });
+    
+    document.getElementById('send-ping').addEventListener('click', () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        wsMessages.textContent = `Cannot send ping: WebSocket not connected\n` + wsMessages.textContent;
+        return;
+      }
+      
+      const pingMessage = {
+        type: 'PING',
+        timestamp: new Date().toISOString(),
+      };
+      
+      ws.send(JSON.stringify(pingMessage));
+      wsMessages.textContent = `Sent: ${JSON.stringify(pingMessage)}\n` + wsMessages.textContent;
+    });
+    
+    document.getElementById('get-market-data-solana').addEventListener('click', () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        wsMessages.textContent = `Cannot request data: WebSocket not connected\n` + wsMessages.textContent;
+        return;
+      }
+      
+      const dataRequest = {
+        type: 'GET_MARKET_DATA',
+        pair: 'SOL/USDC',
+        timestamp: new Date().toISOString(),
+      };
+      
+      ws.send(JSON.stringify(dataRequest));
+      wsMessages.textContent = `Sent: ${JSON.stringify(dataRequest)}\n` + wsMessages.textContent;
+    });
+    
+    document.getElementById('get-market-data-bonk').addEventListener('click', () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        wsMessages.textContent = `Cannot request data: WebSocket not connected\n` + wsMessages.textContent;
+        return;
+      }
+      
+      const dataRequest = {
+        type: 'GET_MARKET_DATA',
+        pair: 'BONK/USDC',
+        timestamp: new Date().toISOString(),
+      };
+      
+      ws.send(JSON.stringify(dataRequest));
+      wsMessages.textContent = `Sent: ${JSON.stringify(dataRequest)}\n` + wsMessages.textContent;
+    });
+    
+    document.getElementById('clear-log').addEventListener('click', () => {
+      wsMessages.textContent = '';
+    });
+    
+    document.getElementById('test-api').addEventListener('click', async () => {
+      try {
+        apiResult.textContent = 'Testing API connection...';
+        
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        
+        apiResult.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        apiResult.textContent = `Error connecting to API: ${error.message}`;
+      }
+    });
+    
+    // Test API on page load
+    document.getElementById('test-api').click();
+  </script>
+</body>
+</html>

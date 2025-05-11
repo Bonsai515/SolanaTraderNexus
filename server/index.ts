@@ -61,17 +61,16 @@ app.use(express.urlencoded({ extended: true }));
 // API routes - register with '/api' prefix
 app.use('/api', routes);
 
-// Root endpoint - serve the React application 
-// Let Vite middleware handle serving the index.html in development
-app.get('/', (req, res, next) => {
-  // We'll let the middleware chain continue so Vite can handle it
-  logger.info(`Serving React app at path: / (letting middleware handle it)`);
-  next();
-});
+// Root endpoint is now included in the React app routes handler below
 
 // Add a health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve our standalone WebSocket test HTML file
+app.get('/ws-test-page', (req, res) => {
+  res.sendFile(path.join(__dirname, '../ws-test.html'));
 });
 
 // Add a detailed API health check
@@ -151,7 +150,7 @@ async function startServer() {
     app.use('/client', express.static(path.join(__dirname, '../client')));
     
     // Handle all routes for the React app - this needs to come before more specific routes
-    app.get(['/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet', '/ws-test'], async (req, res, next) => {
+    app.get(['/', '/system', '/insights', '/dashboard', '/agents', '/analytics', '/strategies', '/trading', '/wallet', '/ws-test'], async (req, res, next) => {
       try {
         // Read the index.html from client directory
         let template = fs.readFileSync(path.join(__dirname, '../client/index.html'), 'utf-8');
