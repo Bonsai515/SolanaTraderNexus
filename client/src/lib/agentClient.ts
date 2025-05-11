@@ -226,13 +226,10 @@ export function useAgentWebSocketHandlers() {
     
     // Register handlers
     registerHandler('agents_list', (message: WebSocketMessage) => {
-      if (message.data && message.data.agents) {
-        // Update agents through the updateAgentState function
-        if (Array.isArray(message.data.agents)) {
-          message.data.agents.forEach((agent: AgentState) => {
-            updateAgentState(agent);
-          });
-        }
+      if (message.data && message.data.agents && Array.isArray(message.data.agents)) {
+        message.data.agents.forEach((agent: AgentState) => {
+          updateAgentState(agent);
+        });
       }
     });
     
