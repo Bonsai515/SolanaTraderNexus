@@ -19,7 +19,12 @@ export enum DexType {
   DRIFT = 'drift',
   JUPITER_PERPS = 'jupiter_perps',
   PUMP_FUN = 'pump_fun',
-  GOOSE = 'goose'
+  GOOSE = 'goose',
+  TENSOR = 'tensor',
+  PHOENIX = 'phoenix',
+  DEXLAB = 'dexlab',
+  SANCTUM = 'sanctum',
+  CYKURA = 'cykura'
 }
 
 /**
@@ -27,7 +32,10 @@ export enum DexType {
  */
 export enum AnalyticsPlatformType {
   DEXSCREENER = 'dexscreener',
-  BIRDEYE = 'birdeye'
+  BIRDEYE = 'birdeye',
+  DEXSCREENER_MOONSHOT = 'dexscreener_moonshot',
+  SOLSCAN = 'solscan',
+  SOLANAFLOOR = 'solanafloor'
 }
 
 /**
