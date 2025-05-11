@@ -34,28 +34,26 @@ export default function WalletMonitor() {
 
   // Query for system wallets
   const { data: systemWallets, isLoading: systemWalletsLoading, error: systemWalletsError, refetch: refetchSystemWallets } = useQuery({
-    queryKey: ["/api/wallet/system"],
-    queryFn: () => apiRequest("GET", "/api/wallet/system").then(res => res.json()),
+    queryKey: ["/system/wallet-status"],
+    queryFn: () => apiRequest("GET", "/system/wallet-status").then(res => res.json()),
   });
 
-  // Query for custom wallet balances
+  // Query for custom wallet balances using bulk endpoint
   const { data: customWalletBalances, isLoading: customWalletBalancesLoading, error: customWalletBalancesError, refetch: refetchCustomWallets } = useQuery({
-    queryKey: ["/api/wallet/balances", customWallets],
+    queryKey: ["/wallet/balances", customWallets],
     enabled: customWallets.length > 0,
-    queryFn: () => {
+    queryFn: async () => {
       if (customWallets.length === 0) return [];
-      return Promise.all(
-        customWallets.map(address => 
-          apiRequest("GET", `/api/wallet/balance/${address}`).then(res => res.json())
-        )
-      );
+      const addressesParam = customWallets.join(',');
+      const response = await apiRequest("GET", `/wallet/balances?addresses=${addressesParam}`);
+      return response.json();
     },
   });
 
   // Mutation for adding custom wallets
   const addWalletMutation = useMutation({
     mutationFn: async (address: string) => {
-      const res = await apiRequest("GET", `/api/wallet/validate/${address}`);
+      const res = await apiRequest("GET", `/wallet/validate/${address}`);
       return res.json();
     },
     onSuccess: (data, address) => {
@@ -96,7 +94,7 @@ export default function WalletMonitor() {
 
     socket.onopen = () => {
       console.log("Connected to wallet balance WebSocket");
-      socket.send(JSON.stringify({ type: "SUBSCRIBE_WALLET_BALANCES" }));
+      socket.send(JSON.stringify({ type: "SUBSCRIBE", channels: ["wallet_balances", "system_health"] }));
     };
 
     socket.onmessage = (event) => {
@@ -114,9 +112,9 @@ export default function WalletMonitor() {
         ]);
         
         // Refresh data
-        queryClient.invalidateQueries({ queryKey: ["/api/wallet/system"] });
+        queryClient.invalidateQueries({ queryKey: ["/system/wallet-status"] });
         if (customWallets.includes(data.address)) {
-          queryClient.invalidateQueries({ queryKey: ["/api/wallet/balances", customWallets] });
+          queryClient.invalidateQueries({ queryKey: ["/wallet/balances", customWallets] });
         }
       }
     };

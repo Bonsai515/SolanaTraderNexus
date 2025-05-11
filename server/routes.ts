@@ -311,7 +311,7 @@ router.post('/trade/wallet/connect', async (req, res) => {
     // Initialize wallet balance monitoring for this address
     try {
       const connection = new solanaWeb3.Connection(
-        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'https://api.mainnet-beta.solana.com',
         { commitment: 'confirmed' }
       );
       
@@ -348,7 +348,153 @@ router.post('/trade/wallet/connect', async (req, res) => {
   }
 });
 
-// Get wallet balance
+// Validate wallet address
+router.get('/wallet/validate/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    // Validate the address format
+    try {
+      new solanaWeb3.PublicKey(address);
+      return res.json({ valid: true });
+    } catch (error) {
+      return res.json({ 
+        valid: false, 
+        message: 'Invalid wallet address format' 
+      });
+    }
+  } catch (error) {
+    console.error('Error validating wallet address:', error);
+    return res.status(500).json({ 
+      valid: false, 
+      message: 'Server error validating wallet address' 
+    });
+  }
+});
+
+// Get individual wallet balance by address
+router.get('/wallet/balance/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    if (!address) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing wallet address'
+      });
+    }
+    
+    try {
+      const connection = new solanaWeb3.Connection(
+        'https://api.mainnet-beta.solana.com',
+        { commitment: 'confirmed' }
+      );
+      
+      const publicKey = new solanaWeb3.PublicKey(address);
+      const balance = await connection.getBalance(publicKey);
+      const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+      
+      // Check if balance changed and emit event if needed
+      if (walletBalances.has(address)) {
+        const oldBalance = walletBalances.get(address);
+        if (oldBalance !== solBalance) {
+          const event = emitWalletBalanceChange(address, oldBalance, solBalance);
+          walletBalances.set(address, solBalance);
+          
+          // Log significant balance changes
+          if (Math.abs(event.changePercent) > 1) {
+            logger.info(`Wallet balance change for ${address}: ${event.change.toFixed(6)} SOL (${event.changePercent.toFixed(2)}%)`);
+          }
+        }
+      } else {
+        walletBalances.set(address, solBalance);
+      }
+      
+      return res.json({
+        address,
+        balance: solBalance,
+        lastUpdated: new Date().toISOString()
+      });
+    } catch (balanceError) {
+      logger.error(`Error fetching wallet balance: ${balanceError.message}`);
+      return res.status(500).json({
+        success: false,
+        error: 'Error fetching wallet balance'
+      });
+    }
+  } catch (error) {
+    logger.error('Error getting wallet balance:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error getting wallet balance'
+    });
+  }
+});
+
+// Get multiple wallet balances
+router.get('/wallet/balances', async (req, res) => {
+  try {
+    // Parse addresses from query string
+    const addressesStr = req.query.addresses as string;
+    if (!addressesStr) {
+      return res.status(400).json({
+        success: false,
+        error: 'No addresses provided'
+      });
+    }
+
+    const addresses = addressesStr.split(',');
+    if (!addresses.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid addresses provided'
+      });
+    }
+
+    // Create connection
+    const connection = new solanaWeb3.Connection(
+      'https://api.mainnet-beta.solana.com',
+      { commitment: 'confirmed' }
+    );
+
+    // Get balances for all addresses
+    const balances = await Promise.all(
+      addresses.map(async (address) => {
+        try {
+          const publicKey = new solanaWeb3.PublicKey(address);
+          const balance = await connection.getBalance(publicKey);
+          const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+          
+          // Update cache
+          walletBalances.set(address, solBalance);
+          
+          return {
+            address,
+            balance: solBalance,
+            lastUpdated: new Date().toISOString()
+          };
+        } catch (error) {
+          return {
+            address,
+            balance: 0,
+            error: 'Invalid address or balance fetch failed',
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      })
+    );
+
+    return res.json(balances);
+  } catch (error) {
+    logger.error('Error getting multiple wallet balances:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error getting wallet balances'
+    });
+  }
+});
+
+// Get wallet balance (old endpoint - keep for backward compatibility)
 router.get('/trade/wallet/:address/balance', async (req, res) => {
   try {
     const { address } = req.params;
@@ -362,7 +508,7 @@ router.get('/trade/wallet/:address/balance', async (req, res) => {
     
     try {
       const connection = new solanaWeb3.Connection(
-        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'https://api.mainnet-beta.solana.com',
         { commitment: 'confirmed' }
       );
       
@@ -453,8 +599,9 @@ router.get('/system/wallet-status', async (req, res) => {
     const wallets = [systemWallet, hyperionWallet, hyperionProfitWallet, quantumWallet, quantumProfitWallet];
     
     try {
+      // Use public Solana RPC endpoint to check balances
       const connection = new solanaWeb3.Connection(
-        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'https://api.mainnet-beta.solana.com',
         { commitment: 'confirmed' }
       );
       
@@ -476,6 +623,12 @@ router.get('/system/wallet-status', async (req, res) => {
             }
           } else {
             walletBalances.set(wallet.address, solBalance);
+          }
+          
+          // Reset the status if it was previously in error
+          if (wallet.balance > 0) {
+            wallet.status = 'active';
+            logger.info(`Wallet ${wallet.address} has balance: ${solBalance} SOL`);
           }
         } catch (error) {
           logger.warn(`Error fetching balance for ${wallet.address}: ${error.message}`);
