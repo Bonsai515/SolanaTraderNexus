@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
+import { throttle } from 'lodash';
 import { logger } from './logger';
 import agentRouter, * as AgentManager from './agents';
 import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, SignalPriority } from './signalHub';
@@ -69,6 +70,47 @@ import {
 
 // Global state for transformer API initialization
 let transformerApiInitialized = false;
+
+// Jupiter API rate limiting - 1 request per second
+const throttledJupiterRequest = throttle(async (url, options = {}) => {
+  try {
+    logger.debug(`Making rate-limited Jupiter API request to: ${url}`);
+    const response = await fetch(url, options);
+    return response;
+  } catch (error) {
+    logger.error(`Error in throttled Jupiter API request: ${error.message}`);
+    throw error;
+  }
+}, 1000);
+
+// Wallet monitoring
+const walletBalances = new Map();
+const walletBalanceChangeListeners = new Set();
+
+// Emit wallet balance change event
+function emitWalletBalanceChange(address, oldBalance, newBalance) {
+  const event = {
+    type: 'WALLET_BALANCE_CHANGE',
+    address,
+    oldBalance,
+    newBalance,
+    change: newBalance - oldBalance,
+    changePercent: oldBalance > 0 ? ((newBalance - oldBalance) / oldBalance) * 100 : 0,
+    timestamp: new Date().toISOString()
+  };
+  
+  walletBalanceChangeListeners.forEach(listener => {
+    try {
+      if (listener.readyState === WebSocket.OPEN) {
+        listener.send(JSON.stringify(event));
+      }
+    } catch (err) {
+      logger.error(`Error emitting wallet balance change: ${err.message}`);
+    }
+  });
+  
+  return event;
+}
 import {
   walletSchema, 
   insertWalletSchema,
@@ -266,6 +308,24 @@ router.post('/trade/wallet/connect', async (req, res) => {
       });
     }
     
+    // Initialize wallet balance monitoring for this address
+    try {
+      const connection = new solanaWeb3.Connection(
+        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        { commitment: 'confirmed' }
+      );
+      
+      const publicKey = new solanaWeb3.PublicKey(walletAddress);
+      const balance = await connection.getBalance(publicKey);
+      const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+      
+      walletBalances.set(walletAddress, solBalance);
+      
+      logger.info(`Initialized wallet balance monitoring for ${walletAddress}: ${solBalance} SOL`);
+    } catch (balanceError) {
+      logger.warn(`Failed to initialize wallet balance monitoring: ${balanceError.message}`);
+    }
+    
     // Return success response
     return res.json({
       status: 'success',
@@ -274,7 +334,8 @@ router.post('/trade/wallet/connect', async (req, res) => {
         address: walletAddress,
         type: walletType,
         connected: true,
-        connected_at: new Date().toISOString()
+        connected_at: new Date().toISOString(),
+        balance: walletBalances.get(walletAddress) || 0
       }
     });
   } catch (error) {
@@ -283,6 +344,188 @@ router.post('/trade/wallet/connect', async (req, res) => {
       status: 'error',
       message: 'Error connecting wallet',
       error: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Get wallet balance
+router.get('/trade/wallet/:address/balance', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    if (!address) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing wallet address'
+      });
+    }
+    
+    try {
+      const connection = new solanaWeb3.Connection(
+        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        { commitment: 'confirmed' }
+      );
+      
+      const publicKey = new solanaWeb3.PublicKey(address);
+      const balance = await connection.getBalance(publicKey);
+      const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+      
+      // Check if balance changed and emit event if needed
+      if (walletBalances.has(address)) {
+        const oldBalance = walletBalances.get(address);
+        if (oldBalance !== solBalance) {
+          const event = emitWalletBalanceChange(address, oldBalance, solBalance);
+          walletBalances.set(address, solBalance);
+          
+          // Log significant balance changes
+          if (Math.abs(event.changePercent) > 1) {
+            logger.info(`Wallet balance change for ${address}: ${event.change.toFixed(6)} SOL (${event.changePercent.toFixed(2)}%)`);
+          }
+        }
+      } else {
+        walletBalances.set(address, solBalance);
+      }
+      
+      return res.json({
+        status: 'success',
+        address,
+        balance: solBalance,
+        balanceLamports: balance,
+        timestamp: new Date().toISOString()
+      });
+    } catch (balanceError) {
+      logger.error(`Error fetching wallet balance: ${balanceError.message}`);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Error fetching wallet balance',
+        error: balanceError.message
+      });
+    }
+  } catch (error) {
+    logger.error('Error processing wallet balance request:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error processing wallet balance request',
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+// System wallet status API endpoint
+router.get('/system/wallet-status', async (req, res) => {
+  try {
+    // Get status of all system wallets
+    const systemWallet = {
+      address: AgentManager.SYSTEM_WALLET_ADDRESS,
+      type: 'system',
+      balance: 0,
+      status: 'active'
+    };
+    
+    const hyperionWallet = {
+      address: '8mFQbdXKNXEHDSxTgQnYJ7gJjwS7Z6TCQwP8HrbbNYQQ',
+      type: 'hyperion_trading',
+      balance: 0,
+      status: 'active'
+    };
+    
+    const hyperionProfitWallet = {
+      address: '5vxoRv2P12q2YvUqnRTrLuhHft8v71dPCnmTNsAATX6s',
+      type: 'hyperion_profit',
+      balance: 0,
+      status: 'active'
+    };
+    
+    const quantumWallet = {
+      address: 'DAz8CQz4G63Wj1jCNe3HY2xQ4VSmaKmTBBVvfBpvizRf',
+      type: 'quantum_omega_trading',
+      balance: 0,
+      status: 'active'
+    };
+    
+    const quantumProfitWallet = {
+      address: '2fZ1XPa3kuGWPgitv3DE1awpa1FEE4JFyVLpUYCZwzDJ',
+      type: 'quantum_omega_profit',
+      balance: 0,
+      status: 'active'
+    };
+    
+    const wallets = [systemWallet, hyperionWallet, hyperionProfitWallet, quantumWallet, quantumProfitWallet];
+    
+    try {
+      const connection = new solanaWeb3.Connection(
+        process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        { commitment: 'confirmed' }
+      );
+      
+      // Get balances in parallel to avoid rate limits
+      const balancePromises = wallets.map(async (wallet) => {
+        try {
+          const publicKey = new solanaWeb3.PublicKey(wallet.address);
+          const balance = await connection.getBalance(publicKey);
+          const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+          
+          wallet.balance = solBalance;
+          
+          // Update tracked balance and check for changes
+          if (walletBalances.has(wallet.address)) {
+            const oldBalance = walletBalances.get(wallet.address);
+            if (oldBalance !== solBalance) {
+              emitWalletBalanceChange(wallet.address, oldBalance, solBalance);
+              walletBalances.set(wallet.address, solBalance);
+            }
+          } else {
+            walletBalances.set(wallet.address, solBalance);
+          }
+        } catch (error) {
+          logger.warn(`Error fetching balance for ${wallet.address}: ${error.message}`);
+          wallet.status = 'error';
+        }
+      });
+      
+      await Promise.all(balancePromises);
+    } catch (error) {
+      logger.error(`Error fetching wallet balances: ${error.message}`);
+    }
+    
+    return res.json({
+      status: 'success',
+      wallets,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error checking system wallet status: ${error.message}`);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error checking system wallet status',
+      error: error.message
+    });
+  }
+});
+
+// AWS Secrets integration for service access
+router.get('/system/aws-status', async (req, res) => {
+  try {
+    // Check if we have AWS credentials
+    const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    
+    return res.json({
+      status: 'ok',
+      hasAwsCredentials,
+      services: {
+        s3: hasAwsCredentials ? 'available' : 'unavailable',
+        ec2: hasAwsCredentials ? 'available' : 'unavailable',
+        lambda: hasAwsCredentials ? 'available' : 'unavailable',
+        cloudwatch: hasAwsCredentials ? 'available' : 'unavailable'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error checking AWS status: ${error.message}`);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error checking AWS services',
+      error: error.message
     });
   }
 });
@@ -1817,7 +2060,153 @@ export function setupWebSocketServer(httpServer: Server) {
     const origin = req.headers.origin || 'unknown';
     logger.info(`New WebSocket connection from ${clientIp} (origin: ${origin})`);
     
-    // Register with signal monitoring service
+    // Handle URL path to route to different handlers
+    const pathname = req.url || '';
+    
+    if (pathname.startsWith('/wallet-balance-monitor')) {
+      // This is a wallet balance monitoring connection
+      // Add to wallet balance change listeners
+      walletBalanceChangeListeners.add(ws);
+      
+      // Handle messages
+      ws.on('message', (message) => {
+        try {
+          const data = JSON.parse(message.toString());
+          
+          if (data.type === 'SUBSCRIBE' && data.address) {
+            // Initialize monitoring for the address if not already tracked
+            if (!walletBalances.has(data.address)) {
+              try {
+                const connection = new solanaWeb3.Connection(
+                  process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+                  { commitment: 'confirmed' }
+                );
+                
+                const publicKey = new solanaWeb3.PublicKey(data.address);
+                connection.getBalance(publicKey).then(balance => {
+                  const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+                  walletBalances.set(data.address, solBalance);
+                  
+                  ws.send(JSON.stringify({
+                    type: 'WALLET_BALANCE_INITIAL',
+                    address: data.address,
+                    balance: solBalance,
+                    timestamp: new Date().toISOString()
+                  }));
+                });
+              } catch (error) {
+                logger.error(`Error initializing wallet monitoring: ${error instanceof Error ? error.message : String(error)}`);
+                ws.send(JSON.stringify({
+                  type: 'ERROR',
+                  message: `Error initializing wallet monitoring: ${error instanceof Error ? error.message : String(error)}`,
+                  timestamp: new Date().toISOString()
+                }));
+              }
+            } else {
+              // Send current balance
+              ws.send(JSON.stringify({
+                type: 'WALLET_BALANCE_INITIAL',
+                address: data.address,
+                balance: walletBalances.get(data.address),
+                timestamp: new Date().toISOString()
+              }));
+            }
+          }
+        } catch (error) {
+          logger.error(`Error processing wallet balance monitor message: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      });
+      
+      ws.on('close', () => {
+        walletBalanceChangeListeners.delete(ws);
+        logger.debug('Wallet balance monitoring client disconnected');
+      });
+      
+      // Send initial connection acknowledgment
+      ws.send(JSON.stringify({
+        type: 'CONNECTED',
+        message: 'Connected to wallet balance monitoring service',
+        timestamp: new Date().toISOString()
+      }));
+      return;
+    } else if (pathname.startsWith('/system-status')) {
+      // This is a system status monitoring connection
+      // Periodic system status update
+      const systemStatusInterval = setInterval(() => {
+        // Create system status update
+        const systemStatus = {
+          type: 'SYSTEM_STATUS',
+          timestamp: new Date().toISOString(),
+          agent_system: AgentManager.isRunning() ? 'running' : 'stopped',
+          price_feed: priceFeedCache.isInitialized() ? 'operational' : 'initializing',
+          instant_nodes_rpc: !!process.env.INSTANT_NODES_RPC_URL ? 'available' : 'unavailable',
+          solana_rpc_api: !!process.env.SOLANA_RPC_API_KEY ? 'available' : 'unavailable',
+          helius_api: !!process.env.HELIUS_API_KEY ? 'available' : 'unavailable',
+          wormhole_api: !!process.env.WORMHOLE_API_KEY ? 'available' : 'unavailable',
+          deepseek_api: !!process.env.DEEPSEEK_API_KEY ? 'available' : 'unavailable',
+          perplexity_api: !!process.env.PERPLEXITY_API_KEY ? 'available' : 'unavailable',
+          aws_access: (!!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY) ? 'available' : 'unavailable',
+          wallets: {
+            system: AgentManager.SYSTEM_WALLET_ADDRESS,
+            hyperion_trading: '8mFQbdXKNXEHDSxTgQnYJ7gJjwS7Z6TCQwP8HrbbNYQQ',
+            hyperion_profit: '5vxoRv2P12q2YvUqnRTrLuhHft8v71dPCnmTNsAATX6s',
+            quantum_omega_trading: 'DAz8CQz4G63Wj1jCNe3HY2xQ4VSmaKmTBBVvfBpvizRf',
+            quantum_omega_profit: '2fZ1XPa3kuGWPgitv3DE1awpa1FEE4JFyVLpUYCZwzDJ'
+          }
+        };
+        
+        try {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(systemStatus));
+          }
+        } catch (error) {
+          logger.error(`Error sending system status update: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }, 10000); // Send updates every 10 seconds
+      
+      ws.on('close', () => {
+        clearInterval(systemStatusInterval);
+        logger.debug('System status monitoring client disconnected');
+      });
+      
+      // Send initial connection acknowledgment
+      ws.send(JSON.stringify({
+        type: 'CONNECTED',
+        message: 'Connected to system status monitoring service',
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Send initial system status
+      try {
+        const initialStatus = {
+          type: 'SYSTEM_STATUS',
+          timestamp: new Date().toISOString(),
+          agent_system: AgentManager.isRunning() ? 'running' : 'stopped',
+          price_feed: priceFeedCache.isInitialized() ? 'operational' : 'initializing',
+          instant_nodes_rpc: !!process.env.INSTANT_NODES_RPC_URL ? 'available' : 'unavailable',
+          solana_rpc_api: !!process.env.SOLANA_RPC_API_KEY ? 'available' : 'unavailable',
+          helius_api: !!process.env.HELIUS_API_KEY ? 'available' : 'unavailable',
+          wormhole_api: !!process.env.WORMHOLE_API_KEY ? 'available' : 'unavailable',
+          deepseek_api: !!process.env.DEEPSEEK_API_KEY ? 'available' : 'unavailable',
+          perplexity_api: !!process.env.PERPLEXITY_API_KEY ? 'available' : 'unavailable',
+          aws_access: (!!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY) ? 'available' : 'unavailable',
+          wallets: {
+            system: AgentManager.SYSTEM_WALLET_ADDRESS,
+            hyperion_trading: '8mFQbdXKNXEHDSxTgQnYJ7gJjwS7Z6TCQwP8HrbbNYQQ',
+            hyperion_profit: '5vxoRv2P12q2YvUqnRTrLuhHft8v71dPCnmTNsAATX6s',
+            quantum_omega_trading: 'DAz8CQz4G63Wj1jCNe3HY2xQ4VSmaKmTBBVvfBpvizRf',
+            quantum_omega_profit: '2fZ1XPa3kuGWPgitv3DE1awpa1FEE4JFyVLpUYCZwzDJ'
+          }
+        };
+        
+        ws.send(JSON.stringify(initialStatus));
+      } catch (error) {
+        logger.error(`Error sending initial system status: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+    
+    // Register with signal monitoring service for regular connections
     const signalMonitoring = require('./signalMonitoring').default;
     signalMonitoring.addSignalMonitoringClient(ws);
     
