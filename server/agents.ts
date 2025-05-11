@@ -68,6 +68,9 @@ const wsClients = new Set<WebSocket>();
 // Whether the agent system is running
 let _isRunning = false;
 
+// System wallet for profit collection - this is the main wallet you should fund
+export const SYSTEM_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+
 // Initialize mock agent states
 function initializeAgentStates() {
   const hyperion: AgentState = {
@@ -76,7 +79,12 @@ function initializeAgentStates() {
     type: AgentType.HYPERION,
     status: AgentStatus.IDLE,
     active: false,
-    wallets: {},
+    wallets: {
+      trading: '8mFQbdXKNXEHDSxTgQnYJ7gJjwS7Z6TCQwP8HrbbNYQQ',
+      profit: '5vxoRv2P12q2YvUqnRTrLuhHft8v71dPCnmTNsAATX6s',
+      fee: '7YttRA5S3JrVR7btJyKtcdKzvYXtgP7NuXoM6tPmDx6w',
+      stealth: ['3gUbdMs4Z5vxWw4twNYewdmYXqYNwZsWJXiyXK4JVnRa']
+    },
     metrics: {
       totalExecutions: 0,
       successRate: 0,
@@ -90,13 +98,21 @@ function initializeAgentStates() {
     type: AgentType.QUANTUM_OMEGA,
     status: AgentStatus.IDLE,
     active: false,
-    wallets: {},
+    wallets: {
+      trading: 'DAz8CQz4G63Wj1jCNe3HY2xQ4VSmaKmTBBVvfBpvizRf',
+      profit: '2fZ1XPa3kuGWPgitv3DE1awpa1FEE4JFyVLpUYCZwzDJ',
+      fee: 'Hs4sAwLN2QgvU6dW3JaRNNzWydQRfA9M3b59HgaEpxeQ',
+      stealth: ['Ckx2B2PKVCyYEVnJa8DxCnoXxTvGbbw39jQAvoLhPLuM']
+    },
     metrics: {
       totalExecutions: 0,
       successRate: 0,
       totalProfit: 0,
     }
   };
+  
+  // Reference the system wallet
+  // The system wallet address is exported at the top level
 
   agents.set(hyperion.id, hyperion);
   agents.set(quantumOmega.id, quantumOmega);
