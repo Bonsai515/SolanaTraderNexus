@@ -4,7 +4,7 @@ import SystemDashboard from './pages/SystemDashboard';
 import WebSocketTest from './pages/WebSocketTest';
 import Trading from './pages/Trading';
 import { useEffect, useState } from 'react';
-import Toasts from './components/ui/toast';
+import Toasts from './components/ui/Toasts';
 
 // Simple Dashboard Component
 function Dashboard() {

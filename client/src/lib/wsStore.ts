@@ -253,9 +253,11 @@ function initWebSocket() {
   
   // Get the correct WebSocket URL
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  // Use the current host (Replit or localhost)
+  const host = window.location.host;
+  const wsUrl = `${protocol}//${host}/ws`;
   
-  console.log(`Connecting to WebSocket at ${wsUrl}`);
+  console.log(`Connecting to WebSocket at ${wsUrl} (protocol: ${protocol}, host: ${host})`);
   
   try {
     // Create new WebSocket
@@ -294,7 +296,12 @@ function initWebSocket() {
     
     ws.onmessage = (event) => {
       // Handle incoming message
-      store._handleMessage(event.data);
+      console.log('WebSocket message received:', event.data.substring(0, 100) + (event.data.length > 100 ? '...' : ''));
+      try {
+        store._handleMessage(event.data);
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
+      }
     };
   } catch (error) {
     console.error('Failed to create WebSocket connection:', error);
@@ -379,4 +386,6 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+// Export both the default and named export for flexibility
 export default useWsStore;
+export const useStore = useWsStore;

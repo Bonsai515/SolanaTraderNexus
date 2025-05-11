@@ -1,89 +1,100 @@
-/**
- * Toast Component
- * 
- * This is a simple toast notification component
- */
-import { useState, useEffect } from 'react';
-import { ToastState, useToast } from '../../hooks/use-toast';
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-export function Toasts() {
-  const { toasts, dismissToast } = useToast();
-  
-  if (toasts.length === 0) {
-    return null;
-  }
-  
-  return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 w-full max-w-md">
-      {toasts.map(toast => (
-        <Toast key={toast.id} toast={toast} onDismiss={() => dismissToast(toast.id)} />
-      ))}
-    </div>
-  );
-}
+export type ToastProps = {
+  title?: string;
+  description?: string;
+  variant?: "default" | "destructive" | "success" | "warning" | "info";
+  onClose?: () => void;
+};
 
-interface ToastProps {
-  toast: ToastState;
-  onDismiss: () => void;
-}
-
-export function Toast({ toast, onDismiss }: ToastProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  
-  // Animation on mount
-  useEffect(() => {
-    // Small delay to ensure the transition works
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 10);
-    return () => clearTimeout(timer);
-  }, []);
-  
-  // Handle animation when removed
-  useEffect(() => {
-    if (!toast.visible) {
-      setIsVisible(false);
-    }
-  }, [toast.visible]);
-  
-  // Determine the background color based on variant
-  const getVariantClass = () => {
-    switch (toast.variant) {
-      case 'success':
-        return 'bg-green-500/90 text-white';
-      case 'warning':
-        return 'bg-yellow-500/90 text-white';
-      case 'destructive':
-        return 'bg-red-500/90 text-white';
-      default:
-        return 'bg-blue-500/90 text-white';
-    }
+export const Toast = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & ToastProps
+>(({ className, title, description, variant = "default", onClose, ...props }, ref) => {
+  const variantClasses = {
+    default: "bg-gray-800 border-gray-700",
+    destructive: "bg-red-900 border-red-800 text-red-50",
+    success: "bg-green-900 border-green-800 text-green-50",
+    warning: "bg-amber-900 border-amber-800 text-amber-50",
+    info: "bg-blue-900 border-blue-800 text-blue-50"
   };
-  
+
+  const iconVariants = {
+    default: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    destructive: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+    success: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    warning: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+    info: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  };
+
   return (
-    <div 
-      className={`rounded-lg shadow-lg p-4 transform transition-all duration-200 ease-in-out ${
-        getVariantClass()
-      } ${
-        isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
-      }`}
+    <div
+      ref={ref}
+      className={cn(
+        "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-4 shadow-lg transition-all",
+        variantClasses[variant],
+        className
+      )}
+      {...props}
     >
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="font-medium">{toast.title}</h3>
-          {toast.description && (
-            <p className="text-sm opacity-90 mt-1">{toast.description}</p>
-          )}
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 self-center">{iconVariants[variant]}</div>
+        <div className="flex-1">
+          {title && <div className="font-medium">{title}</div>}
+          {description && <div className="mt-1 text-sm text-gray-300">{description}</div>}
         </div>
-        <button
-          onClick={onDismiss}
-          className="ml-4 text-white/80 hover:text-white transition-colors"
-        >
-          ✕
-        </button>
       </div>
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="absolute right-2 top-2 rounded-md p-1 text-gray-400 opacity-0 transition-opacity hover:text-gray-200 focus:opacity-100 focus:outline-none focus:ring-1 group-hover:opacity-100"
+        >
+          <span className="sr-only">Close</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
     </div>
   );
-}
+});
+Toast.displayName = "Toast";
 
-export default Toasts;
+export type ToastViewportProps = React.HTMLAttributes<HTMLDivElement>;
+
+export const ToastViewport = React.forwardRef<HTMLDivElement, ToastViewportProps>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+ToastViewport.displayName = "ToastViewport";
+
+export interface ToastActionElement extends React.ReactElement {}

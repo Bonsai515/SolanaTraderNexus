@@ -123,16 +123,35 @@ class WebSocketClient {
       };
       
       this.socket.onmessage = (event) => {
-        // Try to parse message for PONG detection
+        console.log(`Received WebSocket message: ${event.data.substring(0, 100)}${event.data.length > 100 ? '...' : ''}`);
+        
+        // Try to parse message for special message types
         try {
           const data = JSON.parse(event.data);
+          
+          // Handle PONG messages (connection health check)
           if (data && data.type === 'PONG') {
             this.lastPongTime = Date.now();
             const latency = this.lastPongTime - this.lastPingTime;
             console.log(`Received PONG response, latency: ${latency}ms`);
           }
+          
+          // Handle the initial CONNECTED message from server
+          if (data && data.type === 'CONNECTED') {
+            console.log(`WebSocket server connection confirmed: ${data.message || 'Connected'}`);
+            
+            // Request market data after successful connection
+            setTimeout(() => {
+              this.sendImmediately({
+                type: 'GET_MARKET_DATA',
+                pairs: ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'],
+                timestamp: new Date().toISOString()
+              });
+              console.log('Requested initial market data');
+            }, 1000);
+          }
         } catch (e) {
-          // Not JSON or not a PONG message, that's fine
+          console.warn('Failed to parse WebSocket message as JSON:', e);
         }
         
         // Forward to all callbacks
