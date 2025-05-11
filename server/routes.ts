@@ -2663,11 +2663,15 @@ const initializeTransformerAPI = async () => {
   if (!transformerApiInitialized) {
     try {
       const transformer = getTransformerAPI(storage);
-      await transformer.initialize();
+      if (!transformer) {
+        throw new Error('Failed to get transformer API instance');
+      }
+      await transformer.initialize(['SOL/USDC', 'BONK/USDC', 'JUP/USDC']);
       transformerApiInitialized = true;
       logger.info("Transformer API initialized successfully");
     } catch (error) {
       logger.error("Failed to initialize transformer API:", error);
+      throw error; // Re-throw to handle in caller
     }
   }
 };
