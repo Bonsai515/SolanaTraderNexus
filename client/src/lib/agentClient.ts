@@ -206,6 +206,18 @@ export function useAgentStore(): AgentStoreState {
   return context;
 }
 
+export interface WebSocketMessage {
+  type: string;
+  data: any;
+}
+
+export interface AgentConfiguration {
+  active: boolean;
+  tradingWallets: string[];
+  maxSlippageBps: number;
+  minProfitThresholdUsd: number;
+}
+
 // Hook to initialize WebSocket listeners
 export function useAgentWebSocketHandlers() {
   const { registerHandler } = useWsContext();
