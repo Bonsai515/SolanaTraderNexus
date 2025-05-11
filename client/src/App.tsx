@@ -3,6 +3,7 @@ import NotFound from './pages/not-found';
 import SystemDashboard from './pages/SystemDashboard';
 import WebSocketTest from './pages/WebSocketTest';
 import Trading from './pages/Trading';
+import NeuralConnector from './pages/NeuralConnector';
 import { useEffect, useState } from 'react';
 import { ToastProvider } from './components/ui/Toasts';
 
@@ -201,6 +202,7 @@ function App() {
                 <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
                 <li><Link href="/trading" className="hover:text-blue-400 transition-colors">Trading</Link></li>
                 <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
+                <li><Link href="/neural" className="hover:text-blue-400 transition-colors">Neural Connector</Link></li>
                 <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
                 <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
               </ul>
@@ -212,6 +214,7 @@ function App() {
           <Route path="/" component={Dashboard} />
           <Route path="/trading" component={Trading} />
           <Route path="/insights" component={Dashboard} />
+          <Route path="/neural" component={NeuralConnector} />
           <Route path="/system" component={SystemDashboard} />
           <Route path="/ws-test" component={WebSocketTest} />
           <Route path="/:rest*" component={NotFound} />

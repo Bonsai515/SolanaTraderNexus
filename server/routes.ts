@@ -13,6 +13,7 @@ import { priceFeedCache } from './priceFeedCache';
 import { PerplexityService, getPerplexityService } from './ai/perplexityService';
 import { getDeepSeekService } from './ai/deepSeekService';
 import { getNeuralHybridService } from './ai/neuralHybridService';
+import { neuralConnector } from './neuralConnector';
 import aiRouter from './ai/aiRouter';
 import { crossChainRouter } from './wormhole/crossChainRouter';
 import * as crypto from 'crypto';
@@ -4900,6 +4901,19 @@ router.get('/trading-pairs', (req, res) => {
         // Mark as initialized to avoid blocking other features
         transformerApiInitialized = true;
         logger.warn('Transformer API object missing required initialization methods');
+      }
+      
+      // Initialize neural connector
+      try {
+        logger.info('Initializing neural connector for ultra-low latency transformer-agent communication');
+        const neuralInitialized = neuralConnector.initialize();
+        if (neuralInitialized) {
+          logger.info('Neural connector initialized successfully');
+        } else {
+          logger.warn('Neural connector initialization failed');
+        }
+      } catch (neuralError) {
+        logger.error('Error initializing neural connector:', neuralError);
       }
     }
   } catch (error) {
