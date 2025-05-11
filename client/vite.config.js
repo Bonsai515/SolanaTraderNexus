@@ -7,6 +7,10 @@ export default defineConfig({
   server: {
     port: 5000,
     open: false,
+    allowedHosts: [
+      'de951edc-096f-4df8-b381-7801ae07d340-00-1iiaejxecaa3j.kirk.replit.dev',
+      'localhost'
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
