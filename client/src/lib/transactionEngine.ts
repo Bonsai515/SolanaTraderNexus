@@ -228,13 +228,13 @@ export class TransactionEngine {
   private async createSystemWallet(): Promise<void> {
     try {
       // Create a dedicated system wallet for profit capture
-      const wallet = await walletManager.createWallet('System Profit Wallet');
-      this.systemWalletPublicKey = new PublicKey(wallet.publicKey);
+      const systemWalletPublicKey = walletManager.createWallet('System Profit Wallet', 'system');
+      this.systemWalletPublicKey = new PublicKey(systemWalletPublicKey);
       logger.info(`System wallet created: ${this.systemWalletPublicKey.toString()}`);
       
       // Initialize system wallet with a small amount from any existing wallets
       const tradingWallets = walletManager.getAllWallets().filter(w => 
-        !w.isSystemWallet && w.balance && w.balance.sol > 0.02);
+        w.label.toLowerCase().includes('trading') && w.balance && w.balance.sol > 0.02);
       
       if (tradingWallets.length > 0) {
         const donorWallet = tradingWallets[0];
@@ -242,14 +242,14 @@ export class TransactionEngine {
         
         // In a production implementation, this would be a real transfer:
         // await this.transfer({
-        //   source: donorWallet.publicKey,
-        //   destination: wallet.publicKey,
+        //   source: donorWallet.pubkey,
+        //   destination: systemWalletPublicKey,
         //   amount: 0.01,
         //   token: 'SOL'
         // });
         
         // For development, we'll log the intent:
-        logger.info(`Transfer 0.01 SOL from ${donorWallet.pubkey} to system wallet ${wallet.publicKey}`);
+        logger.info(`Transfer 0.01 SOL from ${donorWallet.pubkey} to system wallet ${systemWalletPublicKey}`);
       }
     } catch (error) {
       logger.error('Failed to create system wallet', error);
