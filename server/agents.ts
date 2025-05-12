@@ -45,6 +45,7 @@ export interface AgentState {
     lastExecution?: Date;
   };
   lastError?: string;
+  metadata?: Record<string, any>; // Additional metadata for the agent
 }
 
 export interface ExecutionResult {
@@ -360,6 +361,81 @@ export function addWsClient(client: WebSocket): void {
     type: 'recent_executions',
     executions: getRecentExecutions()
   }));
+}
+
+/**
+ * Configure all agents to use real funds
+ * @param useRealFunds Whether to use real funds for trading
+ * @returns Whether the setting was successfully applied
+ */
+export async function setUseRealFunds(useRealFunds: boolean): Promise<boolean> {
+  try {
+    logger.info(`${useRealFunds ? '✅' : '❌'} Setting all agents to ${useRealFunds ? 'USE' : 'NOT USE'} real funds for trading`);
+    
+    // Apply to all agents
+    for (const agent of agents.values()) {
+      // Add metadata to track real funds usage
+      if (!agent.metadata) {
+        agent.metadata = {};
+      }
+      
+      agent.metadata.useRealFunds = useRealFunds;
+      agent.metadata.lastConfigChange = new Date().toISOString();
+      
+      logger.info(`${useRealFunds ? '💰' : '🛑'} Agent ${agent.name} configured to ${useRealFunds ? 'USE' : 'NOT USE'} real funds`);
+      
+      // Broadcast update
+      broadcastAgentUpdate(agent);
+    }
+    
+    // Broadcast global message about fund usage
+    broadcastMessage({
+      type: 'real_funds_status',
+      useRealFunds,
+      timestamp: new Date().toISOString(),
+      message: `All agents ${useRealFunds ? 'ARE NOW' : 'ARE NOT'} using real funds for trading`
+    });
+    
+    return true;
+  } catch (error) {
+    logger.error(`❌ Failed to set real funds usage to ${useRealFunds}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Activate an individual agent by ID
+ * @param id The agent ID to activate
+ * @returns Whether the agent was successfully activated
+ */
+export async function activateAgent(id: string): Promise<boolean> {
+  try {
+    const agent = getAgent(id);
+    
+    if (!agent) {
+      logger.error(`❌ Failed to activate agent: Agent with ID ${id} not found`);
+      return false;
+    }
+    
+    if (agent.status !== AgentStatus.IDLE && agent.status !== AgentStatus.ERROR) {
+      logger.warn(`⚠️ Agent ${id} is already active with status: ${agent.status}`);
+      return true; // Already active, so technically success
+    }
+    
+    // Set agent to active state
+    agent.active = true;
+    agent.status = AgentStatus.SCANNING;
+    
+    // Broadcast update to all WebSocket clients
+    broadcastAgentUpdate(agent);
+    
+    logger.info(`✅ Agent ${agent.name} activated successfully`);
+    
+    return true;
+  } catch (error) {
+    logger.error(`❌ Failed to activate agent ${id}:`, error);
+    return false;
+  }
 }
 
 /**
