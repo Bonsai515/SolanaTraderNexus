@@ -1,0 +1,7 @@
+{
+  "useRealFunds": true,
+  "rpcUrl": "https://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+  "websocketUrl": "wss://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+  "systemWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "wormholeGuardianRpc": "https://guardian.stable.productions"
+}

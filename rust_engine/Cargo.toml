@@ -1,0 +1,31 @@
+[package]
+name = "neural-nexus-transaction-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Neural Nexus Solana Transaction Engine for real-time trading"
+authors = ["Neural Nexus Team"]
+
+[dependencies]
+# Solana dependencies for blockchain interactions
+solana-sdk = "1.18.3"
+solana-client = "1.18.3"
+solana-transaction-status = "1.18.3"
+solana-rpc-client-api = "1.18.3"
+
+# Other dependencies
+rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.4", features = ["v4"] }
+chrono = "0.4"
+
+[lib]
+name = "neural_nexus_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "transaction_engine"
+path = "src/main.rs"

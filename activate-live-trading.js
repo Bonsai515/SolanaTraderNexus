@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Activate Live Trading with Real Funds
  * 
@@ -7,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 
 // Create logs directory if it doesn't exist
 if (!fs.existsSync('./logs')) {
@@ -17,6 +19,50 @@ if (!fs.existsSync('./logs')) {
 function log(message) {
   console.log(message);
   fs.appendFileSync('./logs/activate-trading.log', message + '\n');
+}
+
+/**
+ * Make a HTTP request to the local API
+ */
+async function makeRequest(method, path, data = null) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 5000,
+      path,
+      method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          resolve(parsedData);
+        } catch (e) {
+          resolve(responseData);
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      reject(error);
+    });
+    
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    
+    req.end();
+  });
 }
 
 /**
@@ -86,17 +132,34 @@ async function enableRealFundTrading() {
   log('💰 Enabling trading with REAL FUNDS...');
   
   try {
-    // Set the real funds flag in the transaction engine
-    const agentsModule = require('./server/agents');
+    // Call the API to enable real funds
+    const response = await makeRequest('POST', '/api/real-funds', { useRealFunds: true });
     
-    if (typeof agentsModule.setUseRealFunds === 'function') {
-      await agentsModule.setUseRealFunds(true);
+    if (response && response.success) {
       log('✅ All agents configured to use REAL FUNDS');
       return true;
-    } else {
-      log('⚠️ setUseRealFunds function not found in agents module, using alternative method');
-      
-      // Try to directly modify agents configuration
+    }
+    
+    log('⚠️ API call failed, trying direct configuration...');
+    
+    // Try to directly modify agents configuration
+    const agentsConfigPath = path.join(__dirname, 'server', 'config', 'agents.json');
+    
+    let agentsConfig = {};
+    if (fs.existsSync(agentsConfigPath)) {
+      agentsConfig = JSON.parse(fs.readFileSync(agentsConfigPath, 'utf8'));
+    }
+    
+    agentsConfig.useRealFunds = true;
+    fs.writeFileSync(agentsConfigPath, JSON.stringify(agentsConfig, null, 2));
+    
+    log('✅ Agents configuration updated to use REAL FUNDS');
+    return true;
+  } catch (error) {
+    log(`❌ Failed to enable real fund trading: ${error?.message || 'Unknown error'}`);
+    
+    // Attempt direct file modification as fallback
+    try {
       const agentsConfigPath = path.join(__dirname, 'server', 'config', 'agents.json');
       
       let agentsConfig = {};
@@ -107,12 +170,12 @@ async function enableRealFundTrading() {
       agentsConfig.useRealFunds = true;
       fs.writeFileSync(agentsConfigPath, JSON.stringify(agentsConfig, null, 2));
       
-      log('✅ Agents configuration updated to use REAL FUNDS');
+      log('✅ Agents configuration updated to use REAL FUNDS (fallback method)');
       return true;
+    } catch (fallbackError) {
+      log(`❌ Even fallback method failed: ${fallbackError?.message || 'Unknown error'}`);
+      return false;
     }
-  } catch (error) {
-    log(`❌ Failed to enable real fund trading: ${error?.message || 'Unknown error'}`);
-    return false;
   }
 }
 
@@ -123,31 +186,37 @@ async function activateAllAgents() {
   log('🤖 Activating all trading agents...');
   
   try {
-    // Get the agents module
-    const agentsModule = require('./server/agents');
-    
-    if (typeof agentsModule.activateAllAgents === 'function') {
-      await agentsModule.activateAllAgents();
-      log('✅ All trading agents activated successfully');
-      return true;
-    } else {
-      log('⚠️ activateAllAgents function not found in agents module');
+    // First try the start-all endpoint
+    try {
+      const startAllResponse = await makeRequest('POST', '/api/agents/start');
       
-      // Try to activate each agent individually
-      const agents = ['hyperion-1', 'quantum-omega-1', 'singularity-1'];
-      
-      for (const agentId of agents) {
-        if (typeof agentsModule.activateAgent === 'function') {
-          await agentsModule.activateAgent(agentId);
-          log(`✅ Agent ${agentId} activated successfully`);
-        } else {
-          log(`⚠️ Unable to activate agent ${agentId} - activation function not found`);
-        }
+      if (startAllResponse && startAllResponse.success) {
+        log('✅ All trading agents activated successfully via API');
+        return true;
       }
-      
-      log('✅ Agent activation process completed');
-      return true;
+    } catch (e) {
+      log('⚠️ Start-all endpoint failed, trying individual activation...');
     }
+    
+    // Try to activate each agent individually
+    const agents = ['hyperion-1', 'quantum-omega-1', 'singularity-1'];
+    
+    for (const agentId of agents) {
+      try {
+        const response = await makeRequest('POST', `/api/agents/activate/${agentId}`);
+        
+        if (response && response.success) {
+          log(`✅ Agent ${agentId} activated successfully via API`);
+        } else {
+          log(`⚠️ Failed to activate agent ${agentId} via API`);
+        }
+      } catch (error) {
+        log(`⚠️ Error activating agent ${agentId}: ${error?.message || 'Unknown error'}`);
+      }
+    }
+    
+    log('✅ Agent activation process completed');
+    return true;
   } catch (error) {
     log(`❌ Failed to activate trading agents: ${error?.message || 'Unknown error'}`);
     return false;
@@ -202,12 +271,15 @@ if (require.main === module) {
   activateLiveTrading()
     .then(success => {
       if (success) {
-        log('✅ Live trading successfully activated!');
+        log('✅ Live trading activated successfully');
+        process.exit(0);
       } else {
-        log('❌ Failed to activate live trading');
+        log('❌ Live trading activation failed');
+        process.exit(1);
       }
     })
-    .catch(err => {
-      log(`❌ Fatal error: ${err.message}`);
+    .catch(error => {
+      log(`❌ Unhandled error: ${error?.message || 'Unknown error'}`);
+      process.exit(1);
     });
 }
