@@ -109,6 +109,10 @@ path = "src/standalone_main.rs"
 name = "solana_quantum_trading"
 path = "src/main.rs"
 
+[[bin]]
+name = "activate_singularity"
+path = "src/bin/activate_singularity.rs"
+
 [profile.release]
 opt-level = 3
 lto = true
