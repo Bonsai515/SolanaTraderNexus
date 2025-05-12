@@ -1,548 +1,439 @@
-//! Singularity Cross-Chain Oracle Agent Module
+//! Singularity Cross-Chain Oracle
 //!
-//! This module implements the Singularity agent for cross-chain arbitrage.
-//! Singularity monitors multiple blockchains to find and execute profitable
-//! arbitrage opportunities across chains using Wormhole.
-
-use anyhow::{Result, anyhow};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::time::{self, Duration};
-use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::task::JoinHandle;
+//! The Singularity agent specializes in cross-chain arbitrage using Wormhole
+//! and other bridges to identify and execute profitable trading opportunities
+//! across multiple blockchains.
 
 pub mod strategy;
-pub mod validator;
 pub mod scanner;
 pub mod executor;
+pub mod validator;
 
-use strategy::{StrategyParams, Opportunity};
-use scanner::{ScannerConfig, Scanner, start_background_scanner};
-use executor::{ExecutorConfig, Executor, ExecutionResult};
-use validator::LiquidityThresholds;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-/// Agent state
-#[derive(Debug, Clone, PartialEq)]
-pub enum AgentState {
-    /// Not started
-    NotStarted,
-    /// Initializing
-    Initializing,
-    /// Scanning for opportunities
-    Scanning,
-    /// Executing opportunity
-    Executing,
-    /// Cooldown period (post-execution)
-    Cooldown,
-    /// Error state
-    Error,
-}
-
-/// Performance metrics
+/// Singularity agent configuration
 #[derive(Debug, Clone)]
-pub struct PerformanceMetrics {
-    /// Total executions
-    pub total_executions: usize,
-    /// Successful executions
-    pub successful_executions: usize,
-    /// Total profit (in USD)
-    pub total_profit: f64,
-    /// Average profit per execution (in USD)
-    pub average_profit: f64,
-    /// Last execution timestamp
-    pub last_execution: Option<u64>,
-}
-
-impl Default for PerformanceMetrics {
-    fn default() -> Self {
-        Self {
-            total_executions: 0,
-            successful_executions: 0,
-            total_profit: 0.0,
-            average_profit: 0.0,
-            last_execution: None,
-        }
-    }
-}
-
-/// Agent configuration
-#[derive(Debug, Clone)]
-pub struct AgentConfig {
-    /// Agent ID
+pub struct SingularityConfig {
+    /// ID of the agent instance
     pub id: String,
-    /// Agent name
-    pub name: String,
-    /// Scanner configuration
-    pub scanner_config: ScannerConfig,
-    /// Executor configuration
-    pub executor_config: ExecutorConfig,
-    /// Strategy parameters
-    pub strategy_params: StrategyParams,
-    /// Cooldown period (in seconds)
-    pub cooldown_secs: u64,
-    /// Maximum executions per hour
-    pub max_executions_per_hour: usize,
-    /// Auto-start on initialization
-    pub auto_start: bool,
+    
+    /// Operation mode
+    pub mode: OperationMode,
+    
+    /// Use system wallet
+    pub use_system_wallet: bool,
+    
+    /// Minimum profit percentage
+    pub min_profit_pct: f64,
+    
+    /// Maximum input amount
+    pub max_input: f64,
+    
+    /// Trading wallet address
+    pub trading_wallet: String,
+    
+    /// Profit wallet address
+    pub profit_wallet: String,
+    
+    /// Fee wallet address
+    pub fee_wallet: String,
 }
 
-impl Default for AgentConfig {
-    fn default() -> Self {
-        Self {
-            id: "singularity-1".to_string(),
-            name: "Singularity Cross-Chain Oracle".to_string(),
-            scanner_config: ScannerConfig::default(),
-            executor_config: ExecutorConfig::default(),
-            strategy_params: StrategyParams::default(),
-            cooldown_secs: 60,
-            max_executions_per_hour: 10,
-            auto_start: true,
+/// Singularity operation mode
+#[derive(Debug, Clone, PartialEq)]
+pub enum OperationMode {
+    /// Scan only, no trades
+    ScanOnly,
+    
+    /// Dry run (simulate trades)
+    DryRun,
+    
+    /// Live trading with real funds
+    LiveTrading,
+}
+
+impl std::fmt::Display for OperationMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OperationMode::ScanOnly => write!(f, "scan_only"),
+            OperationMode::DryRun => write!(f, "dry_run"),
+            OperationMode::LiveTrading => write!(f, "live_trading"),
         }
     }
+}
+
+impl From<&str> for OperationMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "scan_only" => OperationMode::ScanOnly,
+            "live_trading" => OperationMode::LiveTrading,
+            _ => OperationMode::DryRun,
+        }
+    }
+}
+
+/// Chain type
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChainType {
+    /// Solana
+    Solana,
+    
+    /// Ethereum
+    Ethereum,
+    
+    /// Binance Smart Chain
+    BSC,
+    
+    /// Polygon
+    Polygon,
+    
+    /// Avalanche
+    Avalanche,
+    
+    /// Arbitrum
+    Arbitrum,
+    
+    /// Optimism
+    Optimism,
+    
+    /// Base
+    Base,
+}
+
+impl std::fmt::Display for ChainType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChainType::Solana => write!(f, "solana"),
+            ChainType::Ethereum => write!(f, "ethereum"),
+            ChainType::BSC => write!(f, "bsc"),
+            ChainType::Polygon => write!(f, "polygon"),
+            ChainType::Avalanche => write!(f, "avalanche"),
+            ChainType::Arbitrum => write!(f, "arbitrum"),
+            ChainType::Optimism => write!(f, "optimism"),
+            ChainType::Base => write!(f, "base"),
+        }
+    }
+}
+
+/// Cross-chain opportunity
+#[derive(Debug, Clone)]
+pub struct CrossChainOpportunity {
+    /// Opportunity ID
+    pub id: String,
+    
+    /// Source chain
+    pub source_chain: ChainType,
+    
+    /// Target chain
+    pub target_chain: ChainType,
+    
+    /// Source token
+    pub source_token: String,
+    
+    /// Target token
+    pub target_token: String,
+    
+    /// Input amount
+    pub input_amount: f64,
+    
+    /// Output amount
+    pub output_amount: f64,
+    
+    /// Expected profit
+    pub expected_profit: f64,
+    
+    /// Profit percentage
+    pub profit_pct: f64,
+    
+    /// Total fees
+    pub total_fees: f64,
+    
+    /// Source DEX
+    pub source_dex: String,
+    
+    /// Target DEX
+    pub target_dex: String,
+    
+    /// Bridge
+    pub bridge: String,
+    
+    /// Detected timestamp
+    pub detected_at: u64,
+    
+    /// Expires at
+    pub expires_at: u64,
+    
+    /// Is validated
+    pub is_validated: bool,
+    
+    /// Additional metadata
+    pub metadata: HashMap<String, String>,
+}
+
+/// Singularity agent state
+#[derive(Debug, Clone)]
+pub struct SingularityState {
+    /// Configuration
+    pub config: SingularityConfig,
+    
+    /// Is running
+    pub is_running: bool,
+    
+    /// Start time
+    pub start_time: Option<u64>,
+    
+    /// Last scan time
+    pub last_scan_time: Option<u64>,
+    
+    /// Number of scans
+    pub scan_count: u64,
+    
+    /// Number of opportunities detected
+    pub opportunity_count: u64,
+    
+    /// Number of executions
+    pub execution_count: u64,
+    
+    /// Number of successful executions
+    pub successful_executions: u64,
+    
+    /// Total profit
+    pub total_profit: f64,
+    
+    /// Last error
+    pub last_error: Option<String>,
+    
+    /// Current opportunities
+    pub current_opportunities: Vec<CrossChainOpportunity>,
 }
 
 /// Singularity agent
-pub struct SingularityAgent {
-    /// Agent configuration
-    config: AgentConfig,
-    /// Scanner instance
-    scanner: Option<Arc<Mutex<Scanner>>>,
-    /// Executor instance
-    executor: Option<Arc<Mutex<Executor>>>,
-    /// Current state
-    state: AgentState,
-    /// Performance metrics
-    metrics: PerformanceMetrics,
-    /// Current opportunities
-    opportunities: Vec<Opportunity>,
-    /// Recent executions
-    executions: Vec<ExecutionResult>,
-    /// Background task handles
-    task_handles: Vec<JoinHandle<()>>,
-    /// Last error
-    last_error: Option<String>,
+pub struct Singularity {
+    /// State
+    state: RwLock<SingularityState>,
+    
+    /// Strategy
+    strategy: Arc<Mutex<strategy::SingularityStrategy>>,
+    
+    /// Scanner
+    scanner: Arc<Mutex<scanner::SingularityScanner>>,
+    
+    /// Executor
+    executor: Arc<Mutex<executor::SingularityExecutor>>,
+    
+    /// Validator
+    validator: Arc<Mutex<validator::SingularityValidator>>,
 }
 
-impl SingularityAgent {
+impl Singularity {
     /// Create a new Singularity agent
-    pub fn new(config: AgentConfig) -> Self {
-        Self {
-            config,
-            scanner: None,
-            executor: None,
-            state: AgentState::NotStarted,
-            metrics: PerformanceMetrics::default(),
-            opportunities: Vec::new(),
-            executions: Vec::new(),
-            task_handles: Vec::new(),
+    pub fn new(config: SingularityConfig) -> Self {
+        let state = SingularityState {
+            config: config.clone(),
+            is_running: false,
+            start_time: None,
+            last_scan_time: None,
+            scan_count: 0,
+            opportunity_count: 0,
+            execution_count: 0,
+            successful_executions: 0,
+            total_profit: 0.0,
             last_error: None,
+            current_opportunities: Vec::new(),
+        };
+        
+        let strategy = Arc::new(Mutex::new(strategy::SingularityStrategy::new(config.clone())));
+        let scanner = Arc::new(Mutex::new(scanner::SingularityScanner::new(config.clone())));
+        let executor = Arc::new(Mutex::new(executor::SingularityExecutor::new(config.clone())));
+        let validator = Arc::new(Mutex::new(validator::SingularityValidator::new(config.clone())));
+        
+        Self {
+            state: RwLock::new(state),
+            strategy,
+            scanner,
+            executor,
+            validator,
         }
     }
     
-    /// Initialize the agent
-    pub async fn initialize(&mut self) -> Result<()> {
-        println!("🚀 Initializing Singularity Cross-Chain Oracle agent");
-        
-        self.state = AgentState::Initializing;
-        
-        // Check for environment variables
-        if std::env::var("WORMHOLE_API_KEY").is_err() {
-            let msg = "Wormhole API key not found, cross-chain operations may be limited";
-            println!("⚠️ {}", msg);
-            self.last_error = Some(msg.to_string());
-        }
-        
-        // Initialize executor
-        let executor_config = self.config.executor_config.clone();
-        let mut executor = executor::Executor::new(executor_config);
-        
-        // Start executor
-        if let Err(e) = executor.start() {
-            let msg = format!("Failed to start executor: {}", e);
-            println!("❌ {}", msg);
-            self.last_error = Some(msg);
-            self.state = AgentState::Error;
-            return Err(anyhow!(msg));
-        }
-        
-        // Wrap executor in Arc<Mutex>
-        let executor_arc = Arc::new(Mutex::new(executor));
-        self.executor = Some(executor_arc.clone());
-        
-        // Initialize scanner
-        let scanner_config = self.config.scanner_config.clone();
-        let strategy_params = self.config.strategy_params.clone();
-        
-        // Start background scanner
-        match scanner::start_background_scanner(scanner_config, strategy_params).await {
-            Ok(scanner) => {
-                self.scanner = Some(scanner);
-            }
-            Err(e) => {
-                let msg = format!("Failed to start scanner: {}", e);
-                println!("❌ {}", msg);
-                self.last_error = Some(msg);
-                self.state = AgentState::Error;
-                return Err(anyhow!(msg));
-            }
-        }
-        
-        // Start background tasks
-        self.start_background_tasks();
-        
-        println!("✅ Singularity agent initialized successfully");
-        
-        // Auto-start if configured
-        if self.config.auto_start {
-            self.start().await?;
-        }
-        
-        Ok(())
+    /// Get the current state
+    pub fn get_state(&self) -> SingularityState {
+        self.state.read().unwrap().clone()
     }
     
     /// Start the agent
-    pub async fn start(&mut self) -> Result<()> {
-        if self.state == AgentState::Scanning || self.state == AgentState::Executing {
-            return Ok(());
+    pub fn start(&self) -> Result<(), String> {
+        let mut state = self.state.write().unwrap();
+        
+        if state.is_running {
+            return Err("Singularity agent is already running".to_string());
         }
         
-        println!("🚀 Starting Singularity Cross-Chain Oracle agent");
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
         
-        self.state = AgentState::Scanning;
+        state.is_running = true;
+        state.start_time = Some(current_time);
+        state.last_scan_time = None;
         
-        println!("✅ Singularity agent started successfully");
+        // Initialize the strategy
+        self.strategy.lock().unwrap().initialize()?;
+        
+        // Initialize the scanner
+        self.scanner.lock().unwrap().initialize()?;
+        
+        // Initialize the executor
+        self.executor.lock().unwrap().initialize()?;
+        
+        // Initialize the validator
+        self.validator.lock().unwrap().initialize()?;
+        
+        // Log that we've started
+        println!("Singularity agent started in {} mode", state.config.mode);
         
         Ok(())
     }
     
     /// Stop the agent
-    pub async fn stop(&mut self) -> Result<()> {
-        if self.state == AgentState::NotStarted || self.state == AgentState::Error {
-            return Ok(());
+    pub fn stop(&self) -> Result<(), String> {
+        let mut state = self.state.write().unwrap();
+        
+        if !state.is_running {
+            return Err("Singularity agent is not running".to_string());
         }
         
-        println!("🛑 Stopping Singularity Cross-Chain Oracle agent");
+        state.is_running = false;
         
-        // Stop background tasks
-        for handle in self.task_handles.drain(..) {
-            handle.abort();
-        }
+        // Clean up
+        self.strategy.lock().unwrap().shutdown()?;
+        self.scanner.lock().unwrap().shutdown()?;
+        self.executor.lock().unwrap().shutdown()?;
+        self.validator.lock().unwrap().shutdown()?;
         
-        // Stop scanner if running
-        if let Some(scanner) = &self.scanner {
-            let mut scanner = scanner.lock().await;
-            if scanner.is_active() {
-                scanner.stop()?;
-            }
-        }
-        
-        // Stop executor if running
-        if let Some(executor) = &self.executor {
-            let mut executor = executor.lock().await;
-            if executor.is_active() {
-                executor.stop()?;
-            }
-        }
-        
-        self.state = AgentState::NotStarted;
-        
-        println!("✅ Singularity agent stopped successfully");
+        // Log that we've stopped
+        println!("Singularity agent stopped");
         
         Ok(())
     }
     
-    /// Get the current state
-    pub fn state(&self) -> AgentState {
-        self.state.clone()
-    }
-    
-    /// Get the agent ID
-    pub fn id(&self) -> &str {
-        &self.config.id
-    }
-    
-    /// Get the agent name
-    pub fn name(&self) -> &str {
-        &self.config.name
-    }
-    
-    /// Get the current opportunities
-    pub async fn get_opportunities(&self) -> Vec<Opportunity> {
-        if let Some(scanner) = &self.scanner {
-            if let Ok(scanner) = scanner.try_lock() {
-                return scanner.get_opportunities().to_vec();
+    /// Scan for opportunities
+    pub fn scan(&self) -> Result<Vec<CrossChainOpportunity>, String> {
+        let mut state = self.state.write().unwrap();
+        
+        if !state.is_running {
+            return Err("Singularity agent is not running".to_string());
+        }
+        
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        
+        state.last_scan_time = Some(current_time);
+        state.scan_count += 1;
+        
+        // Scan for opportunities
+        let opportunities = self.scanner.lock().unwrap().scan()?;
+        
+        // Update opportunity count
+        state.opportunity_count += opportunities.len() as u64;
+        
+        // Filter and validate opportunities
+        let mut valid_opportunities = Vec::new();
+        for opportunity in opportunities {
+            // Validate the opportunity
+            if self.validator.lock().unwrap().validate(&opportunity)? {
+                valid_opportunities.push(opportunity);
             }
         }
         
-        self.opportunities.clone()
+        // Update current opportunities
+        state.current_opportunities = valid_opportunities.clone();
+        
+        Ok(valid_opportunities)
     }
     
-    /// Get the recent executions
-    pub async fn get_executions(&self, limit: usize) -> Vec<ExecutionResult> {
-        if let Some(executor) = &self.executor {
-            if let Ok(executor) = executor.try_lock() {
-                return executor.get_recent_executions(limit);
-            }
+    /// Execute an opportunity
+    pub fn execute(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
+        let mut state = self.state.write().unwrap();
+        
+        if !state.is_running {
+            return Err("Singularity agent is not running".to_string());
         }
         
-        let start = if self.executions.len() > limit {
-            self.executions.len() - limit
-        } else {
-            0
-        };
-        
-        self.executions[start..].to_vec()
-    }
-    
-    /// Get the performance metrics
-    pub fn get_metrics(&self) -> PerformanceMetrics {
-        self.metrics.clone()
-    }
-    
-    /// Get the last error
-    pub fn get_last_error(&self) -> Option<String> {
-        self.last_error.clone()
-    }
-    
-    /// Start background tasks
-    fn start_background_tasks(&mut self) {
-        // Start opportunity scanner task
-        let scanner_clone = self.scanner.clone();
-        let executor_clone = self.executor.clone();
-        let config_clone = self.config.clone();
-        let mut state_copy = self.state.clone();
-        
-        let handle = tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(10));
-            
-            loop {
-                interval.tick().await;
-                
-                // Skip if executor is not active
-                if let Some(executor) = &executor_clone {
-                    if let Ok(executor) = executor.try_lock() {
-                        if !executor.is_active() {
-                            continue;
-                        }
-                    }
-                }
-                
-                if state_copy == AgentState::Scanning {
-                    // Get opportunities from scanner
-                    if let Some(scanner) = &scanner_clone {
-                        if let Ok(mut scanner) = scanner.try_lock() {
-                            if !scanner.is_active() {
-                                continue;
-                            }
-                            
-                            match scanner.scan().await {
-                                Ok(opportunities) => {
-                                    if !opportunities.is_empty() {
-                                        // We have opportunities! Execute the best one
-                                        if let Some(opportunity) = opportunities.first() {
-                                            if let Some(executor) = &executor_clone {
-                                                if let Ok(mut executor) = executor.try_lock() {
-                                                    state_copy = AgentState::Executing;
-                                                    
-                                                    match executor.execute_opportunity(opportunity).await {
-                                                        Ok(result) => {
-                                                            println!("✅ Execution completed: {}", 
-                                                                    if result.success { "Success" } else { "Failed" });
-                                                            
-                                                            state_copy = AgentState::Cooldown;
-                                                            
-                                                            // Wait for cooldown
-                                                            tokio::time::sleep(Duration::from_secs(config_clone.cooldown_secs)).await;
-                                                            
-                                                            state_copy = AgentState::Scanning;
-                                                        }
-                                                        Err(e) => {
-                                                            println!("❌ Execution error: {}", e);
-                                                            state_copy = AgentState::Scanning;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    println!("❌ Scanner error: {}", e);
-                                }
-                            }
-                        }
-                    }
-                }
+        // Check operation mode
+        match state.config.mode {
+            OperationMode::ScanOnly => {
+                return Err("Cannot execute in scan-only mode".to_string());
             }
-        });
-        
-        self.task_handles.push(handle);
-        
-        // Start metrics update task
-        let executor_clone = self.executor.clone();
-        let metrics_clone = Arc::new(Mutex::new(self.metrics.clone()));
-        
-        let handle = tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(60));
-            
-            loop {
-                interval.tick().await;
+            OperationMode::DryRun => {
+                println!("Simulating execution of opportunity {}", opportunity.id);
                 
-                // Update metrics
-                if let Some(executor) = &executor_clone {
-                    if let Ok(executor) = executor.try_lock() {
-                        let recent_executions = executor.get_recent_executions(100);
-                        let total_profit = executor.get_total_profit();
+                // In dry run mode, we just simulate the execution
+                state.execution_count += 1;
+                state.successful_executions += 1;
+                state.total_profit += opportunity.expected_profit;
+                
+                println!("Simulated profit: {} USDC", opportunity.expected_profit);
+                
+                Ok(opportunity.expected_profit)
+            }
+            OperationMode::LiveTrading => {
+                println!("Executing opportunity {}", opportunity.id);
+                
+                // In live trading mode, we actually execute the trade
+                let profit = self.executor.lock().unwrap().execute(opportunity)?;
+                
+                state.execution_count += 1;
+                state.successful_executions += 1;
+                state.total_profit += profit;
+                
+                println!("Actual profit: {} USDC", profit);
+                
+                Ok(profit)
+            }
+        }
+    }
+    
+    /// Run the agent in a loop
+    pub fn run_loop(&self) -> Result<(), String> {
+        self.start()?;
+        
+        // Continue until stopped
+        while self.get_state().is_running {
+            // Scan for opportunities
+            let opportunities = self.scan()?;
+            
+            println!("Found {} cross-chain opportunities", opportunities.len());
+            
+            // Apply strategy to select the best opportunities
+            let selected = self.strategy.lock().unwrap().select_opportunities(&opportunities)?;
+            
+            println!("Selected {} opportunities for execution", selected.len());
+            
+            // Execute each selected opportunity
+            for opportunity in selected {
+                match self.execute(&opportunity) {
+                    Ok(profit) => {
+                        println!("Successfully executed opportunity {} with profit: {} USDC", opportunity.id, profit);
+                    }
+                    Err(err) => {
+                        println!("Failed to execute opportunity {}: {}", opportunity.id, err);
                         
-                        if let Ok(mut metrics) = metrics_clone.try_lock() {
-                            metrics.total_executions = recent_executions.len();
-                            metrics.successful_executions = recent_executions.iter().filter(|e| e.success).count();
-                            metrics.total_profit = total_profit;
-                            
-                            if metrics.successful_executions > 0 {
-                                metrics.average_profit = total_profit / (metrics.successful_executions as f64);
-                            }
-                            
-                            if let Some(last_execution) = recent_executions.last() {
-                                metrics.last_execution = Some(last_execution.timestamp);
-                            }
-                        }
+                        // Update the error in the state
+                        self.state.write().unwrap().last_error = Some(err);
                     }
                 }
             }
-        });
-        
-        self.task_handles.push(handle);
-    }
-    
-    /// Execute an opportunity manually
-    pub async fn execute_opportunity(&mut self, opportunity_id: &str) -> Result<ExecutionResult> {
-        if self.state != AgentState::Scanning {
-            return Err(anyhow!("Agent must be in scanning state to execute opportunities"));
-        }
-        
-        // Find opportunity
-        let opportunity = self.find_opportunity(opportunity_id).await?;
-        
-        // Execute opportunity
-        self.state = AgentState::Executing;
-        
-        let result = if let Some(executor) = &self.executor {
-            let mut executor = executor.lock().await;
-            executor.execute_opportunity(&opportunity).await?
-        } else {
-            return Err(anyhow!("Executor not initialized"));
-        };
-        
-        // Update state
-        if result.success {
-            self.state = AgentState::Cooldown;
             
-            // Start cooldown timer
-            let state_clone = Arc::new(Mutex::new(self.state.clone()));
-            let cooldown_secs = self.config.cooldown_secs;
-            
-            let handle = tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(cooldown_secs)).await;
-                
-                if let Ok(mut state) = state_clone.lock().await {
-                    if *state == AgentState::Cooldown {
-                        *state = AgentState::Scanning;
-                    }
-                }
-            });
-            
-            self.task_handles.push(handle);
-        } else {
-            self.state = AgentState::Scanning;
+            // Sleep for 10 seconds before the next scan
+            std::thread::sleep(Duration::from_secs(10));
         }
         
-        // Update metrics
-        self.metrics.total_executions += 1;
-        if result.success {
-            self.metrics.successful_executions += 1;
-            self.metrics.total_profit += result.profit_amount;
-            self.metrics.average_profit = self.metrics.total_profit / (self.metrics.successful_executions as f64);
-        }
-        self.metrics.last_execution = Some(result.timestamp);
-        
-        // Add to executions
-        self.executions.push(result.clone());
-        
-        // Trim executions if too many
-        if self.executions.len() > 100 {
-            self.executions.drain(0..self.executions.len() - 100);
-        }
-        
-        Ok(result)
+        Ok(())
     }
-    
-    /// Find an opportunity by ID
-    pub async fn find_opportunity(&self, id: &str) -> Result<Opportunity> {
-        if let Some(scanner) = &self.scanner {
-            let scanner = scanner.lock().await;
-            if let Some(opportunity) = scanner.find_opportunity(id) {
-                return Ok(opportunity.clone());
-            }
-        }
-        
-        if let Some(opportunity) = self.opportunities.iter().find(|o| o.id == id) {
-            return Ok(opportunity.clone());
-        }
-        
-        Err(anyhow!("Opportunity not found: {}", id))
-    }
-}
-
-/// Create a Singularity agent with default configuration
-pub async fn create_default_agent() -> Result<SingularityAgent> {
-    let config = AgentConfig::default();
-    let mut agent = SingularityAgent::new(config);
-    
-    // Initialize agent
-    agent.initialize().await?;
-    
-    Ok(agent)
-}
-
-/// Get agent status as JSON
-pub fn get_agent_status_json(agent: &SingularityAgent) -> String {
-    let status = match agent.state() {
-        AgentState::NotStarted => "not_started",
-        AgentState::Initializing => "initializing",
-        AgentState::Scanning => "scanning",
-        AgentState::Executing => "executing",
-        AgentState::Cooldown => "cooldown",
-        AgentState::Error => "error",
-    };
-    
-    let metrics = agent.get_metrics();
-    
-    format!(
-        r#"{{
-            "id": "{}",
-            "name": "{}",
-            "status": "{}",
-            "metrics": {{
-                "total_executions": {},
-                "successful_executions": {},
-                "total_profit": {},
-                "average_profit": {}
-            }},
-            "last_error": {}
-        }}"#,
-        agent.id(),
-        agent.name(),
-        status,
-        metrics.total_executions,
-        metrics.successful_executions,
-        metrics.total_profit,
-        metrics.average_profit,
-        if let Some(error) = agent.get_last_error() {
-            format!(r#""{}""#, error)
-        } else {
-            "null".to_string()
-        }
-    )
 }

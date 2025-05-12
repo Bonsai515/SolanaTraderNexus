@@ -1,291 +1,265 @@
-//! Singularity Cross-Chain Oracle Strategy Module
+//! Singularity Cross-Chain Strategy
 //!
-//! This module implements the strategy logic for the Singularity agent,
-//! calculating optimal amounts and profitability for cross-chain arbitrage.
+//! This module implements the strategic decision-making component for the
+//! Singularity agent, which focuses on cross-chain arbitrage opportunities.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use super::{SingularityConfig, CrossChainOpportunity};
+use std::collections::HashMap;
 
-/// Slippage model
-#[derive(Debug, Clone)]
-pub enum SlippageModel {
-    /// Constant slippage (as a percentage)
-    Constant(f64),
-    /// Linear slippage (base + scale * amount)
-    Linear { base: f64, scale: f64 },
-    /// Exponential slippage (base * (1 + scale) ^ (amount / unit))
-    Exponential { base: f64, scale: f64, unit: f64 },
-}
-
-impl Default for SlippageModel {
-    fn default() -> Self {
-        Self::Linear {
-            base: 0.1, // 0.1% base slippage
-            scale: 0.01, // +0.01% per $1000
-        }
-    }
-}
-
-impl SlippageModel {
-    /// Calculate slippage for a given amount
-    pub fn calculate(&self, amount: f64) -> f64 {
-        match self {
-            Self::Constant(pct) => *pct,
-            Self::Linear { base, scale } => base + scale * (amount / 1000.0),
-            Self::Exponential { base, scale, unit } => {
-                base * ((1.0 + scale).powf(amount / unit) - 1.0)
-            }
-        }
-    }
+/// Strategy for Singularity cross-chain trading
+pub struct SingularityStrategy {
+    /// Configuration
+    config: SingularityConfig,
+    
+    /// Strategy parameters
+    params: StrategyParams,
+    
+    /// Strategy metrics
+    metrics: HashMap<String, f64>,
+    
+    /// Is initialized
+    is_initialized: bool,
 }
 
 /// Strategy parameters
 #[derive(Debug, Clone)]
 pub struct StrategyParams {
-    /// Minimum price difference (as a percentage)
-    pub min_price_difference_percentage: f64,
-    /// Minimum profit percentage
-    pub min_profit_percentage: f64,
-    /// Maximum input amount
-    pub max_input_amount: f64,
-    /// Minimum input amount
-    pub min_input_amount: f64,
-    /// Slippage model
-    pub slippage_model: SlippageModel,
-    /// Risk tolerance (0.0 to 1.0)
-    pub risk_tolerance: f64,
-    /// Use dynamic sizing
-    pub use_dynamic_sizing: bool,
+    /// Minimum profit threshold (in percentage)
+    pub min_profit_threshold: f64,
+    
+    /// Maximum capital allocation (in absolute terms)
+    pub max_capital_allocation: f64,
+    
+    /// Opportunity timeout (in seconds)
+    pub opportunity_timeout: u64,
+    
+    /// Maximum simultaneous trades
+    pub max_simultaneous_trades: usize,
+    
+    /// Risk factor (0-1, higher means more aggressive)
+    pub risk_factor: f64,
+    
+    /// Prioritize volume (true) or profit margin (false)
+    pub prioritize_volume: bool,
+    
+    /// Take partial fills
+    pub take_partial_fills: bool,
+    
+    /// Bridges to use (empty means all)
+    pub bridges: Vec<String>,
+    
+    /// Token allowlist (empty means all)
+    pub token_allowlist: Vec<String>,
+    
+    /// Token blocklist
+    pub token_blocklist: Vec<String>,
+    
+    /// Max slippage percentage
+    pub max_slippage_pct: f64,
 }
 
 impl Default for StrategyParams {
     fn default() -> Self {
         Self {
-            min_price_difference_percentage: 0.5, // 0.5%
-            min_profit_percentage: 0.2, // 0.2%
-            max_input_amount: 10000.0, // $10,000
-            min_input_amount: 100.0, // $100
-            slippage_model: SlippageModel::default(),
-            risk_tolerance: 0.5, // Medium risk tolerance
-            use_dynamic_sizing: true,
+            min_profit_threshold: 0.5, // 0.5% minimum profit
+            max_capital_allocation: 100.0, // $100 maximum
+            opportunity_timeout: 60, // 60 seconds
+            max_simultaneous_trades: 3, // 3 trades at most
+            risk_factor: 0.5, // Balanced risk
+            prioritize_volume: false, // Prioritize profit margin
+            take_partial_fills: true, // Accept partial fills
+            bridges: vec!["wormhole".to_string()], // Default to Wormhole
+            token_allowlist: vec![], // All tokens allowed
+            token_blocklist: vec![], // No tokens blocked
+            max_slippage_pct: 0.5, // 0.5% maximum slippage
         }
     }
 }
 
-/// Arbitrage opportunity
-#[derive(Debug, Clone)]
-pub struct Opportunity {
-    /// Opportunity ID
-    pub id: String,
-    /// Token pair (e.g., "SOL/USDC")
-    pub token_pair: String,
-    /// Source blockchain (e.g., "solana")
-    pub source_chain: String,
-    /// Destination blockchain (e.g., "ethereum")
-    pub destination_chain: String,
-    /// Price on source chain
-    pub source_price: f64,
-    /// Price on destination chain
-    pub destination_price: f64,
-    /// Price difference
-    pub price_difference: f64,
-    /// Price difference (as a percentage)
-    pub price_difference_percentage: f64,
-    /// Profit percentage
-    pub profit_percentage: f64,
-    /// Optimal input amount
-    pub optimal_input_amount: f64,
-    /// Estimated profit
-    pub estimated_profit: f64,
-    /// Source exchange
-    pub source_exchange: String,
-    /// Destination exchange
-    pub destination_exchange: String,
-    /// Timestamp
-    pub timestamp: u64,
-    /// Source chain fee percentage
-    pub source_fee_percentage: f64,
-    /// Destination chain fee percentage
-    pub destination_fee_percentage: f64,
-    /// Bridge fee percentage
-    pub bridge_fee_percentage: f64,
-    /// Total fee percentage
-    pub total_fee_percentage: f64,
-}
-
-impl Opportunity {
-    /// Create a new opportunity
-    pub fn new(
-        id: String,
-        token_pair: String,
-        source_chain: String,
-        destination_chain: String,
-        source_price: f64,
-        destination_price: f64,
-        source_exchange: String,
-        destination_exchange: String,
-    ) -> Self {
-        let price_difference = destination_price - source_price;
-        let price_difference_percentage = (price_difference / source_price) * 100.0;
+impl SingularityStrategy {
+    /// Create a new instance of the strategy
+    pub fn new(config: SingularityConfig) -> Self {
+        Self {
+            config,
+            params: StrategyParams::default(),
+            metrics: HashMap::new(),
+            is_initialized: false,
+        }
+    }
+    
+    /// Initialize the strategy
+    pub fn initialize(&mut self) -> Result<(), String> {
+        if self.is_initialized {
+            return Err("Strategy already initialized".to_string());
+        }
         
-        // Default fee percentages
-        let source_fee_percentage = 0.05; // 0.05% for Solana DEX trades
-        let destination_fee_percentage = 0.3; // 0.3% for Ethereum DEX trades
-        let bridge_fee_percentage = 0.1; // 0.1% for Wormhole
-        let total_fee_percentage = source_fee_percentage + destination_fee_percentage + bridge_fee_percentage;
+        // Set up the strategy parameters based on configuration
+        self.params.min_profit_threshold = self.config.min_profit_pct;
+        self.params.max_capital_allocation = self.config.max_input;
         
-        // Calculate profit percentage
-        let profit_percentage = price_difference_percentage - total_fee_percentage;
+        // Initialize metrics
+        self.metrics.insert("opportunities_evaluated".to_string(), 0.0);
+        self.metrics.insert("opportunities_selected".to_string(), 0.0);
+        self.metrics.insert("total_expected_profit".to_string(), 0.0);
+        self.metrics.insert("average_profit_pct".to_string(), 0.0);
         
-        // Get current timestamp
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
+        self.is_initialized = true;
+        
+        println!("Singularity strategy initialized with min profit: {}%, max capital: {} USDC",
+            self.params.min_profit_threshold,
+            self.params.max_capital_allocation);
+        
+        Ok(())
+    }
+    
+    /// Shutdown the strategy
+    pub fn shutdown(&mut self) -> Result<(), String> {
+        if !self.is_initialized {
+            return Err("Strategy not initialized".to_string());
+        }
+        
+        self.is_initialized = false;
+        println!("Singularity strategy shutdown complete");
+        
+        Ok(())
+    }
+    
+    /// Get strategy metrics
+    pub fn get_metrics(&self) -> HashMap<String, f64> {
+        self.metrics.clone()
+    }
+    
+    /// Update strategy parameters
+    pub fn update_params(&mut self, params: StrategyParams) {
+        self.params = params;
+        println!("Singularity strategy parameters updated");
+    }
+    
+    /// Select the best opportunities to execute
+    pub fn select_opportunities(&mut self, opportunities: &[CrossChainOpportunity]) -> Result<Vec<CrossChainOpportunity>, String> {
+        if !self.is_initialized {
+            return Err("Strategy not initialized".to_string());
+        }
+        
+        // Update metrics
+        *self.metrics.get_mut("opportunities_evaluated").unwrap() += opportunities.len() as f64;
+        
+        // Filter opportunities by minimum profit threshold
+        let mut filtered: Vec<CrossChainOpportunity> = opportunities
+            .iter()
+            .filter(|opp| {
+                // Check if the profit percentage is above the threshold
+                if opp.profit_pct < self.params.min_profit_threshold {
+                    return false;
+                }
+                
+                // Check if the input amount is within limits
+                if opp.input_amount > self.params.max_capital_allocation {
+                    return false;
+                }
+                
+                // Check if the opportunity is still valid (not expired)
+                let current_time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs();
+                
+                if current_time > opp.expires_at {
+                    return false;
+                }
+                
+                // Filter by bridge
+                if !self.params.bridges.is_empty() && !self.params.bridges.contains(&opp.bridge) {
+                    return false;
+                }
+                
+                // Filter by token allowlist
+                if !self.params.token_allowlist.is_empty() {
+                    if !self.params.token_allowlist.contains(&opp.source_token) &&
+                       !self.params.token_allowlist.contains(&opp.target_token) {
+                        return false;
+                    }
+                }
+                
+                // Filter by token blocklist
+                if self.params.token_blocklist.contains(&opp.source_token) ||
+                   self.params.token_blocklist.contains(&opp.target_token) {
+                    return false;
+                }
+                
+                true
+            })
+            .cloned()
+            .collect();
+        
+        // Sort opportunities by profit percentage (descending) or volume (if prioritize_volume is true)
+        if self.params.prioritize_volume {
+            filtered.sort_by(|a, b| b.input_amount.partial_cmp(&a.input_amount).unwrap());
+        } else {
+            filtered.sort_by(|a, b| b.profit_pct.partial_cmp(&a.profit_pct).unwrap());
+        }
+        
+        // Limit to max_simultaneous_trades
+        let selected = filtered.into_iter().take(self.params.max_simultaneous_trades).collect::<Vec<_>>();
+        
+        // Update metrics
+        *self.metrics.get_mut("opportunities_selected").unwrap() += selected.len() as f64;
+        
+        let total_expected_profit: f64 = selected.iter().map(|opp| opp.expected_profit).sum();
+        *self.metrics.get_mut("total_expected_profit").unwrap() += total_expected_profit;
+        
+        if !selected.is_empty() {
+            let avg_profit_pct = selected.iter().map(|opp| opp.profit_pct).sum::<f64>() / selected.len() as f64;
+            *self.metrics.get_mut("average_profit_pct").unwrap() = avg_profit_pct;
+        }
+        
+        Ok(selected)
+    }
+    
+    /// Evaluate an opportunity against current strategy parameters
+    pub fn evaluate_opportunity(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
+        if !self.is_initialized {
+            return Err("Strategy not initialized".to_string());
+        }
+        
+        // Base score is the profit percentage
+        let mut score = opportunity.profit_pct;
+        
+        // Adjust score based on risk factor and other parameters
+        
+        // Lower score for opportunities close to expiry
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
             .as_secs();
         
-        // Default values for optimal amount and profit
-        // These will be calculated by the strategy
-        let optimal_input_amount = 0.0;
-        let estimated_profit = 0.0;
+        let time_remaining = opportunity.expires_at.saturating_sub(current_time);
+        let time_factor = (time_remaining as f64 / self.params.opportunity_timeout as f64).min(1.0);
         
-        Self {
-            id,
-            token_pair,
-            source_chain,
-            destination_chain,
-            source_price,
-            destination_price,
-            price_difference,
-            price_difference_percentage,
-            profit_percentage,
-            optimal_input_amount,
-            estimated_profit,
-            source_exchange,
-            destination_exchange,
-            timestamp,
-            source_fee_percentage,
-            destination_fee_percentage,
-            bridge_fee_percentage,
-            total_fee_percentage,
-        }
+        // Time factor has more weight when risk factor is lower
+        score *= 0.8 + (0.2 * time_factor * (1.0 - self.params.risk_factor));
+        
+        // Adjust score based on bridge trust (future enhancement)
+        
+        Ok(score)
     }
-}
-
-/// Calculate optimal amount for the opportunity
-pub fn calculate_optimal_amount(
-    source_price: f64,
-    destination_price: f64,
-    source_fee_percentage: f64,
-    destination_fee_percentage: f64,
-    bridge_fee_percentage: f64,
-    max_amount: f64,
-    slippage_model: SlippageModel,
-) -> f64 {
-    // Simple strategy: start with small amount and increase until profit decreases
-    let step = max_amount / 100.0;
-    let mut best_amount = 0.0;
-    let mut best_profit = 0.0;
     
-    let mut amount = step;
-    while amount <= max_amount {
-        let profit = check_profitability(
-            amount,
-            source_price,
-            destination_price,
-            source_fee_percentage,
-            destination_fee_percentage,
-            bridge_fee_percentage,
-            slippage_model.clone(),
-        );
-        
-        if profit > best_profit {
-            best_profit = profit;
-            best_amount = amount;
-        } else if profit < best_profit * 0.9 {
-            // If profit drops significantly, we've passed the optimal point
-            break;
+    /// Calculate optimal trade size for an opportunity
+    pub fn calculate_trade_size(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
+        if !self.is_initialized {
+            return Err("Strategy not initialized".to_string());
         }
         
-        amount += step;
+        // Start with the maximum between opportunity input and our max capital
+        let max_size = opportunity.input_amount.min(self.params.max_capital_allocation);
+        
+        // Adjust based on risk factor - lower risk means smaller trades
+        let size_factor = 0.5 + (0.5 * self.params.risk_factor);
+        let adjusted_size = max_size * size_factor;
+        
+        // Ensure minimum viable trade size (at least $5)
+        let final_size = adjusted_size.max(5.0);
+        
+        Ok(final_size)
     }
-    
-    best_amount
-}
-
-/// Check profitability for a given amount
-pub fn check_profitability(
-    amount: f64,
-    source_price: f64,
-    destination_price: f64,
-    source_fee_percentage: f64,
-    destination_fee_percentage: f64,
-    bridge_fee_percentage: f64,
-    slippage_model: SlippageModel,
-) -> f64 {
-    if amount <= 0.0 {
-        return 0.0;
-    }
-    
-    // Calculate token amount
-    let token_amount = amount / source_price;
-    
-    // Source chain fees
-    let source_fee = amount * (source_fee_percentage / 100.0);
-    
-    // Bridge fees
-    let bridge_fee = amount * (bridge_fee_percentage / 100.0);
-    
-    // Calculate slippage based on amount
-    let source_slippage_pct = slippage_model.calculate(amount);
-    let source_slippage = amount * (source_slippage_pct / 100.0);
-    
-    // Amount after source fees and slippage
-    let amount_after_source = amount - source_fee - source_slippage;
-    
-    // Amount after bridging
-    let amount_after_bridge = amount_after_source - bridge_fee;
-    
-    // Destination chain
-    let dest_amount = token_amount * destination_price;
-    
-    // Destination slippage (usually higher on destination)
-    let dest_slippage_pct = slippage_model.calculate(dest_amount) * 1.5; // 50% higher slippage on destination
-    let dest_slippage = dest_amount * (dest_slippage_pct / 100.0);
-    
-    // Destination fee
-    let dest_fee = dest_amount * (destination_fee_percentage / 100.0);
-    
-    // Final amount after all fees and slippage
-    let final_amount = dest_amount - dest_fee - dest_slippage;
-    
-    // Profit
-    let profit = final_amount - amount;
-    
-    profit
-}
-
-/// Get all supported token pairs
-pub fn get_supported_token_pairs() -> Vec<String> {
-    vec![
-        "SOL/ETH".to_string(),
-        "SOL/USDC".to_string(),
-        "SOL/USDT".to_string(),
-        "ETH/USDC".to_string(),
-        "ETH/USDT".to_string(),
-        "BTC/USDC".to_string(),
-        "BTC/USDT".to_string(),
-        "BONK/USDT".to_string(),
-        "JUP/USDC".to_string(),
-    ]
-}
-
-/// Get all supported blockchains
-pub fn get_supported_blockchains() -> Vec<String> {
-    vec![
-        "solana".to_string(),
-        "ethereum".to_string(),
-        "arbitrum".to_string(),
-        "polygon".to_string(),
-        "avalanche".to_string(),
-        "bsc".to_string(),
-    ]
 }
