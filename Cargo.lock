@@ -5230,6 +5230,7 @@ dependencies = [
  "futures",
  "gloo",
  "governor",
+ "lazy_static",
  "log",
  "mime",
  "mime_guess",
