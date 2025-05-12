@@ -20,7 +20,7 @@ app.get('/api/solana/status', (req, res) => {
   // Check for API keys in environment
   const hasApiKey = process.env.SOLANA_RPC_API_KEY ? true : false;
   const hasInstantNodes = process.env.INSTANT_NODES_RPC_URL ? true : false;
-  
+
   res.json({
     status: 'operational',
     customRpc: hasInstantNodes,
@@ -73,14 +73,14 @@ app.get('/api/agents', (req, res) => {
       }
     }
   ];
-  
+
   res.json(agents);
 });
 
 app.get('/api/executions', (req, res) => {
   const { v4: uuidv4 } = require('uuid');
   const limit = req.query.limit ? parseInt(req.query.limit) : 10;
-  
+
   // Return sample executions
   const executions = Array.from({ length: limit }, (_, i) => ({
     id: uuidv4(),
@@ -97,7 +97,7 @@ app.get('/api/executions', (req, res) => {
     signature: `5${uuidv4().replace(/-/g, '')}`,
     error: Math.random() > 0.8 ? 'Execution reverted: insufficient liquidity' : undefined
   }));
-  
+
   res.json(executions);
 });
 
@@ -110,18 +110,18 @@ const wss = new Server({ server, path: '/ws' });
 
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket');
-  
+
   // Send welcome message
   ws.send(JSON.stringify({
     type: 'WELCOME',
     message: 'Connected to Solana Trading Platform WebSocket',
     timestamp: new Date().toISOString()
   }));
-  
+
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket');
   });
-  
+
   ws.on('message', (message) => {
     console.log('Received message:', message.toString());
   });
