@@ -1,183 +1,249 @@
-import express from 'express';
+/**
+ * Live Trading Routes
+ * 
+ * API endpoints for activating and managing live trading with real funds.
+ */
+
+import express, { Request, Response, Router } from 'express';
 import { logger } from '../logger';
-import transactionEngine from '../transaction_engine';
-import * as AgentManager from '../agents';
-import { getWormholeConfig } from '../wormhole/config';
+import * as transactionEngine from '../transaction-engine';
+import * as agents from '../agents';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { v4 as uuidv4 } from 'uuid';
+import { PublicKey, Keypair } from '@solana/web3.js';
 
-const router = express.Router();
+const execAsync = promisify(exec);
+const router = Router();
 
-// Live Trading Activation
-router.post('/activate', async (req, res) => {
+// Track active processes and agents
+let activeProcesses: Record<string, number> = {};
+let tradingEnabled = false;
+
+/**
+ * GET /api/live-trading/status
+ * Check live trading status
+ */
+router.get('/status', async (req: Request, res: Response) => {
   try {
-    logger.info('🚀 Activating live trading with real funds...');
-    
-    // Check for required environment variables
-    const rpcUrl = process.env.INSTANT_NODES_RPC_URL || 
-                  (process.env.SOLANA_RPC_API_KEY ? 
-                    `https://solana-mainnet.g.alchemy.com/v2/${process.env.SOLANA_RPC_API_KEY}` : 
-                    'https://api.mainnet-beta.solana.com');
-    
-    logger.info(`Using Solana RPC URL: ${rpcUrl.replace(/\/v2\/.*/, '/v2/***')}`);
-    
-    // Initialize transaction engine with real funds
-    const success = transactionEngine.initializeTransactionEngine(rpcUrl);
-    
-    if (!success) {
-      logger.error('❌ Failed to initialize transaction engine');
-      return res.status(500).json({
-        status: 'error',
-        message: 'Failed to initialize transaction engine'
-      });
-    }
-    
-    logger.info('✅ Transaction engine initialized successfully with direct blockchain connection');
-    
-    // Register system wallet
-    const systemWallet = process.env.SYSTEM_WALLET || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
-    logger.info(`Registering system wallet: ${systemWallet}`);
-    
-    const walletRegistered = transactionEngine.registerWallet(systemWallet);
-    if (!walletRegistered) {
-      logger.warn('⚠️ Failed to register system wallet, will retry...');
-      // Retry once
-      setTimeout(() => {
-        transactionEngine.registerWallet(systemWallet);
-      }, 1000);
-    } else {
-      logger.info('✅ System wallet registered successfully');
-    }
-    
-    // Get wallet balance if available
-    try {
-      if (typeof transactionEngine.getWalletBalance === 'function') {
-        const balance = await transactionEngine.getWalletBalance(systemWallet);
-        logger.info(`💰 System wallet balance: ${balance.toFixed(6)} SOL`);
-      }
-    } catch (balanceError: any) {
-      logger.warn(`⚠️ Failed to get system wallet balance: ${balanceError.message}`);
-    }
-    
-    // Initialize Wormhole configuration for cross-chain
-    const wormholeConfig = getWormholeConfig();
-    logger.info(`Using Wormhole API: ${wormholeConfig.apiUrl}`);
-    
-    // Register agent wallets
-    const agentWallets = [
-      // Hyperion flash arbitrage wallet
-      '8Bqt6VHAX1vE25fJ2njJLKCARodmXKqNpsN7KrME5K7M',
-      // Quantum Omega sniper wallet
-      '4XE3oMqoeGPHr9SrN9PxSAvyMZoZL2xcv58sRkVnZfp2',
-      // Singularity cross-chain wallet
-      '9aqYdpMA4RtaDGK3pHLc33n8pxVBJ6fn7Z9Fve9TFF2Z'
-    ];
-    
-    // Register agent wallets
-    for (const wallet of agentWallets) {
-      logger.info(`Registering agent wallet: ${wallet}`);
-      transactionEngine.registerWallet(wallet);
-      
-      // Get balance for each agent wallet if available
-      try {
-        if (typeof transactionEngine.getWalletBalance === 'function') {
-          const balance = await transactionEngine.getWalletBalance(wallet);
-          logger.info(`💰 Agent wallet balance: ${balance.toFixed(6)} SOL`);
+    const agentStatuses = {
+      hyperion: {
+        id: 'hyperion-agent',
+        name: 'Hyperion Flash Arbitrage',
+        status: activeProcesses['hyperion'] ? 'active' : 'stopped',
+        active: !!activeProcesses['hyperion'],
+        wallets: {
+          trading: process.env.HYPERION_TRADING_WALLET,
+          profit: process.env.HYPERION_PROFIT_WALLET
+        },
+        metrics: {
+          totalExecutions: 0,
+          successRate: 0,
+          totalProfit: 0,
+          lastExecution: null
         }
-      } catch (balanceError: any) {
-        logger.warn(`⚠️ Failed to get agent wallet balance: ${balanceError.message}`);
-      }
-    }
-    
-    // Start the agent system
-    const agentSystemStarted = await AgentManager.startAgentSystem();
-    
-    if (!agentSystemStarted) {
-      logger.error('❌ Failed to start agent system');
-      return res.status(500).json({
-        status: 'error',
-        message: 'Failed to start agent system'
-      });
-    }
-    
-    logger.info('✅ Agent system started successfully');
-    
-    // Try activating all agents
-    try {
-      if (typeof AgentManager.activateAgent === 'function') {
-        // Activate each agent
-        await AgentManager.activateAgent('hyperion-1');
-        await AgentManager.activateAgent('quantum-omega-1');
-        await AgentManager.activateAgent('singularity-1');
-        
-        // Set agents to use real funds
-        if (typeof AgentManager.setUseRealFunds === 'function') {
-          await AgentManager.setUseRealFunds(true);
-          logger.info('✅ All agents configured to use real funds');
-        }
-      }
-    } catch (agentError: any) {
-      logger.warn(`⚠️ Agent activation had issues: ${agentError.message}`);
-    }
-    
-    // Execute a test transaction to verify real-funds capability
-    let testTransactionSuccess = false;
-    let testTransactionSignature = null;
-    
-    try {
-      if (typeof transactionEngine.executeTestTransaction === 'function') {
-        const testTx = await transactionEngine.executeTestTransaction();
-        if (testTx.success) {
-          testTransactionSuccess = true;
-          testTransactionSignature = testTx.signature;
-          logger.info(`✅ Live trading verification transaction successful: ${testTx.signature}`);
-        } else {
-          logger.warn(`⚠️ Live trading verification transaction failed: ${testTx.error || 'Unknown error'}`);
-        }
-      }
-    } catch (txError: any) {
-      logger.warn(`⚠️ Failed to execute test transaction: ${txError.message}`);
-    }
-    
-    logger.info('🎉 LIVE TRADING WITH REAL FUNDS IS NOW ACTIVE');
-    logger.info('💎 Profit capture to system wallet is enabled');
-    logger.info('🔄 Real-time trading activity will be visible in the dashboard');
-    
-    // Return success response
-    return res.json({
-      status: 'success',
-      message: 'Live trading activated successfully with real funds',
-      systemWallet,
-      transactionEngineStatus: 'active',
-      agentSystemStatus: 'running',
-      testTransactionSuccess,
-      testTransactionSignature,
-      strategies: {
-        hyperion: [
-          'flash-arb-jupiter-openbook',
-          'flash-arb-raydium-orca',
-          'lending-protocol-arbitrage'
-        ],
-        quantum_omega: [
-          'memecoin-sniper-premium',
-          'memecoin-liquidity-drain'
-        ],
-        singularity: [
-          'cross-chain-sol-eth',
-          'cross-chain-sol-bsc'
-        ]
       },
-      profitEstimates: {
-        hyperion: '$38-$1,200/day',
-        quantum_omega: '$500-$8,000/week',
-        singularity: '$60-$1,500/day',
-        total: '$5,000-$40,000/month'
+      quantum_omega: {
+        id: 'quantum-omega',
+        name: 'Quantum Omega Sniper',
+        status: activeProcesses['quantum_omega'] ? 'active' : 'stopped',
+        active: !!activeProcesses['quantum_omega'],
+        wallets: {
+          trading: process.env.QUANTUM_TRADING_WALLET,
+          profit: process.env.QUANTUM_PROFIT_WALLET
+        },
+        metrics: {
+          totalExecutions: 0,
+          successRate: 0,
+          totalProfit: 0,
+          lastExecution: null
+        }
+      },
+      singularity: {
+        id: 'singularity',
+        name: 'Singularity Cross-Chain',
+        status: activeProcesses['singularity'] ? 'active' : 'stopped',
+        active: !!activeProcesses['singularity'],
+        wallets: {
+          trading: process.env.SINGULARITY_TRADING_WALLET,
+          profit: process.env.SINGULARITY_PROFIT_WALLET
+        },
+        metrics: {
+          totalExecutions: 0,
+          successRate: 0,
+          totalProfit: 0,
+          lastExecution: null
+        }
       }
+    };
+
+    // Check transaction engine initialization
+    const transactionEngineStatus = {
+      initialized: transactionEngine.isInitialized(),
+      rpcUrl: transactionEngine.getRpcUrl(),
+      transactionCount: transactionEngine.getTransactionCount(),
+      registeredWallets: transactionEngine.getRegisteredWallets()
+    };
+
+    return res.json({
+      status: "success",
+      liveTradingEnabled: tradingEnabled,
+      agents: agentStatuses,
+      transactionEngine: transactionEngineStatus,
+      timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
+  } catch (error) {
+    logger.error('Error checking live trading status:', error);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to check live trading status",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * POST /api/live-trading/activate
+ * Activate live trading with real funds
+ */
+router.post('/activate', async (req: Request, res: Response) => {
+  try {
+    logger.info('🚀 Activating live trading with real funds');
+
+    // Initialize the transaction engine
+    const rpcUrl = process.env.INSTANT_NODES_RPC_URL || process.env.SOLANA_RPC_API_KEY;
+    const engineInitialized = transactionEngine.initializeTransactionEngine(rpcUrl);
+    
+    if (!engineInitialized) {
+      throw new Error('Failed to initialize transaction engine');
+    }
+    
+    // Activate the Hyperion agent for flash arbitrage
+    const hyperionAgentResult = await agents.activateAgent('hyperion', true);
+    
+    // Activate the Quantum Omega agent for token sniping
+    const quantumOmegaAgentResult = await agents.activateAgent('quantum_omega', true);
+    
+    // Activate the Singularity agent for cross-chain arbitrage
+    const singularityAgentResult = await agents.activateAgent('singularity', true);
+    
+    // Set all agents to use real funds
+    await agents.setUseRealFunds(true);
+    
+    // Register all trading wallets with the transaction engine
+    const tradingWallets = [
+      process.env.HYPERION_TRADING_WALLET,
+      process.env.QUANTUM_TRADING_WALLET,
+      process.env.SINGULARITY_TRADING_WALLET,
+      process.env.PROFIT_COLLECTION_WALLET
+    ].filter(Boolean);
+    
+    for (const wallet of tradingWallets) {
+      if (wallet) {
+        transactionEngine.registerWallet(wallet);
+      }
+    }
+    
+    // Execute a test transaction to verify the transaction engine
+    const testKeyPair = Keypair.generate();
+    const testTx = await transactionEngine.executeTransaction({
+      type: 'TEST',
+      instructions: [],
+      signers: [testKeyPair],
+      walletAddress: testKeyPair.publicKey.toString(),
+      priorityLevel: 'low',
+      estimatedValue: 0.001
+    });
+    
+    if (!testTx.success) {
+      throw new Error(`Test transaction failed: ${testTx.error || 'Unknown reason'}`);
+    }
+    
+    // Record active state
+    tradingEnabled = true;
+    activeProcesses['hyperion'] = Date.now();
+    activeProcesses['quantum_omega'] = Date.now();
+    activeProcesses['singularity'] = Date.now();
+    
+    logger.info('✅ Live trading activated successfully with real funds');
+    
+    return res.json({
+      status: "success",
+      message: "Live trading activated successfully with real funds",
+      timestamp: new Date().toISOString(),
+      transactionEngine: {
+        initialized: true,
+        transactionCount: transactionEngine.getTransactionCount(),
+        registeredWallets: transactionEngine.getRegisteredWallets()
+      },
+      agents: {
+        hyperion: { active: true },
+        quantum_omega: { active: true },
+        singularity: { active: true }
+      },
+      testTransactionSignature: testTx.signature
+    });
+  } catch (error) {
     logger.error('❌ Error activating live trading:', error);
     return res.status(500).json({
-      status: 'error',
-      message: 'Error activating live trading',
-      error: error.message
+      status: "error",
+      message: `Failed to activate live trading: ${(error as Error).message}`,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * POST /api/live-trading/deactivate
+ * Deactivate live trading
+ */
+router.post('/deactivate', async (req: Request, res: Response) => {
+  try {
+    logger.info('🛑 Deactivating live trading');
+    
+    // Set all agents to not use real funds
+    await agents.setUseRealFunds(false);
+    
+    // Clear active processes
+    activeProcesses = {};
+    tradingEnabled = false;
+    
+    logger.info('✅ Live trading deactivated successfully');
+    
+    return res.json({
+      status: "success",
+      message: "Live trading deactivated successfully",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('❌ Error deactivating live trading:', error);
+    return res.status(500).json({
+      status: "error",
+      message: `Failed to deactivate live trading: ${(error as Error).message}`,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/live-trading/transactions
+ * Get recent live transactions
+ */
+router.get('/transactions', (req: Request, res: Response) => {
+  try {
+    // In a real implementation, we'd fetch the transactions from a database or log
+    // For now, return a simple response
+    return res.json({
+      status: "success",
+      transactions: [],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching live transactions:', error);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to fetch live transactions",
+      timestamp: new Date().toISOString()
     });
   }
 });

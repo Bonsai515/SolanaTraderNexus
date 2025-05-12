@@ -19,10 +19,12 @@ const DEFAULT_CONNECTION_CONFIG: ConnectionConfig = {
 };
 
 // Get RPC URLs from environment
-const INSTANT_NODES_RPC_URL = process.env.INSTANT_NODES_RPC_URL;
-const SOLANA_RPC_API_KEY = process.env.SOLANA_RPC_API_KEY;
+const INSTANT_NODES_RPC_URL = import.meta.env.INSTANT_NODES_RPC_URL;
+const SOLANA_RPC_API_KEY = import.meta.env.SOLANA_RPC_API_KEY;
+const HELIUS_API_KEY = import.meta.env.HELIUS_API_KEY;
 const BACKUP_RPC_URLS = [
   `https://solana-mainnet.g.alchemy.com/v2/${SOLANA_RPC_API_KEY || ''}`,
+  `https://api.helius-rpc.com/?api-key=${HELIUS_API_KEY || ''}`,
   'https://api.mainnet-beta.solana.com'
 ];
 
