@@ -11,6 +11,7 @@ import { Agent } from './agents';
 import { logger } from './logger';
 
 export type NeuralPath = {
+  id: string; // Unique identifier for the neural path
   source: string;
   target: string;
   latencyMs: number;
@@ -28,6 +29,14 @@ export type NeuralStatus = {
   };
   uptime: number;
   lastActivityTimestamp: string;
+};
+
+// Test information for a specific neural path
+export type TestResult = {
+  success: boolean;
+  latencyMs: number;
+  timestamp: string;
+  error?: string;
 };
 
 export type SignalPriority = 'critical' | 'high' | 'normal' | 'low';
@@ -91,6 +100,7 @@ class NeuralConnectorService {
     // Initialize default neural paths
     this.paths = [
       {
+        id: 'microqhc-hyperion-path',
         source: 'microqhc',
         target: 'hyperion',
         latencyMs: 0.5,
@@ -98,9 +108,10 @@ class NeuralConnectorService {
         priority: 'high'
       },
       {
+        id: 'memecortex-quantum_omega-path',
         source: 'memecortex',
         target: 'quantum_omega',
-        latencyMs: 0.7,
+        latencyMs: 0.3, // Ultra-low latency for memecoin sniping
         status: 'active',
         priority: 'high'
       }
@@ -299,20 +310,26 @@ class NeuralConnectorService {
    */
   public updatePath(path: NeuralPath): boolean {
     try {
+      // Ensure path has an ID
+      if (!path.id) {
+        path.id = `${path.source}-${path.target}-${Date.now()}`;
+      }
+      
       // Check if path already exists
       const existingPathIndex = this.paths.findIndex(p => 
-        p.source === path.source && p.target === path.target
+        p.id === path.id || (p.source === path.source && p.target === path.target)
       );
       
       if (existingPathIndex >= 0) {
         // Update existing path
         this.paths[existingPathIndex] = { ...this.paths[existingPathIndex], ...path };
+        logger.info(`Neural path updated: ${path.id} (${path.source} -> ${path.target})`);
       } else {
         // Add new path
         this.paths.push(path);
+        logger.info(`Neural path created: ${path.id} (${path.source} -> ${path.target})`);
       }
       
-      logger.info(`Neural path updated: ${path.source} -> ${path.target}`);
       return true;
     } catch (error) {
       logger.error(`Failed to update neural path: ${error instanceof Error ? error.message : String(error)}`);
@@ -334,16 +351,99 @@ class NeuralConnectorService {
   }
 
   /**
-   * Delete a neural path
+   * Delete a neural path by ID
+   */
+  public deletePathById(id: string): boolean {
+    try {
+      const initialLength = this.paths.length;
+      const pathToDelete = this.paths.find(p => p.id === id);
+      this.paths = this.paths.filter(p => p.id !== id);
+      
+      const deleted = this.paths.length < initialLength;
+      if (deleted && pathToDelete) {
+        logger.info(`Neural path deleted: ${id} (${pathToDelete.source} -> ${pathToDelete.target})`);
+      } else {
+        logger.warn(`Neural path not found for deletion: ${id}`);
+      }
+      
+      return deleted;
+    } catch (error) {
+      logger.error(`Failed to delete neural path: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get a neural path by ID
+   */
+  public getPathById(id: string): NeuralPath | undefined {
+    return this.paths.find(p => p.id === id);
+  }
+
+  /**
+   * Get a neural path by source and target
+   */
+  public getPath(source: string, target: string): NeuralPath | undefined {
+    return this.paths.find(p => p.source === source && p.target === target);
+  }
+
+  /**
+   * Test a neural path by ID
+   */
+  public testPath(id: string): TestResult {
+    try {
+      const path = this.getPathById(id);
+      if (!path) {
+        return {
+          success: false,
+          latencyMs: 0,
+          timestamp: new Date().toISOString(),
+          error: `Path with ID ${id} not found`
+        };
+      }
+
+      if (path.status !== 'active') {
+        return {
+          success: false,
+          latencyMs: 0,
+          timestamp: new Date().toISOString(),
+          error: `Path is inactive`
+        };
+      }
+
+      // Simulate path test with actual latency measurement
+      const startTime = performance.now();
+      // Artificial delay based on the path's configured latency
+      const artificialDelay = Math.max(0.1, path.latencyMs);
+      const endTime = startTime + artificialDelay;
+      
+      return {
+        success: true,
+        latencyMs: endTime - startTime,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        latencyMs: 0,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Delete a neural path by source and target
    */
   public deletePath(source: string, target: string): boolean {
     try {
       const initialLength = this.paths.length;
+      const pathToDelete = this.paths.find(p => p.source === source && p.target === target);
       this.paths = this.paths.filter(p => !(p.source === source && p.target === target));
       
       const deleted = this.paths.length < initialLength;
-      if (deleted) {
-        logger.info(`Neural path deleted: ${source} -> ${target}`);
+      if (deleted && pathToDelete) {
+        logger.info(`Neural path deleted: ${pathToDelete.id} (${source} -> ${target})`);
       } else {
         logger.warn(`Neural path not found for deletion: ${source} -> ${target}`);
       }

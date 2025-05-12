@@ -10,6 +10,8 @@ import net from 'net';
 import { createServer as createViteServer } from 'vite';
 import * as fs from 'fs';
 import signalMonitoring from './signalMonitoring';
+import transactionEngine from './transaction_engine';
+import quantumOmegaRouter from './agents/quantum_omega_router';
 
 // Set the InstantNodes URLs for the 2-day trial
 process.env.INSTANT_NODES_RPC_URL = 'https://solana-grpc-geyser.instantnodes.io:443';
@@ -95,6 +97,9 @@ logger.info('Signal monitoring service initialized');
 
 // Set up WebSocket server using our enhanced implementation
 const wss = setupWebSocketServer(httpServer);
+
+// Import agent system to auto-start trading
+import { startAgentSystem } from './agents';
 
 // Main function to start the server
 async function startServer() {
@@ -563,6 +568,21 @@ async function startServer() {
       logger.info(`- Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`- Replit URL: ${process.env.REPL_SLUG || 'Not in Replit'}`);
       logger.info(`- Process ID: ${process.pid}`);
+      
+      // Auto-start agent system for live trading
+      setTimeout(async () => {
+        logger.info('🔄 Auto-starting agent system for live trading...');
+        try {
+          const success = await startAgentSystem();
+          if (success) {
+            logger.info('✅ Agent system auto-started successfully for live trading');
+          } else {
+            logger.warn('⚠️ Failed to auto-start agent system');
+          }
+        } catch (error) {
+          logger.error('❌ Error auto-starting agent system:', error);
+        }
+      }, 5000); // Start after 5 seconds to ensure all systems are initialized
       
       // Test reachability
       setTimeout(() => {
