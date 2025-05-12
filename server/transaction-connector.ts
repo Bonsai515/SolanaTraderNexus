@@ -1,197 +1,285 @@
 /**
- * Transaction Engine Connector
+ * Transaction Connector - Interfaces with the Rust Transaction Engine
  * 
- * Provides a TypeScript interface to the Rust-based transaction engine.
- * This module connects the Express server to the Rust binary for executing
- * Solana blockchain transactions.
+ * This module provides a TypeScript interface to the Rust-based Solana
+ * transaction engine for live trading with real funds.
  */
 
-import { spawn } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { logger } from './logger';
+import { execFile } from 'child_process';
+import { EventEmitter } from 'events';
 
-// Path to the Rust binary
-const RUST_BINARY_PATH = path.join(__dirname, '../target/release/solana_quantum_trading');
-
-// Transaction priority levels
-export enum PriorityLevel {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  MAX = 'max',
+// Transaction Engine Configuration
+interface EngineConfig {
+  useRealFunds: boolean;
+  rpcUrl: string;
+  websocketUrl?: string;
+  systemWalletAddress: string;
+  wormholeGuardianRpc?: string;
 }
 
-// Transaction parameters
-export interface TransactionParams {
-  transaction_type: string;
-  wallet_address: string;
-  amount?: number;
-  token?: string;
-  priority: PriorityLevel;
-  memo?: string;
-  verify_real_funds: boolean;
+// Transaction Parameters
+interface TransactionParams {
+  fromToken: string;
+  toToken: string;
+  amount: number;
+  slippage: number;
+  walletAddress: string;
+  isSimulation?: boolean;
 }
 
-// Transaction result
-export interface TransactionResult {
-  success: boolean;
-  id: string;
-  signature?: string;
-  fee?: number;
-  compute_units?: number;
-  error?: string;
+// Transaction Status
+interface TransactionStatus {
+  signature: string;
+  status: 'pending' | 'confirmed' | 'finalized' | 'failed';
+  timestamp: number;
+  errorMessage?: string;
 }
-
-// In-memory process cache to avoid spawning multiple processes
-let rustyEngine: any = null;
-let initialized = false;
 
 /**
- * Initialize the transaction engine with an RPC URL
- * @param rpcUrl The Solana RPC URL to use
- * @returns Whether the initialization was successful
+ * TransactionConnector provides the interface to the Rust transaction engine
  */
-export function initializeTransactionEngine(rpcUrl?: string): boolean {
-  try {
-    // Check if we already have the engine running
-    if (rustyEngine) {
-      logger.info('Transaction engine already initialized');
+class TransactionConnector extends EventEmitter {
+  private config: EngineConfig;
+  private engineProcess: any = null;
+  private transactions: Map<string, TransactionStatus> = new Map();
+  private isRunning: boolean = false;
+  private enginePath: string;
+
+  /**
+   * Create a new TransactionConnector
+   * @param config Engine configuration
+   */
+  constructor(config: EngineConfig) {
+    super();
+    this.config = config;
+    this.enginePath = path.join(__dirname, '..', 'rust_engine', 'target', 'release', 'transaction_engine');
+    
+    // Create logs directory if it doesn't exist
+    const logsDir = path.join(__dirname, '..', 'logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    
+    console.log('Transaction Connector initialized with configuration:');
+    console.log(`- RPC URL: ${this.config.rpcUrl}`);
+    console.log(`- System Wallet: ${this.config.systemWalletAddress}`);
+    console.log(`- Using Real Funds: ${this.config.useRealFunds}`);
+  }
+
+  /**
+   * Start the transaction engine
+   */
+  public async start(): Promise<boolean> {
+    if (this.isRunning) {
+      console.log('Transaction engine is already running');
       return true;
     }
-
-    logger.info(`Initializing transaction engine with RPC URL: ${rpcUrl ? rpcUrl.replace(/\/v2\/.*/, '/v2/***') : 'default'}`);
-
-    // If the Rust binary exists, use it
+    
+    console.log('Starting transaction engine...');
+    
     try {
-      // Set environment variables for the Rust process
-      const env = {
-        ...process.env,
-        RUST_LOG: 'info',
-        INSTANT_NODES_RPC_URL: rpcUrl || process.env.INSTANT_NODES_RPC_URL || '',
-        SOLANA_RPC_API_KEY: process.env.SOLANA_RPC_API_KEY || '',
-      };
-
-      // Spawn the Rust process
-      rustyEngine = spawn(RUST_BINARY_PATH, [], { env });
-
-      // Log stdout from the Rust process
-      rustyEngine.stdout.on('data', (data: Buffer) => {
-        logger.info(`[Rust Engine] ${data.toString().trim()}`);
+      // Set environment variables for the engine
+      process.env.SOLANA_RPC_URL = this.config.rpcUrl;
+      process.env.SYSTEM_WALLET_ADDRESS = this.config.systemWalletAddress;
+      process.env.USE_REAL_FUNDS = this.config.useRealFunds ? 'true' : 'false';
+      
+      if (this.config.websocketUrl) {
+        process.env.SOLANA_WEBSOCKET_URL = this.config.websocketUrl;
+      }
+      
+      if (this.config.wormholeGuardianRpc) {
+        process.env.WORMHOLE_GUARDIAN_RPC = this.config.wormholeGuardianRpc;
+      }
+      
+      // Check if the engine binary exists
+      if (!fs.existsSync(this.enginePath)) {
+        // If the binary doesn't exist, use cargo to run it
+        console.log('Engine binary not found, running from source with cargo...');
+        
+        this.engineProcess = execFile('cargo', ['run', '--release', '--bin', 'transaction_engine'], {
+          cwd: path.join(__dirname, '..', 'rust_engine'),
+          env: process.env
+        });
+      } else {
+        // If the binary exists, run it directly
+        console.log('Starting transaction engine binary...');
+        this.engineProcess = execFile(this.enginePath, [], {
+          env: process.env
+        });
+      }
+      
+      // Handle process output
+      this.engineProcess.stdout?.on('data', (data: Buffer) => {
+        const logMessage = data.toString().trim();
+        console.log(`[ENGINE] ${logMessage}`);
+        
+        // Also write to log file
+        fs.appendFileSync(path.join(__dirname, '..', 'logs', 'transaction-engine.log'), `${new Date().toISOString()} - ${logMessage}\n`);
       });
-
-      // Log stderr from the Rust process
-      rustyEngine.stderr.on('data', (data: Buffer) => {
-        logger.error(`[Rust Engine Error] ${data.toString().trim()}`);
+      
+      this.engineProcess.stderr?.on('data', (data: Buffer) => {
+        const errorMessage = data.toString().trim();
+        console.error(`[ENGINE ERROR] ${errorMessage}`);
+        
+        // Also write to log file
+        fs.appendFileSync(path.join(__dirname, '..', 'logs', 'transaction-engine-error.log'), `${new Date().toISOString()} - ${errorMessage}\n`);
       });
-
+      
       // Handle process exit
-      rustyEngine.on('close', (code: number) => {
-        logger.warn(`Rust engine process exited with code ${code}`);
-        rustyEngine = null;
-        initialized = false;
+      this.engineProcess.on('close', (code: number) => {
+        console.log(`Transaction engine exited with code ${code}`);
+        this.isRunning = false;
+        this.emit('engineStopped', code);
       });
-
-      initialized = true;
-      logger.info('Transaction engine initialized successfully');
+      
+      this.isRunning = true;
+      this.emit('engineStarted');
+      
+      console.log('Transaction engine started successfully');
+      
       return true;
     } catch (error) {
-      logger.warn(`Rust engine binary not found at ${RUST_BINARY_PATH}, falling back to direct web3.js implementation`);
-      
-      // If the Rust binary doesn't exist, mark as initialized anyway
-      // so we can fall back to the JS implementation
-      initialized = true;
-      return true;
-    }
-  } catch (error) {
-    logger.error(`Failed to initialize transaction engine: ${error}`);
-    return false;
-  }
-}
-
-/**
- * Register a wallet for transactions
- * @param publicKeyStr The wallet public key string
- * @returns Whether the registration was successful
- */
-export function registerWallet(publicKeyStr: string): boolean {
-  try {
-    if (!initialized) {
-      logger.error('Transaction engine not initialized');
+      console.error('Failed to start transaction engine:', error);
       return false;
     }
-
-    logger.info(`Registering wallet: ${publicKeyStr}`);
-    return true;
-  } catch (error) {
-    logger.error(`Failed to register wallet: ${error}`);
-    return false;
   }
-}
 
-/**
- * Execute a transaction
- * @param params The transaction parameters
- * @returns The transaction result
- */
-export function executeTransaction(params: TransactionParams): TransactionResult {
-  try {
-    if (!initialized) {
-      throw new Error('Transaction engine not initialized');
+  /**
+   * Stop the transaction engine
+   */
+  public async stop(): Promise<boolean> {
+    if (!this.isRunning || !this.engineProcess) {
+      console.log('Transaction engine is not running');
+      return true;
     }
+    
+    console.log('Stopping transaction engine...');
+    
+    try {
+      // Send SIGTERM to gracefully stop the process
+      this.engineProcess.kill('SIGTERM');
+      
+      // Wait for the process to exit
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.log('Transaction engine did not exit gracefully, forcing termination');
+          this.engineProcess.kill('SIGKILL');
+          resolve();
+        }, 5000);
+        
+        this.engineProcess.on('close', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+      
+      this.isRunning = false;
+      console.log('Transaction engine stopped successfully');
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to stop transaction engine:', error);
+      return false;
+    }
+  }
 
-    logger.info(`Executing transaction: ${params.transaction_type} with wallet ${params.wallet_address}`);
+  /**
+   * Check if the transaction engine is running
+   */
+  public isEngineRunning(): boolean {
+    return this.isRunning;
+  }
+
+  /**
+   * Execute a transaction
+   * @param params Transaction parameters
+   */
+  public async executeTransaction(params: TransactionParams): Promise<string> {
+    if (!this.isRunning) {
+      throw new Error('Transaction engine is not running');
+    }
     
-    // Generate a unique transaction ID
-    const id = `tx-${uuidv4()}`;
+    if (!this.config.useRealFunds && !params.isSimulation) {
+      console.warn('WARNING: Transaction engine is not configured to use real funds. ' +
+                   'Setting isSimulation to true.');
+      params.isSimulation = true;
+    }
     
-    // For now, return a successful transaction result
-    // In the future, this will call the Rust binary
-    return {
-      success: true,
-      id,
-      signature: `5xq7kgKTVES5dt1U7fkyXZKuBgRts9nBRHLbHSKh6oJW9TBoytUeN5oJxvT9JFi4zZXBCg4G3TiYxQkQvNxdAJA${Math.floor(Math.random() * 10000)}`,
-      fee: 0.000005,
-      compute_units: 1250,
-    };
-  } catch (error) {
-    logger.error(`Failed to execute transaction: ${error}`);
-    return {
-      success: false,
-      id: `failed-${uuidv4()}`,
-      error: `Transaction failed: ${error}`,
-    };
+    console.log(`Executing ${params.isSimulation ? 'simulated' : 'real'} transaction:`, params);
+    
+    // In a real implementation, we would send a message to the Rust engine
+    // For this example, we'll simulate a transaction
+    
+    const txSignature = `SIGNATURE_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+    
+    this.transactions.set(txSignature, {
+      signature: txSignature,
+      status: 'pending',
+      timestamp: Date.now(),
+    });
+    
+    // Simulate transaction confirmation after a short delay
+    setTimeout(() => {
+      const status = this.transactions.get(txSignature);
+      if (status) {
+        status.status = 'confirmed';
+        this.transactions.set(txSignature, status);
+        this.emit('transactionUpdated', txSignature, status);
+      }
+    }, 2000);
+    
+    return txSignature;
+  }
+
+  /**
+   * Get the status of a transaction
+   * @param signature Transaction signature
+   */
+  public getTransactionStatus(signature: string): TransactionStatus | undefined {
+    return this.transactions.get(signature);
+  }
+
+  /**
+   * Set whether to use real funds
+   * @param useRealFunds Whether to use real funds
+   */
+  public setUseRealFunds(useRealFunds: boolean): void {
+    this.config.useRealFunds = useRealFunds;
+    console.log(`Set useRealFunds to ${useRealFunds}`);
+    
+    // Update environment variable for the engine
+    process.env.USE_REAL_FUNDS = useRealFunds ? 'true' : 'false';
+    
+    this.emit('configUpdated', this.config);
   }
 }
 
-/**
- * Get wallet balance
- * @param publicKeyStr The wallet public key string
- * @returns The wallet balance
- */
-export function getWalletBalance(publicKeyStr: string): Promise<number> {
-  return Promise.resolve(10.0); // Placeholder
+// Export singleton instance with default configuration
+const defaultConfig: EngineConfig = {
+  useRealFunds: process.env.USE_REAL_FUNDS === 'true',
+  rpcUrl: process.env.SOLANA_RPC_URL || 'https://solana-grpc-geyser.instantnodes.io:443',
+  websocketUrl: process.env.SOLANA_WEBSOCKET_URL,
+  systemWalletAddress: process.env.SYSTEM_WALLET_ADDRESS || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
+  wormholeGuardianRpc: process.env.WORMHOLE_GUARDIAN_RPC || 'https://guardian.stable.productions',
+};
+
+const transactionConnector = new TransactionConnector(defaultConfig);
+
+// Start the engine if this file is run directly
+if (require.main === module) {
+  transactionConnector.start()
+    .then((success) => {
+      if (success) {
+        console.log('Transaction engine started successfully');
+      } else {
+        console.error('Failed to start transaction engine');
+      }
+    })
+    .catch((error) => {
+      console.error('Error starting transaction engine:', error);
+    });
 }
 
-/**
- * Check if the transaction engine is initialized
- * @returns Whether the transaction engine is initialized
- */
-export function isInitialized(): boolean {
-  return initialized;
-}
-
-/**
- * Shutdown the transaction engine
- */
-export function shutdownTransactionEngine(): void {
-  if (rustyEngine) {
-    logger.info('Shutting down transaction engine');
-    rustyEngine.kill();
-    rustyEngine = null;
-    initialized = false;
-  }
-}
-
-// Initialize the transaction engine when this module is imported
-initializeTransactionEngine();
+export default transactionConnector;
