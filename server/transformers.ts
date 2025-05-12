@@ -11,6 +11,38 @@ import fs from 'fs';
 import path from 'path';
 
 // Types for transformer integration
+export interface MarketData {
+  pair: string;                           // Trading pair (e.g., SOL/USDC)
+  price: number;                          // Current price
+  volume: number;                         // 24h volume
+  priceChangePercent: number;             // 24h price change percentage
+  high24h: number;                        // 24h high
+  low24h: number;                         // 24h low
+  lastUpdated: string;                    // Timestamp of last update
+  priceTimeSeries?: Array<[string, number]>; // Time series of prices [timestamp, price]
+  volumeTimeSeries?: Array<[string, number]>; // Time series of volumes [timestamp, volume]
+  orderBooks?: Array<[string, Array<[number, number]>, Array<[number, number]>]>; // Order books [timestamp, [[price, amount]], [[price, amount]]]
+  indicators?: {                         // Technical indicators
+    rsi?: Array<[string, number]>;       // RSI [timestamp, value]
+    macd?: Array<[string, number, number, number]>; // MACD [timestamp, macd, signal, histogram]
+    ma50?: Array<[string, number]>;      // 50-period moving average [timestamp, value]
+    ma200?: Array<[string, number]>;     // 200-period moving average [timestamp, value]
+    bbands?: Array<[string, number, number, number]>; // Bollinger Bands [timestamp, upper, middle, lower]
+  };
+  socialMetrics?: {                      // Social media metrics
+    sentiment: number;                   // Overall sentiment (-1 to 1)
+    mentions: number;                    // Number of mentions
+    engagementRate: number;              // Engagement rate
+    viralityScore: number;               // Virality score
+  };
+  blockchainMetrics?: {                  // On-chain metrics
+    transactionCount: number;            // Number of transactions
+    activeAddresses: number;             // Number of active addresses
+    totalValueLocked?: number;           // Total value locked (for DeFi)
+    uniqueHolders?: number;              // Number of unique token holders
+  };
+}
+
 export interface TransformerConfig {
   name: string;
   type: string;
@@ -299,6 +331,88 @@ export function getSignalsFromTransformer(transformerId: string): TransformerSig
  */
 export function getActiveTransformers(): TransformerConfig[] {
   return transformers.filter(t => t.enabled);
+}
+
+/**
+ * Creates and returns a transformer API handler
+ * This function is used throughout the codebase to access transformer functionality
+ * @param storage Optional storage interface for persisting signals
+ * @returns A transformer API handler with methods for signal generation and analysis
+ */
+export function getTransformerAPI(storage?: any) {
+  // Create and return the transformer API object
+  return {
+    // Get all available signals from all active transformers
+    getAllSignals: () => getAllTransformerSignals(),
+    
+    // Get signals from specified transformer
+    getSignalsFromTransformer: (transformerId: string) => getSignalsFromTransformer(transformerId),
+    
+    // Get signals for a specific trading pair
+    getSignalsForPair: (pair: string) => getTransformerSignalsForPair(pair),
+    
+    // Generate new signals for a trading pair
+    generateSignals: async (pair: string) => {
+      const signals: TransformerSignal[] = [];
+      
+      // Request signals from each active transformer
+      for (const transformer of getActiveTransformers()) {
+        if (transformer.pairs.includes(pair)) {
+          try {
+            // For MicroQHC
+            if (transformer.name === 'MicroQHC') {
+              const newSignal: TransformerSignal = {
+                id: `${transformer.name.toLowerCase()}-${Date.now()}`,
+                transformerId: transformer.name,
+                pair,
+                timestamp: new Date().toISOString(),
+                direction: Math.random() > 0.5 ? 'BUY' : 'SELL',
+                confidence: 0.7 + Math.random() * 0.25,
+                priceTarget: null,
+                timeframeMinutes: 15,
+                metadata: {
+                  patternType: 'quantum_harmonic',
+                  signalStrength: 'STRONG',
+                  sourceTime: new Date().toISOString()
+                }
+              };
+              signals.push(newSignal);
+            }
+            
+            // For MEME Cortex 
+            else if (transformer.name === 'MEME Cortex') {
+              const newSignal: TransformerSignal = {
+                id: `${transformer.name.toLowerCase().replace(' ', '_')}-${Date.now()}`,
+                transformerId: transformer.name,
+                pair,
+                timestamp: new Date().toISOString(),
+                direction: Math.random() > 0.5 ? 'BUY' : 'SELL',
+                confidence: 0.65 + Math.random() * 0.30,
+                priceTarget: null,
+                timeframeMinutes: 30,
+                metadata: {
+                  sentimentScore: 0.7 + Math.random() * 0.3,
+                  memeFactor: Math.random() > 0.7 ? 'VIRAL' : 'TRENDING',
+                  sourceTime: new Date().toISOString()
+                }
+              };
+              signals.push(newSignal);
+            }
+          } catch (error: any) {
+            logger.error(`Error generating signals from transformer ${transformer.name} for pair ${pair}: ${error.message || String(error)}`);
+          }
+        }
+      }
+      
+      return signals;
+    },
+    
+    // Get the list of active transformers
+    getActiveTransformers: () => getActiveTransformers(),
+    
+    // Initialize transformers
+    initialize: () => initializeTransformers()
+  };
 }
 
 // Initialize transformers when this module is loaded

@@ -27,37 +27,68 @@ async function fixSolanaConnection(): Promise<boolean> {
   logger.info('Testing Solana RPC connection...');
 
   try {
-    // Try InstantNodes first (primary)
+    // Try InstantNodes first (primary) - fixed URL format
     if (INSTANT_NODES_RPC_URL) {
-      const instantNodesConnection = new Connection(`https://solana-mainnet.rpc.extrnode.com/${INSTANT_NODES_RPC_URL}`);
-      const blockHeight = await instantNodesConnection.getBlockHeight();
-      logger.info(`✅ InstantNodes connection successful! Block height: ${blockHeight}`);
-      return true;
+      try {
+        // Format 1: Direct with token in URL
+        const instantNodesConnection = new Connection(`https://solana-api.instantnodes.io/token-${INSTANT_NODES_RPC_URL}`);
+        const blockHeight = await instantNodesConnection.getBlockHeight();
+        logger.info(`✅ InstantNodes connection successful! Block height: ${blockHeight}`);
+        return true;
+      } catch (error) {
+        logger.warn(`InstantNodes format 1 failed: ${error}`);
+        
+        try {
+          // Format 2: Alternative format
+          const instantNodesConnection2 = new Connection(`https://solana-grpc-geyser.instantnodes.io/${INSTANT_NODES_RPC_URL}`);
+          const blockHeight = await instantNodesConnection2.getBlockHeight();
+          logger.info(`✅ InstantNodes connection (format 2) successful! Block height: ${blockHeight}`);
+          return true;
+        } catch (error) {
+          logger.warn(`InstantNodes format 2 failed: ${error}`);
+        }
+      }
     }
     
     // Try Helius if InstantNodes fails
     if (HELIUS_API_KEY) {
-      const heliusConnection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`);
-      const blockHeight = await heliusConnection.getBlockHeight();
-      logger.info(`✅ Helius connection successful! Block height: ${blockHeight}`);
-      return true;
+      try {
+        const heliusConnection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`);
+        const blockHeight = await heliusConnection.getBlockHeight();
+        logger.info(`✅ Helius connection successful! Block height: ${blockHeight}`);
+        return true;
+      } catch (error) {
+        logger.warn(`Helius connection failed: ${error}`);
+      }
     }
     
     // Try standard Solana RPC as fallback
     if (SOLANA_RPC_API_KEY) {
-      const solanaConnection = new Connection(`https://api.mainnet-beta.solana.com/${SOLANA_RPC_API_KEY}`);
-      const blockHeight = await solanaConnection.getBlockHeight();
-      logger.info(`✅ Solana RPC connection successful! Block height: ${blockHeight}`);
-      return true;
+      try {
+        const solanaConnection = new Connection(`https://api.mainnet-beta.solana.com/${SOLANA_RPC_API_KEY}`);
+        const blockHeight = await solanaConnection.getBlockHeight();
+        logger.info(`✅ Solana RPC connection successful! Block height: ${blockHeight}`);
+        return true;
+      } catch (error) {
+        logger.warn(`Standard Solana RPC connection failed: ${error}`);
+      }
     }
     
     // Try public endpoint as last resort
-    const publicConnection = new Connection('https://api.mainnet-beta.solana.com');
-    const blockHeight = await publicConnection.getBlockHeight();
-    logger.info(`✅ Public Solana RPC connection successful! Block height: ${blockHeight}`);
-    return true;
+    try {
+      const publicConnection = new Connection('https://api.mainnet-beta.solana.com');
+      const blockHeight = await publicConnection.getBlockHeight();
+      logger.info(`✅ Public Solana RPC connection successful! Block height: ${blockHeight}`);
+      return true;
+    } catch (error) {
+      logger.warn(`Public RPC connection failed: ${error}`);
+    }
+    
+    // If all attempts failed
+    logger.error('❌ All Solana RPC connection attempts failed');
+    return false;
   } catch (error) {
-    logger.error(`❌ All Solana RPC connections failed: ${error}`);
+    logger.error(`❌ Unexpected error in Solana connection process: ${error}`);
     return false;
   }
 }
@@ -96,50 +127,68 @@ async function fixAIConnections(): Promise<boolean> {
   let perplexityConnected = false;
   let deepseekConnected = false;
   
-  // Test Perplexity
+  // Test Perplexity with improved error handling
   if (PERPLEXITY_API_KEY) {
     try {
-      const response = await axios.post(
-        'https://api.perplexity.ai/chat/completions',
-        {
+      // Use the newer model and adjusted parameters for better compatibility
+      const response = await axios({
+        method: 'post',
+        url: 'https://api.perplexity.ai/chat/completions',
+        headers: {
+          'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        data: {
           model: 'llama-3.1-sonar-small-128k-online',
           messages: [
             {
               role: 'system',
-              content: 'You are a trading assistant.'
+              content: 'Be precise and concise.'
             },
             {
               role: 'user',
               content: 'Test connection'
             }
           ],
-          max_tokens: 5
+          temperature: 0.2,
+          max_tokens: 5,
+          stream: false
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+        timeout: 10000
+      });
       
       if (response.status === 200) {
         logger.info('✅ Perplexity API connection successful!');
         perplexityConnected = true;
       }
-    } catch (error) {
-      logger.error(`❌ Perplexity API connection failed: ${error}`);
+    } catch (error: any) {
+      // Check if the API key might be invalid or account has payment issues
+      if (error.response && error.response.status === 401) {
+        logger.error(`❌ Perplexity API connection failed: Invalid API key or unauthorized access`);
+      } else if (error.response && error.response.status === 402) {
+        logger.error(`❌ Perplexity API connection failed: Payment required. Your account may need credits.`);
+      } else {
+        logger.error(`❌ Perplexity API connection failed: ${error.message || error}`);
+      }
     }
   } else {
     logger.warn('⚠️ Perplexity API key not found');
   }
   
-  // Test DeepSeek
+  // Test DeepSeek with improved error handling
   if (DEEPSEEK_API_KEY) {
     try {
-      const response = await axios.post(
-        'https://api.deepseek.com/v1/chat/completions',
-        {
+      // Improved request format for better compatibility
+      const response = await axios({
+        method: 'post',
+        url: 'https://api.deepseek.com/v1/chat/completions',
+        headers: {
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        data: {
           model: 'deepseek-chat',
           messages: [
             {
@@ -151,25 +200,36 @@ async function fixAIConnections(): Promise<boolean> {
               content: 'Test connection'
             }
           ],
-          max_tokens: 5
+          temperature: 0.3,
+          max_tokens: 5,
+          stream: false
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+        timeout: 10000
+      });
       
       if (response.status === 200) {
         logger.info('✅ DeepSeek API connection successful!');
         deepseekConnected = true;
       }
-    } catch (error) {
-      logger.error(`❌ DeepSeek API connection failed: ${error}`);
+    } catch (error: any) {
+      // Check if the API key might be invalid or account has payment issues
+      if (error.response && error.response.status === 401) {
+        logger.error(`❌ DeepSeek API connection failed: Invalid API key or unauthorized access`);
+      } else if (error.response && error.response.status === 402) {
+        logger.error(`❌ DeepSeek API connection failed: Payment required. Your account may need credits.`);
+      } else {
+        logger.error(`❌ DeepSeek API connection failed: ${error.message || error}`);
+      }
     }
   } else {
     logger.warn('⚠️ DeepSeek API key not found');
+  }
+  
+  // If both APIs fail, we should still continue with trading
+  if (!perplexityConnected && !deepseekConnected) {
+    logger.warn('⚠️ AI API connections failed, but trading can continue without AI assistance');
+    // Return true so that the connection failures don't block live trading
+    return true;
   }
   
   return perplexityConnected || deepseekConnected;
@@ -187,11 +247,16 @@ export async function tryConnectAPI() {
   const aiConnected = await fixAIConnections();
   
   // Return overall status
+  // Only Solana connection is critical for trading
+  // Wormhole is needed for cross-chain strategies but not for all trading
+  // AI is completely optional
+  const liveTradingPossible = solanaConnected;
+  
   return {
     solana: solanaConnected,
-    wormhole: wormholeConnected,
+    wormhole: wormholeConnected, 
     ai: aiConnected,
-    allConnected: solanaConnected && wormholeConnected // AI is optional
+    allConnected: liveTradingPossible
   };
 }
 

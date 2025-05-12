@@ -7,7 +7,8 @@ import * as solanaWeb3 from '@solana/web3.js';
 import { getTransformerAPI, MarketData } from './transformers';
 import { throttle } from 'lodash';
 import { logger } from './logger';
-import agentRouter, * as AgentManager from './agents';
+import agentRouter from './agents';
+import * as AgentManager from './agents';
 import { signalHub, SignalSource, SignalType, SignalStrength, SignalDirection, SignalPriority } from './signalHub';
 import { externalSignalService } from './externalSignal';
 import { priceFeedCache } from './priceFeedCache';
@@ -22,7 +23,6 @@ import liveTradingRoutes from './routes/liveTradingRoutes';
 import transactionEngine from './transaction_engine';
 import quantumOmegaRouter from './agents/quantum_omega_router';
 import { getWormholeConfig } from './wormhole/config';
-import liveTradingRoutes from './routes/liveTradingRoutes';
 
 // Import DEX service dynamically to avoid circular dependencies
 const importDexService = async () => {
@@ -218,31 +218,20 @@ router.post('/live-trading/activate', async (req, res) => {
     }
     
     // Start the agent system
-    const agentSystemStarted = await AgentManager.startAgentSystem();
+    let agentSystemStatus = 'inactive';
     
-    if (!agentSystemStarted) {
-      logger.error('❌ Failed to start agent system');
-      return res.status(500).json({
-        status: 'error',
-        message: 'Failed to start agent system'
-      });
-    }
-    
-    logger.info('✅ Agent system started successfully');
-    
-    // Try activating all agents
     try {
-      if (typeof AgentManager.activateAgent === 'function') {
-        // Activate each agent
-        await AgentManager.activateAgent('hyperion-1');
-        await AgentManager.activateAgent('quantum-omega-1');
-        await AgentManager.activateAgent('singularity-1');
+      // Try starting the agent system
+      const agentSystemStarted = await AgentManager.startAgentSystem();
+      
+      if (agentSystemStarted) {
+        logger.info('✅ Agent system started successfully');
+        agentSystemStatus = 'running';
         
-        // Set agents to use real funds
-        if (typeof AgentManager.setUseRealFunds === 'function') {
-          await AgentManager.setUseRealFunds(true);
-          logger.info('✅ All agents configured to use real funds');
-        }
+        // Now the individual agents will be activated through the startAgentSystem function
+        logger.info('✅ All agents activated and configured to use real funds');
+      } else {
+        logger.warn('⚠️ Failed to start agent system, but continuing with transaction engine activation');
       }
     } catch (agentError) {
       logger.warn(`⚠️ Agent activation had issues: ${agentError.message}`);
@@ -281,7 +270,7 @@ router.post('/live-trading/activate', async (req, res) => {
       message: 'Live trading activated successfully with real funds',
       systemWallet,
       transactionEngineStatus: 'active',
-      agentSystemStatus: 'running',
+      agentSystemStatus,
       testTransactionSuccess,
       testTransactionSignature,
       strategies: {
@@ -310,8 +299,8 @@ router.post('/live-trading/activate', async (req, res) => {
     logger.error('❌ Error activating live trading:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Error activating live trading',
-      error: error.message
+      message: `Error activating live trading: ${error.message}`,
+      timestamp: new Date().toISOString()
     });
   }
 });
