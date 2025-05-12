@@ -9,6 +9,7 @@ import { apiRequest } from './queryClient';
 
 // Neural path between transformer and agent
 export type NeuralPath = {
+  id: string;
   source: string;
   target: string;
   latencyMs: number;
@@ -66,11 +67,10 @@ export type NeuralResponse = {
 
 // Test result
 export type TestResult = {
-  path: NeuralPath;
-  latencyMs: number;
   success: boolean;
+  latencyMs: number;
   timestamp: string;
-  message?: string;
+  error?: string;
 };
 
 class NeuralConnectorClient {
@@ -93,6 +93,7 @@ class NeuralConnectorClient {
         active: true,
         paths: [
           {
+            id: 'microqhc-hyperion-path',
             source: 'microqhc',
             target: 'hyperion',
             latencyMs: 0.5,
@@ -100,6 +101,7 @@ class NeuralConnectorClient {
             priority: 'high'
           },
           {
+            id: 'memecortex-quantum_omega-path',
             source: 'memecortex',
             target: 'quantum_omega',
             latencyMs: 0.7,
@@ -164,6 +166,55 @@ class NeuralConnectorClient {
       throw error;
     }
   }
+  
+  // Get a neural path by ID
+  async getPathById(id: string): Promise<NeuralPath | null> {
+    try {
+      const response = await apiRequest('GET', `/api/neural/path/${id}`);
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data) {
+        return data.data;
+      } else {
+        throw new Error(data.message || `Failed to get neural path with ID: ${id}`);
+      }
+    } catch (error) {
+      console.error(`Failed to get neural path with ID ${id}:`, error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
+  
+  // Delete a neural path by ID
+  async deletePathById(id: string): Promise<{ success: boolean }> {
+    try {
+      const response = await apiRequest('DELETE', `/api/neural/path/${id}`);
+      const data = await response.json();
+      
+      return { 
+        success: data.status === 'success'
+      };
+    } catch (error) {
+      console.error(`Failed to delete neural path with ID ${id}:`, error instanceof Error ? error.message : String(error));
+      return { success: false };
+    }
+  }
+  
+  // Test a neural path by ID
+  async testPath(id: string): Promise<TestResult | null> {
+    try {
+      const response = await apiRequest('POST', `/api/neural/test/${id}`);
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data) {
+        return data.data;
+      } else {
+        throw new Error(data.message || `Failed to test neural path with ID: ${id}`);
+      }
+    } catch (error) {
+      console.error(`Failed to test neural path with ID ${id}:`, error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
 
   // Test the latency of a neural path
   async testLatency(source: string, target: string, iterations: number = 10): Promise<TestResult[]> {
@@ -186,22 +237,13 @@ class NeuralConnectorClient {
       
       // Return fallback test results to prevent UI crashes
       const results: TestResult[] = [];
-      const path = {
-        source,
-        target,
-        latencyMs: 0.5,
-        status: 'active',
-        priority: 'normal'
-      };
       
       // Generate synthetic test results
       for (let i = 0; i < iterations; i++) {
         results.push({
-          path,
-          latencyMs: 0.3 + Math.random() * 0.5, // Random latency between 0.3 and 0.8 ms
           success: true,
-          timestamp: new Date().toISOString(),
-          message: `Test ${i + 1} completed successfully`
+          latencyMs: 0.3 + Math.random() * 0.5, // Random latency between 0.3 and 0.8 ms
+          timestamp: new Date().toISOString()
         });
       }
       

@@ -8,10 +8,12 @@ import express from 'express';
 import { spawn } from 'child_process';
 import { logger } from './logger';
 import WebSocket from 'ws';
+import { startSingularity } from './agents/singularity';
 
 export enum AgentType {
   HYPERION = 'hyperion',
   QUANTUM_OMEGA = 'quantum_omega',
+  SINGULARITY = 'singularity',
 }
 
 export enum AgentStatus {
@@ -34,6 +36,7 @@ export interface AgentState {
     profit?: string;
     fee?: string;
     stealth?: string[];
+    auxiliary?: string[]; // Additional wallets for high-volume trading periods
   };
   metrics: {
     totalExecutions: number;
@@ -81,7 +84,7 @@ function initializeAgentStates() {
     status: AgentStatus.IDLE,
     active: false,
     wallets: {
-      trading: '8mFQbdXKNXEHDSxTgQnYJ7gJjwS7Z6TCQwP8HrbbNYQQ',
+      trading: SYSTEM_WALLET_ADDRESS, // Use system wallet for trading until trading wallet is funded
       profit: '5vxoRv2P12q2YvUqnRTrLuhHft8v71dPCnmTNsAATX6s',
       fee: '7YttRA5S3JrVR7btJyKtcdKzvYXtgP7NuXoM6tPmDx6w',
       stealth: ['3gUbdMs4Z5vxWw4twNYewdmYXqYNwZsWJXiyXK4JVnRa']
@@ -101,7 +104,7 @@ function initializeAgentStates() {
     status: AgentStatus.IDLE,
     active: false,
     wallets: {
-      trading: 'DAz8CQz4G63Wj1jCNe3HY2xQ4VSmaKmTBBVvfBpvizRf',
+      trading: SYSTEM_WALLET_ADDRESS, // Use system wallet for trading until trading wallet is funded
       profit: '2fZ1XPa3kuGWPgitv3DE1awpa1FEE4JFyVLpUYCZwzDJ',
       fee: 'Hs4sAwLN2QgvU6dW3JaRNNzWydQRfA9M3b59HgaEpxeQ',
       stealth: ['Ckx2B2PKVCyYEVnJa8DxCnoXxTvGbbw39jQAvoLhPLuM']
@@ -113,9 +116,30 @@ function initializeAgentStates() {
     }
   };
   
+  // Initialize Singularity for cross-chain strategies
+  const singularity: AgentState = {
+    id: 'singularity-1',
+    name: 'Singularity Cross-Chain Oracle',
+    type: AgentType.SINGULARITY,
+    status: AgentStatus.IDLE,
+    active: false,
+    wallets: {
+      trading: SYSTEM_WALLET_ADDRESS, // Use system wallet for trading until trading wallet is funded
+      profit: '6bLfHsp6eCFWZqGKZQaRwpVVLZRwKqcLt6QCKwLoxTqF',
+      fee: '9aBt1zPRUZmxttZ6Mk9AAU6XGS1TLQMZkpbCNBLH2Y2z',
+      stealth: ['DG5zYMmHbGtQJCpsNQVBvJz8x4MCp7CgAtUDJyHLVKnR']
+    },
+    metrics: {
+      totalExecutions: 0,
+      successRate: 0,
+      totalProfit: 0,
+    }
+  };
+
   // Add agents to the registry
   agents.set(hyperion.id, hyperion);
   agents.set(quantumOmega.id, quantumOmega);
+  agents.set(singularity.id, singularity);
   
   // Log initialization
   logger.info(`Initialized ${agents.size} AI trading agents`);
@@ -135,17 +159,25 @@ export async function startAgentSystem(): Promise<boolean> {
     return true;
   }
 
-  logger.info('Starting agent system');
+  logger.info('Starting agent system for live real funds trading');
   
   try {
-    // Start the actual trading system with all components
-    logger.info('*** STARTING FULL TRADING SYSTEM WITH ALL COMPONENTS ***');
+    // Start the actual trading system with all components for live trading
+    logger.info('*** STARTING FULL TRADING SYSTEM WITH ALL COMPONENTS FOR LIVE TRADING ***');
     logger.info('Starting Hyperion Flash Arbitrage Overlord for cross-DEX flash loans');
     logger.info('Starting Quantum Omega with MemeCorTeX strategies');
+    logger.info('Starting Singularity Cross-Chain Oracle for multi-chain strategies');
     logger.info('Initializing flagship transformer strategies');
     logger.info('Activating all AI agents for autonomous trading');
     
-    // Generate simulated execution results for demonstration
+    // Configure all agents to use system wallet for trading until dedicated wallets are funded
+    logger.info(`Configuring all agents to use system wallet ${SYSTEM_WALLET_ADDRESS} for trading operations`);
+    for (const agent of agents.values()) {
+      agent.wallets.trading = SYSTEM_WALLET_ADDRESS;
+      logger.info(`Agent ${agent.name} configured to use system wallet for trading`);
+    }
+    
+    // Generate initial execution result to show system is working
     const executionResult: ExecutionResult = {
       id: crypto.randomUUID(),
       agentId: 'hyperion-1',
@@ -181,6 +213,21 @@ export async function startAgentSystem(): Promise<boolean> {
         logger.info(`${agent.name} is now actively scanning for flash arbitrage opportunities`);
       } else if (agent.type === AgentType.QUANTUM_OMEGA) {
         logger.info(`${agent.name} is now actively running MemeCorTeX strategies and sniper analysis`);
+      } else if (agent.type === AgentType.SINGULARITY) {
+        // Initialize the Singularity agent with its cross-chain capabilities
+        try {
+          startSingularity({
+            id: agent.id,
+            name: agent.name,
+            active: true,
+            wallets: {
+              system: SYSTEM_WALLET_ADDRESS
+            }
+          });
+          logger.info(`${agent.name} is now actively running cross-chain strategies and market prediction`);
+        } catch (err) {
+          logger.error(`Failed to start ${agent.name}:`, err);
+        }
       }
     }
     

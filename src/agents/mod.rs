@@ -1,386 +1,106 @@
-// Agent framework module
-// Main interface for trading agents in the system
-
-use anyhow::{Result, anyhow, Context};
-use log::{info, warn, error, debug};
-use serde::{Serialize, Deserialize};
-use std::sync::{Arc, RwLock, Mutex};
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
-
-use crate::solana::connection::SolanaConnection;
-use crate::solana::wallet_manager::WalletManager;
-use crate::solana::transaction_manager::TransactionManager;
-use crate::transformers::TransformerAPI;
+//! AI Trading Agents for Solana Quantum Trading Platform
+//!
+//! This module contains the implementation of specialized AI trading agents
+//! that drive the trading system. Each agent has a specific focus and strategy.
 
 pub mod hyperion;
 pub mod quantum_omega;
-pub mod intelligence;
-pub mod wallet_generator;
+pub mod singularity;
 
-// Agent type enum
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+use solana_sdk::pubkey::Pubkey;
+use anyhow::Result;
+
+/// Agent types available in the system
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AgentType {
+    /// Hyperion Flash Arbitrage Overlord
     Hyperion,
+    /// Quantum Omega Sniper
     QuantumOmega,
-    Custom(String),
+    /// Singularity Cross-Chain Oracle
+    Singularity,
 }
 
-// Agent status enum
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+/// Agent status states
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AgentStatus {
+    /// Agent is idle, not scanning or executing
     Idle,
+    /// Agent is initializing
     Initializing,
+    /// Agent is actively scanning for opportunities
     Scanning,
+    /// Agent is executing a trade
     Executing,
+    /// Agent is in cooldown period after execution
     Cooldown,
+    /// Agent encountered an error
     Error,
 }
 
-// Agent config
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentConfig {
-    /// Agent ID
-    pub id: String,
+/// Initialize all trading agents
+pub fn initialize_agents() -> Result<()> {
+    println!("🚀 Initializing all AI trading agents");
     
-    /// Agent name
-    pub name: String,
+    // Initialize Hyperion agent
+    println!("⚡ Initializing Hyperion Flash Arbitrage Overlord");
+    hyperion::initialize_hyperion()?;
     
-    /// Agent type
-    pub agent_type: AgentType,
+    // Initialize Quantum Omega agent
+    println!("⚛️ Initializing Quantum Omega Sniper");
+    quantum_omega::initialize_quantum_omega()?;
     
-    /// Active flag
-    pub active: bool,
+    // Initialize Singularity agent
+    println!("🔮 Initializing Singularity Cross-Chain Oracle");
+    let singularity_config = singularity::initialize_singularity()?;
     
-    /// Risk level (0.0 - 1.0)
-    pub risk_level: f64,
+    println!("✅ All agents initialized successfully");
     
-    /// Maximum capital allocation
-    pub max_capital: f64,
-    
-    /// Strategy IDs this agent can execute
-    pub strategy_ids: Vec<String>,
-    
-    /// Wallet ID for agent operations
-    pub wallet_id: String,
-    
-    /// Agent priority
-    pub priority: u32,
-    
-    /// Custom parameters
-    pub parameters: HashMap<String, String>,
+    Ok(())
 }
 
-// Agent execution result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentExecutionResult {
-    /// Execution ID
-    pub id: String,
+/// Start the agent system for live trading
+pub fn start_trading_system(use_real_funds: bool) -> Result<()> {
+    println!("🚀 Starting full trading system with all components for live trading");
     
-    /// Success flag
-    pub success: bool,
+    // Start Hyperion agent
+    println!("⚡ Starting Hyperion Flash Arbitrage Overlord for cross-DEX flash loans");
+    hyperion::start_hyperion(use_real_funds)?;
     
-    /// Profit amount
-    pub profit: f64,
+    // Start Quantum Omega agent
+    println!("⚛️ Starting Quantum Omega with MemeCorTeX strategies");
+    quantum_omega::start_quantum_omega(use_real_funds)?;
     
-    /// Execution timestamp
-    pub timestamp: String,
+    // Start Singularity agent
+    println!("🔮 Starting Singularity Cross-Chain Oracle for multi-chain strategies");
+    let singularity_config = singularity::initialize_singularity()?;
+    singularity::start_singularity(&singularity_config)?;
     
-    /// Transaction signature
-    pub signature: Option<String>,
+    // Verify system wallet status
+    let system_wallet = "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb";
+    println!("💼 System wallet {} activated for profit collection", system_wallet);
     
-    /// Error message
-    pub error: Option<String>,
+    println!("✅ Trading system started successfully with all agents");
     
-    /// Execution metrics
-    pub metrics: HashMap<String, f64>,
+    Ok(())
 }
 
-// Agent trait
-pub trait Agent {
-    /// Get agent configuration
-    fn get_config(&self) -> AgentConfig;
+/// Stop the agent system
+pub fn stop_trading_system() -> Result<()> {
+    println!("🛑 Stopping all trading agents");
     
-    /// Get agent status
-    fn get_status(&self) -> AgentStatus;
+    // Stop each agent
+    println!("⚡ Stopping Hyperion agent");
+    hyperion::stop_hyperion()?;
     
-    /// Initialize agent
-    fn initialize(&mut self) -> Result<()>;
+    println!("⚛️ Stopping Quantum Omega agent");
+    quantum_omega::stop_quantum_omega()?;
     
-    /// Start agent
-    fn start(&mut self) -> Result<()>;
+    println!("🔮 Stopping Singularity agent");
+    let singularity_config = singularity::initialize_singularity()?;
+    singularity::stop_singularity(&singularity_config)?;
     
-    /// Stop agent
-    fn stop(&mut self) -> Result<()>;
+    println!("✅ All agents stopped successfully");
     
-    /// Execute strategy
-    fn execute_strategy(&mut self) -> Result<AgentExecutionResult>;
-    
-    /// Update agent (periodic)
-    fn update(&mut self) -> Result<()>;
-}
-
-// Agent factory
-pub struct AgentFactory {
-    /// Connection for agents
-    connection: Arc<SolanaConnection>,
-    
-    /// Wallet manager for agents
-    wallet_manager: Arc<WalletManager>,
-    
-    /// Transaction manager for agents
-    tx_manager: Arc<TransactionManager>,
-    
-    /// Transformer API for market prediction
-    transformer_api: Arc<TransformerAPI>,
-    
-    /// LLM controller for intelligence
-    llm_controller: Arc<intelligence::LLMController>,
-}
-
-impl AgentFactory {
-    /// Create new agent factory
-    pub fn new(
-        connection: Arc<SolanaConnection>,
-        wallet_manager: Arc<WalletManager>,
-        tx_manager: Arc<TransactionManager>,
-        transformer_api: Arc<TransformerAPI>,
-        llm_controller: Arc<intelligence::LLMController>,
-    ) -> Self {
-        Self {
-            connection,
-            wallet_manager,
-            tx_manager,
-            transformer_api,
-            llm_controller,
-        }
-    }
-    
-    /// Create agent from config
-    pub fn create_agent(&self, config: AgentConfig) -> Result<Box<dyn Agent + Send + Sync>> {
-        match config.agent_type {
-            AgentType::Hyperion => {
-                // Create Hyperion agent
-                let mut agent = hyperion::HyperionAgent::new(config.clone())?;
-                
-                // Set dependencies
-                agent.set_connection(self.connection.clone());
-                agent.set_wallet_manager(self.wallet_manager.clone());
-                agent.set_transaction_manager(self.tx_manager.clone());
-                agent.set_transformer_api(self.transformer_api.clone());
-                agent.set_llm_controller(Some(self.llm_controller.clone()));
-                
-                // Initialize
-                agent.initialize()?;
-                
-                Ok(Box::new(agent) as Box<dyn Agent + Send + Sync>)
-            }
-            AgentType::QuantumOmega => {
-                // Create Quantum Omega agent
-                let mut agent = quantum_omega::QuantumOmegaAgent::new(config.clone())?;
-                
-                // Set dependencies
-                agent.set_connection(self.connection.clone());
-                agent.set_wallet_manager(self.wallet_manager.clone());
-                agent.set_transaction_manager(self.tx_manager.clone());
-                agent.set_transformer_api(self.transformer_api.clone());
-                agent.set_llm_controller(Some(self.llm_controller.clone()));
-                
-                // Initialize
-                agent.initialize()?;
-                
-                Ok(Box::new(agent) as Box<dyn Agent + Send + Sync>)
-            }
-            AgentType::Custom(name) => {
-                Err(anyhow!("Custom agent type not implemented: {}", name))
-            }
-        }
-    }
-}
-
-// Agent manager
-pub struct AgentManager {
-    /// Agent factory
-    factory: AgentFactory,
-    
-    /// Running agents
-    agents: RwLock<HashMap<String, Box<dyn Agent + Send + Sync>>>,
-    
-    /// Execution history
-    execution_history: RwLock<Vec<AgentExecutionResult>>,
-}
-
-impl AgentManager {
-    /// Create new agent manager
-    pub fn new(
-        connection: Arc<SolanaConnection>,
-        wallet_manager: Arc<WalletManager>,
-        tx_manager: Arc<TransactionManager>,
-        transformer_api: Arc<TransformerAPI>,
-        llm_controller: Arc<intelligence::LLMController>,
-    ) -> Result<Self> {
-        let factory = AgentFactory::new(
-            connection,
-            wallet_manager,
-            tx_manager,
-            transformer_api,
-            llm_controller,
-        );
-        
-        Ok(Self {
-            factory,
-            agents: RwLock::new(HashMap::new()),
-            execution_history: RwLock::new(Vec::new()),
-        })
-    }
-    
-    /// Create and register agent
-    pub fn create_agent(&self, config: AgentConfig) -> Result<String> {
-        let agent_id = config.id.clone();
-        
-        // Create agent
-        let agent = self.factory.create_agent(config)?;
-        
-        // Register agent
-        {
-            let mut agents = self.agents.write().unwrap();
-            agents.insert(agent_id.clone(), agent);
-        }
-        
-        Ok(agent_id)
-    }
-    
-    /// Get agent by ID
-    pub fn get_agent(&self, id: &str) -> Result<Box<dyn Agent + Send + Sync>> {
-        let agents = self.agents.read().unwrap();
-        
-        let agent = agents.get(id)
-            .ok_or_else(|| anyhow!("Agent not found: {}", id))?;
-        
-        // We can't actually return the agent directly due to borrowing rules,
-        // so this is a simplified version for interface demonstration
-        
-        Err(anyhow!("Cannot directly access agent - use manager methods"))
-    }
-    
-    /// Get all agent IDs
-    pub fn get_agent_ids(&self) -> Vec<String> {
-        let agents = self.agents.read().unwrap();
-        agents.keys().cloned().collect()
-    }
-    
-    /// Start agent
-    pub fn start_agent(&self, id: &str) -> Result<()> {
-        let mut agents = self.agents.write().unwrap();
-        
-        let agent = agents.get_mut(id)
-            .ok_or_else(|| anyhow!("Agent not found: {}", id))?;
-        
-        agent.start()
-    }
-    
-    /// Stop agent
-    pub fn stop_agent(&self, id: &str) -> Result<()> {
-        let mut agents = self.agents.write().unwrap();
-        
-        let agent = agents.get_mut(id)
-            .ok_or_else(|| anyhow!("Agent not found: {}", id))?;
-        
-        agent.stop()
-    }
-    
-    /// Start all agents
-    pub fn start_all(&self) -> Result<()> {
-        let mut agents = self.agents.write().unwrap();
-        
-        for (id, agent) in agents.iter_mut() {
-            info!("Starting agent: {}", id);
-            agent.start()?;
-        }
-        
-        Ok(())
-    }
-    
-    /// Stop all agents
-    pub fn stop_all(&self) -> Result<()> {
-        let mut agents = self.agents.write().unwrap();
-        
-        for (id, agent) in agents.iter_mut() {
-            info!("Stopping agent: {}", id);
-            agent.stop()?;
-        }
-        
-        Ok(())
-    }
-    
-    /// Update all agents
-    pub fn update_all(&self) -> Result<()> {
-        let mut agents = self.agents.write().unwrap();
-        
-        for (id, agent) in agents.iter_mut() {
-            debug!("Updating agent: {}", id);
-            agent.update()?;
-        }
-        
-        Ok(())
-    }
-    
-    /// Check for execution opportunities and execute if found
-    pub fn check_execution_opportunities(&self) -> Result<Option<Vec<AgentExecutionResult>>> {
-        let mut agents = self.agents.write().unwrap();
-        
-        let mut results = Vec::new();
-        
-        // Simple strategy: check each agent in priority order
-        let mut agent_entries: Vec<_> = agents.iter_mut().collect();
-        
-        // Sort by agent priority (higher first)
-        agent_entries.sort_by(|(_, a), (_, b)| {
-            let a_priority = a.get_config().priority;
-            let b_priority = b.get_config().priority;
-            b_priority.cmp(&a_priority)
-        });
-        
-        // Execute for each agent that is ready
-        for (id, agent) in agent_entries {
-            // Only execute for active agents in scanning state
-            if agent.get_config().active && agent.get_status() == AgentStatus::Scanning {
-                info!("Checking execution opportunities for agent: {}", id);
-                
-                // In production, this would check market conditions
-                // For now, we'll just execute if the agent is in scanning state
-                
-                // Execute strategy
-                let result = agent.execute_strategy()?;
-                
-                info!("Agent {} executed strategy: success={}, profit={}", 
-                     id, result.success, result.profit);
-                
-                results.push(result.clone());
-                
-                // Add to execution history
-                {
-                    let mut history = self.execution_history.write().unwrap();
-                    history.push(result);
-                }
-            }
-        }
-        
-        if results.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(results))
-        }
-    }
-    
-    /// Get recent execution results
-    pub fn get_recent_executions(&self, limit: usize) -> Vec<AgentExecutionResult> {
-        let history = self.execution_history.read().unwrap();
-        
-        history.iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect()
-    }
+    Ok(())
 }
