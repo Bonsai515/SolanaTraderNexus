@@ -88,18 +88,13 @@ spl-memo = "3.0.1"
 # For static variables
 lazy_static = "1.4.0"
 
-# Wormhole SDK for cross-chain interactions
-wormhole-sdk = "0.1.0"
-wormhole-core = "0.1.0"
-portal-bridge = "0.1.0"
+# Wormhole integration can be added later if needed
+# Removed non-existent dependencies
 
 # For HTTP requests
 reqwest = { version = "0.11.20", features = ["json"] }
 
-# For cross-chain functionality
-ethers = { version = "2.0.4", features = ["legacy"] }
-ethers-providers = "2.0.4"
-ethers-core = "2.0.4"
+# Cross-chain functionality will be added later when needed
 
 [lib]
 crate-type = ["cdylib", "rlib"]
