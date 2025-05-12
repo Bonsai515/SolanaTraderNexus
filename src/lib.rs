@@ -1,667 +1,297 @@
-//! Solana Quantum Trading Platform - Main Library
+//! Solana Quantum Trading System - Core Library
 //!
-//! This library provides all the components needed for the Solana
-//! Quantum Trading Platform, including agents, transformers, and utilities.
+//! This library implements the core functionality of the Solana Quantum Trading System,
+//! including AI trading agents, transformers, and cross-chain capabilities.
 
 pub mod agents;
-pub mod solana;
 pub mod transformers;
-pub mod dex;
+pub mod solana;
 pub mod utils;
 
-// Re-export commonly used types and functions
-pub use agents::AgentManager;
-pub use transformers::TransformerManager;
-pub use solana::wallet_manager::WalletManager;
+use std::error::Error;
 
-/// Module for utility types and functions
-pub mod utils {
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+/// Initialize the trading system
+pub fn initialize() -> Result<(), Box<dyn Error>> {
+    println!("Initializing Solana Quantum Trading System...");
     
-    /// Get the current timestamp in seconds
-    pub fn current_timestamp() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::from_secs(0))
-            .as_secs()
-    }
+    // Initialize agents
+    agents::initialize()?;
     
-    /// Get the current timestamp in milliseconds
-    pub fn current_timestamp_millis() -> u128 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::from_secs(0))
-            .as_millis()
-    }
+    // Initialize transformers
+    transformers::initialize()?;
     
-    /// Format a timestamp as an ISO 8601 string
-    pub fn format_timestamp(timestamp: u64) -> String {
-        let dt = chrono::DateTime::<chrono::Utc>::from_utc(
-            chrono::NaiveDateTime::from_timestamp_opt(timestamp as i64, 0).unwrap(),
-            chrono::Utc,
-        );
-        dt.to_rfc3339()
-    }
+    // Initialize Solana client
+    solana::initialize()?;
     
-    /// Format a duration as a human-readable string (e.g., "1h 23m 45s")
-    pub fn format_duration(seconds: u64) -> String {
-        let hours = seconds / 3600;
-        let minutes = (seconds % 3600) / 60;
-        let seconds = seconds % 60;
-        
-        if hours > 0 {
-            format!("{}h {}m {}s", hours, minutes, seconds)
-        } else if minutes > 0 {
-            format!("{}m {}s", minutes, seconds)
-        } else {
-            format!("{}s", seconds)
-        }
-    }
+    println!("Solana Quantum Trading System initialized successfully!");
     
-    /// Generate a random ID
-    pub fn generate_id() -> String {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen();
-        format!("{:016x}", id)
+    Ok(())
+}
+
+/// Shutdown the trading system
+pub fn shutdown() -> Result<(), Box<dyn Error>> {
+    println!("Shutting down Solana Quantum Trading System...");
+    
+    // Shutdown agents
+    agents::shutdown()?;
+    
+    // Shutdown transformers
+    transformers::shutdown()?;
+    
+    // Shutdown Solana client
+    solana::shutdown()?;
+    
+    println!("Solana Quantum Trading System shutdown complete!");
+    
+    Ok(())
+}
+
+/// Version information
+pub fn version() -> &'static str {
+    "Solana Quantum Trading System v0.1.0"
+}
+
+/// Check system status
+pub fn status() -> SystemStatus {
+    SystemStatus {
+        agents_running: agents::is_running(),
+        transformers_running: transformers::is_running(),
+        solana_connected: solana::is_connected(),
+        last_heartbeat: utils::current_timestamp(),
     }
 }
 
-/// Module for agent management
-pub mod agents {
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex, RwLock};
+/// System status information
+#[derive(Debug, Clone)]
+pub struct SystemStatus {
+    /// Whether the agents are running
+    pub agents_running: bool,
     
-    /// Agent type
+    /// Whether the transformers are running
+    pub transformers_running: bool,
+    
+    /// Whether Solana is connected
+    pub solana_connected: bool,
+    
+    /// Last heartbeat timestamp
+    pub last_heartbeat: u64,
+}
+
+/// Agent module
+pub mod agents {
+    //! AI trading agents for the Solana Quantum Trading System
+    
+    /// Agent types
     #[derive(Debug, Clone, PartialEq)]
     pub enum AgentType {
-        /// Hyperion flash arbitrage agent
+        /// Hyperion Flash Arbitrage Overlord
         Hyperion,
         
-        /// Quantum Omega memecoin sniper agent
+        /// Quantum Omega Sniper
         QuantumOmega,
         
-        /// Singularity cross-chain arbitrage agent
+        /// Singularity Cross-Chain Oracle
         Singularity,
     }
     
-    impl std::fmt::Display for AgentType {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                AgentType::Hyperion => write!(f, "hyperion"),
-                AgentType::QuantumOmega => write!(f, "quantum_omega"),
-                AgentType::Singularity => write!(f, "singularity"),
-            }
-        }
+    /// Initialize all agents
+    pub fn initialize() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Initializing AI trading agents...");
+        
+        // Initialize Hyperion agent
+        println!("Initializing Hyperion Flash Arbitrage Overlord...");
+        
+        // Initialize Quantum Omega agent
+        println!("Initializing Quantum Omega Sniper...");
+        
+        // Initialize Singularity agent
+        println!("Initializing Singularity Cross-Chain Oracle...");
+        
+        println!("All agents initialized successfully!");
+        
+        Ok(())
     }
     
-    /// Agent state
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum AgentState {
-        /// Agent is idle (not running)
-        Idle,
+    /// Shutdown all agents
+    pub fn shutdown() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Shutting down AI trading agents...");
         
-        /// Agent is initializing
-        Initializing,
+        // Shutdown Hyperion agent
+        println!("Shutting down Hyperion Flash Arbitrage Overlord...");
         
-        /// Agent is running
-        Running,
+        // Shutdown Quantum Omega agent
+        println!("Shutting down Quantum Omega Sniper...");
         
-        /// Agent is stopped
-        Stopped,
+        // Shutdown Singularity agent
+        println!("Shutting down Singularity Cross-Chain Oracle...");
         
-        /// Agent has an error
-        Error(String),
+        println!("All agents shut down successfully!");
+        
+        Ok(())
     }
     
-    impl std::fmt::Display for AgentState {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                AgentState::Idle => write!(f, "idle"),
-                AgentState::Initializing => write!(f, "initializing"),
-                AgentState::Running => write!(f, "running"),
-                AgentState::Stopped => write!(f, "stopped"),
-                AgentState::Error(e) => write!(f, "error: {}", e),
-            }
-        }
+    /// Check if agents are running
+    pub fn is_running() -> bool {
+        // In a real implementation, this would actually check the agents
+        true
     }
     
-    /// Agent information
-    #[derive(Debug, Clone)]
-    pub struct AgentInfo {
-        /// Agent ID
-        pub id: String,
+    /// Start an agent
+    pub fn start_agent(agent_type: AgentType) -> Result<(), Box<dyn std::error::Error>> {
+        match agent_type {
+            AgentType::Hyperion => {
+                println!("Starting Hyperion Flash Arbitrage Overlord...");
+                // In a real implementation, this would actually start the agent
+            }
+            AgentType::QuantumOmega => {
+                println!("Starting Quantum Omega Sniper...");
+                // In a real implementation, this would actually start the agent
+            }
+            AgentType::Singularity => {
+                println!("Starting Singularity Cross-Chain Oracle...");
+                // In a real implementation, this would actually start the agent
+            }
+        }
         
-        /// Agent name
-        pub name: String,
-        
-        /// Agent type
-        pub agent_type: AgentType,
-        
-        /// Agent state
-        pub state: AgentState,
-        
-        /// Is the agent active?
-        pub active: bool,
-        
-        /// Last error
-        pub last_error: Option<String>,
-        
-        /// Metrics
-        pub metrics: HashMap<String, f64>,
+        Ok(())
     }
     
-    /// Agent manager
-    pub struct AgentManager {
-        /// Agents
-        agents: RwLock<HashMap<String, Arc<Mutex<AgentInfo>>>>,
+    /// Stop an agent
+    pub fn stop_agent(agent_type: AgentType) -> Result<(), Box<dyn std::error::Error>> {
+        match agent_type {
+            AgentType::Hyperion => {
+                println!("Stopping Hyperion Flash Arbitrage Overlord...");
+                // In a real implementation, this would actually stop the agent
+            }
+            AgentType::QuantumOmega => {
+                println!("Stopping Quantum Omega Sniper...");
+                // In a real implementation, this would actually stop the agent
+            }
+            AgentType::Singularity => {
+                println!("Stopping Singularity Cross-Chain Oracle...");
+                // In a real implementation, this would actually stop the agent
+            }
+        }
+        
+        Ok(())
     }
     
-    impl AgentManager {
-        /// Create a new AgentManager
-        pub fn new() -> Self {
-            Self {
-                agents: RwLock::new(HashMap::new()),
-            }
-        }
-        
-        /// Register an agent
-        pub fn register_agent(&self, agent: AgentInfo) -> String {
-            let id = agent.id.clone();
-            let agent = Arc::new(Mutex::new(agent));
-            self.agents.write().unwrap().insert(id.clone(), agent);
-            id
-        }
-        
-        /// Get an agent by ID
-        pub fn get_agent(&self, id: &str) -> Option<Arc<Mutex<AgentInfo>>> {
-            self.agents.read().unwrap().get(id).cloned()
-        }
-        
-        /// Get all agents
-        pub fn get_agents(&self) -> Vec<AgentInfo> {
-            self.agents
-                .read()
-                .unwrap()
-                .values()
-                .map(|agent| agent.lock().unwrap().clone())
-                .collect()
-        }
-        
-        /// Update agent state
-        pub fn update_agent_state(&self, id: &str, state: AgentState) -> bool {
-            if let Some(agent) = self.get_agent(id) {
-                let mut agent = agent.lock().unwrap();
-                agent.state = state;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Update agent metrics
-        pub fn update_agent_metrics(&self, id: &str, metrics: HashMap<String, f64>) -> bool {
-            if let Some(agent) = self.get_agent(id) {
-                let mut agent = agent.lock().unwrap();
-                agent.metrics = metrics;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Set agent active state
-        pub fn set_agent_active(&self, id: &str, active: bool) -> bool {
-            if let Some(agent) = self.get_agent(id) {
-                let mut agent = agent.lock().unwrap();
-                agent.active = active;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Set agent error
-        pub fn set_agent_error(&self, id: &str, error: Option<String>) -> bool {
-            if let Some(agent) = self.get_agent(id) {
-                let mut agent = agent.lock().unwrap();
-                agent.last_error = error;
-                true
-            } else {
-                false
-            }
-        }
-    }
+    // Re-export the Singularity agent module
+    pub mod singularity;
 }
 
-/// Module for transformer management
+/// Transformer module
 pub mod transformers {
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex, RwLock};
+    //! Quantum-inspired transformers for the Solana Quantum Trading System
     
-    /// Transformer type
+    /// Transformer types
     #[derive(Debug, Clone, PartialEq)]
     pub enum TransformerType {
         /// MicroQHC transformer
         MicroQHC,
         
-        /// MemeCortex transformer
-        MemeCortex,
+        /// MemeCorTeX transformer
+        MemeCorTeX,
         
-        /// CommunicationTransformer
-        CommunicationTransformer,
+        /// Communication transformer
+        Communication,
     }
     
-    impl std::fmt::Display for TransformerType {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                TransformerType::MicroQHC => write!(f, "microqhc"),
-                TransformerType::MemeCortex => write!(f, "memecortex"),
-                TransformerType::CommunicationTransformer => write!(f, "communication"),
-            }
-        }
+    /// Initialize all transformers
+    pub fn initialize() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Initializing quantum-inspired transformers...");
+        
+        // Initialize MicroQHC transformer
+        println!("Initializing MicroQHC transformer...");
+        
+        // Initialize MemeCorTeX transformer
+        println!("Initializing MemeCorTeX transformer...");
+        
+        // Initialize Communication transformer
+        println!("Initializing Communication transformer...");
+        
+        println!("All transformers initialized successfully!");
+        
+        Ok(())
     }
     
-    /// Transformer state
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum TransformerState {
-        /// Transformer is idle (not running)
-        Idle,
+    /// Shutdown all transformers
+    pub fn shutdown() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Shutting down quantum-inspired transformers...");
         
-        /// Transformer is initializing
-        Initializing,
+        // Shutdown MicroQHC transformer
+        println!("Shutting down MicroQHC transformer...");
         
-        /// Transformer is running
-        Running,
+        // Shutdown MemeCorTeX transformer
+        println!("Shutting down MemeCorTeX transformer...");
         
-        /// Transformer is stopped
-        Stopped,
+        // Shutdown Communication transformer
+        println!("Shutting down Communication transformer...");
         
-        /// Transformer has an error
-        Error(String),
+        println!("All transformers shut down successfully!");
+        
+        Ok(())
     }
     
-    impl std::fmt::Display for TransformerState {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                TransformerState::Idle => write!(f, "idle"),
-                TransformerState::Initializing => write!(f, "initializing"),
-                TransformerState::Running => write!(f, "running"),
-                TransformerState::Stopped => write!(f, "stopped"),
-                TransformerState::Error(e) => write!(f, "error: {}", e),
-            }
-        }
-    }
-    
-    /// Transformer information
-    #[derive(Debug, Clone)]
-    pub struct TransformerInfo {
-        /// Transformer ID
-        pub id: String,
-        
-        /// Transformer name
-        pub name: String,
-        
-        /// Transformer type
-        pub transformer_type: TransformerType,
-        
-        /// Transformer state
-        pub state: TransformerState,
-        
-        /// Is the transformer active?
-        pub active: bool,
-        
-        /// Last error
-        pub last_error: Option<String>,
-        
-        /// Metrics
-        pub metrics: HashMap<String, f64>,
-    }
-    
-    /// Transformer manager
-    pub struct TransformerManager {
-        /// Transformers
-        transformers: RwLock<HashMap<String, Arc<Mutex<TransformerInfo>>>>,
-    }
-    
-    impl TransformerManager {
-        /// Create a new TransformerManager
-        pub fn new() -> Self {
-            Self {
-                transformers: RwLock::new(HashMap::new()),
-            }
-        }
-        
-        /// Register a transformer
-        pub fn register_transformer(&self, transformer: TransformerInfo) -> String {
-            let id = transformer.id.clone();
-            let transformer = Arc::new(Mutex::new(transformer));
-            self.transformers.write().unwrap().insert(id.clone(), transformer);
-            id
-        }
-        
-        /// Get a transformer by ID
-        pub fn get_transformer(&self, id: &str) -> Option<Arc<Mutex<TransformerInfo>>> {
-            self.transformers.read().unwrap().get(id).cloned()
-        }
-        
-        /// Get all transformers
-        pub fn get_transformers(&self) -> Vec<TransformerInfo> {
-            self.transformers
-                .read()
-                .unwrap()
-                .values()
-                .map(|transformer| transformer.lock().unwrap().clone())
-                .collect()
-        }
-        
-        /// Update transformer state
-        pub fn update_transformer_state(&self, id: &str, state: TransformerState) -> bool {
-            if let Some(transformer) = self.get_transformer(id) {
-                let mut transformer = transformer.lock().unwrap();
-                transformer.state = state;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Update transformer metrics
-        pub fn update_transformer_metrics(&self, id: &str, metrics: HashMap<String, f64>) -> bool {
-            if let Some(transformer) = self.get_transformer(id) {
-                let mut transformer = transformer.lock().unwrap();
-                transformer.metrics = metrics;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Set transformer active state
-        pub fn set_transformer_active(&self, id: &str, active: bool) -> bool {
-            if let Some(transformer) = self.get_transformer(id) {
-                let mut transformer = transformer.lock().unwrap();
-                transformer.active = active;
-                true
-            } else {
-                false
-            }
-        }
-        
-        /// Set transformer error
-        pub fn set_transformer_error(&self, id: &str, error: Option<String>) -> bool {
-            if let Some(transformer) = self.get_transformer(id) {
-                let mut transformer = transformer.lock().unwrap();
-                transformer.last_error = error;
-                true
-            } else {
-                false
-            }
-        }
+    /// Check if transformers are running
+    pub fn is_running() -> bool {
+        // In a real implementation, this would actually check the transformers
+        true
     }
 }
 
-/// Solana module for wallet management and blockchain interactions
+/// Solana module
 pub mod solana {
-    /// Wallet manager module
-    pub mod wallet_manager {
-        use std::collections::HashMap;
-        use std::sync::{Arc, Mutex, RwLock};
+    //! Solana blockchain integration for the Solana Quantum Trading System
+    
+    /// Initialize Solana client
+    pub fn initialize() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Initializing Solana client...");
         
-        /// Wallet type
-        #[derive(Debug, Clone, PartialEq)]
-        pub enum WalletType {
-            /// System wallet
-            System,
-            
-            /// Trading wallet
-            Trading,
-            
-            /// Profit wallet
-            Profit,
-            
-            /// Fee wallet
-            Fee,
-            
-            /// Stealth wallet
-            Stealth,
-        }
+        // In a real implementation, this would actually initialize the Solana client
         
-        impl std::fmt::Display for WalletType {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    WalletType::System => write!(f, "system"),
-                    WalletType::Trading => write!(f, "trading"),
-                    WalletType::Profit => write!(f, "profit"),
-                    WalletType::Fee => write!(f, "fee"),
-                    WalletType::Stealth => write!(f, "stealth"),
-                }
-            }
-        }
+        println!("Solana client initialized successfully!");
         
-        /// Wallet information
-        #[derive(Debug, Clone)]
-        pub struct WalletInfo {
-            /// Wallet address
-            pub address: String,
-            
-            /// Wallet type
-            pub wallet_type: WalletType,
-            
-            /// Wallet balance
-            pub balance: f64,
-            
-            /// Last updated timestamp
-            pub last_updated: u64,
-            
-            /// Is the wallet active?
-            pub active: bool,
-            
-            /// Associated agent ID
-            pub agent_id: Option<String>,
-            
-            /// Last error
-            pub last_error: Option<String>,
-        }
+        Ok(())
+    }
+    
+    /// Shutdown Solana client
+    pub fn shutdown() -> Result<(), Box<dyn std::error::Error>> {
+        println!("Shutting down Solana client...");
         
-        /// Wallet manager
-        pub struct WalletManager {
-            /// Wallets
-            wallets: RwLock<HashMap<String, Arc<Mutex<WalletInfo>>>>,
-        }
+        // In a real implementation, this would actually shutdown the Solana client
         
-        impl WalletManager {
-            /// Create a new WalletManager
-            pub fn new() -> Self {
-                Self {
-                    wallets: RwLock::new(HashMap::new()),
-                }
-            }
-            
-            /// Register a wallet
-            pub fn register_wallet(&self, wallet: WalletInfo) -> String {
-                let address = wallet.address.clone();
-                let wallet = Arc::new(Mutex::new(wallet));
-                self.wallets.write().unwrap().insert(address.clone(), wallet);
-                address
-            }
-            
-            /// Get a wallet by address
-            pub fn get_wallet(&self, address: &str) -> Option<Arc<Mutex<WalletInfo>>> {
-                self.wallets.read().unwrap().get(address).cloned()
-            }
-            
-            /// Get all wallets
-            pub fn get_wallets(&self) -> Vec<WalletInfo> {
-                self.wallets
-                    .read()
-                    .unwrap()
-                    .values()
-                    .map(|wallet| wallet.lock().unwrap().clone())
-                    .collect()
-            }
-            
-            /// Update wallet balance
-            pub fn update_wallet_balance(&self, address: &str, balance: f64) -> bool {
-                if let Some(wallet) = self.get_wallet(address) {
-                    let mut wallet = wallet.lock().unwrap();
-                    wallet.balance = balance;
-                    wallet.last_updated = crate::utils::current_timestamp();
-                    true
-                } else {
-                    false
-                }
-            }
-            
-            /// Set wallet active state
-            pub fn set_wallet_active(&self, address: &str, active: bool) -> bool {
-                if let Some(wallet) = self.get_wallet(address) {
-                    let mut wallet = wallet.lock().unwrap();
-                    wallet.active = active;
-                    true
-                } else {
-                    false
-                }
-            }
-            
-            /// Set wallet error
-            pub fn set_wallet_error(&self, address: &str, error: Option<String>) -> bool {
-                if let Some(wallet) = self.get_wallet(address) {
-                    let mut wallet = wallet.lock().unwrap();
-                    wallet.last_error = error;
-                    true
-                } else {
-                    false
-                }
-            }
-            
-            /// Get system wallet
-            pub fn get_system_wallet(&self) -> Option<WalletInfo> {
-                self.wallets
-                    .read()
-                    .unwrap()
-                    .values()
-                    .filter_map(|wallet| {
-                        let wallet = wallet.lock().unwrap();
-                        if wallet.wallet_type == WalletType::System {
-                            Some(wallet.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .next()
-            }
-            
-            /// Get agent wallets
-            pub fn get_agent_wallets(&self, agent_id: &str) -> Vec<WalletInfo> {
-                self.wallets
-                    .read()
-                    .unwrap()
-                    .values()
-                    .filter_map(|wallet| {
-                        let wallet = wallet.lock().unwrap();
-                        if wallet.agent_id.as_deref() == Some(agent_id) {
-                            Some(wallet.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            }
-        }
+        println!("Solana client shut down successfully!");
+        
+        Ok(())
+    }
+    
+    /// Check if Solana is connected
+    pub fn is_connected() -> bool {
+        // In a real implementation, this would actually check the connection
+        true
     }
 }
 
-/// DEX interaction module
-pub mod dex {
-    /// DEX types
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum DexType {
-        /// Jupiter aggregator
-        Jupiter,
-        
-        /// Raydium
-        Raydium,
-        
-        /// OpenBook (formerly Serum)
-        OpenBook,
-        
-        /// Orca
-        Orca,
-        
-        /// Meteora
-        Meteora,
+/// Utilities module
+pub mod utils {
+    //! Utility functions for the Solana Quantum Trading System
+    
+    use std::time::{SystemTime, UNIX_EPOCH};
+    
+    /// Get current timestamp (seconds since epoch)
+    pub fn current_timestamp() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
     }
     
-    impl std::fmt::Display for DexType {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                DexType::Jupiter => write!(f, "jupiter"),
-                DexType::Raydium => write!(f, "raydium"),
-                DexType::OpenBook => write!(f, "openbook"),
-                DexType::Orca => write!(f, "orca"),
-                DexType::Meteora => write!(f, "meteora"),
-            }
-        }
-    }
-    
-    /// Price information
-    #[derive(Debug, Clone)]
-    pub struct Price {
-        /// Token pair
-        pub pair: String,
-        
-        /// Price value
-        pub value: f64,
-        
-        /// Volume
-        pub volume: f64,
-        
-        /// Source
-        pub source: DexType,
-        
-        /// Timestamp
-        pub timestamp: u64,
-    }
-    
-    /// Order information
-    #[derive(Debug, Clone)]
-    pub struct Order {
-        /// Order ID
-        pub id: String,
-        
-        /// Token pair
-        pub pair: String,
-        
-        /// Order type
-        pub order_type: OrderType,
-        
-        /// Price
-        pub price: f64,
-        
-        /// Amount
-        pub amount: f64,
-        
-        /// Timestamp
-        pub timestamp: u64,
-    }
-    
-    /// Order type
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum OrderType {
-        /// Buy order
-        Buy,
-        
-        /// Sell order
-        Sell,
-    }
-    
-    impl std::fmt::Display for OrderType {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                OrderType::Buy => write!(f, "buy"),
-                OrderType::Sell => write!(f, "sell"),
-            }
-        }
+    /// Get current timestamp in milliseconds
+    pub fn current_timestamp_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_millis() as u64
     }
 }

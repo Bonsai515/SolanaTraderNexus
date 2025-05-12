@@ -1,81 +1,26 @@
-//! Singularity Cross-Chain Oracle
+//! Singularity Cross-Chain Agent
 //!
-//! The Singularity agent specializes in cross-chain arbitrage using Wormhole
-//! and other bridges to identify and execute profitable trading opportunities
-//! across multiple blockchains.
-
-pub mod strategy;
-pub mod scanner;
-pub mod executor;
-pub mod validator;
+//! This module implements the Singularity agent for cross-chain arbitrage.
+//! It coordinates the strategy, scanner, executor, and validator components
+//! to find and execute cross-chain arbitrage opportunities.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// Singularity agent configuration
-#[derive(Debug, Clone)]
-pub struct SingularityConfig {
-    /// ID of the agent instance
-    pub id: String,
-    
-    /// Operation mode
-    pub mode: OperationMode,
-    
-    /// Use system wallet
-    pub use_system_wallet: bool,
-    
-    /// Minimum profit percentage
-    pub min_profit_pct: f64,
-    
-    /// Maximum input amount
-    pub max_input: f64,
-    
-    /// Trading wallet address
-    pub trading_wallet: String,
-    
-    /// Profit wallet address
-    pub profit_wallet: String,
-    
-    /// Fee wallet address
-    pub fee_wallet: String,
-}
+mod strategy;
+mod scanner;
+mod executor;
+mod validator;
 
-/// Singularity operation mode
-#[derive(Debug, Clone, PartialEq)]
-pub enum OperationMode {
-    /// Scan only, no trades
-    ScanOnly,
-    
-    /// Dry run (simulate trades)
-    DryRun,
-    
-    /// Live trading with real funds
-    LiveTrading,
-}
+pub use strategy::{SingularityStrategy, StrategyParams};
+pub use scanner::{SingularityScanner, ScannerParams};
+pub use executor::{SingularityExecutor, ExecutorParams};
+pub use validator::{SingularityValidator, ValidatorParams, ValidationResult};
 
-impl std::fmt::Display for OperationMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OperationMode::ScanOnly => write!(f, "scan_only"),
-            OperationMode::DryRun => write!(f, "dry_run"),
-            OperationMode::LiveTrading => write!(f, "live_trading"),
-        }
-    }
-}
-
-impl From<&str> for OperationMode {
-    fn from(s: &str) -> Self {
-        match s {
-            "scan_only" => OperationMode::ScanOnly,
-            "live_trading" => OperationMode::LiveTrading,
-            _ => OperationMode::DryRun,
-        }
-    }
-}
-
-/// Chain type
-#[derive(Debug, Clone, PartialEq)]
+/// Chain types
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChainType {
     /// Solana
     Solana,
@@ -97,27 +42,23 @@ pub enum ChainType {
     
     /// Optimism
     Optimism,
-    
-    /// Base
-    Base,
 }
 
 impl std::fmt::Display for ChainType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChainType::Solana => write!(f, "solana"),
-            ChainType::Ethereum => write!(f, "ethereum"),
-            ChainType::BSC => write!(f, "bsc"),
-            ChainType::Polygon => write!(f, "polygon"),
-            ChainType::Avalanche => write!(f, "avalanche"),
-            ChainType::Arbitrum => write!(f, "arbitrum"),
-            ChainType::Optimism => write!(f, "optimism"),
-            ChainType::Base => write!(f, "base"),
+            ChainType::Solana => write!(f, "Solana"),
+            ChainType::Ethereum => write!(f, "Ethereum"),
+            ChainType::BSC => write!(f, "BSC"),
+            ChainType::Polygon => write!(f, "Polygon"),
+            ChainType::Avalanche => write!(f, "Avalanche"),
+            ChainType::Arbitrum => write!(f, "Arbitrum"),
+            ChainType::Optimism => write!(f, "Optimism"),
         }
     }
 }
 
-/// Cross-chain opportunity
+/// Cross-chain arbitrage opportunity
 #[derive(Debug, Clone)]
 pub struct CrossChainOpportunity {
     /// Opportunity ID
@@ -135,19 +76,19 @@ pub struct CrossChainOpportunity {
     /// Target token
     pub target_token: String,
     
-    /// Input amount
+    /// Input amount (in USD)
     pub input_amount: f64,
     
-    /// Output amount
+    /// Expected output amount (in USD)
     pub output_amount: f64,
     
-    /// Expected profit
+    /// Expected profit (in USD)
     pub expected_profit: f64,
     
     /// Profit percentage
     pub profit_pct: f64,
     
-    /// Total fees
+    /// Total fees (in USD)
     pub total_fees: f64,
     
     /// Source DEX
@@ -156,284 +97,493 @@ pub struct CrossChainOpportunity {
     /// Target DEX
     pub target_dex: String,
     
-    /// Bridge
+    /// Bridge to use
     pub bridge: String,
     
-    /// Detected timestamp
+    /// Detected at timestamp (seconds since epoch)
     pub detected_at: u64,
     
-    /// Expires at
+    /// Expires at timestamp (seconds since epoch)
     pub expires_at: u64,
     
-    /// Is validated
+    /// Whether the opportunity has been validated
     pub is_validated: bool,
     
     /// Additional metadata
     pub metadata: HashMap<String, String>,
 }
 
-/// Singularity agent state
+/// Execution result
 #[derive(Debug, Clone)]
-pub struct SingularityState {
+pub struct ExecutionResult {
+    /// Execution ID
+    pub id: String,
+    
+    /// Opportunity ID
+    pub opportunity_id: String,
+    
+    /// Success flag
+    pub success: bool,
+    
+    /// Input amount (in USD)
+    pub input_amount: f64,
+    
+    /// Actual output amount (in USD)
+    pub output_amount: f64,
+    
+    /// Profit (in USD)
+    pub profit: f64,
+    
+    /// Profit percentage
+    pub profit_pct: f64,
+    
+    /// Timestamp (seconds since epoch)
+    pub timestamp: u64,
+    
+    /// Transaction hashes
+    pub tx_hashes: HashMap<String, String>,
+    
+    /// Error message (if any)
+    pub error: Option<String>,
+    
+    /// Duration (in milliseconds)
+    pub duration_ms: u64,
+    
+    /// Source chain
+    pub source_chain: ChainType,
+    
+    /// Target chain
+    pub target_chain: ChainType,
+    
+    /// Source token
+    pub source_token: String,
+    
+    /// Target token
+    pub target_token: String,
+}
+
+/// Singularity agent configuration
+#[derive(Debug, Clone)]
+pub struct SingularityConfig {
+    /// Agent ID
+    pub id: String,
+    
+    /// Agent name
+    pub name: String,
+    
+    /// Trading wallet address
+    pub trading_wallet: String,
+    
+    /// Profit wallet address
+    pub profit_wallet: String,
+    
+    /// Fee wallet address
+    pub fee_wallet: String,
+    
+    /// Maximum input amount (in USD)
+    pub max_input: f64,
+    
+    /// Minimum profit percentage
+    pub min_profit_pct: f64,
+    
+    /// Gas price multiplier
+    pub gas_price_multiplier: f64,
+    
+    /// Scan interval (in seconds)
+    pub scan_interval: u64,
+    
+    /// Debug mode
+    pub debug_mode: bool,
+    
+    /// Active flag
+    pub active: bool,
+}
+
+impl Default for SingularityConfig {
+    fn default() -> Self {
+        Self {
+            id: "singularity_agent".to_string(),
+            name: "Singularity Cross-Chain Oracle".to_string(),
+            trading_wallet: "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb".to_string(),
+            profit_wallet: "6bLfHsp6eCFWZqGKZQaRwpVVLZRwKqcLt6QCKwLoxTqF".to_string(),
+            fee_wallet: "9aBt1zPRUZmxttZ6Mk9AAU6XGS1TLQMZkpbCNBLH2Y2z".to_string(),
+            max_input: 100.0,
+            min_profit_pct: 0.5,
+            gas_price_multiplier: 1.2,
+            scan_interval: 10,
+            debug_mode: false,
+            active: false,
+        }
+    }
+}
+
+/// Singularity agent for cross-chain arbitrage
+pub struct SingularityAgent {
     /// Configuration
-    pub config: SingularityConfig,
+    config: SingularityConfig,
     
-    /// Is running
-    pub is_running: bool,
+    /// Strategy component
+    strategy: Arc<Mutex<SingularityStrategy>>,
     
-    /// Start time
-    pub start_time: Option<u64>,
+    /// Scanner component
+    scanner: Arc<Mutex<SingularityScanner>>,
     
-    /// Last scan time
-    pub last_scan_time: Option<u64>,
+    /// Executor component
+    executor: Arc<Mutex<SingularityExecutor>>,
     
-    /// Number of scans
-    pub scan_count: u64,
-    
-    /// Number of opportunities detected
-    pub opportunity_count: u64,
-    
-    /// Number of executions
-    pub execution_count: u64,
-    
-    /// Number of successful executions
-    pub successful_executions: u64,
-    
-    /// Total profit
-    pub total_profit: f64,
-    
-    /// Last error
-    pub last_error: Option<String>,
+    /// Validator component
+    validator: Arc<Mutex<SingularityValidator>>,
     
     /// Current opportunities
-    pub current_opportunities: Vec<CrossChainOpportunity>,
+    opportunities: Arc<Mutex<Vec<CrossChainOpportunity>>>,
+    
+    /// Recent executions
+    executions: Arc<Mutex<Vec<ExecutionResult>>>,
+    
+    /// Agent status
+    status: Arc<Mutex<AgentStatus>>,
+    
+    /// Shutdown flag
+    shutdown: Arc<Mutex<bool>>,
+    
+    /// Agent thread handle
+    thread_handle: Option<thread::JoinHandle<()>>,
 }
 
-/// Singularity agent
-pub struct Singularity {
-    /// State
-    state: RwLock<SingularityState>,
+/// Agent status
+#[derive(Debug, Clone, PartialEq)]
+pub enum AgentStatus {
+    /// Stopped
+    Stopped,
     
-    /// Strategy
-    strategy: Arc<Mutex<strategy::SingularityStrategy>>,
+    /// Initializing
+    Initializing,
     
-    /// Scanner
-    scanner: Arc<Mutex<scanner::SingularityScanner>>,
+    /// Scanning
+    Scanning,
     
-    /// Executor
-    executor: Arc<Mutex<executor::SingularityExecutor>>,
+    /// Executing
+    Executing,
     
-    /// Validator
-    validator: Arc<Mutex<validator::SingularityValidator>>,
+    /// Running
+    Running,
+    
+    /// Error
+    Error(String),
 }
 
-impl Singularity {
+impl SingularityAgent {
     /// Create a new Singularity agent
     pub fn new(config: SingularityConfig) -> Self {
-        let state = SingularityState {
-            config: config.clone(),
-            is_running: false,
-            start_time: None,
-            last_scan_time: None,
-            scan_count: 0,
-            opportunity_count: 0,
-            execution_count: 0,
-            successful_executions: 0,
-            total_profit: 0.0,
-            last_error: None,
-            current_opportunities: Vec::new(),
-        };
-        
-        let strategy = Arc::new(Mutex::new(strategy::SingularityStrategy::new(config.clone())));
-        let scanner = Arc::new(Mutex::new(scanner::SingularityScanner::new(config.clone())));
-        let executor = Arc::new(Mutex::new(executor::SingularityExecutor::new(config.clone())));
-        let validator = Arc::new(Mutex::new(validator::SingularityValidator::new(config.clone())));
+        let strategy = Arc::new(Mutex::new(SingularityStrategy::new(config.clone())));
+        let scanner = Arc::new(Mutex::new(SingularityScanner::new(config.clone())));
+        let executor = Arc::new(Mutex::new(SingularityExecutor::new(config.clone())));
+        let validator = Arc::new(Mutex::new(SingularityValidator::new(config.clone())));
         
         Self {
-            state: RwLock::new(state),
+            config,
             strategy,
             scanner,
             executor,
             validator,
+            opportunities: Arc::new(Mutex::new(Vec::new())),
+            executions: Arc::new(Mutex::new(Vec::new())),
+            status: Arc::new(Mutex::new(AgentStatus::Stopped)),
+            shutdown: Arc::new(Mutex::new(false)),
+            thread_handle: None,
         }
-    }
-    
-    /// Get the current state
-    pub fn get_state(&self) -> SingularityState {
-        self.state.read().unwrap().clone()
     }
     
     /// Start the agent
-    pub fn start(&self) -> Result<(), String> {
-        let mut state = self.state.write().unwrap();
-        
-        if state.is_running {
-            return Err("Singularity agent is already running".to_string());
+    pub fn start(&mut self) -> Result<(), String> {
+        // Check if already running
+        {
+            let status = self.status.lock().unwrap();
+            if *status != AgentStatus::Stopped {
+                return Err("Agent is already running".to_string());
+            }
         }
         
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        // Reset shutdown flag
+        *self.shutdown.lock().unwrap() = false;
         
-        state.is_running = true;
-        state.start_time = Some(current_time);
-        state.last_scan_time = None;
+        // Update status to initializing
+        *self.status.lock().unwrap() = AgentStatus::Initializing;
         
-        // Initialize the strategy
-        self.strategy.lock().unwrap().initialize()?;
+        // Initialize components
+        {
+            let mut strategy = self.strategy.lock().unwrap();
+            strategy.initialize()?;
+        }
         
-        // Initialize the scanner
-        self.scanner.lock().unwrap().initialize()?;
+        {
+            let mut scanner = self.scanner.lock().unwrap();
+            scanner.initialize()?;
+        }
         
-        // Initialize the executor
-        self.executor.lock().unwrap().initialize()?;
+        {
+            let mut executor = self.executor.lock().unwrap();
+            executor.initialize()?;
+        }
         
-        // Initialize the validator
-        self.validator.lock().unwrap().initialize()?;
+        {
+            let mut validator = self.validator.lock().unwrap();
+            validator.initialize()?;
+        }
         
-        // Log that we've started
-        println!("Singularity agent started in {} mode", state.config.mode);
+        // Clone Arc references for the thread
+        let strategy = self.strategy.clone();
+        let scanner = self.scanner.clone();
+        let executor = self.executor.clone();
+        let validator = self.validator.clone();
+        let opportunities = self.opportunities.clone();
+        let executions = self.executions.clone();
+        let status = self.status.clone();
+        let shutdown = self.shutdown.clone();
+        let config = self.config.clone();
+        
+        // Start the agent thread
+        let thread_handle = thread::spawn(move || {
+            println!("Singularity agent thread started");
+            
+            *status.lock().unwrap() = AgentStatus::Running;
+            
+            let mut last_scan_time = 0;
+            
+            // Main agent loop
+            loop {
+                // Check shutdown flag
+                if *shutdown.lock().unwrap() {
+                    println!("Singularity agent thread shutting down");
+                    break;
+                }
+                
+                // Get current time
+                let current_time = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs();
+                
+                // Check if it's time to scan
+                if current_time - last_scan_time >= config.scan_interval {
+                    last_scan_time = current_time;
+                    
+                    // Scan for opportunities
+                    *status.lock().unwrap() = AgentStatus::Scanning;
+                    
+                    let new_opportunities = match scanner.lock().unwrap().scan() {
+                        Ok(opps) => opps,
+                        Err(e) => {
+                            println!("Error scanning for opportunities: {}", e);
+                            *status.lock().unwrap() = AgentStatus::Error(e);
+                            thread::sleep(Duration::from_secs(config.scan_interval));
+                            continue;
+                        }
+                    };
+                    
+                    // Validate opportunities
+                    let mut validated_opportunities = Vec::new();
+                    
+                    for opp in new_opportunities {
+                        match validator.lock().unwrap().validate(&opp) {
+                            Ok(result) => {
+                                if result.is_valid {
+                                    let mut validated_opp = opp.clone();
+                                    validated_opp.is_validated = true;
+                                    validated_opportunities.push(validated_opp);
+                                }
+                            }
+                            Err(e) => {
+                                println!("Error validating opportunity {}: {}", opp.id, e);
+                            }
+                        }
+                    }
+                    
+                    // Select opportunities to execute
+                    let selected_opportunities = match strategy.lock().unwrap().select_opportunities(&validated_opportunities) {
+                        Ok(opps) => opps,
+                        Err(e) => {
+                            println!("Error selecting opportunities: {}", e);
+                            *status.lock().unwrap() = AgentStatus::Error(e);
+                            thread::sleep(Duration::from_secs(config.scan_interval));
+                            continue;
+                        }
+                    };
+                    
+                    // Execute selected opportunities
+                    if !selected_opportunities.is_empty() {
+                        *status.lock().unwrap() = AgentStatus::Executing;
+                        
+                        for opp in &selected_opportunities {
+                            println!("Executing opportunity {}: {} -> {} ({:.2}%)", 
+                                opp.id, opp.source_chain, opp.target_chain, opp.profit_pct);
+                            
+                            match executor.lock().unwrap().execute(opp) {
+                                Ok(execution_id) => {
+                                    println!("Execution started: {}", execution_id);
+                                }
+                                Err(e) => {
+                                    println!("Error executing opportunity {}: {}", opp.id, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Update opportunities list
+                    *opportunities.lock().unwrap() = validated_opportunities.clone();
+                    
+                    // Get recent executions
+                    let recent_execs = executor.lock().unwrap().get_recent_executions(10);
+                    *executions.lock().unwrap() = recent_execs;
+                    
+                    // Update status to running
+                    *status.lock().unwrap() = AgentStatus::Running;
+                }
+                
+                // Sleep a bit to avoid hogging CPU
+                thread::sleep(Duration::from_millis(100));
+            }
+            
+            // Set status to stopped before exiting
+            *status.lock().unwrap() = AgentStatus::Stopped;
+            println!("Singularity agent thread stopped");
+        });
+        
+        self.thread_handle = Some(thread_handle);
+        self.config.active = true;
+        
+        println!("Singularity agent started");
         
         Ok(())
     }
     
     /// Stop the agent
-    pub fn stop(&self) -> Result<(), String> {
-        let mut state = self.state.write().unwrap();
-        
-        if !state.is_running {
-            return Err("Singularity agent is not running".to_string());
+    pub fn stop(&mut self) -> Result<(), String> {
+        // Check if already stopped
+        {
+            let status = self.status.lock().unwrap();
+            if *status == AgentStatus::Stopped {
+                return Err("Agent is already stopped".to_string());
+            }
         }
         
-        state.is_running = false;
+        // Set shutdown flag
+        *self.shutdown.lock().unwrap() = true;
         
-        // Clean up
-        self.strategy.lock().unwrap().shutdown()?;
-        self.scanner.lock().unwrap().shutdown()?;
-        self.executor.lock().unwrap().shutdown()?;
-        self.validator.lock().unwrap().shutdown()?;
+        // Wait for thread to finish
+        if let Some(handle) = self.thread_handle.take() {
+            match handle.join() {
+                Ok(_) => {
+                    println!("Singularity agent thread joined successfully");
+                }
+                Err(e) => {
+                    println!("Error joining Singularity agent thread: {:?}", e);
+                }
+            }
+        }
         
-        // Log that we've stopped
+        // Shutdown components
+        {
+            let mut strategy = self.strategy.lock().unwrap();
+            strategy.shutdown()?;
+        }
+        
+        {
+            let mut scanner = self.scanner.lock().unwrap();
+            scanner.shutdown()?;
+        }
+        
+        {
+            let mut executor = self.executor.lock().unwrap();
+            executor.shutdown()?;
+        }
+        
+        {
+            let mut validator = self.validator.lock().unwrap();
+            validator.shutdown()?;
+        }
+        
+        self.config.active = false;
+        
         println!("Singularity agent stopped");
         
         Ok(())
     }
     
-    /// Scan for opportunities
-    pub fn scan(&self) -> Result<Vec<CrossChainOpportunity>, String> {
-        let mut state = self.state.write().unwrap();
-        
-        if !state.is_running {
-            return Err("Singularity agent is not running".to_string());
-        }
-        
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        
-        state.last_scan_time = Some(current_time);
-        state.scan_count += 1;
-        
-        // Scan for opportunities
-        let opportunities = self.scanner.lock().unwrap().scan()?;
-        
-        // Update opportunity count
-        state.opportunity_count += opportunities.len() as u64;
-        
-        // Filter and validate opportunities
-        let mut valid_opportunities = Vec::new();
-        for opportunity in opportunities {
-            // Validate the opportunity
-            if self.validator.lock().unwrap().validate(&opportunity)? {
-                valid_opportunities.push(opportunity);
-            }
-        }
-        
-        // Update current opportunities
-        state.current_opportunities = valid_opportunities.clone();
-        
-        Ok(valid_opportunities)
+    /// Get agent status
+    pub fn get_status(&self) -> AgentStatus {
+        self.status.lock().unwrap().clone()
     }
     
-    /// Execute an opportunity
-    pub fn execute(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
-        let mut state = self.state.write().unwrap();
-        
-        if !state.is_running {
-            return Err("Singularity agent is not running".to_string());
-        }
-        
-        // Check operation mode
-        match state.config.mode {
-            OperationMode::ScanOnly => {
-                return Err("Cannot execute in scan-only mode".to_string());
-            }
-            OperationMode::DryRun => {
-                println!("Simulating execution of opportunity {}", opportunity.id);
-                
-                // In dry run mode, we just simulate the execution
-                state.execution_count += 1;
-                state.successful_executions += 1;
-                state.total_profit += opportunity.expected_profit;
-                
-                println!("Simulated profit: {} USDC", opportunity.expected_profit);
-                
-                Ok(opportunity.expected_profit)
-            }
-            OperationMode::LiveTrading => {
-                println!("Executing opportunity {}", opportunity.id);
-                
-                // In live trading mode, we actually execute the trade
-                let profit = self.executor.lock().unwrap().execute(opportunity)?;
-                
-                state.execution_count += 1;
-                state.successful_executions += 1;
-                state.total_profit += profit;
-                
-                println!("Actual profit: {} USDC", profit);
-                
-                Ok(profit)
-            }
-        }
+    /// Get current opportunities
+    pub fn get_opportunities(&self) -> Vec<CrossChainOpportunity> {
+        self.opportunities.lock().unwrap().clone()
     }
     
-    /// Run the agent in a loop
-    pub fn run_loop(&self) -> Result<(), String> {
-        self.start()?;
+    /// Get recent executions
+    pub fn get_executions(&self) -> Vec<ExecutionResult> {
+        self.executions.lock().unwrap().clone()
+    }
+    
+    /// Get agent configuration
+    pub fn get_config(&self) -> SingularityConfig {
+        self.config.clone()
+    }
+    
+    /// Update agent configuration
+    pub fn update_config(&mut self, config: SingularityConfig) -> Result<(), String> {
+        // Check if running
+        {
+            let status = self.status.lock().unwrap();
+            if *status != AgentStatus::Stopped {
+                return Err("Cannot update configuration while agent is running".to_string());
+            }
+        }
         
-        // Continue until stopped
-        while self.get_state().is_running {
-            // Scan for opportunities
-            let opportunities = self.scan()?;
+        self.config = config;
+        
+        Ok(())
+    }
+    
+    /// Get agent metrics
+    pub fn get_metrics(&self) -> HashMap<String, f64> {
+        let mut metrics = HashMap::new();
+        
+        // Add strategy metrics
+        if let Ok(strategy) = self.strategy.lock() {
+            for (key, value) in strategy.get_metrics() {
+                metrics.insert(format!("strategy_{}", key), value);
+            }
+        }
+        
+        // Add execution metrics
+        if let Ok(executions) = self.executions.lock() {
+            let total_executions = executions.len();
+            metrics.insert("total_executions".to_string(), total_executions as f64);
             
-            println!("Found {} cross-chain opportunities", opportunities.len());
+            let successful_executions = executions.iter().filter(|e| e.success).count();
+            metrics.insert("successful_executions".to_string(), successful_executions as f64);
             
-            // Apply strategy to select the best opportunities
-            let selected = self.strategy.lock().unwrap().select_opportunities(&opportunities)?;
+            if total_executions > 0 {
+                let success_rate = (successful_executions as f64) / (total_executions as f64) * 100.0;
+                metrics.insert("success_rate".to_string(), success_rate);
+            }
             
-            println!("Selected {} opportunities for execution", selected.len());
+            let total_profit: f64 = executions.iter().filter(|e| e.success).map(|e| e.profit).sum();
+            metrics.insert("total_profit".to_string(), total_profit);
             
-            // Execute each selected opportunity
-            for opportunity in selected {
-                match self.execute(&opportunity) {
-                    Ok(profit) => {
-                        println!("Successfully executed opportunity {} with profit: {} USDC", opportunity.id, profit);
-                    }
-                    Err(err) => {
-                        println!("Failed to execute opportunity {}: {}", opportunity.id, err);
-                        
-                        // Update the error in the state
-                        self.state.write().unwrap().last_error = Some(err);
+            if !executions.is_empty() {
+                if let Some(latest) = executions.first() {
+                    metrics.insert("latest_execution_timestamp".to_string(), latest.timestamp as f64);
+                    
+                    if latest.success {
+                        metrics.insert("latest_execution_profit".to_string(), latest.profit);
+                        metrics.insert("latest_execution_profit_pct".to_string(), latest.profit_pct);
                     }
                 }
             }
-            
-            // Sleep for 10 seconds before the next scan
-            std::thread::sleep(Duration::from_secs(10));
         }
         
-        Ok(())
+        metrics
     }
 }
