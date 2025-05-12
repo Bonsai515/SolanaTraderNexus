@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import signalMonitoring from './signalMonitoring';
 import transactionEngine from './transaction_engine';
 import quantumOmegaRouter from './agents/quantum_omega_router';
+import liveTradingRoutes from './routes/liveTradingRoutes';
 
 // Set the InstantNodes URLs for the 2-day trial
 process.env.INSTANT_NODES_RPC_URL = 'https://solana-grpc-geyser.instantnodes.io:443';
@@ -63,6 +64,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // API routes - register without '/api' prefix
 app.use('/', routes);
+
+// Live trading routes
+app.use('/api/live-trading', liveTradingRoutes);
 
 // Root endpoint is now included in the React app routes handler below
 
