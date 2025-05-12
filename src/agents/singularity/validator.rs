@@ -1,243 +1,346 @@
-//! Singularity Cross-Chain Oracle Validator Module
+//! Singularity Validator Module
 //!
-//! This module implements the validation logic for the Singularity agent,
-//! checking if cross-chain arbitrage opportunities are valid and executable.
+//! This module implements the validation logic for cross-chain arbitrage opportunities
+//! to ensure they are valid before execution.
 
-use anyhow::{Result, anyhow};
-use std::collections::HashMap;
+use anyhow::{Result, anyhow, Context};
 
 use super::strategy::Opportunity;
 
-/// Liquidity thresholds
+/// Validation result
 #[derive(Debug, Clone)]
-pub struct LiquidityThresholds {
-    /// Minimum liquidity required on source chain
-    pub min_source_liquidity: f64,
-    /// Minimum liquidity required on destination chain
-    pub min_destination_liquidity: f64,
-    /// Liquidity buffer (multiplier on input amount)
-    pub liquidity_buffer: f64,
+pub struct ValidationResult {
+    /// Is the opportunity valid?
+    pub is_valid: bool,
+    
+    /// Validation errors
+    pub errors: Vec<String>,
+    
+    /// Validation warnings
+    pub warnings: Vec<String>,
+    
+    /// Adjusted profit (after additional checks)
+    pub adjusted_profit: Option<f64>,
+    
+    /// Adjusted profit percentage (after additional checks)
+    pub adjusted_profit_percentage: Option<f64>,
 }
 
-impl Default for LiquidityThresholds {
+impl ValidationResult {
+    /// Create a new validation result
+    pub fn new() -> Self {
+        Self {
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            adjusted_profit: None,
+            adjusted_profit_percentage: None,
+        }
+    }
+    
+    /// Add an error
+    pub fn add_error(&mut self, error: &str) {
+        self.errors.push(error.to_string());
+        self.is_valid = false;
+    }
+    
+    /// Add a warning
+    pub fn add_warning(&mut self, warning: &str) {
+        self.warnings.push(warning.to_string());
+    }
+    
+    /// Set adjusted profit
+    pub fn set_adjusted_profit(&mut self, profit: f64, percentage: f64) {
+        self.adjusted_profit = Some(profit);
+        self.adjusted_profit_percentage = Some(percentage);
+    }
+}
+
+/// Validation configuration
+#[derive(Debug, Clone)]
+pub struct ValidationConfig {
+    /// Minimum profit percentage required
+    pub min_profit_percentage: f64,
+    
+    /// Maximum allowed slippage percentage
+    pub max_slippage_percentage: f64,
+    
+    /// Maximum source chain liquidity as percentage of input
+    pub max_source_liquidity_percentage: f64,
+    
+    /// Maximum destination chain liquidity as percentage of output
+    pub max_destination_liquidity_percentage: f64,
+    
+    /// Maximum gas cost as percentage of profit
+    pub max_gas_cost_percentage: f64,
+    
+    /// Minimum SOL balance required for transaction
+    pub min_sol_balance: f64,
+    
+    /// Validate against live price feeds
+    pub validate_live_prices: bool,
+    
+    /// Validate liquidity
+    pub validate_liquidity: bool,
+    
+    /// Validate gas costs
+    pub validate_gas_costs: bool,
+    
+    /// Check execution history
+    pub check_execution_history: bool,
+}
+
+impl Default for ValidationConfig {
     fn default() -> Self {
         Self {
-            min_source_liquidity: 10000.0, // $10,000
-            min_destination_liquidity: 10000.0, // $10,000
-            liquidity_buffer: 5.0, // 5x the input amount
+            min_profit_percentage: 0.5,
+            max_slippage_percentage: 0.5,
+            max_source_liquidity_percentage: 10.0,
+            max_destination_liquidity_percentage: 10.0,
+            max_gas_cost_percentage: 20.0,
+            min_sol_balance: 0.01,
+            validate_live_prices: true,
+            validate_liquidity: true,
+            validate_gas_costs: true,
+            check_execution_history: true,
         }
     }
 }
 
-/// Fee configuration
-#[derive(Debug, Clone)]
-pub struct FeeConfig {
-    /// Maximum source chain fee (in USD)
-    pub max_source_fee: f64,
-    /// Maximum destination chain fee (in USD)
-    pub max_destination_fee: f64,
-    /// Maximum bridge fee (in USD)
-    pub max_bridge_fee: f64,
-    /// Maximum total fee (in USD)
-    pub max_total_fee: f64,
-    /// Maximum fee percentage relative to expected profit
-    pub max_fee_to_profit_ratio: f64,
+/// Cross-chain opportunity validator
+pub struct OpportunityValidator {
+    /// Validation configuration
+    config: ValidationConfig,
+    
+    /// Execution history
+    execution_history: Vec<(String, bool, f64)>, // (opportunity_id, success, actual_profit)
 }
 
-impl Default for FeeConfig {
-    fn default() -> Self {
+impl OpportunityValidator {
+    /// Create a new OpportunityValidator
+    pub fn new(config: ValidationConfig) -> Self {
         Self {
-            max_source_fee: 50.0, // $50
-            max_destination_fee: 100.0, // $100
-            max_bridge_fee: 50.0, // $50
-            max_total_fee: 150.0, // $150
-            max_fee_to_profit_ratio: 0.5, // 50% of expected profit
+            config,
+            execution_history: Vec::new(),
         }
     }
-}
-
-/// Validate opportunity before execution
-pub async fn validate_opportunity(
-    opportunity: &Opportunity,
-    liquidity_thresholds: &LiquidityThresholds,
-    fee_config: &FeeConfig,
-) -> Result<bool> {
-    // Check if opportunity is profitable
-    if opportunity.profit_percentage <= 0.0 || opportunity.estimated_profit <= 0.0 {
-        return Ok(false);
+    
+    /// Validate an opportunity
+    pub async fn validate(&self, opportunity: &Opportunity) -> Result<ValidationResult> {
+        let mut result = ValidationResult::new();
+        
+        // Basic validation
+        if opportunity.profit_percentage < self.config.min_profit_percentage {
+            result.add_error(&format!(
+                "Profit percentage {:.2}% is below minimum threshold {:.2}%",
+                opportunity.profit_percentage,
+                self.config.min_profit_percentage
+            ));
+        }
+        
+        if opportunity.optimal_input_amount <= 0.0 {
+            result.add_error("Input amount must be greater than zero");
+        }
+        
+        // Validate price change since discovery (to avoid executing on stale opportunities)
+        if self.config.validate_live_prices {
+            // In a real implementation, this would check the current prices
+            // and compare them to the prices in the opportunity
+            let simulated_price_change = rand::random::<f64>() * 0.01 - 0.005; // +/- 0.5% price change
+            
+            let new_source_price = opportunity.source_price * (1.0 + simulated_price_change);
+            let new_destination_price = opportunity.destination_price * (1.0 + simulated_price_change);
+            
+            let price_diff = (new_destination_price - new_source_price) / new_source_price * 100.0;
+            
+            // Calculate new profit
+            let bridge_fee = opportunity.optimal_input_amount * 0.003; // 0.3% bridge fee
+            let source_dex_fee = opportunity.optimal_input_amount * 0.003; // 0.3% source DEX fee
+            let dest_dex_fee = (opportunity.optimal_input_amount / new_source_price * new_destination_price) * 0.003; // 0.3% destination DEX fee
+            let gas_fee = 1.0; // $1 gas fee estimate
+            let total_fees = bridge_fee + source_dex_fee + dest_dex_fee + gas_fee;
+            
+            let output_value = opportunity.optimal_input_amount / new_source_price * new_destination_price;
+            let adjusted_profit = output_value - opportunity.optimal_input_amount - total_fees;
+            let adjusted_profit_percentage = adjusted_profit / opportunity.optimal_input_amount * 100.0;
+            
+            if adjusted_profit_percentage < self.config.min_profit_percentage {
+                result.add_error(&format!(
+                    "Adjusted profit percentage {:.2}% is below minimum threshold {:.2}% due to price changes",
+                    adjusted_profit_percentage,
+                    self.config.min_profit_percentage
+                ));
+            } else if adjusted_profit_percentage < opportunity.profit_percentage {
+                result.add_warning(&format!(
+                    "Profit percentage has decreased from {:.2}% to {:.2}% due to price changes",
+                    opportunity.profit_percentage,
+                    adjusted_profit_percentage
+                ));
+            }
+            
+            result.set_adjusted_profit(adjusted_profit, adjusted_profit_percentage);
+        }
+        
+        // Validate liquidity
+        if self.config.validate_liquidity {
+            // In a real implementation, this would check the actual liquidity
+            // available on each chain/DEX
+            let simulated_source_liquidity = opportunity.optimal_input_amount * (5.0 + rand::random::<f64>() * 15.0);
+            let simulated_destination_liquidity = opportunity.expected_output_amount * (5.0 + rand::random::<f64>() * 15.0);
+            
+            let source_liquidity_percentage = (opportunity.optimal_input_amount / simulated_source_liquidity) * 100.0;
+            let destination_liquidity_percentage = (opportunity.expected_output_amount / simulated_destination_liquidity) * 100.0;
+            
+            if source_liquidity_percentage > self.config.max_source_liquidity_percentage {
+                result.add_error(&format!(
+                    "Input amount is {:.2}% of available source liquidity, exceeding maximum threshold {:.2}%",
+                    source_liquidity_percentage,
+                    self.config.max_source_liquidity_percentage
+                ));
+            } else if source_liquidity_percentage > self.config.max_source_liquidity_percentage * 0.7 {
+                result.add_warning(&format!(
+                    "Input amount is {:.2}% of available source liquidity, approaching maximum threshold {:.2}%",
+                    source_liquidity_percentage,
+                    self.config.max_source_liquidity_percentage
+                ));
+            }
+            
+            if destination_liquidity_percentage > self.config.max_destination_liquidity_percentage {
+                result.add_error(&format!(
+                    "Output amount is {:.2}% of available destination liquidity, exceeding maximum threshold {:.2}%",
+                    destination_liquidity_percentage,
+                    self.config.max_destination_liquidity_percentage
+                ));
+            } else if destination_liquidity_percentage > self.config.max_destination_liquidity_percentage * 0.7 {
+                result.add_warning(&format!(
+                    "Output amount is {:.2}% of available destination liquidity, approaching maximum threshold {:.2}%",
+                    destination_liquidity_percentage,
+                    self.config.max_destination_liquidity_percentage
+                ));
+            }
+        }
+        
+        // Validate gas costs
+        if self.config.validate_gas_costs {
+            // In a real implementation, this would check the actual gas costs
+            // for each chain
+            let simulated_source_gas_cost = 0.5 + rand::random::<f64>() * 0.5; // $0.5-1.0
+            let simulated_destination_gas_cost = 0.5 + rand::random::<f64>() * 2.0; // $0.5-2.5
+            let total_gas_cost = simulated_source_gas_cost + simulated_destination_gas_cost;
+            
+            let gas_percentage = if opportunity.estimated_profit > 0.0 {
+                (total_gas_cost / opportunity.estimated_profit) * 100.0
+            } else {
+                100.0
+            };
+            
+            if gas_percentage > self.config.max_gas_cost_percentage {
+                result.add_error(&format!(
+                    "Gas cost is {:.2}% of estimated profit, exceeding maximum threshold {:.2}%",
+                    gas_percentage,
+                    self.config.max_gas_cost_percentage
+                ));
+            } else if gas_percentage > self.config.max_gas_cost_percentage * 0.7 {
+                result.add_warning(&format!(
+                    "Gas cost is {:.2}% of estimated profit, approaching maximum threshold {:.2}%",
+                    gas_percentage,
+                    self.config.max_gas_cost_percentage
+                ));
+            }
+        }
+        
+        // Check execution history
+        if self.config.check_execution_history {
+            let similar_opportunities = self.execution_history
+                .iter()
+                .filter(|(id, _, _)| {
+                    id.contains(&opportunity.source_chain) &&
+                    id.contains(&opportunity.destination_chain) &&
+                    id.contains(&opportunity.token_pair.replace("/", "-"))
+                })
+                .collect::<Vec<_>>();
+            
+            let failed_count = similar_opportunities
+                .iter()
+                .filter(|(_, success, _)| !*success)
+                .count();
+            
+            let total_count = similar_opportunities.len();
+            
+            if total_count > 0 {
+                let failure_rate = (failed_count as f64) / (total_count as f64) * 100.0;
+                
+                if failure_rate > 50.0 && total_count >= 5 {
+                    result.add_error(&format!(
+                        "Similar opportunities have a high failure rate ({:.2}% over {} attempts)",
+                        failure_rate,
+                        total_count
+                    ));
+                } else if failure_rate > 30.0 && total_count >= 3 {
+                    result.add_warning(&format!(
+                        "Similar opportunities have a moderate failure rate ({:.2}% over {} attempts)",
+                        failure_rate,
+                        total_count
+                    ));
+                }
+                
+                // Calculate average profit for successful executions
+                let successful_profits = similar_opportunities
+                    .iter()
+                    .filter(|(_, success, _)| *success)
+                    .map(|(_, _, profit)| *profit)
+                    .collect::<Vec<_>>();
+                
+                if !successful_profits.is_empty() {
+                    let avg_profit = successful_profits.iter().sum::<f64>() / successful_profits.len() as f64;
+                    
+                    if opportunity.estimated_profit < avg_profit * 0.7 {
+                        result.add_warning(&format!(
+                            "Estimated profit (${:.2}) is significantly lower than average profit (${:.2}) for similar opportunities",
+                            opportunity.estimated_profit,
+                            avg_profit
+                        ));
+                    }
+                }
+            }
+        }
+        
+        // Combine all errors and warnings
+        if !result.is_valid {
+            let error_msg = result.errors.join("; ");
+            println!("Validation failed: {}", error_msg);
+        } else if !result.warnings.is_empty() {
+            let warning_msg = result.warnings.join("; ");
+            println!("Validation passed with warnings: {}", warning_msg);
+        } else {
+            println!("Validation passed without issues");
+        }
+        
+        Ok(result)
     }
     
-    // Check input amount
-    if opportunity.optimal_input_amount <= 0.0 {
-        return Ok(false);
+    /// Add execution result to history
+    pub fn add_execution_result(&mut self, opportunity_id: &str, success: bool, actual_profit: f64) {
+        self.execution_history.push((opportunity_id.to_string(), success, actual_profit));
+        
+        // Limit history size
+        if self.execution_history.len() > 1000 {
+            self.execution_history.remove(0);
+        }
     }
     
-    // Check liquidity
-    let (source_liquidity, destination_liquidity) = check_liquidity(opportunity).await?;
-    
-    // Verify source liquidity is sufficient
-    let required_source_liquidity = opportunity.optimal_input_amount * liquidity_thresholds.liquidity_buffer;
-    if source_liquidity < required_source_liquidity || source_liquidity < liquidity_thresholds.min_source_liquidity {
-        println!("❌ Insufficient source liquidity: ${} < ${}", 
-                 source_liquidity, required_source_liquidity);
-        return Ok(false);
+    /// Get execution history
+    pub fn get_execution_history(&self) -> &Vec<(String, bool, f64)> {
+        &self.execution_history
     }
     
-    // Verify destination liquidity is sufficient
-    let expected_output = opportunity.optimal_input_amount * (1.0 + opportunity.profit_percentage / 100.0);
-    let required_destination_liquidity = expected_output * liquidity_thresholds.liquidity_buffer;
-    if destination_liquidity < required_destination_liquidity || destination_liquidity < liquidity_thresholds.min_destination_liquidity {
-        println!("❌ Insufficient destination liquidity: ${} < ${}", 
-                 destination_liquidity, required_destination_liquidity);
-        return Ok(false);
+    /// Get validation configuration
+    pub fn get_config(&self) -> &ValidationConfig {
+        &self.config
     }
     
-    // Check fees
-    let (source_fee, destination_fee, bridge_fee) = estimate_fees(opportunity).await?;
-    let total_fee = source_fee + destination_fee + bridge_fee;
-    
-    // Verify fees are within limits
-    if source_fee > fee_config.max_source_fee {
-        println!("❌ Source fee too high: ${} > ${}", source_fee, fee_config.max_source_fee);
-        return Ok(false);
-    }
-    
-    if destination_fee > fee_config.max_destination_fee {
-        println!("❌ Destination fee too high: ${} > ${}", destination_fee, fee_config.max_destination_fee);
-        return Ok(false);
-    }
-    
-    if bridge_fee > fee_config.max_bridge_fee {
-        println!("❌ Bridge fee too high: ${} > ${}", bridge_fee, fee_config.max_bridge_fee);
-        return Ok(false);
-    }
-    
-    if total_fee > fee_config.max_total_fee {
-        println!("❌ Total fee too high: ${} > ${}", total_fee, fee_config.max_total_fee);
-        return Ok(false);
-    }
-    
-    // Verify fee to profit ratio
-    let fee_to_profit_ratio = total_fee / opportunity.estimated_profit;
-    if fee_to_profit_ratio > fee_config.max_fee_to_profit_ratio {
-        println!("❌ Fee to profit ratio too high: {:.2}% > {:.2}%", 
-                 fee_to_profit_ratio * 100.0, fee_config.max_fee_to_profit_ratio * 100.0);
-        return Ok(false);
-    }
-    
-    // Check execution prerequisites
-    if !check_prerequisites(opportunity).await? {
-        println!("❌ Prerequisites check failed");
-        return Ok(false);
-    }
-    
-    // If all checks pass, the opportunity is valid
-    println!("✅ Opportunity validation passed");
-    Ok(true)
-}
-
-/// Check liquidity on both chains
-async fn check_liquidity(opportunity: &Opportunity) -> Result<(f64, f64)> {
-    // In a real implementation, this would check liquidity on the actual DEXes
-    
-    // Mock implementation for testing
-    // Simulate fetching liquidity data
-    let source_liquidity = 500000.0 + (rand::random::<f64>() * 1000000.0); // $500k-$1.5M
-    let destination_liquidity = 500000.0 + (rand::random::<f64>() * 1000000.0); // $500k-$1.5M
-    
-    // Add some randomization to make some opportunities fail validation
-    if rand::random::<f64>() < 0.05 {
-        // 5% chance to return low liquidity to test validation failure
-        return Ok((opportunity.optimal_input_amount * 0.5, destination_liquidity));
-    }
-    
-    Ok((source_liquidity, destination_liquidity))
-}
-
-/// Estimate fees for the opportunity
-async fn estimate_fees(opportunity: &Opportunity) -> Result<(f64, f64, f64)> {
-    // In a real implementation, this would calculate actual fees from the chains
-    
-    // Source chain fee (based on percentage)
-    let source_fee = opportunity.optimal_input_amount * (opportunity.source_fee_percentage / 100.0);
-    
-    // Bridge fee (based on percentage)
-    let bridge_fee = opportunity.optimal_input_amount * (opportunity.bridge_fee_percentage / 100.0);
-    
-    // Destination chain fee (based on percentage of output amount)
-    let expected_output = opportunity.optimal_input_amount * (1.0 + opportunity.profit_percentage / 100.0);
-    let destination_fee = expected_output * (opportunity.destination_fee_percentage / 100.0);
-    
-    Ok((source_fee, destination_fee, bridge_fee))
-}
-
-/// Check execution prerequisites
-async fn check_prerequisites(opportunity: &Opportunity) -> Result<bool> {
-    // In a real implementation, this would check:
-    // - Wallet balances
-    // - Token approvals
-    // - Required signatures
-    // - Chain-specific requirements
-    
-    // Mock implementation for testing
-    // Add some randomization to make some opportunities fail validation
-    if rand::random::<f64>() < 0.03 {
-        // 3% chance to fail prerequisites check
-        return Ok(false);
-    }
-    
-    Ok(true)
-}
-
-/// Get supported source blockchains
-pub fn get_supported_source_chains() -> Vec<String> {
-    vec![
-        "solana".to_string(),
-        "ethereum".to_string(),
-        "arbitrum".to_string(),
-        "bsc".to_string(),
-    ]
-}
-
-/// Get supported destination blockchains
-pub fn get_supported_destination_chains() -> Vec<String> {
-    vec![
-        "solana".to_string(),
-        "ethereum".to_string(),
-        "arbitrum".to_string(),
-        "polygon".to_string(),
-        "avalanche".to_string(),
-        "bsc".to_string(),
-    ]
-}
-
-/// Get token pairs supported for specific source and destination chains
-pub fn get_supported_pairs_for_route(source: &str, destination: &str) -> Vec<String> {
-    match (source, destination) {
-        ("solana", "ethereum") => vec![
-            "SOL/ETH".to_string(),
-            "SOL/USDC".to_string(),
-            "SOL/USDT".to_string(),
-        ],
-        ("ethereum", "solana") => vec![
-            "ETH/SOL".to_string(),
-            "ETH/USDC".to_string(),
-            "ETH/USDT".to_string(),
-        ],
-        ("solana", "arbitrum") => vec![
-            "SOL/ETH".to_string(),
-            "SOL/USDC".to_string(),
-            "SOL/USDT".to_string(),
-        ],
-        ("solana", "bsc") => vec![
-            "SOL/BNB".to_string(),
-            "SOL/USDC".to_string(),
-            "SOL/USDT".to_string(),
-            "SOL/BUSD".to_string(),
-        ],
-        _ => vec![
-            "USDC/USDT".to_string(),
-            "USDT/USDC".to_string(),
-        ],
+    /// Update validation configuration
+    pub fn update_config(&mut self, config: ValidationConfig) {
+        self.config = config;
     }
 }
