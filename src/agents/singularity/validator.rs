@@ -1,402 +1,432 @@
-//! Singularity Cross-Chain Validator
+//! Singularity Cross-Chain Oracle Validator
 //!
-//! This module implements the validation component for the Singularity agent,
-//! which is responsible for validating cross-chain arbitrage opportunities.
+//! This module implements the validator component of the Singularity agent,
+//! responsible for validating cross-chain arbitrage opportunities.
 
-use super::{SingularityConfig, CrossChainOpportunity, ChainType};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::error::Error;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-/// Singularity validator for cross-chain opportunities
-pub struct SingularityValidator {
-    /// Configuration
-    config: SingularityConfig,
-    
-    /// Validator parameters
-    params: ValidatorParams,
-    
-    /// Is initialized
-    is_initialized: bool,
-    
-    /// Validation history
-    validation_history: HashMap<String, ValidationResult>,
-    
-    /// API keys
-    api_keys: HashMap<String, String>,
-}
+use crate::agents::singularity::strategy::{Chain, CrossChainOpportunity, PathStep};
+use crate::utils::current_timestamp;
 
-/// Validation result
+// Validation result structure
 #[derive(Debug, Clone)]
 pub struct ValidationResult {
-    /// Opportunity ID
     pub opportunity_id: String,
-    
-    /// Is valid
-    pub is_valid: bool,
-    
-    /// Validation timestamp
+    pub valid: bool,
+    pub reasons: Vec<String>,
     pub timestamp: u64,
-    
-    /// Confidence score (0-100)
-    pub confidence_score: u8,
-    
-    /// Validation checks
-    pub checks: Vec<ValidationCheck>,
-    
-    /// Error message (if any)
-    pub error: Option<String>,
-    
-    /// Additional metadata
-    pub metadata: HashMap<String, String>,
+    pub validation_time_ms: u64,
+    pub validator_version: String,
+    pub adjusted_profit: Option<f64>,
+    pub adjusted_profit_percentage: Option<f64>,
+    pub confidence: f64,
+    pub execution_priority: u8,
+    pub risk_level: RiskLevel,
 }
 
-/// Validation check
-#[derive(Debug, Clone)]
-pub struct ValidationCheck {
-    /// Check name
-    pub name: String,
-    
-    /// Check result
-    pub result: bool,
-    
-    /// Check details
-    pub details: String,
+// Risk level enum
+#[derive(Debug, Clone, PartialEq)]
+pub enum RiskLevel {
+    Low,
+    Medium,
+    High,
+    VeryHigh,
 }
 
-/// Validator parameters
+// Validator configuration
 #[derive(Debug, Clone)]
-pub struct ValidatorParams {
-    /// Minimum confidence score to consider valid (0-100)
-    pub min_confidence_score: u8,
-    
-    /// Maximum validation age (in seconds)
-    pub max_validation_age: u64,
-    
-    /// Maximum parallel validations
-    pub max_parallel_validations: usize,
-    
-    /// Minimum profit threshold for validation (in percentage)
+pub struct ValidatorConfig {
     pub min_profit_threshold: f64,
-    
-    /// Perform liquidity check
-    pub perform_liquidity_check: bool,
-    
-    /// Check bridge status
-    pub check_bridge_status: bool,
-    
-    /// Verify token pairs
-    pub verify_token_pairs: bool,
-    
-    /// Check price impact
-    pub check_price_impact: bool,
-    
-    /// Re-validate after time (in seconds)
-    pub revalidate_after: u64,
+    pub max_allowed_slippage: f64,
+    pub max_validation_time: Duration,
+    pub min_confidence_threshold: f64,
+    pub liquidity_threshold: f64,
+    pub enabled_chain_pairs: Vec<(Chain, Chain)>,
+    pub price_verification_sources: HashMap<Chain, Vec<String>>,
+    pub verification_depth: usize,
+    pub verification_retries: usize,
+    pub use_on_chain_verification: bool,
+    pub use_dex_verification: bool,
+    pub use_cex_verification: bool,
+    pub verify_asset_reserves: bool,
+    pub verify_token_contract: bool,
+    pub verify_dex_contract: bool,
+    pub max_gas_percentage: f64,
+    pub max_route_hops: usize,
+    pub flash_loan_verification: bool,
+    pub verify_wormhole_bridge: bool,
 }
 
-impl Default for ValidatorParams {
+impl Default for ValidatorConfig {
     fn default() -> Self {
+        let mut price_verification_sources = HashMap::new();
+        
+        price_verification_sources.insert(
+            Chain::Solana,
+            vec![
+                "CoinGecko".to_string(),
+                "CoinMarketCap".to_string(),
+                "Birdeye".to_string(),
+                "DexScreener".to_string(),
+                "Jupiter".to_string(),
+                "Raydium".to_string(),
+                "Orca".to_string(),
+            ],
+        );
+        
+        price_verification_sources.insert(
+            Chain::Ethereum,
+            vec![
+                "CoinGecko".to_string(),
+                "CoinMarketCap".to_string(),
+                "DexScreener".to_string(),
+                "Uniswap".to_string(),
+                "SushiSwap".to_string(),
+                "1inch".to_string(),
+                "Chainlink".to_string(),
+            ],
+        );
+        
+        price_verification_sources.insert(
+            Chain::BinanceSmartChain,
+            vec![
+                "CoinGecko".to_string(),
+                "CoinMarketCap".to_string(),
+                "DexScreener".to_string(),
+                "PancakeSwap".to_string(),
+                "BakerySwap".to_string(),
+                "BiSwap".to_string(),
+                "1inch".to_string(),
+            ],
+        );
+        
+        price_verification_sources.insert(
+            Chain::Avalanche,
+            vec![
+                "CoinGecko".to_string(),
+                "CoinMarketCap".to_string(),
+                "DexScreener".to_string(),
+                "Trader Joe".to_string(),
+                "Pangolin".to_string(),
+                "1inch".to_string(),
+                "GMX".to_string(),
+            ],
+        );
+        
         Self {
-            min_confidence_score: 80, // 80% confidence required
-            max_validation_age: 60, // 60 seconds max age
-            max_parallel_validations: 5,
-            min_profit_threshold: 0.5, // 0.5% minimum profit
-            perform_liquidity_check: true,
-            check_bridge_status: true,
-            verify_token_pairs: true,
-            check_price_impact: true,
-            revalidate_after: 30, // 30 seconds
+            min_profit_threshold: 0.5,
+            max_allowed_slippage: 2.0,
+            max_validation_time: Duration::from_millis(500),
+            min_confidence_threshold: 0.8,
+            liquidity_threshold: 10000.0,
+            enabled_chain_pairs: vec![
+                (Chain::Solana, Chain::Ethereum),
+                (Chain::Solana, Chain::BinanceSmartChain),
+                (Chain::Solana, Chain::Avalanche),
+                (Chain::Ethereum, Chain::BinanceSmartChain),
+                (Chain::Ethereum, Chain::Avalanche),
+                (Chain::BinanceSmartChain, Chain::Avalanche),
+                (Chain::Solana, Chain::Polygon),
+                (Chain::Ethereum, Chain::Polygon),
+                (Chain::BinanceSmartChain, Chain::Polygon),
+                (Chain::Avalanche, Chain::Polygon),
+                (Chain::Solana, Chain::Arbitrum),
+                (Chain::Ethereum, Chain::Arbitrum),
+                (Chain::Solana, Chain::Optimism),
+                (Chain::Ethereum, Chain::Optimism),
+            ],
+            price_verification_sources,
+            verification_depth: 3,
+            verification_retries: 2,
+            use_on_chain_verification: true,
+            use_dex_verification: true,
+            use_cex_verification: true,
+            verify_asset_reserves: true,
+            verify_token_contract: true,
+            verify_dex_contract: true,
+            max_gas_percentage: 20.0,
+            max_route_hops: 5,
+            flash_loan_verification: true,
+            verify_wormhole_bridge: true,
         }
     }
 }
 
-impl SingularityValidator {
-    /// Create a new validator
-    pub fn new(config: SingularityConfig) -> Self {
+// Price verification result
+#[derive(Debug, Clone)]
+pub struct PriceVerificationResult {
+    pub token: String,
+    pub chain: Chain,
+    pub source: String,
+    pub price_usd: f64,
+    pub timestamp: u64,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+// Validator instance
+pub struct Validator {
+    config: ValidatorConfig,
+    validation_history: Arc<Mutex<HashMap<String, ValidationResult>>>,
+    latest_prices: Arc<Mutex<HashMap<(Chain, String), Vec<PriceVerificationResult>>>>,
+    active: bool,
+    validation_count: usize,
+}
+
+impl Validator {
+    pub fn new(config: ValidatorConfig) -> Self {
         Self {
             config,
-            params: ValidatorParams::default(),
-            is_initialized: false,
-            validation_history: HashMap::new(),
-            api_keys: HashMap::new(),
+            validation_history: Arc::new(Mutex::new(HashMap::new())),
+            latest_prices: Arc::new(Mutex::new(HashMap::new())),
+            active: false,
+            validation_count: 0,
         }
     }
     
-    /// Initialize the validator
-    pub fn initialize(&mut self) -> Result<(), String> {
-        if self.is_initialized {
-            return Err("Validator already initialized".to_string());
-        }
+    pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Starting Singularity cross-chain validator...");
+        self.active = true;
         
-        // Load API keys from environment variables
-        self.load_api_keys();
-        
-        // Initialize validation history
-        self.validation_history.clear();
-        
-        self.is_initialized = true;
-        println!("Singularity validator initialized");
+        // In a real implementation, this would start a background thread for validation
         
         Ok(())
     }
     
-    /// Load API keys from environment variables
-    fn load_api_keys(&mut self) {
-        // Try to load environment variables for different APIs
+    pub fn stop(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Stopping Singularity cross-chain validator...");
+        self.active = false;
         
-        // Wormhole API key
-        if let Ok(key) = std::env::var("WORMHOLE_API_KEY") {
-            self.api_keys.insert("wormhole".to_string(), key);
-            println!("Loaded Wormhole API key for cross-chain validation");
-        } else {
-            println!("Wormhole API key not found in environment variables");
-        }
-        
-        // Helius API key (for Solana)
-        if let Ok(key) = std::env::var("HELIUS_API_KEY") {
-            self.api_keys.insert("helius".to_string(), key);
-            println!("Loaded Helius API key for Solana validation");
-        } else {
-            println!("Helius API key not found in environment variables");
-        }
-        
-        // Solana RPC URL
-        if let Ok(key) = std::env::var("INSTANT_NODES_RPC_URL") {
-            self.api_keys.insert("solana_rpc".to_string(), key);
-            println!("Loaded Solana RPC URL for validation");
-        } else {
-            println!("Solana RPC URL not found in environment variables");
-        }
-    }
-    
-    /// Shutdown the validator
-    pub fn shutdown(&mut self) -> Result<(), String> {
-        if !self.is_initialized {
-            return Err("Validator not initialized".to_string());
-        }
-        
-        self.is_initialized = false;
-        println!("Singularity validator shutdown complete");
+        // In a real implementation, this would stop the background thread
         
         Ok(())
     }
     
-    /// Update validator parameters
-    pub fn update_params(&mut self, params: ValidatorParams) {
-        self.params = params;
-        println!("Singularity validator parameters updated");
+    pub fn is_active(&self) -> bool {
+        self.active
     }
     
-    /// Validate a cross-chain opportunity
-    pub fn validate(&mut self, opportunity: &CrossChainOpportunity) -> Result<ValidationResult, String> {
-        if !self.is_initialized {
-            return Err("Validator not initialized".to_string());
+    pub fn get_validation_count(&self) -> usize {
+        self.validation_count
+    }
+    
+    pub fn validate_opportunity(&mut self, opportunity: &CrossChainOpportunity) -> Result<ValidationResult, Box<dyn Error>> {
+        if !self.active {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Validator is not active",
+            )));
         }
         
-        // Check if we already have a recent validation for this opportunity
-        if let Some(result) = self.validation_history.get(&opportunity.id) {
-            let current_time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs();
-            
-            // If the validation is recent enough, return it
-            if current_time - result.timestamp < self.params.revalidate_after {
-                return Ok(result.clone());
-            }
+        println!("Validating cross-chain opportunity {}...", opportunity.id);
+        
+        let start_time = std::time::Instant::now();
+        self.validation_count += 1;
+        
+        // Validate the opportunity
+        let mut reasons = Vec::new();
+        let mut valid = true;
+        let mut adjusted_profit = opportunity.net_profit;
+        let mut adjusted_profit_percentage = opportunity.profit_percentage;
+        let mut confidence = opportunity.confidence;
+        
+        // Check if the chain pair is enabled
+        let chain_pair = (opportunity.source_chain.clone(), opportunity.target_chain.clone());
+        if !self.config.enabled_chain_pairs.contains(&chain_pair) {
+            valid = false;
+            reasons.push(format!("Chain pair {:?} -> {:?} is not enabled",
+                opportunity.source_chain, opportunity.target_chain));
         }
         
-        // Perform validation checks
-        let mut checks: Vec<ValidationCheck> = Vec::new();
-        
-        // Check 1: Profit threshold
-        let profit_check = ValidationCheck {
-            name: "profit_threshold".to_string(),
-            result: opportunity.profit_pct >= self.params.min_profit_threshold,
-            details: format!("Profit: {:.2}%, Threshold: {:.2}%", 
-                opportunity.profit_pct, self.params.min_profit_threshold),
-        };
-        checks.push(profit_check);
-        
-        // Check 2: Expiry time check
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        
-        let expiry_check = ValidationCheck {
-            name: "expiry_time".to_string(),
-            result: opportunity.expires_at > current_time,
-            details: format!("Expires in {} seconds", 
-                opportunity.expires_at.saturating_sub(current_time)),
-        };
-        checks.push(expiry_check);
-        
-        // Check 3: Liquidity check (if enabled)
-        if self.params.perform_liquidity_check {
-            let liquidity_check = self.check_liquidity(opportunity)?;
-            checks.push(liquidity_check);
+        // Check if the profit is above the minimum threshold
+        if opportunity.profit_percentage < self.config.min_profit_threshold {
+            valid = false;
+            reasons.push(format!("Profit percentage ({:.2}%) is below minimum threshold ({:.2}%)",
+                opportunity.profit_percentage, self.config.min_profit_threshold));
         }
         
-        // Check 4: Bridge status check (if enabled)
-        if self.params.check_bridge_status {
-            let bridge_check = self.check_bridge_status(opportunity)?;
-            checks.push(bridge_check);
+        // Check if the route has too many hops
+        if opportunity.route.len() > self.config.max_route_hops {
+            valid = false;
+            reasons.push(format!("Route has too many hops ({} > {})",
+                opportunity.route.len(), self.config.max_route_hops));
         }
         
-        // Check 5: Token pair verification (if enabled)
-        if self.params.verify_token_pairs {
-            let pair_check = self.verify_token_pairs(opportunity)?;
-            checks.push(pair_check);
+        // Check if the gas cost is too high relative to the profit
+        let gas_percentage = opportunity.estimated_gas_cost / opportunity.net_profit * 100.0;
+        if gas_percentage > self.config.max_gas_percentage {
+            valid = false;
+            reasons.push(format!("Gas cost percentage ({:.2}%) is above maximum ({:.2}%)",
+                gas_percentage, self.config.max_gas_percentage));
         }
         
-        // Check 6: Price impact check (if enabled)
-        if self.params.check_price_impact {
-            let impact_check = self.check_price_impact(opportunity)?;
-            checks.push(impact_check);
+        // Check if the confidence is above the minimum threshold
+        if opportunity.confidence < self.config.min_confidence_threshold {
+            valid = false;
+            reasons.push(format!("Confidence ({:.2}) is below minimum threshold ({:.2})",
+                opportunity.confidence, self.config.min_confidence_threshold));
         }
         
-        // Calculate confidence score based on checks
-        let mut confidence_score = 0;
-        let mut passed_checks = 0;
-        
-        for check in &checks {
-            if check.result {
-                passed_checks += 1;
-            }
+        // In a real implementation, we would verify the prices
+        let prices_verified = self.verify_prices(opportunity)?;
+        if !prices_verified {
+            valid = false;
+            reasons.push("Price verification failed".to_string());
+            confidence *= 0.8;
         }
         
-        if !checks.is_empty() {
-            confidence_score = (passed_checks * 100) / checks.len() as u32;
+        // In a real implementation, we would verify the liquidity
+        let liquidity_verified = self.verify_liquidity(opportunity)?;
+        if !liquidity_verified {
+            valid = false;
+            reasons.push("Liquidity verification failed".to_string());
+            confidence *= 0.7;
         }
         
-        // Determine if the opportunity is valid based on confidence score
-        let is_valid = confidence_score as u8 >= self.params.min_confidence_score;
+        // Apply a safety margin to the profit to account for price movement
+        adjusted_profit = opportunity.net_profit * 0.95;
+        adjusted_profit_percentage = opportunity.profit_percentage * 0.95;
+        
+        // Determine risk level
+        let risk_level = self.determine_risk_level(opportunity);
+        
+        // Determine execution priority
+        let execution_priority = self.determine_execution_priority(opportunity, valid, confidence);
         
         // Create validation result
-        let result = ValidationResult {
+        let validation_result = ValidationResult {
             opportunity_id: opportunity.id.clone(),
-            is_valid,
-            timestamp: current_time,
-            confidence_score: confidence_score as u8,
-            checks,
-            error: None,
-            metadata: HashMap::new(),
+            valid,
+            reasons,
+            timestamp: current_timestamp(),
+            validation_time_ms: start_time.elapsed().as_millis() as u64,
+            validator_version: "0.1.0".to_string(),
+            adjusted_profit: Some(adjusted_profit),
+            adjusted_profit_percentage: Some(adjusted_profit_percentage),
+            confidence,
+            execution_priority,
+            risk_level,
         };
         
-        // Store in validation history
-        self.validation_history.insert(opportunity.id.clone(), result.clone());
+        // Add to validation history
+        let mut history = self.validation_history.lock().unwrap();
+        history.insert(opportunity.id.clone(), validation_result.clone());
         
-        Ok(result)
+        Ok(validation_result)
     }
     
-    /// Check liquidity for an opportunity
-    fn check_liquidity(&self, opportunity: &CrossChainOpportunity) -> Result<ValidationCheck, String> {
-        // In a real implementation, this would query the DEXs on both chains
-        // to check if there's enough liquidity for the trade
+    fn verify_prices(&self, opportunity: &CrossChainOpportunity) -> Result<bool, Box<dyn Error>> {
+        println!("Verifying prices for opportunity {}...", opportunity.id);
         
-        // For simplicity, we'll simulate a liquidity check
-        let liquidity_sufficient = opportunity.input_amount <= 1000.0; // Assume up to $1000 is liquid
+        // In a real implementation, this would fetch prices from multiple sources
+        // and verify that they are within an acceptable range
         
-        let details = if liquidity_sufficient {
-            format!("Sufficient liquidity available for {} {}", 
-                opportunity.input_amount, opportunity.source_token)
+        // For now, just simulate a successful verification
+        Ok(true)
+    }
+    
+    fn verify_liquidity(&self, opportunity: &CrossChainOpportunity) -> Result<bool, Box<dyn Error>> {
+        println!("Verifying liquidity for opportunity {}...", opportunity.id);
+        
+        // In a real implementation, this would check the liquidity of the tokens
+        // on the source and target chains
+        
+        // For now, just simulate a successful verification
+        Ok(true)
+    }
+    
+    fn determine_risk_level(&self, opportunity: &CrossChainOpportunity) -> RiskLevel {
+        // In a real implementation, this would determine the risk level based on
+        // various factors such as token liquidity, price stability, etc.
+        
+        if opportunity.profit_percentage > 5.0 {
+            // High profit usually means high risk
+            RiskLevel::High
+        } else if opportunity.profit_percentage > 2.0 {
+            RiskLevel::Medium
         } else {
-            format!("Input amount {} {} might be too large for available liquidity", 
-                opportunity.input_amount, opportunity.source_token)
-        };
-        
-        Ok(ValidationCheck {
-            name: "liquidity".to_string(),
-            result: liquidity_sufficient,
-            details,
-        })
+            RiskLevel::Low
+        }
     }
     
-    /// Check bridge status for an opportunity
-    fn check_bridge_status(&self, opportunity: &CrossChainOpportunity) -> Result<ValidationCheck, String> {
-        // In a real implementation, this would query the bridge API
-        // to check if it's operational for the given chains
+    fn determine_execution_priority(&self, opportunity: &CrossChainOpportunity, valid: bool, confidence: f64) -> u8 {
+        // In a real implementation, this would determine the execution priority based on
+        // various factors such as profit, risk, etc.
         
-        // For simplicity, we'll simulate a bridge status check
-        let bridge_operational = true; // Assume bridge is always operational
+        if !valid {
+            return 0;
+        }
         
-        let details = if bridge_operational {
-            format!("Bridge {} is operational for {} -> {}", 
-                opportunity.bridge, opportunity.source_chain, opportunity.target_chain)
+        if opportunity.profit_percentage > 5.0 && confidence > 0.9 {
+            // High profit and high confidence: highest priority
+            255
+        } else if opportunity.profit_percentage > 2.0 && confidence > 0.8 {
+            // Medium profit and good confidence: high priority
+            200
+        } else if opportunity.profit_percentage > 1.0 && confidence > 0.7 {
+            // Low profit but still good confidence: medium priority
+            150
         } else {
-            format!("Bridge {} may have issues for {} -> {}", 
-                opportunity.bridge, opportunity.source_chain, opportunity.target_chain)
-        };
-        
-        Ok(ValidationCheck {
-            name: "bridge_status".to_string(),
-            result: bridge_operational,
-            details,
-        })
+            // Low profit or low confidence: low priority
+            100
+        }
     }
     
-    /// Verify token pairs for an opportunity
-    fn verify_token_pairs(&self, opportunity: &CrossChainOpportunity) -> Result<ValidationCheck, String> {
-        // In a real implementation, this would verify that the token pairs
-        // exist on both chains and are valid for arbitrage
-        
-        // For simplicity, we'll simulate a token pair verification
-        let pairs_valid = true; // Assume all pairs are valid
-        
-        let details = if pairs_valid {
-            format!("Token pair {} on {} and {} on {} is valid", 
-                opportunity.source_token, opportunity.source_chain,
-                opportunity.target_token, opportunity.target_chain)
-        } else {
-            format!("Token pair {} on {} and {} on {} may not be valid", 
-                opportunity.source_token, opportunity.source_chain,
-                opportunity.target_token, opportunity.target_chain)
-        };
-        
-        Ok(ValidationCheck {
-            name: "token_pairs".to_string(),
-            result: pairs_valid,
-            details,
-        })
+    pub fn get_validation_result(&self, opportunity_id: &str) -> Option<ValidationResult> {
+        let history = self.validation_history.lock().unwrap();
+        history.get(opportunity_id).cloned()
     }
     
-    /// Check price impact for an opportunity
-    fn check_price_impact(&self, opportunity: &CrossChainOpportunity) -> Result<ValidationCheck, String> {
-        // In a real implementation, this would calculate the price impact
-        // of the trade on both DEXs
+    pub fn validate_all_opportunities(&mut self, opportunities: &[CrossChainOpportunity]) -> Result<Vec<ValidationResult>, Box<dyn Error>> {
+        let mut results = Vec::new();
         
-        // For simplicity, we'll simulate a price impact check
-        let impact_percentage = opportunity.input_amount * 0.01 / 100.0; // 0.01% per $100
-        let impact_acceptable = impact_percentage < 1.0; // Less than 1% impact is acceptable
+        for opportunity in opportunities {
+            match self.validate_opportunity(opportunity) {
+                Ok(result) => results.push(result),
+                Err(e) => println!("Failed to validate opportunity {}: {}", opportunity.id, e),
+            }
+        }
         
-        let details = if impact_acceptable {
-            format!("Estimated price impact: {:.2}% (acceptable)", impact_percentage)
-        } else {
-            format!("Estimated price impact: {:.2}% (too high)", impact_percentage)
-        };
-        
-        Ok(ValidationCheck {
-            name: "price_impact".to_string(),
-            result: impact_acceptable,
-            details,
-        })
+        Ok(results)
     }
     
-    /// Get validation result for an opportunity
-    pub fn get_validation(&self, opportunity_id: &str) -> Option<ValidationResult> {
-        self.validation_history.get(opportunity_id).cloned()
+    pub fn filter_valid_opportunities<'a>(&self, opportunities: &'a [CrossChainOpportunity]) -> Vec<&'a CrossChainOpportunity> {
+        let mut valid_opportunities = Vec::new();
+        
+        let history = self.validation_history.lock().unwrap();
+        
+        for opportunity in opportunities {
+            if let Some(result) = history.get(&opportunity.id) {
+                if result.valid {
+                    valid_opportunities.push(opportunity);
+                }
+            }
+        }
+        
+        valid_opportunities
     }
     
-    /// Clear expired validations
-    pub fn clear_expired_validations(&mut self) {
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        
-        self.validation_history.retain(|_, result| {
-            current_time - result.timestamp < self.params.max_validation_age
-        });
+    pub fn is_chain_pair_enabled(&self, source_chain: &Chain, target_chain: &Chain) -> bool {
+        self.config.enabled_chain_pairs.contains(&(source_chain.clone(), target_chain.clone()))
     }
+}
+
+// External API for the validator
+pub fn create_validator() -> Validator {
+    Validator::new(ValidatorConfig::default())
+}
+
+pub fn start_validator(validator: &mut Validator) -> Result<(), Box<dyn Error>> {
+    validator.start()
+}
+
+pub fn stop_validator(validator: &mut Validator) -> Result<(), Box<dyn Error>> {
+    validator.stop()
+}
+
+pub fn validate_opportunity(validator: &mut Validator, opportunity: &CrossChainOpportunity) -> Result<ValidationResult, Box<dyn Error>> {
+    validator.validate_opportunity(opportunity)
 }
