@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import useWsStore, { useWsConnectionState, useSolanaConnectionInfo } from '../lib/wsClient';
 import useSolanaStore from '../lib/solanaUtils';
+import LiveTradingActivator from '../components/LiveTradingActivator';
 import { ReloadIcon } from '@radix-ui/react-icons';
 
 export default function Dashboard() {
@@ -86,11 +87,14 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <div className="flex items-center space-x-2">
-          <div className={`h-2 w-2 rounded-full ${connectionStatus.status === 'operational' ? 'bg-success' : 'bg-warning'}`}></div>
-          <span className="text-sm">
-            {connectionStatus.status === 'operational' ? 'Connected' : 'Connecting...'}
-          </span>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <div className={`h-2 w-2 rounded-full ${connectionStatus.status === 'operational' ? 'bg-success' : 'bg-warning'}`}></div>
+            <span className="text-sm">
+              {connectionStatus.status === 'operational' ? 'Connected' : 'Connecting...'}
+            </span>
+          </div>
+          <LiveTradingActivator />
         </div>
       </div>
       
