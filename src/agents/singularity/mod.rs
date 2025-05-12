@@ -1,284 +1,128 @@
-//! Singularity Cross-Chain Agent
+//! Singularity Cross-Chain Oracle Agent
 //!
-//! This module implements the Singularity agent for cross-chain arbitrage.
-//! It coordinates the strategy, scanner, executor, and validator components
-//! to find and execute cross-chain arbitrage opportunities.
+//! This module implements the Singularity agent for cross-chain arbitrage,
+//! which coordinates the strategy, scanner, executor, and validator components.
+
+pub mod strategy;
+pub mod scanner;
+pub mod executor;
+pub mod validator;
 
 use std::collections::HashMap;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
-mod strategy;
-mod scanner;
-mod executor;
-mod validator;
+use crate::utils::current_timestamp;
 
-pub use strategy::{SingularityStrategy, StrategyParams};
-pub use scanner::{SingularityScanner, ScannerParams};
-pub use executor::{SingularityExecutor, ExecutorParams};
-pub use validator::{SingularityValidator, ValidatorParams, ValidationResult};
+// Re-exports
+pub use strategy::{
+    Strategy, StrategyConfig, CrossChainOpportunity, Chain, PathStep,
+    create_strategy, start_strategy, stop_strategy, scan_opportunities, get_current_opportunities,
+};
+pub use scanner::{
+    Scanner, ScannerConfig, TokenPrice,
+    create_scanner, start_scanner, stop_scanner, run_scan,
+};
+pub use executor::{
+    Executor, ExecutorConfig, Transaction, TransactionStatus, TransactionStep, AtomicTransactionBatch,
+    create_executor, start_executor, stop_executor, execute_opportunity,
+};
+pub use validator::{
+    Validator, ValidatorConfig, ValidationResult, RiskLevel, PriceVerificationResult,
+    create_validator, start_validator, stop_validator, validate_opportunity,
+};
 
-/// Chain types
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ChainType {
-    /// Solana
-    Solana,
-    
-    /// Ethereum
-    Ethereum,
-    
-    /// Binance Smart Chain
-    BSC,
-    
-    /// Polygon
-    Polygon,
-    
-    /// Avalanche
-    Avalanche,
-    
-    /// Arbitrum
-    Arbitrum,
-    
-    /// Optimism
-    Optimism,
-}
-
-impl std::fmt::Display for ChainType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChainType::Solana => write!(f, "Solana"),
-            ChainType::Ethereum => write!(f, "Ethereum"),
-            ChainType::BSC => write!(f, "BSC"),
-            ChainType::Polygon => write!(f, "Polygon"),
-            ChainType::Avalanche => write!(f, "Avalanche"),
-            ChainType::Arbitrum => write!(f, "Arbitrum"),
-            ChainType::Optimism => write!(f, "Optimism"),
-        }
-    }
-}
-
-/// Cross-chain arbitrage opportunity
-#[derive(Debug, Clone)]
-pub struct CrossChainOpportunity {
-    /// Opportunity ID
-    pub id: String,
-    
-    /// Source chain
-    pub source_chain: ChainType,
-    
-    /// Target chain
-    pub target_chain: ChainType,
-    
-    /// Source token
-    pub source_token: String,
-    
-    /// Target token
-    pub target_token: String,
-    
-    /// Input amount (in USD)
-    pub input_amount: f64,
-    
-    /// Expected output amount (in USD)
-    pub output_amount: f64,
-    
-    /// Expected profit (in USD)
-    pub expected_profit: f64,
-    
-    /// Profit percentage
-    pub profit_pct: f64,
-    
-    /// Total fees (in USD)
-    pub total_fees: f64,
-    
-    /// Source DEX
-    pub source_dex: String,
-    
-    /// Target DEX
-    pub target_dex: String,
-    
-    /// Bridge to use
-    pub bridge: String,
-    
-    /// Detected at timestamp (seconds since epoch)
-    pub detected_at: u64,
-    
-    /// Expires at timestamp (seconds since epoch)
-    pub expires_at: u64,
-    
-    /// Whether the opportunity has been validated
-    pub is_validated: bool,
-    
-    /// Additional metadata
-    pub metadata: HashMap<String, String>,
-}
-
-/// Execution result
-#[derive(Debug, Clone)]
-pub struct ExecutionResult {
-    /// Execution ID
-    pub id: String,
-    
-    /// Opportunity ID
-    pub opportunity_id: String,
-    
-    /// Success flag
-    pub success: bool,
-    
-    /// Input amount (in USD)
-    pub input_amount: f64,
-    
-    /// Actual output amount (in USD)
-    pub output_amount: f64,
-    
-    /// Profit (in USD)
-    pub profit: f64,
-    
-    /// Profit percentage
-    pub profit_pct: f64,
-    
-    /// Timestamp (seconds since epoch)
-    pub timestamp: u64,
-    
-    /// Transaction hashes
-    pub tx_hashes: HashMap<String, String>,
-    
-    /// Error message (if any)
-    pub error: Option<String>,
-    
-    /// Duration (in milliseconds)
-    pub duration_ms: u64,
-    
-    /// Source chain
-    pub source_chain: ChainType,
-    
-    /// Target chain
-    pub target_chain: ChainType,
-    
-    /// Source token
-    pub source_token: String,
-    
-    /// Target token
-    pub target_token: String,
-}
-
-/// Singularity agent configuration
+// Singularity agent configuration
 #[derive(Debug, Clone)]
 pub struct SingularityConfig {
-    /// Agent ID
     pub id: String,
-    
-    /// Agent name
     pub name: String,
-    
-    /// Trading wallet address
-    pub trading_wallet: String,
-    
-    /// Profit wallet address
-    pub profit_wallet: String,
-    
-    /// Fee wallet address
-    pub fee_wallet: String,
-    
-    /// Maximum input amount (in USD)
-    pub max_input: f64,
-    
-    /// Minimum profit percentage
-    pub min_profit_pct: f64,
-    
-    /// Gas price multiplier
+    pub scan_interval: Duration,
+    pub max_concurrent_executions: usize,
+    pub max_input_amount: f64,
+    pub min_profit_percentage: f64,
     pub gas_price_multiplier: f64,
-    
-    /// Scan interval (in seconds)
-    pub scan_interval: u64,
-    
-    /// Debug mode
-    pub debug_mode: bool,
-    
-    /// Active flag
-    pub active: bool,
+    pub enable_flash_loans: bool,
+    pub enable_atomic_transactions: bool,
+    pub trading_wallet: String,
+    pub profit_wallet: String,
+    pub fee_wallet: String,
+    pub strategy_config: StrategyConfig,
+    pub scanner_config: ScannerConfig,
+    pub executor_config: ExecutorConfig,
+    pub validator_config: ValidatorConfig,
 }
 
 impl Default for SingularityConfig {
     fn default() -> Self {
         Self {
-            id: "singularity_agent".to_string(),
+            id: "singularity".to_string(),
             name: "Singularity Cross-Chain Oracle".to_string(),
+            scan_interval: Duration::from_secs(10),
+            max_concurrent_executions: 5,
+            max_input_amount: 1000.0,
+            min_profit_percentage: 0.5,
+            gas_price_multiplier: 1.2,
+            enable_flash_loans: true,
+            enable_atomic_transactions: true,
             trading_wallet: "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb".to_string(),
             profit_wallet: "6bLfHsp6eCFWZqGKZQaRwpVVLZRwKqcLt6QCKwLoxTqF".to_string(),
             fee_wallet: "9aBt1zPRUZmxttZ6Mk9AAU6XGS1TLQMZkpbCNBLH2Y2z".to_string(),
-            max_input: 100.0,
-            min_profit_pct: 0.5,
-            gas_price_multiplier: 1.2,
-            scan_interval: 10,
-            debug_mode: false,
-            active: false,
+            strategy_config: StrategyConfig::default(),
+            scanner_config: ScannerConfig::default(),
+            executor_config: ExecutorConfig::default(),
+            validator_config: ValidatorConfig::default(),
         }
     }
 }
 
-/// Singularity agent for cross-chain arbitrage
-pub struct SingularityAgent {
-    /// Configuration
-    config: SingularityConfig,
-    
-    /// Strategy component
-    strategy: Arc<Mutex<SingularityStrategy>>,
-    
-    /// Scanner component
-    scanner: Arc<Mutex<SingularityScanner>>,
-    
-    /// Executor component
-    executor: Arc<Mutex<SingularityExecutor>>,
-    
-    /// Validator component
-    validator: Arc<Mutex<SingularityValidator>>,
-    
-    /// Current opportunities
-    opportunities: Arc<Mutex<Vec<CrossChainOpportunity>>>,
-    
-    /// Recent executions
-    executions: Arc<Mutex<Vec<ExecutionResult>>>,
-    
-    /// Agent status
-    status: Arc<Mutex<AgentStatus>>,
-    
-    /// Shutdown flag
-    shutdown: Arc<Mutex<bool>>,
-    
-    /// Agent thread handle
-    thread_handle: Option<thread::JoinHandle<()>>,
-}
-
-/// Agent status
+// Singularity agent status
 #[derive(Debug, Clone, PartialEq)]
 pub enum AgentStatus {
-    /// Stopped
-    Stopped,
-    
-    /// Initializing
+    Idle,
     Initializing,
-    
-    /// Scanning
     Scanning,
-    
-    /// Executing
     Executing,
-    
-    /// Running
-    Running,
-    
-    /// Error
     Error(String),
 }
 
+// Agent metrics
+#[derive(Debug, Clone)]
+pub struct AgentMetrics {
+    pub opportunities_found: usize,
+    pub opportunities_executed: usize,
+    pub successful_executions: usize,
+    pub failed_executions: usize,
+    pub total_profit: f64,
+    pub total_gas_spent: f64,
+    pub last_scan: Option<u64>,
+    pub last_execution: Option<u64>,
+    pub average_profit_per_execution: f64,
+    pub success_rate: f64,
+}
+
+// Singularity agent
+pub struct SingularityAgent {
+    config: SingularityConfig,
+    strategy: Arc<Mutex<Strategy>>,
+    scanner: Arc<Mutex<Scanner>>,
+    executor: Arc<Mutex<Executor>>,
+    validator: Arc<Mutex<Validator>>,
+    opportunities: Arc<Mutex<HashMap<String, CrossChainOpportunity>>>,
+    executed_opportunities: Arc<Mutex<HashMap<String, (CrossChainOpportunity, Transaction)>>>,
+    status: Arc<Mutex<AgentStatus>>,
+    metrics: Arc<Mutex<AgentMetrics>>,
+    active: bool,
+    last_scan: Arc<Mutex<Option<Instant>>>,
+}
+
 impl SingularityAgent {
-    /// Create a new Singularity agent
     pub fn new(config: SingularityConfig) -> Self {
-        let strategy = Arc::new(Mutex::new(SingularityStrategy::new(config.clone())));
-        let scanner = Arc::new(Mutex::new(SingularityScanner::new(config.clone())));
-        let executor = Arc::new(Mutex::new(SingularityExecutor::new(config.clone())));
-        let validator = Arc::new(Mutex::new(SingularityValidator::new(config.clone())));
+        let strategy = Arc::new(Mutex::new(Strategy::new(config.strategy_config.clone())));
+        let scanner = Arc::new(Mutex::new(Scanner::new(config.scanner_config.clone())));
+        let executor = Arc::new(Mutex::new(Executor::new(config.executor_config.clone())));
+        let validator = Arc::new(Mutex::new(Validator::new(config.validator_config.clone())));
         
         Self {
             config,
@@ -286,304 +130,409 @@ impl SingularityAgent {
             scanner,
             executor,
             validator,
-            opportunities: Arc::new(Mutex::new(Vec::new())),
-            executions: Arc::new(Mutex::new(Vec::new())),
-            status: Arc::new(Mutex::new(AgentStatus::Stopped)),
-            shutdown: Arc::new(Mutex::new(false)),
-            thread_handle: None,
+            opportunities: Arc::new(Mutex::new(HashMap::new())),
+            executed_opportunities: Arc::new(Mutex::new(HashMap::new())),
+            status: Arc::new(Mutex::new(AgentStatus::Idle)),
+            metrics: Arc::new(Mutex::new(AgentMetrics {
+                opportunities_found: 0,
+                opportunities_executed: 0,
+                successful_executions: 0,
+                failed_executions: 0,
+                total_profit: 0.0,
+                total_gas_spent: 0.0,
+                last_scan: None,
+                last_execution: None,
+                average_profit_per_execution: 0.0,
+                success_rate: 0.0,
+            })),
+            active: false,
+            last_scan: Arc::new(Mutex::new(None)),
         }
     }
     
-    /// Start the agent
-    pub fn start(&mut self) -> Result<(), String> {
-        // Check if already running
-        {
-            let status = self.status.lock().unwrap();
-            if *status != AgentStatus::Stopped {
-                return Err("Agent is already running".to_string());
-            }
-        }
+    pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Starting Singularity Cross-Chain Oracle agent...");
         
-        // Reset shutdown flag
-        *self.shutdown.lock().unwrap() = false;
+        // Set status to initializing
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Initializing;
+        drop(status);
         
-        // Update status to initializing
-        *self.status.lock().unwrap() = AgentStatus::Initializing;
+        // Start all components
+        self.strategy.lock().unwrap().start()?;
+        self.scanner.lock().unwrap().start()?;
+        self.executor.lock().unwrap().start()?;
+        self.validator.lock().unwrap().start()?;
         
-        // Initialize components
-        {
-            let mut strategy = self.strategy.lock().unwrap();
-            strategy.initialize()?;
-        }
+        // Set agent as active
+        self.active = true;
         
-        {
-            let mut scanner = self.scanner.lock().unwrap();
-            scanner.initialize()?;
-        }
+        // Set status to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
         
-        {
-            let mut executor = self.executor.lock().unwrap();
-            executor.initialize()?;
-        }
-        
-        {
-            let mut validator = self.validator.lock().unwrap();
-            validator.initialize()?;
-        }
-        
-        // Clone Arc references for the thread
-        let strategy = self.strategy.clone();
-        let scanner = self.scanner.clone();
-        let executor = self.executor.clone();
-        let validator = self.validator.clone();
-        let opportunities = self.opportunities.clone();
-        let executions = self.executions.clone();
-        let status = self.status.clone();
-        let shutdown = self.shutdown.clone();
-        let config = self.config.clone();
-        
-        // Start the agent thread
-        let thread_handle = thread::spawn(move || {
-            println!("Singularity agent thread started");
-            
-            *status.lock().unwrap() = AgentStatus::Running;
-            
-            let mut last_scan_time = 0;
-            
-            // Main agent loop
-            loop {
-                // Check shutdown flag
-                if *shutdown.lock().unwrap() {
-                    println!("Singularity agent thread shutting down");
-                    break;
-                }
-                
-                // Get current time
-                let current_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs();
-                
-                // Check if it's time to scan
-                if current_time - last_scan_time >= config.scan_interval {
-                    last_scan_time = current_time;
-                    
-                    // Scan for opportunities
-                    *status.lock().unwrap() = AgentStatus::Scanning;
-                    
-                    let new_opportunities = match scanner.lock().unwrap().scan() {
-                        Ok(opps) => opps,
-                        Err(e) => {
-                            println!("Error scanning for opportunities: {}", e);
-                            *status.lock().unwrap() = AgentStatus::Error(e);
-                            thread::sleep(Duration::from_secs(config.scan_interval));
-                            continue;
-                        }
-                    };
-                    
-                    // Validate opportunities
-                    let mut validated_opportunities = Vec::new();
-                    
-                    for opp in new_opportunities {
-                        match validator.lock().unwrap().validate(&opp) {
-                            Ok(result) => {
-                                if result.is_valid {
-                                    let mut validated_opp = opp.clone();
-                                    validated_opp.is_validated = true;
-                                    validated_opportunities.push(validated_opp);
-                                }
-                            }
-                            Err(e) => {
-                                println!("Error validating opportunity {}: {}", opp.id, e);
-                            }
-                        }
-                    }
-                    
-                    // Select opportunities to execute
-                    let selected_opportunities = match strategy.lock().unwrap().select_opportunities(&validated_opportunities) {
-                        Ok(opps) => opps,
-                        Err(e) => {
-                            println!("Error selecting opportunities: {}", e);
-                            *status.lock().unwrap() = AgentStatus::Error(e);
-                            thread::sleep(Duration::from_secs(config.scan_interval));
-                            continue;
-                        }
-                    };
-                    
-                    // Execute selected opportunities
-                    if !selected_opportunities.is_empty() {
-                        *status.lock().unwrap() = AgentStatus::Executing;
-                        
-                        for opp in &selected_opportunities {
-                            println!("Executing opportunity {}: {} -> {} ({:.2}%)", 
-                                opp.id, opp.source_chain, opp.target_chain, opp.profit_pct);
-                            
-                            match executor.lock().unwrap().execute(opp) {
-                                Ok(execution_id) => {
-                                    println!("Execution started: {}", execution_id);
-                                }
-                                Err(e) => {
-                                    println!("Error executing opportunity {}: {}", opp.id, e);
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Update opportunities list
-                    *opportunities.lock().unwrap() = validated_opportunities.clone();
-                    
-                    // Get recent executions
-                    let recent_execs = executor.lock().unwrap().get_recent_executions(10);
-                    *executions.lock().unwrap() = recent_execs;
-                    
-                    // Update status to running
-                    *status.lock().unwrap() = AgentStatus::Running;
-                }
-                
-                // Sleep a bit to avoid hogging CPU
-                thread::sleep(Duration::from_millis(100));
-            }
-            
-            // Set status to stopped before exiting
-            *status.lock().unwrap() = AgentStatus::Stopped;
-            println!("Singularity agent thread stopped");
-        });
-        
-        self.thread_handle = Some(thread_handle);
-        self.config.active = true;
-        
-        println!("Singularity agent started");
+        println!("Singularity Cross-Chain Oracle agent started successfully!");
         
         Ok(())
     }
     
-    /// Stop the agent
-    pub fn stop(&mut self) -> Result<(), String> {
-        // Check if already stopped
-        {
-            let status = self.status.lock().unwrap();
-            if *status == AgentStatus::Stopped {
-                return Err("Agent is already stopped".to_string());
-            }
-        }
+    pub fn stop(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Stopping Singularity Cross-Chain Oracle agent...");
         
-        // Set shutdown flag
-        *self.shutdown.lock().unwrap() = true;
+        // Set agent as inactive
+        self.active = false;
         
-        // Wait for thread to finish
-        if let Some(handle) = self.thread_handle.take() {
-            match handle.join() {
-                Ok(_) => {
-                    println!("Singularity agent thread joined successfully");
-                }
-                Err(e) => {
-                    println!("Error joining Singularity agent thread: {:?}", e);
-                }
-            }
-        }
+        // Stop all components
+        self.strategy.lock().unwrap().stop()?;
+        self.scanner.lock().unwrap().stop()?;
+        self.executor.lock().unwrap().stop()?;
+        self.validator.lock().unwrap().stop()?;
         
-        // Shutdown components
-        {
-            let mut strategy = self.strategy.lock().unwrap();
-            strategy.shutdown()?;
-        }
+        // Set status to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
         
-        {
-            let mut scanner = self.scanner.lock().unwrap();
-            scanner.shutdown()?;
-        }
-        
-        {
-            let mut executor = self.executor.lock().unwrap();
-            executor.shutdown()?;
-        }
-        
-        {
-            let mut validator = self.validator.lock().unwrap();
-            validator.shutdown()?;
-        }
-        
-        self.config.active = false;
-        
-        println!("Singularity agent stopped");
+        println!("Singularity Cross-Chain Oracle agent stopped successfully!");
         
         Ok(())
     }
     
-    /// Get agent status
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+    
     pub fn get_status(&self) -> AgentStatus {
         self.status.lock().unwrap().clone()
     }
     
-    /// Get current opportunities
-    pub fn get_opportunities(&self) -> Vec<CrossChainOpportunity> {
+    pub fn get_metrics(&self) -> AgentMetrics {
+        self.metrics.lock().unwrap().clone()
+    }
+    
+    pub fn scan(&mut self) -> Result<Vec<CrossChainOpportunity>, Box<dyn Error>> {
+        if !self.active {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Agent is not active",
+            )));
+        }
+        
+        // Set status to scanning
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Scanning;
+        drop(status);
+        
+        // Set last scan time
+        let mut last_scan = self.last_scan.lock().unwrap();
+        *last_scan = Some(Instant::now());
+        drop(last_scan);
+        
+        // Update metrics
+        let mut metrics = self.metrics.lock().unwrap();
+        metrics.last_scan = Some(current_timestamp());
+        drop(metrics);
+        
+        println!("Scanning for cross-chain arbitrage opportunities...");
+        
+        // Run scanner
+        let opportunities = self.scanner.lock().unwrap().scan()?;
+        
+        // Update opportunities
+        let mut opportunities_map = self.opportunities.lock().unwrap();
+        for opportunity in &opportunities {
+            opportunities_map.insert(opportunity.id.clone(), opportunity.clone());
+        }
+        
+        // Set status back to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
+        
+        // Update metrics
+        let mut metrics = self.metrics.lock().unwrap();
+        metrics.opportunities_found += opportunities.len();
+        
+        println!("Found {} cross-chain arbitrage opportunities", opportunities.len());
+        
+        Ok(opportunities)
+    }
+    
+    pub fn execute(&mut self, opportunity_id: &str) -> Result<String, Box<dyn Error>> {
+        if !self.active {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Agent is not active",
+            )));
+        }
+        
+        // Set status to executing
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Executing;
+        drop(status);
+        
+        // Get the opportunity
+        let opportunities = self.opportunities.lock().unwrap();
+        let opportunity = match opportunities.get(opportunity_id) {
+            Some(opp) => opp.clone(),
+            None => {
+                // Set status back to idle
+                let mut status = self.status.lock().unwrap();
+                *status = AgentStatus::Idle;
+                
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Opportunity {} not found", opportunity_id),
+                )));
+            }
+        };
+        drop(opportunities);
+        
+        // Validate the opportunity
+        let validation_result = self.validator.lock().unwrap().validate_opportunity(&opportunity)?;
+        
+        if !validation_result.valid {
+            // Set status back to idle
+            let mut status = self.status.lock().unwrap();
+            *status = AgentStatus::Idle;
+            
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Opportunity {} failed validation: {:?}", opportunity_id, validation_result.reasons),
+            )));
+        }
+        
+        // Execute the opportunity
+        let transaction_id = self.executor.lock().unwrap().execute_opportunity(&opportunity)?;
+        
+        // Get the executed transaction
+        let transaction = self.executor.lock().unwrap().get_transaction(&transaction_id)
+            .ok_or_else(|| {
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Transaction {} not found", transaction_id),
+                )) as Box<dyn Error>
+            })?;
+        
+        // Add to executed opportunities
+        let mut executed_opportunities = self.executed_opportunities.lock().unwrap();
+        executed_opportunities.insert(opportunity_id.to_string(), (opportunity.clone(), transaction.clone()));
+        
+        // Update metrics
+        let mut metrics = self.metrics.lock().unwrap();
+        metrics.opportunities_executed += 1;
+        metrics.last_execution = Some(current_timestamp());
+        
+        if transaction.status == TransactionStatus::Confirmed {
+            metrics.successful_executions += 1;
+            if let Some(profit) = transaction.actual_profit {
+                metrics.total_profit += profit;
+            }
+            if let Some(gas) = transaction.gas_used {
+                metrics.total_gas_spent += gas;
+            }
+        } else {
+            metrics.failed_executions += 1;
+        }
+        
+        // Calculate average profit and success rate
+        if metrics.opportunities_executed > 0 {
+            metrics.average_profit_per_execution = metrics.total_profit / metrics.successful_executions as f64;
+            metrics.success_rate = metrics.successful_executions as f64 / metrics.opportunities_executed as f64 * 100.0;
+        }
+        
+        // Set status back to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
+        
+        println!("Executed opportunity {} with transaction {}", opportunity_id, transaction_id);
+        
+        Ok(transaction_id)
+    }
+    
+    pub fn get_opportunities(&self) -> HashMap<String, CrossChainOpportunity> {
         self.opportunities.lock().unwrap().clone()
     }
     
-    /// Get recent executions
-    pub fn get_executions(&self) -> Vec<ExecutionResult> {
-        self.executions.lock().unwrap().clone()
+    pub fn get_executed_opportunities(&self) -> HashMap<String, (CrossChainOpportunity, Transaction)> {
+        self.executed_opportunities.lock().unwrap().clone()
     }
     
-    /// Get agent configuration
-    pub fn get_config(&self) -> SingularityConfig {
-        self.config.clone()
+    pub fn get_opportunity(&self, opportunity_id: &str) -> Option<CrossChainOpportunity> {
+        self.opportunities.lock().unwrap().get(opportunity_id).cloned()
     }
     
-    /// Update agent configuration
-    pub fn update_config(&mut self, config: SingularityConfig) -> Result<(), String> {
-        // Check if running
-        {
-            let status = self.status.lock().unwrap();
-            if *status != AgentStatus::Stopped {
-                return Err("Cannot update configuration while agent is running".to_string());
-            }
+    pub fn get_transaction(&self, transaction_id: &str) -> Option<Transaction> {
+        self.executor.lock().unwrap().get_transaction(transaction_id)
+    }
+    
+    pub fn execute_atomic_batch(&mut self, opportunity_ids: &[String]) -> Result<String, Box<dyn Error>> {
+        if !self.active {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Agent is not active",
+            )));
         }
         
-        self.config = config;
-        
-        Ok(())
-    }
-    
-    /// Get agent metrics
-    pub fn get_metrics(&self) -> HashMap<String, f64> {
-        let mut metrics = HashMap::new();
-        
-        // Add strategy metrics
-        if let Ok(strategy) = self.strategy.lock() {
-            for (key, value) in strategy.get_metrics() {
-                metrics.insert(format!("strategy_{}", key), value);
-            }
+        if !self.config.enable_atomic_transactions {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Atomic transactions are not enabled",
+            )));
         }
         
-        // Add execution metrics
-        if let Ok(executions) = self.executions.lock() {
-            let total_executions = executions.len();
-            metrics.insert("total_executions".to_string(), total_executions as f64);
-            
-            let successful_executions = executions.iter().filter(|e| e.success).count();
-            metrics.insert("successful_executions".to_string(), successful_executions as f64);
-            
-            if total_executions > 0 {
-                let success_rate = (successful_executions as f64) / (total_executions as f64) * 100.0;
-                metrics.insert("success_rate".to_string(), success_rate);
-            }
-            
-            let total_profit: f64 = executions.iter().filter(|e| e.success).map(|e| e.profit).sum();
-            metrics.insert("total_profit".to_string(), total_profit);
-            
-            if !executions.is_empty() {
-                if let Some(latest) = executions.first() {
-                    metrics.insert("latest_execution_timestamp".to_string(), latest.timestamp as f64);
+        // Set status to executing
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Executing;
+        drop(status);
+        
+        // Get the opportunities
+        let opportunities = self.opportunities.lock().unwrap();
+        let mut batch_opportunities = Vec::new();
+        
+        for id in opportunity_ids {
+            match opportunities.get(id) {
+                Some(opp) => batch_opportunities.push(opp.clone()),
+                None => {
+                    // Set status back to idle
+                    let mut status = self.status.lock().unwrap();
+                    *status = AgentStatus::Idle;
                     
-                    if latest.success {
-                        metrics.insert("latest_execution_profit".to_string(), latest.profit);
-                        metrics.insert("latest_execution_profit_pct".to_string(), latest.profit_pct);
-                    }
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Opportunity {} not found", id),
+                    )));
                 }
             }
         }
         
-        metrics
+        // Validate the opportunities
+        let mut valid_opportunities = Vec::new();
+        
+        for opportunity in &batch_opportunities {
+            match self.validator.lock().unwrap().validate_opportunity(opportunity) {
+                Ok(result) => {
+                    if result.valid {
+                        valid_opportunities.push(opportunity.clone());
+                    } else {
+                        println!("Opportunity {} failed validation: {:?}", opportunity.id, result.reasons);
+                    }
+                }
+                Err(e) => {
+                    println!("Failed to validate opportunity {}: {}", opportunity.id, e);
+                }
+            }
+        }
+        
+        if valid_opportunities.is_empty() {
+            // Set status back to idle
+            let mut status = self.status.lock().unwrap();
+            *status = AgentStatus::Idle;
+            
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "No valid opportunities in batch",
+            )));
+        }
+        
+        // Create atomic batch
+        let batch_id = self.executor.lock().unwrap().create_atomic_transaction_batch(&valid_opportunities)?;
+        
+        // Execute atomic batch
+        self.executor.lock().unwrap().execute_atomic_batch(&batch_id)?;
+        
+        // Update metrics (would need to get batch result from executor in a real implementation)
+        
+        // Set status back to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
+        
+        println!("Executed atomic batch {} with {} opportunities", batch_id, valid_opportunities.len());
+        
+        Ok(batch_id)
     }
+    
+    pub fn execute_flash_loan_arbitrage(&mut self, opportunity_id: &str) -> Result<String, Box<dyn Error>> {
+        if !self.active {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Agent is not active",
+            )));
+        }
+        
+        if !self.config.enable_flash_loans {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Flash loans are not enabled",
+            )));
+        }
+        
+        // Set status to executing
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Executing;
+        drop(status);
+        
+        // Get the opportunity
+        let opportunities = self.opportunities.lock().unwrap();
+        let opportunity = match opportunities.get(opportunity_id) {
+            Some(opp) => opp.clone(),
+            None => {
+                // Set status back to idle
+                let mut status = self.status.lock().unwrap();
+                *status = AgentStatus::Idle;
+                
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Opportunity {} not found", opportunity_id),
+                )));
+            }
+        };
+        drop(opportunities);
+        
+        // Validate the opportunity
+        let validation_result = self.validator.lock().unwrap().validate_opportunity(&opportunity)?;
+        
+        if !validation_result.valid {
+            // Set status back to idle
+            let mut status = self.status.lock().unwrap();
+            *status = AgentStatus::Idle;
+            
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Opportunity {} failed validation: {:?}", opportunity_id, validation_result.reasons),
+            )));
+        }
+        
+        // Execute the flash loan arbitrage
+        let transaction_id = self.executor.lock().unwrap().execute_flash_loan_arbitrage(&opportunity)?;
+        
+        // Update metrics (similar to regular execute)
+        
+        // Set status back to idle
+        let mut status = self.status.lock().unwrap();
+        *status = AgentStatus::Idle;
+        
+        println!("Executed flash loan arbitrage for opportunity {} with transaction {}", opportunity_id, transaction_id);
+        
+        Ok(transaction_id)
+    }
+}
+
+// External API for the Singularity agent
+pub fn create_singularity_agent() -> SingularityAgent {
+    SingularityAgent::new(SingularityConfig::default())
+}
+
+pub fn start_singularity_agent(agent: &mut SingularityAgent) -> Result<(), Box<dyn Error>> {
+    agent.start()
+}
+
+pub fn stop_singularity_agent(agent: &mut SingularityAgent) -> Result<(), Box<dyn Error>> {
+    agent.stop()
+}
+
+pub fn scan_for_opportunities(agent: &mut SingularityAgent) -> Result<Vec<CrossChainOpportunity>, Box<dyn Error>> {
+    agent.scan()
+}
+
+pub fn execute_opportunity(agent: &mut SingularityAgent, opportunity_id: &str) -> Result<String, Box<dyn Error>> {
+    agent.execute(opportunity_id)
 }

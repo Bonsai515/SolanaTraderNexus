@@ -1,265 +1,299 @@
-//! Singularity Cross-Chain Strategy
+//! Singularity Cross-Chain Oracle Strategy
 //!
-//! This module implements the strategic decision-making component for the
-//! Singularity agent, which focuses on cross-chain arbitrage opportunities.
+//! This module implements the strategy component of the Singularity agent,
+//! responsible for identifying cross-chain arbitrage opportunities.
 
-use super::{SingularityConfig, CrossChainOpportunity};
 use std::collections::HashMap;
+use std::error::Error;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-/// Strategy for Singularity cross-chain trading
-pub struct SingularityStrategy {
-    /// Configuration
-    config: SingularityConfig,
-    
-    /// Strategy parameters
-    params: StrategyParams,
-    
-    /// Strategy metrics
-    metrics: HashMap<String, f64>,
-    
-    /// Is initialized
-    is_initialized: bool,
-}
-
-/// Strategy parameters
+// Opportunity structure for cross-chain arbitrage
 #[derive(Debug, Clone)]
-pub struct StrategyParams {
-    /// Minimum profit threshold (in percentage)
-    pub min_profit_threshold: f64,
-    
-    /// Maximum capital allocation (in absolute terms)
-    pub max_capital_allocation: f64,
-    
-    /// Opportunity timeout (in seconds)
-    pub opportunity_timeout: u64,
-    
-    /// Maximum simultaneous trades
-    pub max_simultaneous_trades: usize,
-    
-    /// Risk factor (0-1, higher means more aggressive)
-    pub risk_factor: f64,
-    
-    /// Prioritize volume (true) or profit margin (false)
-    pub prioritize_volume: bool,
-    
-    /// Take partial fills
-    pub take_partial_fills: bool,
-    
-    /// Bridges to use (empty means all)
-    pub bridges: Vec<String>,
-    
-    /// Token allowlist (empty means all)
-    pub token_allowlist: Vec<String>,
-    
-    /// Token blocklist
-    pub token_blocklist: Vec<String>,
-    
-    /// Max slippage percentage
-    pub max_slippage_pct: f64,
+pub struct CrossChainOpportunity {
+    pub id: String,
+    pub source_chain: Chain,
+    pub target_chain: Chain,
+    pub source_token: String,
+    pub target_token: String,
+    pub input_amount: f64,
+    pub expected_output: f64,
+    pub profit_percentage: f64,
+    pub estimated_gas_cost: f64,
+    pub net_profit: f64,
+    pub route: Vec<PathStep>,
+    pub timestamp: u64,
+    pub validity_period: Duration,
+    pub confidence: f64,
 }
 
-impl Default for StrategyParams {
+// Chain enum for supported blockchains
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Chain {
+    Solana,
+    Ethereum,
+    BinanceSmartChain,
+    Avalanche,
+    Polygon,
+    Arbitrum,
+    Optimism,
+}
+
+// Path step for multi-hop routes
+#[derive(Debug, Clone)]
+pub struct PathStep {
+    pub chain: Chain,
+    pub dex: String,
+    pub input_token: String,
+    pub output_token: String,
+    pub expected_rate: f64,
+}
+
+// Strategy configuration
+#[derive(Debug, Clone)]
+pub struct StrategyConfig {
+    pub min_profit_percentage: f64,
+    pub max_input_amount: f64,
+    pub gas_price_multiplier: f64,
+    pub scan_frequency: Duration,
+    pub enabled_chains: Vec<Chain>,
+    pub enabled_tokens: HashMap<Chain, Vec<String>>,
+}
+
+impl Default for StrategyConfig {
     fn default() -> Self {
+        let mut enabled_tokens = HashMap::new();
+        
+        // Solana tokens
+        enabled_tokens.insert(
+            Chain::Solana,
+            vec![
+                "SOL".to_string(),
+                "USDC".to_string(),
+                "USDT".to_string(),
+                "ETH".to_string(),
+                "BTC".to_string(),
+                "BONK".to_string(),
+                "JUP".to_string(),
+                "RAY".to_string(),
+                "ORCA".to_string(),
+                "MNGO".to_string(),
+                "SAMO".to_string(),
+                "SRM".to_string(),
+                "FIDA".to_string(),
+                "STSOL".to_string(),
+                "MSOL".to_string(),
+            ],
+        );
+        
+        // Ethereum tokens
+        enabled_tokens.insert(
+            Chain::Ethereum,
+            vec![
+                "ETH".to_string(),
+                "USDC".to_string(),
+                "USDT".to_string(),
+                "WBTC".to_string(),
+                "DAI".to_string(),
+                "LINK".to_string(),
+                "UNI".to_string(),
+                "AAVE".to_string(),
+                "MKR".to_string(),
+                "CRV".to_string(),
+                "SNX".to_string(),
+                "COMP".to_string(),
+                "YFI".to_string(),
+                "SUSHI".to_string(),
+                "BAL".to_string(),
+            ],
+        );
+        
+        // BSC tokens
+        enabled_tokens.insert(
+            Chain::BinanceSmartChain,
+            vec![
+                "BNB".to_string(),
+                "BUSD".to_string(),
+                "USDT".to_string(),
+                "USDC".to_string(),
+                "CAKE".to_string(),
+                "BAKE".to_string(),
+                "XVS".to_string(),
+                "AUTO".to_string(),
+                "ALPACA".to_string(),
+                "TWT".to_string(),
+                "BTCB".to_string(),
+                "ETH".to_string(),
+                "DOT".to_string(),
+                "ADA".to_string(),
+                "XRP".to_string(),
+            ],
+        );
+        
+        // Avalanche tokens
+        enabled_tokens.insert(
+            Chain::Avalanche,
+            vec![
+                "AVAX".to_string(),
+                "USDC".to_string(),
+                "USDT".to_string(),
+                "ETH".to_string(),
+                "WBTC".to_string(),
+                "DAI".to_string(),
+                "LINK".to_string(),
+                "JOE".to_string(),
+                "QI".to_string(),
+                "PNG".to_string(),
+                "WAVAX".to_string(),
+                "XAVA".to_string(),
+                "MIM".to_string(),
+                "SPELL".to_string(),
+                "TIME".to_string(),
+            ],
+        );
+        
         Self {
-            min_profit_threshold: 0.5, // 0.5% minimum profit
-            max_capital_allocation: 100.0, // $100 maximum
-            opportunity_timeout: 60, // 60 seconds
-            max_simultaneous_trades: 3, // 3 trades at most
-            risk_factor: 0.5, // Balanced risk
-            prioritize_volume: false, // Prioritize profit margin
-            take_partial_fills: true, // Accept partial fills
-            bridges: vec!["wormhole".to_string()], // Default to Wormhole
-            token_allowlist: vec![], // All tokens allowed
-            token_blocklist: vec![], // No tokens blocked
-            max_slippage_pct: 0.5, // 0.5% maximum slippage
+            min_profit_percentage: 0.5, // 0.5% minimum profit
+            max_input_amount: 100.0,    // $100 maximum input
+            gas_price_multiplier: 1.2,  // 20% buffer for gas price
+            scan_frequency: Duration::from_secs(10),
+            enabled_chains: vec![
+                Chain::Solana, 
+                Chain::Ethereum, 
+                Chain::BinanceSmartChain, 
+                Chain::Avalanche,
+                Chain::Polygon,
+                Chain::Arbitrum,
+                Chain::Optimism,
+            ],
+            enabled_tokens,
         }
     }
 }
 
-impl SingularityStrategy {
-    /// Create a new instance of the strategy
-    pub fn new(config: SingularityConfig) -> Self {
+// Strategy state
+pub struct Strategy {
+    config: StrategyConfig,
+    opportunities: Arc<Mutex<Vec<CrossChainOpportunity>>>,
+    last_scan: Instant,
+    active: bool,
+}
+
+impl Strategy {
+    pub fn new(config: StrategyConfig) -> Self {
         Self {
             config,
-            params: StrategyParams::default(),
-            metrics: HashMap::new(),
-            is_initialized: false,
+            opportunities: Arc::new(Mutex::new(Vec::new())),
+            last_scan: Instant::now(),
+            active: false,
         }
     }
     
-    /// Initialize the strategy
-    pub fn initialize(&mut self) -> Result<(), String> {
-        if self.is_initialized {
-            return Err("Strategy already initialized".to_string());
-        }
+    pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Starting Singularity Cross-Chain Oracle strategy...");
+        self.active = true;
         
-        // Set up the strategy parameters based on configuration
-        self.params.min_profit_threshold = self.config.min_profit_pct;
-        self.params.max_capital_allocation = self.config.max_input;
-        
-        // Initialize metrics
-        self.metrics.insert("opportunities_evaluated".to_string(), 0.0);
-        self.metrics.insert("opportunities_selected".to_string(), 0.0);
-        self.metrics.insert("total_expected_profit".to_string(), 0.0);
-        self.metrics.insert("average_profit_pct".to_string(), 0.0);
-        
-        self.is_initialized = true;
-        
-        println!("Singularity strategy initialized with min profit: {}%, max capital: {} USDC",
-            self.params.min_profit_threshold,
-            self.params.max_capital_allocation);
+        // In a real implementation, this would start a background thread for scanning
         
         Ok(())
     }
     
-    /// Shutdown the strategy
-    pub fn shutdown(&mut self) -> Result<(), String> {
-        if !self.is_initialized {
-            return Err("Strategy not initialized".to_string());
-        }
+    pub fn stop(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Stopping Singularity Cross-Chain Oracle strategy...");
+        self.active = false;
         
-        self.is_initialized = false;
-        println!("Singularity strategy shutdown complete");
+        // In a real implementation, this would stop the background thread
         
         Ok(())
     }
     
-    /// Get strategy metrics
-    pub fn get_metrics(&self) -> HashMap<String, f64> {
-        self.metrics.clone()
+    pub fn is_active(&self) -> bool {
+        self.active
     }
     
-    /// Update strategy parameters
-    pub fn update_params(&mut self, params: StrategyParams) {
-        self.params = params;
-        println!("Singularity strategy parameters updated");
+    pub fn scan_for_opportunities(&mut self) -> Result<Vec<CrossChainOpportunity>, Box<dyn Error>> {
+        if !self.active {
+            return Ok(Vec::new());
+        }
+        
+        println!("Scanning for cross-chain arbitrage opportunities...");
+        self.last_scan = Instant::now();
+        
+        // In a real implementation, this would actually scan for opportunities
+        // For now, we'll just generate some example opportunities
+        
+        let opportunities = self.generate_example_opportunities();
+        
+        // Update opportunities
+        let mut locked_opportunities = self.opportunities.lock().unwrap();
+        *locked_opportunities = opportunities.clone();
+        
+        Ok(opportunities)
     }
     
-    /// Select the best opportunities to execute
-    pub fn select_opportunities(&mut self, opportunities: &[CrossChainOpportunity]) -> Result<Vec<CrossChainOpportunity>, String> {
-        if !self.is_initialized {
-            return Err("Strategy not initialized".to_string());
-        }
-        
-        // Update metrics
-        *self.metrics.get_mut("opportunities_evaluated").unwrap() += opportunities.len() as f64;
-        
-        // Filter opportunities by minimum profit threshold
-        let mut filtered: Vec<CrossChainOpportunity> = opportunities
-            .iter()
-            .filter(|opp| {
-                // Check if the profit percentage is above the threshold
-                if opp.profit_pct < self.params.min_profit_threshold {
-                    return false;
-                }
-                
-                // Check if the input amount is within limits
-                if opp.input_amount > self.params.max_capital_allocation {
-                    return false;
-                }
-                
-                // Check if the opportunity is still valid (not expired)
-                let current_time = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs();
-                
-                if current_time > opp.expires_at {
-                    return false;
-                }
-                
-                // Filter by bridge
-                if !self.params.bridges.is_empty() && !self.params.bridges.contains(&opp.bridge) {
-                    return false;
-                }
-                
-                // Filter by token allowlist
-                if !self.params.token_allowlist.is_empty() {
-                    if !self.params.token_allowlist.contains(&opp.source_token) &&
-                       !self.params.token_allowlist.contains(&opp.target_token) {
-                        return false;
-                    }
-                }
-                
-                // Filter by token blocklist
-                if self.params.token_blocklist.contains(&opp.source_token) ||
-                   self.params.token_blocklist.contains(&opp.target_token) {
-                    return false;
-                }
-                
-                true
-            })
-            .cloned()
-            .collect();
-        
-        // Sort opportunities by profit percentage (descending) or volume (if prioritize_volume is true)
-        if self.params.prioritize_volume {
-            filtered.sort_by(|a, b| b.input_amount.partial_cmp(&a.input_amount).unwrap());
-        } else {
-            filtered.sort_by(|a, b| b.profit_pct.partial_cmp(&a.profit_pct).unwrap());
-        }
-        
-        // Limit to max_simultaneous_trades
-        let selected = filtered.into_iter().take(self.params.max_simultaneous_trades).collect::<Vec<_>>();
-        
-        // Update metrics
-        *self.metrics.get_mut("opportunities_selected").unwrap() += selected.len() as f64;
-        
-        let total_expected_profit: f64 = selected.iter().map(|opp| opp.expected_profit).sum();
-        *self.metrics.get_mut("total_expected_profit").unwrap() += total_expected_profit;
-        
-        if !selected.is_empty() {
-            let avg_profit_pct = selected.iter().map(|opp| opp.profit_pct).sum::<f64>() / selected.len() as f64;
-            *self.metrics.get_mut("average_profit_pct").unwrap() = avg_profit_pct;
-        }
-        
-        Ok(selected)
+    pub fn get_opportunities(&self) -> Vec<CrossChainOpportunity> {
+        let locked_opportunities = self.opportunities.lock().unwrap();
+        locked_opportunities.clone()
     }
     
-    /// Evaluate an opportunity against current strategy parameters
-    pub fn evaluate_opportunity(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
-        if !self.is_initialized {
-            return Err("Strategy not initialized".to_string());
-        }
+    fn generate_example_opportunities(&self) -> Vec<CrossChainOpportunity> {
+        // This is just for example purposes
+        // In a real implementation, this would actually find real opportunities
         
-        // Base score is the profit percentage
-        let mut score = opportunity.profit_pct;
-        
-        // Adjust score based on risk factor and other parameters
-        
-        // Lower score for opportunities close to expiry
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        
-        let time_remaining = opportunity.expires_at.saturating_sub(current_time);
-        let time_factor = (time_remaining as f64 / self.params.opportunity_timeout as f64).min(1.0);
-        
-        // Time factor has more weight when risk factor is lower
-        score *= 0.8 + (0.2 * time_factor * (1.0 - self.params.risk_factor));
-        
-        // Adjust score based on bridge trust (future enhancement)
-        
-        Ok(score)
+        vec![
+            CrossChainOpportunity {
+                id: "cc-arb-001".to_string(),
+                source_chain: Chain::Solana,
+                target_chain: Chain::Ethereum,
+                source_token: "USDC".to_string(),
+                target_token: "USDC".to_string(),
+                input_amount: 1000.0,
+                expected_output: 1015.0,
+                profit_percentage: 1.5,
+                estimated_gas_cost: 5.0,
+                net_profit: 10.0,
+                route: vec![
+                    PathStep {
+                        chain: Chain::Solana,
+                        dex: "Jupiter".to_string(),
+                        input_token: "USDC".to_string(),
+                        output_token: "USDC".to_string(),
+                        expected_rate: 1.0,
+                    },
+                    PathStep {
+                        chain: Chain::Ethereum,
+                        dex: "Uniswap".to_string(),
+                        input_token: "USDC".to_string(),
+                        output_token: "USDC".to_string(),
+                        expected_rate: 1.015,
+                    },
+                ],
+                timestamp: crate::utils::current_timestamp(),
+                validity_period: Duration::from_secs(60),
+                confidence: 0.95,
+            },
+            // Add more example opportunities if needed
+        ]
     }
-    
-    /// Calculate optimal trade size for an opportunity
-    pub fn calculate_trade_size(&self, opportunity: &CrossChainOpportunity) -> Result<f64, String> {
-        if !self.is_initialized {
-            return Err("Strategy not initialized".to_string());
-        }
-        
-        // Start with the maximum between opportunity input and our max capital
-        let max_size = opportunity.input_amount.min(self.params.max_capital_allocation);
-        
-        // Adjust based on risk factor - lower risk means smaller trades
-        let size_factor = 0.5 + (0.5 * self.params.risk_factor);
-        let adjusted_size = max_size * size_factor;
-        
-        // Ensure minimum viable trade size (at least $5)
-        let final_size = adjusted_size.max(5.0);
-        
-        Ok(final_size)
-    }
+}
+
+// External API for the strategy
+pub fn create_strategy() -> Strategy {
+    Strategy::new(StrategyConfig::default())
+}
+
+pub fn start_strategy(strategy: &mut Strategy) -> Result<(), Box<dyn Error>> {
+    strategy.start()
+}
+
+pub fn stop_strategy(strategy: &mut Strategy) -> Result<(), Box<dyn Error>> {
+    strategy.stop()
+}
+
+pub fn scan_opportunities(strategy: &mut Strategy) -> Result<Vec<CrossChainOpportunity>, Box<dyn Error>> {
+    strategy.scan_for_opportunities()
+}
+
+pub fn get_current_opportunities(strategy: &Strategy) -> Vec<CrossChainOpportunity> {
+    strategy.get_opportunities()
 }
