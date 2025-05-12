@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env ts-node
 
 /**
  * Hyperion Trading System - Agent Control CLI
@@ -7,8 +7,47 @@
  * Provides fine-grained control over individual agents from the terminal.
  */
 
-const http = require('http');
-const readline = require('readline');
+import * as http from 'http';
+import * as readline from 'readline';
+
+interface AgentMetrics {
+  totalExecutions: number;
+  successRate: number;
+  totalProfit: number;
+  lastExecution?: string;
+}
+
+interface AgentWallets {
+  trading?: string;
+  profit?: string;
+  fee?: string;
+  stealth?: string[];
+}
+
+interface AgentStatus {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  active: boolean;
+  wallets?: AgentWallets;
+  metrics?: AgentMetrics;
+  lastError?: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+  id?: string;
+  signature?: string;
+}
+
+interface WalletStatus {
+  address: string;
+  status: string;
+  balance: number;
+  lastUpdated: string;
+}
 
 const CONFIG = {
   apiEndpoint: 'http://localhost:5000',
@@ -34,7 +73,7 @@ const colors = {
 };
 
 // Helper function for making API requests
-function makeRequest(method, path, data = null) {
+function makeRequest(method: string, path: string, data: any = null): Promise<any> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'localhost',
@@ -76,7 +115,7 @@ function makeRequest(method, path, data = null) {
 }
 
 // Display the agent control menu
-function displayMenu() {
+function displayMenu(): void {
   console.clear();
   console.log(`${colors.bold}${colors.cyan}HYPERION TRADING SYSTEM - AGENT CONTROL${colors.reset}\n`);
   console.log(`${colors.bold}COMMANDS:${colors.reset}`);
@@ -99,9 +138,9 @@ const rl = readline.createInterface({
 });
 
 // Main function to check agent status
-async function checkAgentStatus() {
+async function checkAgentStatus(): Promise<void> {
   try {
-    const agentsData = await makeRequest('GET', '/api/agents');
+    const agentsData: AgentStatus[] = await makeRequest('GET', '/api/agents');
     
     console.log(`\n${colors.bold}AGENT STATUS:${colors.reset}`);
     console.log('--------------------------------------------------------------------------------');
@@ -138,14 +177,14 @@ async function checkAgentStatus() {
       
       console.log('--------------------------------------------------------------------------------');
     });
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error checking agent status: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to activate an agent
-async function activateAgent(agentName) {
-  let agentId;
+async function activateAgent(agentName: string): Promise<void> {
+  let agentId: string;
   
   switch (agentName.toLowerCase()) {
     case 'hyperion':
@@ -166,7 +205,7 @@ async function activateAgent(agentName) {
   }
   
   try {
-    const response = await makeRequest('POST', `/api/agents/activate/${agentId}`);
+    const response: ApiResponse = await makeRequest('POST', `/api/agents/activate/${agentId}`);
     
     if (response && response.success) {
       console.log(`${colors.green}✓ Agent ${agentName} activated successfully${colors.reset}`);
@@ -176,15 +215,15 @@ async function activateAgent(agentName) {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error activating agent ${agentName}: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to activate all agents
-async function activateAllAgents() {
+async function activateAllAgents(): Promise<void> {
   try {
-    const response = await makeRequest('POST', '/api/agents/activate-all');
+    const response: ApiResponse = await makeRequest('POST', '/api/agents/activate-all');
     
     if (response && response.success) {
       console.log(`${colors.green}✓ All agents activated successfully${colors.reset}`);
@@ -194,14 +233,14 @@ async function activateAllAgents() {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error activating agents: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to deactivate an agent
-async function deactivateAgent(agentName) {
-  let agentId;
+async function deactivateAgent(agentName: string): Promise<void> {
+  let agentId: string;
   
   switch (agentName.toLowerCase()) {
     case 'hyperion':
@@ -222,7 +261,7 @@ async function deactivateAgent(agentName) {
   }
   
   try {
-    const response = await makeRequest('POST', `/api/agents/deactivate/${agentId}`);
+    const response: ApiResponse = await makeRequest('POST', `/api/agents/deactivate/${agentId}`);
     
     if (response && response.success) {
       console.log(`${colors.green}✓ Agent ${agentName} deactivated successfully${colors.reset}`);
@@ -232,15 +271,15 @@ async function deactivateAgent(agentName) {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error deactivating agent ${agentName}: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to deactivate all agents
-async function deactivateAllAgents() {
+async function deactivateAllAgents(): Promise<void> {
   try {
-    const response = await makeRequest('POST', '/api/agents/deactivate-all');
+    const response: ApiResponse = await makeRequest('POST', '/api/agents/deactivate-all');
     
     if (response && response.success) {
       console.log(`${colors.green}✓ All agents deactivated successfully${colors.reset}`);
@@ -250,15 +289,15 @@ async function deactivateAllAgents() {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error deactivating agents: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to check wallet status
-async function checkWalletStatus() {
+async function checkWalletStatus(): Promise<void> {
   try {
-    const walletData = await makeRequest('GET', `/api/wallet/${CONFIG.systemWalletAddress}`);
+    const walletData: WalletStatus = await makeRequest('GET', `/api/wallet/${CONFIG.systemWalletAddress}`);
     
     console.log(`\n${colors.bold}SYSTEM WALLET STATUS:${colors.reset}`);
     console.log('--------------------------------------------------------------------------------');
@@ -274,13 +313,13 @@ async function checkWalletStatus() {
     console.log(`${colors.bold}Last Updated:${colors.reset} ${walletData.lastUpdated || 'Unknown'}`);
     
     console.log('--------------------------------------------------------------------------------');
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error checking wallet status: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to toggle real funds usage
-async function toggleRealFunds(setting) {
+async function toggleRealFunds(setting: string): Promise<void> {
   if (setting !== 'on' && setting !== 'off') {
     console.log(`${colors.red}Invalid setting. Use 'on' or 'off'.${colors.reset}`);
     return;
@@ -289,7 +328,7 @@ async function toggleRealFunds(setting) {
   const useRealFunds = setting === 'on';
   
   try {
-    const response = await makeRequest('POST', '/api/real-funds', { useRealFunds });
+    const response: ApiResponse = await makeRequest('POST', '/api/real-funds', { useRealFunds });
     
     if (response && response.success) {
       if (useRealFunds) {
@@ -304,17 +343,17 @@ async function toggleRealFunds(setting) {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error updating real funds setting: ${error.message}${colors.reset}`);
   }
 }
 
 // Function to execute a test transaction
-async function executeTestTransaction() {
+async function executeTestTransaction(): Promise<void> {
   try {
     console.log(`${colors.yellow}Executing test transaction...${colors.reset}`);
     
-    const response = await makeRequest('POST', '/api/test-transaction');
+    const response: ApiResponse = await makeRequest('POST', '/api/test-transaction');
     
     if (response && response.success) {
       console.log(`${colors.green}✓ Test transaction executed successfully${colors.reset}`);
@@ -326,13 +365,13 @@ async function executeTestTransaction() {
         console.log(`${colors.yellow}  ${response.message}${colors.reset}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}Error executing test transaction: ${error.message}${colors.reset}`);
   }
 }
 
 // Process commands
-async function processCommand(input) {
+async function processCommand(input: string): Promise<void> {
   const [command, ...args] = input.trim().split(' ');
   
   switch (command) {
@@ -405,7 +444,7 @@ async function processCommand(input) {
 }
 
 // Start the CLI
-async function startCLI() {
+async function startCLI(): Promise<void> {
   displayMenu();
   
   try {
@@ -418,7 +457,7 @@ async function startCLI() {
     } else {
       console.log(`${colors.yellow}⚠️ Warning: System status check returned unexpected result${colors.reset}`);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.log(`${colors.red}✗ Failed to connect to Hyperion Trading System: ${error.message}${colors.reset}`);
     console.log(`${colors.yellow}⚠️ Make sure the server is running and accessible at http://localhost:5000${colors.reset}`);
   }
@@ -439,7 +478,7 @@ if (require.main === module) {
   startCLI();
 }
 
-module.exports = {
+export {
   checkAgentStatus,
   activateAgent,
   deactivateAgent,

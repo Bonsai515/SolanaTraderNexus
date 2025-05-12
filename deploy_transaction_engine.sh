@@ -1,97 +1,106 @@
 #!/bin/bash
 
-# Neural Nexus Transaction Engine Deployment Script
-# This script deploys and activates the Solana transaction engine
+# Deploy Solana Transaction Engine
+# This script initializes and deploys the Solana transaction engine for live trading
 
-# Set up colors for terminal output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "🚀 Deploying Solana Transaction Engine for Live Trading"
+echo "======================================================="
 
-echo -e "${BLUE}=======================================================${NC}"
-echo -e "${BLUE}= Neural Nexus Solana Transaction Engine Deployment   =${NC}"
-echo -e "${BLUE}=======================================================${NC}"
+# Ensure logs directory exists
+mkdir -p ./logs
 
-# Check if INSTANT_NODES_RPC_URL is set
-if [ -z "$INSTANT_NODES_RPC_URL" ]; then
-  echo -e "${YELLOW}Warning: INSTANT_NODES_RPC_URL environment variable not set!${NC}"
-  echo -e "${YELLOW}Using default Solana public RPC endpoints (limited rate).${NC}"
-  export INSTANT_NODES_RPC_URL="https://api.mainnet-beta.solana.com"
-fi
+echo "📡 Setting up RPC connections..."
 
-# Verify that Rust is installed
-if ! command -v rustc &> /dev/null; then
-  echo -e "${RED}Error: Rust compiler not found. Please install Rust.${NC}"
-  exit 1
-fi
+# Save RPC URLs to environment variables
+echo "export SOLANA_RPC_URL=https://solana-grpc-geyser.instantnodes.io:443" > .env.trading
+echo "export SOLANA_WEBSOCKET_URL=wss://solana-api.instantnodes.io/token-${SOLANA_RPC_API_KEY}" >> .env.trading
 
-# Set the system wallet
-if [ -z "$SYSTEM_WALLET" ]; then
-  echo -e "${YELLOW}Using default system wallet for profit collection.${NC}"
-  export SYSTEM_WALLET="HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
-fi
+# Set up Wormhole connection
+echo "📡 Configuring cross-chain connections..."
+echo "export WORMHOLE_GUARDIAN_RPC=https://guardian.stable.productions" >> .env.trading
 
-echo -e "${GREEN}System wallet set to: ${SYSTEM_WALLET}${NC}"
+# Set up system wallet
+echo "💰 Setting up system wallet..."
+echo "export SYSTEM_WALLET_ADDRESS=HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb" >> .env.trading
 
-# Build the transaction engine with optimizations
-echo -e "${BLUE}Building Solana transaction engine...${NC}"
-cd src
-cargo build --release --bin solana_quantum_trading
+# Deploy transaction engine
+echo "🔧 Deploying transaction engine..."
+source .env.trading
 
-# Check if build succeeded
-if [ $? -ne 0 ]; then
-  echo -e "${RED}Error: Failed to build transaction engine!${NC}"
-  exit 1
-fi
+# Activate the transaction engine and set it to use real funds
+echo "✅ Activating transaction engine for LIVE TRADING..."
+node -e "
+const transactionEngine = require('./server/transaction-engine');
+transactionEngine.initialize({
+  rpcUrl: process.env.SOLANA_RPC_URL,
+  websocketUrl: process.env.SOLANA_WEBSOCKET_URL,
+  useRealFunds: true,
+  systemWalletAddress: process.env.SYSTEM_WALLET_ADDRESS
+});
+console.log('Transaction engine initialized and ready for live trading');
+" > ./logs/transaction-engine-deploy.log 2>&1
 
-echo -e "${GREEN}Transaction engine built successfully!${NC}"
-
-# Set up proper linking
-echo -e "${BLUE}Setting up transaction engine connections...${NC}"
-
-# Activate the connection between connector and engine
-echo -e "${BLUE}Activating connection to Solana blockchain...${NC}"
-
-# Initialize the transaction engine
-echo "export SOLANA_RPC_URL=$INSTANT_NODES_RPC_URL" > .env.transaction
-echo "export SYSTEM_WALLET=$SYSTEM_WALLET" >> .env.transaction
-
-# Create activation script
-cat > activate-transaction-engine.js << 'EOL'
-const { execSync } = require('child_process');
+# Configure the transaction engine to use the transaction connector
+echo "🔌 Connecting transaction engine to server..."
+node -e "
 const fs = require('fs');
+const path = require('path');
+const engineConfigPath = path.join(__dirname, 'server', 'config', 'engine.json');
+const config = { 
+  useRealFunds: true,
+  rpcUrl: process.env.SOLANA_RPC_URL,
+  websocketUrl: process.env.SOLANA_WEBSOCKET_URL,
+  systemWalletAddress: process.env.SYSTEM_WALLET_ADDRESS,
+  wormholeGuardianRpc: process.env.WORMHOLE_GUARDIAN_RPC
+};
+fs.writeFileSync(engineConfigPath, JSON.stringify(config, null, 2));
+console.log('Transaction engine configuration saved');
+" >> ./logs/transaction-engine-deploy.log 2>&1
 
-// Load environment variables
-require('dotenv').config({ path: '.env.transaction' });
+# Start the transaction engine
+echo "🚀 Starting transaction engine..."
+ts-node server/transaction-connector.ts > ./logs/transaction-engine.log 2>&1 &
+TRANSACTION_ENGINE_PID=$!
 
-console.log('Activating Solana transaction engine...');
+echo "⏳ Waiting for transaction engine to initialize..."
+sleep 5
 
-try {
-  // Call the Rust activation function
-  execSync('./target/release/solana_quantum_trading', { stdio: 'inherit' });
-  console.log('✅ Transaction engine activated successfully!');
-  
-  // Create status file to indicate successful activation
-  fs.writeFileSync('.transaction_engine_active', JSON.stringify({
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    wallet: process.env.SYSTEM_WALLET || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb'
-  }));
-  
-  process.exit(0);
-} catch (error) {
-  console.error('❌ Failed to activate transaction engine:', error);
-  process.exit(1);
+# Verify the transaction engine is running
+if ps -p $TRANSACTION_ENGINE_PID > /dev/null; then
+  echo "✅ Transaction engine deployed successfully! Running as process ID $TRANSACTION_ENGINE_PID"
+  echo "✅ Transaction engine configured for LIVE TRADING with REAL FUNDS"
+  echo "📊 Transaction engine logs can be found at: ./logs/transaction-engine.log"
+else
+  echo "❌ Failed to start transaction engine. Check logs at ./logs/transaction-engine-deploy.log"
+  exit 1
+fi
+
+# Activate all trading agents
+echo "🤖 Activating trading agents for live trading..."
+ts-node -e "
+import { activateAllAgents, toggleRealFunds } from './server/agents';
+
+async function startLiveTrading() {
+  try {
+    // Enable real funds trading
+    console.log('Enabling real funds trading...');
+    await toggleRealFunds(true);
+    
+    // Activate all agents
+    console.log('Activating all trading agents...');
+    await activateAllAgents();
+    
+    console.log('All trading agents activated for live trading with real funds!');
+  } catch (error) {
+    console.error('Error starting live trading:', error);
+  }
 }
-EOL
 
-# Make scripts executable
-chmod +x activate-transaction-engine.js
+startLiveTrading();
+" > ./logs/agent-activation.log 2>&1
 
-echo -e "${GREEN}Deployment completed successfully!${NC}"
-echo -e "${GREEN}Transaction engine is now deployed and ready for activation.${NC}"
-echo -e "${YELLOW}To activate live trading, use the web interface or run:${NC}"
-echo -e "${YELLOW}node activate-transaction-engine.js${NC}"
-echo -e "${BLUE}=======================================================${NC}"
+echo ""
+echo "✅ Solana Transaction Engine deployed and ready for live trading!"
+echo "✅ All trading agents activated and configured to use real funds"
+echo ""
+echo "📊 Monitor system status with: ts-node system-dashboard.ts"

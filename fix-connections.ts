@@ -5,90 +5,89 @@
  * for live trading with real funds.
  */
 
-import axios from 'axios';
-import { Connection } from '@solana/web3.js';
-import { logger } from './server/logger';
-import { initializeWormholeConnector, checkWormholeConnection } from './server/wormhole/wormholeConnector';
+import * as http from 'http';
 
-// RPC URLs
-const INSTANT_NODES_RPC_URL = process.env.INSTANT_NODES_RPC_URL;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const SOLANA_RPC_API_KEY = process.env.SOLANA_RPC_API_KEY;
+// Color formatting for terminal output
+const colors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  bold: '\x1b[1m',
+};
 
-// AI API Keys
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+console.log(`${colors.bold}${colors.cyan}HYPERION TRADING SYSTEM - CONNECTION FIX${colors.reset}\n`);
+console.log(`${colors.yellow}Attempting to fix API connections for live trading...${colors.reset}\n`);
+
+// Helper function for making API requests
+function makeRequest(method: string, path: string, data: any = null): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 5000,
+      path: path,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          resolve(parsedData);
+        } catch (error) {
+          reject(new Error(`Failed to parse response: ${responseData}`));
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      reject(error);
+    });
+    
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    
+    req.end();
+  });
+}
 
 /**
  * Fix Solana RPC connection issues
  * @returns true if connection is successful
  */
 async function fixSolanaConnection(): Promise<boolean> {
-  logger.info('Testing Solana RPC connection...');
-
+  console.log(`${colors.blue}Fixing Solana RPC connection...${colors.reset}`);
+  
   try {
-    // Try InstantNodes first (primary) - fixed URL format
-    if (INSTANT_NODES_RPC_URL) {
-      try {
-        // Format 1: Direct with token in URL
-        const instantNodesConnection = new Connection(`https://solana-api.instantnodes.io/token-${INSTANT_NODES_RPC_URL}`);
-        const blockHeight = await instantNodesConnection.getBlockHeight();
-        logger.info(`✅ InstantNodes connection successful! Block height: ${blockHeight}`);
-        return true;
-      } catch (error) {
-        logger.warn(`InstantNodes format 1 failed: ${error}`);
-        
-        try {
-          // Format 2: Alternative format
-          const instantNodesConnection2 = new Connection(`https://solana-grpc-geyser.instantnodes.io/${INSTANT_NODES_RPC_URL}`);
-          const blockHeight = await instantNodesConnection2.getBlockHeight();
-          logger.info(`✅ InstantNodes connection (format 2) successful! Block height: ${blockHeight}`);
-          return true;
-        } catch (error) {
-          logger.warn(`InstantNodes format 2 failed: ${error}`);
-        }
-      }
-    }
+    // Use the provided InstantNodes RPC URL
+    const response = await makeRequest('POST', '/api/fix-solana-connection');
     
-    // Try Helius if InstantNodes fails
-    if (HELIUS_API_KEY) {
-      try {
-        const heliusConnection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`);
-        const blockHeight = await heliusConnection.getBlockHeight();
-        logger.info(`✅ Helius connection successful! Block height: ${blockHeight}`);
-        return true;
-      } catch (error) {
-        logger.warn(`Helius connection failed: ${error}`);
-      }
-    }
-    
-    // Try standard Solana RPC as fallback
-    if (SOLANA_RPC_API_KEY) {
-      try {
-        const solanaConnection = new Connection(`https://api.mainnet-beta.solana.com/${SOLANA_RPC_API_KEY}`);
-        const blockHeight = await solanaConnection.getBlockHeight();
-        logger.info(`✅ Solana RPC connection successful! Block height: ${blockHeight}`);
-        return true;
-      } catch (error) {
-        logger.warn(`Standard Solana RPC connection failed: ${error}`);
-      }
-    }
-    
-    // Try public endpoint as last resort
-    try {
-      const publicConnection = new Connection('https://api.mainnet-beta.solana.com');
-      const blockHeight = await publicConnection.getBlockHeight();
-      logger.info(`✅ Public Solana RPC connection successful! Block height: ${blockHeight}`);
+    if (response && response.success) {
+      console.log(`${colors.green}✓ Solana RPC connection fixed successfully${colors.reset}`);
+      console.log(`  ${colors.bold}Provider:${colors.reset} ${response.provider || 'InstantNodes'}`);
+      console.log(`  ${colors.bold}Network:${colors.reset} ${response.network || 'Mainnet'}`);
       return true;
-    } catch (error) {
-      logger.warn(`Public RPC connection failed: ${error}`);
+    } else {
+      console.log(`${colors.red}✗ Failed to fix Solana RPC connection${colors.reset}`);
+      if (response && response.message) {
+        console.log(`  ${colors.yellow}${response.message}${colors.reset}`);
+      }
+      return false;
     }
-    
-    // If all attempts failed
-    logger.error('❌ All Solana RPC connection attempts failed');
-    return false;
-  } catch (error) {
-    logger.error(`❌ Unexpected error in Solana connection process: ${error}`);
+  } catch (error: any) {
+    console.log(`${colors.red}✗ Error fixing Solana RPC connection: ${error.message}${colors.reset}`);
     return false;
   }
 }
@@ -98,21 +97,24 @@ async function fixSolanaConnection(): Promise<boolean> {
  * @returns true if connection is successful
  */
 async function fixWormholeConnection(): Promise<boolean> {
-  logger.info('Testing Wormhole connection...');
+  console.log(`${colors.blue}Fixing Wormhole connection...${colors.reset}`);
   
   try {
-    // Use our TypeScript implementation that doesn't require an API key
-    const isConnected = await checkWormholeConnection();
+    const response = await makeRequest('POST', '/api/fix-wormhole-connection');
     
-    if (isConnected) {
-      logger.info('✅ Wormhole connection successful using Guardian RPC network!');
+    if (response && response.success) {
+      console.log(`${colors.green}✓ Wormhole connection fixed successfully${colors.reset}`);
+      console.log(`  ${colors.bold}Mode:${colors.reset} ${response.mode || 'Guardian RPCs (no API key)'}`);
       return true;
     } else {
-      logger.error('❌ Wormhole connection failed using all Guardian RPCs');
+      console.log(`${colors.red}✗ Failed to fix Wormhole connection${colors.reset}`);
+      if (response && response.message) {
+        console.log(`  ${colors.yellow}${response.message}${colors.reset}`);
+      }
       return false;
     }
-  } catch (error) {
-    logger.error(`❌ Wormhole connection error: ${error}`);
+  } catch (error: any) {
+    console.log(`${colors.red}✗ Error fixing Wormhole connection: ${error.message}${colors.reset}`);
     return false;
   }
 }
@@ -122,160 +124,88 @@ async function fixWormholeConnection(): Promise<boolean> {
  * @returns true if at least one connection is successful
  */
 async function fixAIConnections(): Promise<boolean> {
-  logger.info('Testing AI API connections...');
+  console.log(`${colors.blue}Fixing AI API connections...${colors.reset}`);
   
-  let perplexityConnected = false;
-  let deepseekConnected = false;
-  
-  // Test Perplexity with improved error handling
-  if (PERPLEXITY_API_KEY) {
-    try {
-      // Use the newer model and adjusted parameters for better compatibility
-      const response = await axios({
-        method: 'post',
-        url: 'https://api.perplexity.ai/chat/completions',
-        headers: {
-          'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        data: {
-          model: 'llama-3.1-sonar-small-128k-online',
-          messages: [
-            {
-              role: 'system',
-              content: 'Be precise and concise.'
-            },
-            {
-              role: 'user',
-              content: 'Test connection'
-            }
-          ],
-          temperature: 0.2,
-          max_tokens: 5,
-          stream: false
-        },
-        timeout: 10000
-      });
+  try {
+    const response = await makeRequest('POST', '/api/fix-ai-connections');
+    
+    if (response && response.success) {
+      console.log(`${colors.green}✓ AI connections fixed successfully${colors.reset}`);
       
-      if (response.status === 200) {
-        logger.info('✅ Perplexity API connection successful!');
-        perplexityConnected = true;
-      }
-    } catch (error: any) {
-      // Check if the API key might be invalid or account has payment issues
-      if (error.response && error.response.status === 401) {
-        logger.error(`❌ Perplexity API connection failed: Invalid API key or unauthorized access`);
-      } else if (error.response && error.response.status === 402) {
-        logger.error(`❌ Perplexity API connection failed: Payment required. Your account may need credits.`);
+      if (response.perplexity) {
+        console.log(`  ${colors.bold}Perplexity API:${colors.reset} Connected`);
       } else {
-        logger.error(`❌ Perplexity API connection failed: ${error.message || error}`);
+        console.log(`  ${colors.yellow}Perplexity API:${colors.reset} Not available`);
       }
-    }
-  } else {
-    logger.warn('⚠️ Perplexity API key not found');
-  }
-  
-  // Test DeepSeek with improved error handling
-  if (DEEPSEEK_API_KEY) {
-    try {
-      // Improved request format for better compatibility
-      const response = await axios({
-        method: 'post',
-        url: 'https://api.deepseek.com/v1/chat/completions',
-        headers: {
-          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        data: {
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a trading assistant.'
-            },
-            {
-              role: 'user',
-              content: 'Test connection'
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 5,
-          stream: false
-        },
-        timeout: 10000
-      });
       
-      if (response.status === 200) {
-        logger.info('✅ DeepSeek API connection successful!');
-        deepseekConnected = true;
-      }
-    } catch (error: any) {
-      // Check if the API key might be invalid or account has payment issues
-      if (error.response && error.response.status === 401) {
-        logger.error(`❌ DeepSeek API connection failed: Invalid API key or unauthorized access`);
-      } else if (error.response && error.response.status === 402) {
-        logger.error(`❌ DeepSeek API connection failed: Payment required. Your account may need credits.`);
+      if (response.deepseek) {
+        console.log(`  ${colors.bold}DeepSeek API:${colors.reset} Connected`);
       } else {
-        logger.error(`❌ DeepSeek API connection failed: ${error.message || error}`);
+        console.log(`  ${colors.yellow}DeepSeek API:${colors.reset} Not available`);
       }
+      
+      return true;
+    } else {
+      console.log(`${colors.red}✗ Failed to fix AI connections${colors.reset}`);
+      if (response && response.message) {
+        console.log(`  ${colors.yellow}${response.message}${colors.reset}`);
+      }
+      console.log(`  ${colors.yellow}Note: AI connections are recommended but not required for trading${colors.reset}`);
+      return false;
     }
-  } else {
-    logger.warn('⚠️ DeepSeek API key not found');
+  } catch (error: any) {
+    console.log(`${colors.red}✗ Error fixing AI connections: ${error.message}${colors.reset}`);
+    console.log(`  ${colors.yellow}Note: AI connections are recommended but not required for trading${colors.reset}`);
+    return false;
   }
-  
-  // If both APIs fail, we should still continue with trading
-  if (!perplexityConnected && !deepseekConnected) {
-    logger.warn('⚠️ AI API connections failed, but trading can continue without AI assistance');
-    // Return true so that the connection failures don't block live trading
-    return true;
-  }
-  
-  return perplexityConnected || deepseekConnected;
 }
 
 /**
  * Main function to fix all connections
  */
-export async function tryConnectAPI() {
-  logger.info('Fixing API connections for live trading...');
-  
-  // Initialize connections
-  const solanaConnected = await fixSolanaConnection();
-  const wormholeConnected = await fixWormholeConnection();
-  const aiConnected = await fixAIConnections();
-  
-  // Return overall status
-  // Only Solana connection is critical for trading
-  // Wormhole is needed for cross-chain strategies but not for all trading
-  // AI is completely optional
-  const liveTradingPossible = solanaConnected;
-  
-  return {
-    solana: solanaConnected,
-    wormhole: wormholeConnected, 
-    ai: aiConnected,
-    allConnected: liveTradingPossible
-  };
+export async function tryConnectAPI(): Promise<void> {
+  try {
+    console.log(`${colors.cyan}Checking API health...${colors.reset}`);
+    
+    const healthCheck = await makeRequest('GET', '/api/health');
+    
+    if (healthCheck && healthCheck.status === 'ok') {
+      console.log(`${colors.green}✓ API is healthy${colors.reset}`);
+      
+      // Fix Solana connection
+      const solanaFixed = await fixSolanaConnection();
+      
+      // Fix Wormhole connection
+      const wormholeFixed = await fixWormholeConnection();
+      
+      // Fix AI connections (optional)
+      const aiFixed = await fixAIConnections();
+      
+      console.log(`\n${colors.bold}Connection Fix Summary:${colors.reset}`);
+      console.log(`  ${solanaFixed ? colors.green + '✓' : colors.red + '✗'} Solana RPC: ${solanaFixed ? 'Fixed' : 'Failed'}${colors.reset}`);
+      console.log(`  ${wormholeFixed ? colors.green + '✓' : colors.red + '✗'} Wormhole: ${wormholeFixed ? 'Fixed' : 'Failed'}${colors.reset}`);
+      console.log(`  ${aiFixed ? colors.green + '✓' : colors.yellow + '⚠️'} AI APIs: ${aiFixed ? 'Fixed' : 'Not available (optional)'}${colors.reset}`);
+      
+      const overallSuccess = solanaFixed && wormholeFixed;
+      
+      if (overallSuccess) {
+        console.log(`\n${colors.green}${colors.bold}All critical connections fixed successfully!${colors.reset}`);
+        console.log(`${colors.green}The system is ready for live trading.${colors.reset}`);
+      } else {
+        console.log(`\n${colors.yellow}${colors.bold}Some connections could not be fixed.${colors.reset}`);
+        console.log(`${colors.yellow}Live trading may be limited or unavailable.${colors.reset}`);
+      }
+    } else {
+      console.log(`${colors.red}✗ API health check failed${colors.reset}`);
+      console.log(`${colors.yellow}Please ensure the server is running.${colors.reset}`);
+    }
+  } catch (error: any) {
+    console.log(`${colors.red}✗ Error connecting to API: ${error.message}${colors.reset}`);
+    console.log(`${colors.yellow}Please ensure the server is running on http://localhost:5000${colors.reset}`);
+  }
 }
 
-// Run if executed directly
+// Run the script if it's called directly
 if (require.main === module) {
-  tryConnectAPI()
-    .then(status => {
-      logger.info('Connection status:', status);
-      
-      if (status.allConnected) {
-        logger.info('✅ All critical connections fixed!');
-        process.exit(0);
-      } else {
-        logger.error('❌ Some connections could not be fixed');
-        process.exit(1);
-      }
-    })
-    .catch(error => {
-      logger.error('❌ Connection fix failed:', error);
-      process.exit(1);
-    });
+  tryConnectAPI();
 }
