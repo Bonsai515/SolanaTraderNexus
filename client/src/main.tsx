@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { QueryClientProvider } from './lib/queryClient';
+import { ToastProvider } from '@/components/ui/toast';
 
 // Fix for TypeScript's error if root element is null
 const rootElement = document.getElementById('root');
@@ -16,7 +17,9 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement || document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider>
+      <ToastProvider>
         <App />
+      </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

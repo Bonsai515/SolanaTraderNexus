@@ -6,9 +6,12 @@ import Trading from './pages/Trading';
 import NeuralConnector from './pages/NeuralConnector';
 import WalletMonitor from './pages/WalletMonitor';
 import { useEffect, useState } from 'react';
-import { ToastProvider } from './hooks/use-toast';
+import { Toaster } from './components/ui/toaster';
 
-// Simple Dashboard Component
+// Import LiveTradingActivator component
+import LiveTradingActivator from './components/LiveTradingActivator';
+
+// Dashboard Component
 function Dashboard() {
   const [marketData, setMarketData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -115,6 +118,9 @@ function Dashboard() {
         Welcome to the advanced quantum-inspired trading platform for Solana blockchain.
       </p>
       
+      {/* Live Trading Activator - Added at the top for visibility */}
+      <LiveTradingActivator />
+      
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Market Data Status Card */}
         <div className="p-6 rounded-lg bg-gray-800 border border-gray-700">
@@ -191,39 +197,38 @@ function Dashboard() {
 
 function App() {
   return (
-    <ToastProvider>
-      <div className="min-h-screen bg-gray-900 text-white">
-        <header className="border-b border-gray-800 py-4">
-          <div className="container mx-auto px-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-blue-400">Solana Quantum Trading</h1>
-            </div>
-            <nav>
-              <ul className="flex space-x-6">
-                <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
-                <li><Link href="/trading" className="hover:text-blue-400 transition-colors">Trading</Link></li>
-                <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
-                <li><Link href="/neural" className="hover:text-blue-400 transition-colors">Neural Connector</Link></li>
-                <li><Link href="/wallets" className="hover:text-blue-400 transition-colors">Wallet Monitor</Link></li>
-                <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
-                <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
-              </ul>
-            </nav>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <header className="border-b border-gray-800 py-4">
+        <div className="container mx-auto px-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-blue-400">Solana Quantum Trading</h1>
           </div>
-        </header>
+          <nav>
+            <ul className="flex space-x-6">
+              <li><Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link></li>
+              <li><Link href="/trading" className="hover:text-blue-400 transition-colors">Trading</Link></li>
+              <li><Link href="/insights" className="hover:text-blue-400 transition-colors">AI Insights</Link></li>
+              <li><Link href="/neural" className="hover:text-blue-400 transition-colors">Neural Connector</Link></li>
+              <li><Link href="/wallets" className="hover:text-blue-400 transition-colors">Wallet Monitor</Link></li>
+              <li><Link href="/system" className="hover:text-blue-400 transition-colors">System Dashboard</Link></li>
+              <li><Link href="/ws-test" className="hover:text-blue-400 transition-colors">WebSocket Test</Link></li>
+            </ul>
+          </nav>
+        </div>
+      </header>
 
-        <main className="container mx-auto px-4 py-8">
-          <Route path="/" component={Dashboard} />
-          <Route path="/trading" component={Trading} />
-          <Route path="/insights" component={Dashboard} />
-          <Route path="/neural" component={NeuralConnector} />
-          <Route path="/wallets" component={WalletMonitor} />
-          <Route path="/system" component={SystemDashboard} />
-          <Route path="/ws-test" component={WebSocketTest} />
-          <Route path="/:rest*" component={NotFound} />
-        </main>
-      </div>
-    </ToastProvider>
+      <main className="container mx-auto px-4 py-8">
+        <Route path="/" component={Dashboard} />
+        <Route path="/trading" component={Trading} />
+        <Route path="/insights" component={Dashboard} />
+        <Route path="/neural" component={NeuralConnector} />
+        <Route path="/wallets" component={WalletMonitor} />
+        <Route path="/system" component={SystemDashboard} />
+        <Route path="/ws-test" component={WebSocketTest} />
+        <Route path="/:rest*" component={NotFound} />
+      </main>
+      <Toaster />
+    </div>
   );
 }
 
