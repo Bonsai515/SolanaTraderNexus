@@ -39,7 +39,7 @@ localPort = 24678
 externalPort = 3001
 
 [workflows]
-runButton = "Start"
+runButton = "Build and Start"
 
 [[workflows.workflow]]
 name = "Project"
@@ -67,3 +67,20 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm install && npm run dev"
+
+[[workflows.workflow]]
+name = "Build and Start"
+author = 39917403
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run start"
