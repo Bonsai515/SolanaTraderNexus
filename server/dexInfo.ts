@@ -4,6 +4,35 @@
  * Provides information about supported DEXes on Solana
  */
 
+export enum DexType {
+  Jupiter = 'jupiter',
+  Openbook = 'openbook',
+  Raydium = 'raydium',
+  Orca = 'orca',
+  Meteora = 'meteora',
+  PumpFun = 'pump.fun',
+  GMGN = 'gmgn',
+  DexScreener = 'dexscreener',
+  Moonshot = 'moonshot',
+  Birdeye = 'birdeye'
+}
+
+export enum DexCategory {
+  AMM = 'amm',
+  OrderBook = 'orderbook',
+  Aggregator = 'aggregator',
+  Analytics = 'analytics',
+  Launchpad = 'launchpad'
+}
+
+export enum LendingProtocolType {
+  MarginFi = 'marginfi',
+  Kamino = 'kamino',
+  Mercurial = 'mercurial',
+  Jet = 'jet',
+  Bolt = 'bolt'
+}
+
 export interface DexInfo {
   id: string;
   name: string;
@@ -71,6 +100,61 @@ const dexes: DexInfo[] = [
     fees: {
       maker: 0.0,
       taker: 0.0004
+    }
+  },
+  {
+    id: 'pump.fun',
+    name: 'pump.fun',
+    url: 'https://pump.fun',
+    active: true,
+    features: ['memecoins', 'launchpad', 'swap'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0025
+    }
+  },
+  {
+    id: 'gmgn',
+    name: 'GMGN',
+    url: 'https://gmgn.ai',
+    active: true,
+    features: ['ai-powered', 'intelligent-swap', 'predictive-algo'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0005
+    }
+  },
+  {
+    id: 'dexscreener',
+    name: 'DEX Screener',
+    url: 'https://dexscreener.com',
+    active: true,
+    features: ['market-data', 'analytics', 'screening'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0
+    }
+  },
+  {
+    id: 'moonshot',
+    name: 'Moonshot',
+    url: 'https://moonshot.com',
+    active: true,
+    features: ['launchpad', 'token-generator', 'staking'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0020
+    }
+  },
+  {
+    id: 'birdeye',
+    name: 'Birdeye',
+    url: 'https://birdeye.so',
+    active: true,
+    features: ['analytics', 'real-time-data', 'portfolio-tracking'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0
     }
   }
 ];
