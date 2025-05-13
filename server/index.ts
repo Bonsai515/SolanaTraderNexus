@@ -135,56 +135,107 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Initialize Nexus Transaction Engine with Instant Nodes RPC URL
-const { initializeTransactionEngine } = require('./nexus-transaction-engine');
-const instantNodesApiKey = process.env.INSTANT_NODES_RPC_URL;
+// Import enhanced modules
+const { initializeTransactionEngine, registerWallet } = require('./nexus-transaction-engine');
+const { initializeRpcConnection, verifyWalletConnection } = require('./lib/ensureRpcConnection');
+const { profitCapture } = require('./lib/profitCapture');
+const { connectToRustTransformers } = require('./connect-transformer-rust');
 
-// Use the provided exact URLs for Instant Nodes
-const instantNodesRpcUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-const instantNodesWsUrl = 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-// Alternative gRPC endpoint for advanced usage
-const instantNodesGrpcUrl = 'https://solana-grpc-geyser.instantnodes.io:443';
+// System wallet for all trading operations
+const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
 
-if (instantNodesRpcUrl) {
-  console.log('Initializing Nexus Professional Engine with Instant Nodes RPC, WebSocket and gRPC URLs');
-  initializeTransactionEngine(instantNodesRpcUrl, true, instantNodesWsUrl, instantNodesGrpcUrl)
-    .then(success => {
-      if (success) {
-        console.log('✅ Successfully initialized Nexus Professional Engine with all Instant Nodes endpoints');
-        
-        // Initialize the transformers (Security, CrossChain, MemeCortex)
-        const { initializeTransformers } = require('./transformers');
-        initializeTransformers()
-          .then(() => {
-            console.log('✅ Successfully initialized all transformers with neural-quantum entanglement');
-            
-            // Initialize and activate the trading agents
-            const { startAgentSystem } = require('./agents');
-            startAgentSystem()
-              .then(agentSuccess => {
-                if (agentSuccess) {
-                  console.log('✅ Successfully initialized all AI trading agents');
-                } else {
-                  console.error('❌ Failed to initialize AI trading agents');
-                }
-              })
-              .catch(err => {
-                console.error('❌ Error initializing AI trading agents:', err.message);
-              });
-          })
-          .catch(err => {
-            console.error('❌ Error initializing transformers:', err.message);
-          });
-      } else {
-        console.error('❌ Failed to initialize Nexus Professional Engine');
+// Initialize the blockchain connection and engine with improved RPC reliability
+(async function initializeFullSystem() {
+  try {
+    console.log('Initializing Hyperion Trading System with enhanced reliability...');
+    
+    // Initialize Solana RPC connection with automatic fallback
+    console.log('Connecting to Solana blockchain via high-reliability connection...');
+    const solanaConnection = await initializeRpcConnection();
+    console.log('✅ Successfully established connection to Solana blockchain');
+    
+    // Verify the system wallet exists and has SOL
+    const walletVerified = await verifyWalletConnection(SYSTEM_WALLET);
+    if (walletVerified) {
+      console.log(`✅ System wallet ${SYSTEM_WALLET} verified and has SOL balance`);
+    } else {
+      console.warn(`⚠️ System wallet ${SYSTEM_WALLET} verification failed - check balance`);
+    }
+    
+    // Initialize profit capture system
+    console.log('Initializing profit capture mechanism...');
+    profitCapture.loadProfitData();
+    profitCapture.startAutomaticCapture(30); // Capture profits every 30 minutes
+    console.log('✅ Profit capture system activated with automatic collection');
+    
+    // Connect to Rust transformer binaries
+    console.log('Connecting to Rust transformer binaries...');
+    const transformersConnected = await connectToRustTransformers();
+    if (transformersConnected) {
+      console.log('✅ Successfully connected to all Rust transformer binaries');
+    } else {
+      console.warn('⚠️ Rust transformer binaries not fully available, using direct API integration');
+    }
+    
+    // Get Instant Nodes URLs from environment or use defaults with warning
+    const instantNodesRpcUrl = process.env.INSTANT_NODES_RPC_URL || 
+      'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+    const instantNodesWsUrl = process.env.INSTANT_NODES_WS_URL || 
+      'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+    const instantNodesGrpcUrl = process.env.INSTANT_NODES_GRPC_URL || 
+      'https://solana-grpc-geyser.instantnodes.io:443';
+    
+    console.log('Initializing Nexus Professional Engine with Instant Nodes endpoints');
+    
+    // Initialize transaction engine with the Solana connection
+    const success = await initializeTransactionEngine(
+      solanaConnection.rpcEndpoint || instantNodesRpcUrl,
+      true, // Use real funds by default
+      instantNodesWsUrl,
+      instantNodesGrpcUrl
+    );
+    
+    if (success) {
+      console.log('✅ Successfully initialized Nexus Professional Engine with enhanced RPC connection');
+      
+      // Register system wallet with the engine
+      registerWallet(SYSTEM_WALLET);
+      console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
+      
+      // Initialize the transformers (Security, CrossChain, MemeCortex)
+      const { initializeTransformers } = require('./transformers');
+      try {
+        const transformersInitialized = await initializeTransformers();
+        if (transformersInitialized) {
+          console.log('✅ Successfully initialized all transformers with neural-quantum entanglement');
+          
+          // Initialize and activate the trading agents
+          const { startAgentSystem } = require('./agents');
+          try {
+            const agentSuccess = await startAgentSystem();
+            if (agentSuccess) {
+              console.log('✅ Successfully initialized all AI trading agents');
+              console.log('*** STARTING FULL TRADING SYSTEM WITH ALL COMPONENTS FOR LIVE TRADING ***');
+              console.log('System wallet HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb activated for profit collection');
+            } else {
+              console.error('❌ Failed to initialize AI trading agents');
+            }
+          } catch (agentError) {
+            console.error('❌ Error initializing AI trading agents:', agentError.message);
+          }
+        } else {
+          console.error('❌ Failed to initialize transformers');
+        }
+      } catch (transformerError) {
+        console.error('❌ Error initializing transformers:', transformerError.message);
       }
-    })
-    .catch(err => {
-      console.error('❌ Error initializing Nexus Professional Engine:', err.message);
-    });
-} else {
-  console.warn('⚠️ INSTANT_NODES_RPC_URL environment variable not found, using public endpoint');
-}
+    } else {
+      console.error('❌ Failed to initialize Nexus Professional Engine');
+    }
+  } catch (error) {
+    console.error('❌ Error during system initialization:', error.message);
+  }
+})();
 
 // Register routes
 routes(app);
