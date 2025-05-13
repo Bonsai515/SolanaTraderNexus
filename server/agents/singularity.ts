@@ -295,6 +295,11 @@ class SingularityAgent {
     const opportunities: CrossChainOpportunity[] = [];
     
     try {
+      // Make sure CrossChain transformer is initialized
+      if (!crossChainTransformer.isInitialized()) {
+        crossChainTransformer.forceInitialize();
+      }
+      
       // Use the CrossChain transformer to find opportunities
       const crossChainOpps = await crossChainTransformer.findArbitrageOpportunities();
       
