@@ -138,17 +138,43 @@ wss.on('connection', (ws) => {
 // Initialize Nexus Transaction Engine with Instant Nodes RPC URL
 const { initializeTransactionEngine } = require('./nexus-transaction-engine');
 const instantNodesApiKey = process.env.INSTANT_NODES_RPC_URL;
-// Construct proper URL using the API key
-const instantNodesRpcUrl = instantNodesApiKey ? 
-  `https://solana-api.instantnodes.io/token-${instantNodesApiKey}` : 
-  null;
+
+// Use the provided exact URLs for Instant Nodes
+const instantNodesRpcUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+const instantNodesWsUrl = 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+// Alternative gRPC endpoint for advanced usage
+const instantNodesGrpcUrl = 'https://solana-grpc-geyser.instantnodes.io:443';
 
 if (instantNodesRpcUrl) {
-  console.log('Initializing Nexus Professional Engine with Instant Nodes RPC URL');
-  initializeTransactionEngine(instantNodesRpcUrl, true)
+  console.log('Initializing Nexus Professional Engine with Instant Nodes RPC, WebSocket and gRPC URLs');
+  initializeTransactionEngine(instantNodesRpcUrl, true, instantNodesWsUrl, instantNodesGrpcUrl)
     .then(success => {
       if (success) {
-        console.log('✅ Successfully initialized Nexus Professional Engine with Instant Nodes RPC');
+        console.log('✅ Successfully initialized Nexus Professional Engine with all Instant Nodes endpoints');
+        
+        // Initialize the transformers (Security, CrossChain, MemeCortex)
+        const { initializeTransformers } = require('./transformers');
+        initializeTransformers()
+          .then(() => {
+            console.log('✅ Successfully initialized all transformers with neural-quantum entanglement');
+            
+            // Initialize and activate the trading agents
+            const { startAgentSystem } = require('./agents');
+            startAgentSystem()
+              .then(agentSuccess => {
+                if (agentSuccess) {
+                  console.log('✅ Successfully initialized all AI trading agents');
+                } else {
+                  console.error('❌ Failed to initialize AI trading agents');
+                }
+              })
+              .catch(err => {
+                console.error('❌ Error initializing AI trading agents:', err.message);
+              });
+          })
+          .catch(err => {
+            console.error('❌ Error initializing transformers:', err.message);
+          });
       } else {
         console.error('❌ Failed to initialize Nexus Professional Engine');
       }

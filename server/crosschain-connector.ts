@@ -82,9 +82,9 @@ class CrossChainTransformer {
    */
   public async initialize(config?: any): Promise<boolean> {
     try {
-      // Initialize Solana connection
-      const rpcUrl = process.env.INSTANT_NODES_RPC_URL || web3.clusterApiUrl('mainnet-beta');
-      this.solanaConnection = new web3.Connection(rpcUrl);
+      // Initialize Solana connection with the proper formatted URL
+      const instantNodesRpcUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
+      this.solanaConnection = new web3.Connection(instantNodesRpcUrl);
       
       // Initialize Wormhole
       this.wormholeApiKey = process.env.WORMHOLE_API_KEY || null;

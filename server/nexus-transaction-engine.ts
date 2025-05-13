@@ -33,13 +33,15 @@ interface LendingProtocol {
 // Internal state
 let nexusInitialized = false;
 let rpcUrl = '';
+let wsUrl = '';
+let grpcUrl = '';
 let transactionCount = 0;
 let registeredWallets: string[] = [];
 let usingRealFunds = true;
 let solanaConnection: web3.Connection | null = null;
 let nexusEngineProcess: any = null;
 let rpcRateLimitMonitor = {
-  dailyLimit: 40000, // Instant Nodes limit
+  dailyLimit: 4000000, // Updated Instant Nodes limit (4 million per day)
   currentUsage: 0,
   resetTime: Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
 };
@@ -139,7 +141,12 @@ async function deployAnchorBackupProgram(): Promise<boolean> {
  * This engine routes all transactions through the Nexus system and falls back to
  * the on-chain Anchor program if needed
  */
-export async function initializeTransactionEngine(rpcUrlInput: string, useRealFundsInput: boolean): Promise<boolean> {
+export async function initializeTransactionEngine(
+  rpcUrlInput: string, 
+  useRealFundsInput: boolean, 
+  wsUrlInput?: string,
+  grpcUrlInput?: string
+): Promise<boolean> {
   try {
     // Prioritize using the rpcUrlInput if provided, then format Instant Nodes URL properly,
     // and only use public endpoint as last resort
@@ -159,7 +166,12 @@ export async function initializeTransactionEngine(rpcUrlInput: string, useRealFu
     
     // Store configuration
     rpcUrl = effectiveRpcUrl;
+    wsUrl = wsUrlInput || ''; // Store WebSocket URL if provided
+    grpcUrl = grpcUrlInput || ''; // Store gRPC URL if provided
     usingRealFunds = useRealFundsInput;
+    
+    logger.info(`WebSocket URL: ${wsUrl || 'Not provided'}`);
+    logger.info(`gRPC URL: ${grpcUrl || 'Not provided'}`);
     
     // Connect to Solana with the provided RPC URL
     try {
