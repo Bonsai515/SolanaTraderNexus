@@ -60,24 +60,24 @@ export function initializeTransactionEngine(rpcUrl?: string): boolean {
   try {
     logger.info(`Initializing transaction engine with RPC URL: ${rpcUrl || DEFAULT_RPC_URL}`);
     _rpcUrl = rpcUrl || DEFAULT_RPC_URL;
-    
+
     // Set environment variables for the Rust engine
     process.env.SOLANA_RPC_URL = _rpcUrl;
-    
+
     // Basic check if binary exists (in real implementation, we'd call the Rust binary)
     const engineExists = fs.existsSync(RUST_ENGINE_PATH);
     if (!engineExists) {
       logger.warn(`Rust engine binary not found at ${RUST_ENGINE_PATH}, falling back to direct web3.js implementation`);
     } else {
       logger.info(`Found Rust engine binary at ${RUST_ENGINE_PATH}`);
-      
+
       // Execute engine verification command
       exec(`${RUST_ENGINE_PATH} verify`, (error, stdout, stderr) => {
         if (error) {
           logger.error(`Error verifying Rust engine: ${error.message}`);
           return;
         }
-        
+
         if (stdout.includes('verification successful')) {
           logger.info('Rust engine verification successful');
         } else {
@@ -85,7 +85,7 @@ export function initializeTransactionEngine(rpcUrl?: string): boolean {
         }
       });
     }
-    
+
     _initialized = true;
     return true;
   } catch (error) {
@@ -102,12 +102,12 @@ export function initializeTransactionEngine(rpcUrl?: string): boolean {
 export function registerWallet(publicKeyStr: string): boolean {
   try {
     logger.info(`Registering wallet ${publicKeyStr} with transaction engine`);
-    
+
     if (!_initialized) {
       logger.error('Transaction engine not initialized');
       return false;
     }
-    
+
     // Validate the public key
     try {
       new PublicKey(publicKeyStr);
@@ -115,12 +115,12 @@ export function registerWallet(publicKeyStr: string): boolean {
       logger.error(`Invalid public key: ${publicKeyStr}`);
       return false;
     }
-    
+
     // Add to registered wallets if not already present
     if (!_registeredWallets.includes(publicKeyStr)) {
       _registeredWallets.push(publicKeyStr);
     }
-    
+
     // In real implementation, we'd call the Rust binary to register the wallet
     const engineExists = fs.existsSync(RUST_ENGINE_PATH);
     if (engineExists) {
@@ -129,14 +129,14 @@ export function registerWallet(publicKeyStr: string): boolean {
           logger.error(`Error registering wallet with Rust engine: ${error.message}`);
           return;
         }
-        
+
         logger.info(`Wallet registered with Rust engine: ${stdout.trim()}`);
       });
     }
-    
+
     return true;
   } catch (error) {
-    logger.error('Error registering wallet:', error);
+    console.error('Transaction failed:', error instanceof Error ? error.message : 'Unknown error');
     return false;
   }
 }
@@ -150,16 +150,16 @@ export async function executeTransaction(params: TransactionParams): Promise<Tra
   if (!_initialized) {
     throw new Error('Transaction engine not initialized');
   }
-  
+
   const transactionId = uuidv4();
   _transactionCount++;
-  
+
   logger.info(`Executing ${params.type} transaction (ID: ${transactionId})`);
-  
+
   try {
     // In a real implementation, we'd call the Rust binary to execute the transaction
     const engineExists = fs.existsSync(RUST_ENGINE_PATH);
-    
+
     // Simulate actual transaction by recording it
     const transactionResult: TransactionResult = {
       success: true,
@@ -168,7 +168,7 @@ export async function executeTransaction(params: TransactionParams): Promise<Tra
       fee: Math.random() * 0.001,
       computeUnits: Math.floor(Math.random() * 200000)
     };
-    
+
     // Log the transaction
     const transactions = JSON.parse(fs.readFileSync(TRANSACTION_LOG_PATH, 'utf-8'));
     transactions.push({
@@ -179,9 +179,9 @@ export async function executeTransaction(params: TransactionParams): Promise<Tra
       estimatedValue: params.estimatedValue
     });
     fs.writeFileSync(TRANSACTION_LOG_PATH, JSON.stringify(transactions, null, 2));
-    
+
     logger.info(`Transaction executed successfully: ${transactionResult.signature}`);
-    
+
     return transactionResult;
   } catch (error) {
     logger.error('Error executing transaction:', error);

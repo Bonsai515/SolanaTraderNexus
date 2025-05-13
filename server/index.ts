@@ -106,7 +106,11 @@ const http = require('http');
 const { Server } = require('ws');
 
 const server = http.createServer(app);
-const wss = new Server({ server, path: '/ws' });
+const wss = new Server({ 
+  server, 
+  path: '/ws',
+  perMessageDeflate: false
+});
 
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket');
@@ -130,6 +134,8 @@ wss.on('connection', (ws) => {
 // Listen on port 5000 for production deployment
 const port = process.env.PORT || 5000;
 server.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
   console.log(`🚀 Server running on port ${port}`);
   console.log(`💻 WebSocket server accessible at /ws endpoint`);
 });
