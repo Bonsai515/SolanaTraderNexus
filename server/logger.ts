@@ -1,76 +1,21 @@
-// Logger configuration
+/**
+ * Logger Module
+ */
 
-import winston from 'winston';
-import path from 'path';
-
-// Define log levels
-const levels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
-
-// Define log level based on environment
-const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  return env === 'development' ? 'debug' : 'info';
-};
-
-// Define custom colors
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'blue',
-};
-
-// Add colors to winston
-winston.addColors(colors);
-
-// Define format for console output
-const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
-);
-
-// Define format for file output
-const fileFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.json(),
-);
-
-// Define log directory
-const logDir = path.join(process.cwd(), 'logs');
-
-// Configure transports
-const transports = [
-  // Console transport
-  new winston.transports.Console({ format: consoleFormat }),
+export const logger = {
+  info: (message: string, ...args: any[]) => {
+    console.log(`${new Date().toISOString().split('T')[0]} ${new Date().toISOString().split('T')[1].split('.')[0].replace(/:/g, ':')} info: ${message}`, ...args);
+  },
   
-  // File transports - for production use
-  // new winston.transports.File({
-  //   filename: path.join(logDir, 'error.log'),
-  //   level: 'error',
-  //   format: fileFormat,
-  // }),
-  // new winston.transports.File({
-  //   filename: path.join(logDir, 'combined.log'),
-  //   format: fileFormat,
-  // }),
-];
-
-// Create logger
-export const logger = winston.createLogger({
-  level: level(),
-  levels,
-  transports,
-});
-
-// Export default logger
-export default logger;
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`${new Date().toISOString().split('T')[0]} ${new Date().toISOString().split('T')[1].split('.')[0].replace(/:/g, ':')} warn: ${message}`, ...args);
+  },
+  
+  error: (message: string, ...args: any[]) => {
+    console.error(`${new Date().toISOString().split('T')[0]} ${new Date().toISOString().split('T')[1].split('.')[0].replace(/:/g, ':')} error: ${message}`, ...args);
+  },
+  
+  debug: (message: string, ...args: any[]) => {
+    console.debug(`${new Date().toISOString().split('T')[0]} ${new Date().toISOString().split('T')[1].split('.')[0].replace(/:/g, ':')} debug: ${message}`, ...args);
+  }
+};
