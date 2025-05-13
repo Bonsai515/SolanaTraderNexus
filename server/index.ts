@@ -135,6 +135,31 @@ wss.on('connection', (ws) => {
   });
 });
 
+// Initialize Nexus Transaction Engine with Instant Nodes RPC URL
+const { initializeTransactionEngine } = require('./nexus-transaction-engine');
+const instantNodesApiKey = process.env.INSTANT_NODES_RPC_URL;
+// Construct proper URL using the API key
+const instantNodesRpcUrl = instantNodesApiKey ? 
+  `https://solana-api.instantnodes.io/token-${instantNodesApiKey}` : 
+  null;
+
+if (instantNodesRpcUrl) {
+  console.log('Initializing Nexus Professional Engine with Instant Nodes RPC URL');
+  initializeTransactionEngine(instantNodesRpcUrl, true)
+    .then(success => {
+      if (success) {
+        console.log('✅ Successfully initialized Nexus Professional Engine with Instant Nodes RPC');
+      } else {
+        console.error('❌ Failed to initialize Nexus Professional Engine');
+      }
+    })
+    .catch(err => {
+      console.error('❌ Error initializing Nexus Professional Engine:', err.message);
+    });
+} else {
+  console.warn('⚠️ INSTANT_NODES_RPC_URL environment variable not found, using public endpoint');
+}
+
 // Register routes
 routes(app);
 
