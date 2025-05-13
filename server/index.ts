@@ -1,6 +1,10 @@
 const express = require('express');
 const path = require('path');
 const app = express();
+const routes = require('./routes');
+
+// Middleware for parsing JSON bodies
+app.use(express.json());
 
 // Serve static files (CSS, JS, images)
 app.use(express.static(path.join(__dirname, '..')));
@@ -131,11 +135,12 @@ wss.on('connection', (ws) => {
   });
 });
 
+// Register routes
+routes(app);
+
 // Listen on port 5000 for production deployment
 const port = process.env.PORT || 5000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`💻 WebSocket server accessible at /ws endpoint`);
 });
