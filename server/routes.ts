@@ -1,12 +1,13 @@
 import express from 'express';
 import { ArbitrageOpportunity } from './signalTypes';
 import { getAllDexes } from './dexInfo';
-import * as transactionEngine from './transaction-engine';
-import * as nexusTransactionEngine from './nexus-transaction-engine';
+import * as nexusEngine from './nexus-transaction-engine';
 import { logger } from './logger';
+import * as agents from './agents';
+import { AgentType } from './agents';
 
 const router = express.Router();
-let usingNexusEngine = false; // By default, use the original engine
+let usingNexusEngine = true; // Always use the Nexus Professional Engine
 
 router.get('/api/market/analyze/:token', async (req, res) => {
   try {
@@ -69,7 +70,7 @@ router.post('/api/engine/nexus/activate', async (req, res) => {
     const { rpcUrl, useRealFunds = true } = req.body;
     
     // Initialize the Nexus engine
-    const success = await nexusTransactionEngine.initializeTransactionEngine(rpcUrl, useRealFunds);
+    const success = await nexusEngine.initializeTransactionEngine(rpcUrl, useRealFunds);
     
     if (success) {
       usingNexusEngine = true;
@@ -90,7 +91,7 @@ router.post('/api/engine/nexus/deactivate', async (req, res) => {
     logger.info('Deactivating Nexus Professional Engine');
     
     if (usingNexusEngine) {
-      await nexusTransactionEngine.stopTransactionEngine();
+      await nexusEngine.stopTransactionEngine();
       usingNexusEngine = false;
       logger.info('Nexus Professional Engine deactivated successfully');
       res.json({ success: true, message: 'Nexus Professional Engine deactivated' });
@@ -107,22 +108,12 @@ router.post('/api/engine/nexus/deactivate', async (req, res) => {
 router.get('/api/engine/status', (req, res) => {
   try {
     const status = {
-      activeEngine: usingNexusEngine ? 'nexus_professional' : 'standard',
-      initialized: usingNexusEngine ? 
-        nexusTransactionEngine.isInitialized() : 
-        transactionEngine.isInitialized(),
-      transactionCount: usingNexusEngine ? 
-        nexusTransactionEngine.getTransactionCount() : 
-        transactionEngine.getTransactionCount(),
-      rpcUrl: usingNexusEngine ? 
-        nexusTransactionEngine.getRpcUrl() : 
-        transactionEngine.getRpcUrl(),
-      registeredWallets: usingNexusEngine ? 
-        nexusTransactionEngine.getRegisteredWallets() : 
-        transactionEngine.getRegisteredWallets(),
-      usingRealFunds: usingNexusEngine ? 
-        nexusTransactionEngine.isUsingRealFunds() : 
-        true
+      activeEngine: 'nexus_professional',
+      initialized: nexusEngine.isInitialized(),
+      transactionCount: nexusEngine.getTransactionCount(),
+      rpcUrl: nexusEngine.getRpcUrl(),
+      registeredWallets: nexusEngine.getRegisteredWallets(),
+      usingRealFunds: nexusEngine.isUsingRealFunds()
     };
     
     res.json(status);
@@ -140,9 +131,8 @@ router.post('/api/engine/register-wallet', (req, res) => {
       return res.status(400).json({ success: false, message: 'Wallet address is required' });
     }
     
-    const success = usingNexusEngine ? 
-      nexusTransactionEngine.registerWallet(walletAddress) : 
-      transactionEngine.registerWallet(walletAddress);
+    // We're always using Nexus engine
+    const success = nexusEngine.registerWallet(walletAddress);
     
     if (success) {
       res.json({ success: true, message: 'Wallet registered successfully' });
@@ -173,7 +163,7 @@ router.post('/api/engine/execute-swap', async (req, res) => {
       });
     }
     
-    const result = await nexusTransactionEngine.executeSwap({
+    const result = await nexusEngine.executeSwap({
       fromToken,
       toToken,
       amount: parseFloat(amount),
@@ -203,7 +193,7 @@ router.post('/api/engine/check-token-security', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Token address is required' });
     }
     
-    const securityAnalysis = await nexusTransactionEngine.checkTokenSecurity(tokenAddress);
+    const securityAnalysis = await nexusEngine.checkTokenSecurity(tokenAddress);
     res.json({ success: true, securityAnalysis });
   } catch (error) {
     logger.error('Error checking token security:', error);
@@ -220,7 +210,7 @@ router.get('/api/engine/cross-chain-opportunities', async (req, res) => {
       });
     }
     
-    const opportunities = await nexusTransactionEngine.findCrossChainOpportunities();
+    const opportunities = await nexusEngine.findCrossChainOpportunities();
     res.json({ success: true, opportunities });
   } catch (error) {
     logger.error('Error finding cross-chain opportunities:', error);
@@ -243,7 +233,7 @@ router.post('/api/engine/analyze-meme-sentiment', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Token address is required' });
     }
     
-    const sentimentAnalysis = await nexusTransactionEngine.analyzeMemeSentiment(tokenAddress);
+    const sentimentAnalysis = await nexusEngine.analyzeMemeSentiment(tokenAddress);
     res.json({ success: true, sentimentAnalysis });
   } catch (error) {
     logger.error('Error analyzing meme sentiment:', error);
@@ -260,7 +250,7 @@ router.post('/api/engine/set-real-funds', (req, res) => {
     }
     
     if (usingNexusEngine) {
-      nexusTransactionEngine.setUseRealFunds(useRealFunds);
+      nexusEngine.setUseRealFunds(useRealFunds);
     }
     
     res.json({ 
@@ -270,6 +260,125 @@ router.post('/api/engine/set-real-funds', (req, res) => {
     });
   } catch (error) {
     logger.error('Error setting real funds mode:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+// Agent API Routes
+router.get('/agents/status', (req, res) => {
+  try {
+    const status = agents.getAllAgentsStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    logger.error('Error getting agent status:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+router.get('/agents/status/:type', (req, res) => {
+  try {
+    const type = req.params.type as AgentType;
+    const status = agents.getAgentStatus(type);
+    
+    if (status.error) {
+      return res.status(400).json({ success: false, message: status.error });
+    }
+    
+    res.json({ success: true, status });
+  } catch (error) {
+    logger.error('Error getting agent status:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+router.post('/agents/activate/:type', async (req, res) => {
+  try {
+    const type = req.params.type as AgentType;
+    const { primaryWallet, secondaryWallet, profitWallet } = req.body;
+    
+    if (!primaryWallet) {
+      return res.status(400).json({ success: false, message: 'Primary wallet address is required' });
+    }
+    
+    const result = await agents.activateAgent(type, primaryWallet, secondaryWallet, profitWallet);
+    
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(500).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    logger.error('Error activating agent:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+router.post('/agents/deactivate/:type', async (req, res) => {
+  try {
+    const type = req.params.type as AgentType;
+    const result = await agents.deactivateAgent(type);
+    
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(500).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    logger.error('Error deactivating agent:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+router.post('/agents/activate-all', async (req, res) => {
+  try {
+    const { primaryWallet, secondaryWallet, profitWallet } = req.body;
+    
+    if (!primaryWallet) {
+      return res.status(400).json({ success: false, message: 'Primary wallet address is required' });
+    }
+    
+    const results = await agents.activateAllAgents(primaryWallet, secondaryWallet, profitWallet);
+    const allSuccess = results.every(r => r.success);
+    
+    if (allSuccess) {
+      res.json({ 
+        success: true, 
+        message: 'All agents activated successfully', 
+        results 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Some agents failed to activate', 
+        results 
+      });
+    }
+  } catch (error) {
+    logger.error('Error activating all agents:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
+router.post('/agents/deactivate-all', async (req, res) => {
+  try {
+    const results = await agents.deactivateAllAgents();
+    const allSuccess = results.every(r => r.success);
+    
+    if (allSuccess) {
+      res.json({ 
+        success: true, 
+        message: 'All agents deactivated successfully', 
+        results 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Some agents failed to deactivate', 
+        results 
+      });
+    }
+  } catch (error) {
+    logger.error('Error deactivating all agents:', error);
     res.status(500).json({ success: false, message: `Error: ${error.message}` });
   }
 });

@@ -112,7 +112,7 @@ export async function executeSwap(params: any): Promise<any> {
  */
 export async function stopTransactionEngine(): Promise<boolean> {
   try {
-    isInitialized = false;
+    engineInitialized = false;
     logger.info('Transaction engine stopped');
     return true;
   } catch (error: any) {
