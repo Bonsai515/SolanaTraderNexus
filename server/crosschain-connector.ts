@@ -102,6 +102,14 @@ class CrossChainTransformer {
   }
   
   /**
+   * Force initialization - used to override the initialization check
+   */
+  public forceInitialize(): void {
+    this.initialized = true;
+    logger.info('Force initialized CrossChain transformer');
+  }
+  
+  /**
    * Check if the CrossChain transformer is initialized
    */
   public isInitialized(): boolean {
