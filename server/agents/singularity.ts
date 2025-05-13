@@ -571,3 +571,30 @@ class SingularityAgent {
 
 // Export a singleton instance
 export const singularityAgent = new SingularityAgent();
+
+/**
+ * Start the Singularity agent with the provided configuration
+ * @param config Configuration object for the Singularity agent
+ * @returns Promise that resolves to true if the agent is started successfully
+ */
+export async function startSingularity(config: { 
+  id: string;
+  name: string;
+  active: boolean;
+  wallets: {
+    system: string;
+    profit?: string;
+  }
+}): Promise<boolean> {
+  try {
+    logger.info(`Starting Singularity agent ${config.id}: ${config.name}`);
+    const systemWallet = config.wallets.system;
+    const profitWallet = config.wallets.profit || systemWallet;
+    
+    // Use the same wallet for source and target since we're using Wormhole bridge
+    return singularityAgent.activate(systemWallet, systemWallet, profitWallet);
+  } catch (error) {
+    logger.error(`Failed to start Singularity agent ${config.id}:`, error);
+    return false;
+  }
+}
