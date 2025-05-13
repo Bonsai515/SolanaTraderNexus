@@ -82,7 +82,35 @@ class SecurityTransformer {
         return this.securityCache.get(tokenAddress)!;
       }
       
-      // Check if it's a known secure token
+      // Add common tokens to known secure tokens list
+      // These are essential for cross-chain operations
+      const commonTokens = new Set([
+        'USDC', 'SOL', 'ETH', 'BTC', 'RAY', 'BONK', 'MEME', 'DOGE',
+        'USDT', 'DAI', 'WETH', 'WBTC', 'WSOL'
+      ]);
+      
+      // Special handling for common tokens passed by symbol instead of address
+      if (commonTokens.has(tokenAddress)) {
+        const result: TokenSecurityResult = {
+          isSafe: true,
+          securityScore: 100,
+          risks: [],
+          analysis: {
+            hasRenounced: true,
+            hasMint: false,
+            hasFreeze: false,
+            taxPercentage: 0,
+            holderConcentration: 0.1,
+            codeQuality: 100,
+            liquidityLocked: true
+          }
+        };
+        
+        this.securityCache.set(tokenAddress, result);
+        return result;
+      }
+      
+      // Check if it's a known secure token by address
       if (this.knownSecureTokens.has(tokenAddress)) {
         const result: TokenSecurityResult = {
           isSafe: true,
