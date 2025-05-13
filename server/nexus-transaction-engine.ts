@@ -141,23 +141,49 @@ async function deployAnchorBackupProgram(): Promise<boolean> {
  */
 export async function initializeTransactionEngine(rpcUrlInput: string, useRealFundsInput: boolean): Promise<boolean> {
   try {
-    logger.info(`Initializing Nexus Professional Engine with RPC URL: ${rpcUrlInput}`);
+    // Prioritize using the rpcUrlInput if provided, then format Instant Nodes URL properly,
+    // and only use public endpoint as last resort
+    let effectiveRpcUrl = rpcUrlInput;
+    
+    if (!effectiveRpcUrl && process.env.INSTANT_NODES_RPC_URL) {
+      const instantNodesApiKey = process.env.INSTANT_NODES_RPC_URL;
+      effectiveRpcUrl = `https://solana-mainnet.rpc.instantnodes.io/v1/${instantNodesApiKey}`;
+    }
+    
+    if (!effectiveRpcUrl) {
+      effectiveRpcUrl = 'https://api.mainnet-beta.solana.com';
+    }
+    
+    logger.info(`Initializing Nexus Professional Engine with RPC URL: ${effectiveRpcUrl}`);
     logger.info(`Using real funds: ${useRealFundsInput}`);
     
     // Store configuration
-    rpcUrl = rpcUrlInput || process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com';
+    rpcUrl = effectiveRpcUrl;
     usingRealFunds = useRealFundsInput;
     
     // Connect to Solana with the provided RPC URL
-    solanaConnection = new web3.Connection(rpcUrl, 'confirmed');
-    
-    // Try to verify the connection
     try {
+      solanaConnection = new web3.Connection(rpcUrl, 'confirmed');
+      logger.info('Solana connection object created, attempting to verify connection...');
+      
+      // Try to verify the connection
       await solanaConnection.getLatestBlockhash();
-      logger.info('Successfully connected to Solana network');
+      logger.info('✅ Successfully connected to Solana network using Instant Nodes RPC');
     } catch (error: any) {
-      logger.error(`Failed to connect to Solana: ${error.message}`);
-      return false;
+      logger.error(`Failed to connect to Solana using ${rpcUrl}: ${error.message}`);
+      logger.warn('Falling back to public Solana endpoint');
+      
+      try {
+        // Fall back to public endpoint
+        const publicRpcUrl = 'https://api.mainnet-beta.solana.com';
+        solanaConnection = new web3.Connection(publicRpcUrl, 'confirmed');
+        await solanaConnection.getLatestBlockhash();
+        logger.info('✅ Successfully connected to Solana network using public endpoint');
+        rpcUrl = publicRpcUrl; // Update the stored URL
+      } catch (fallbackError: any) {
+        logger.error(`Failed to connect to fallback Solana endpoint: ${fallbackError.message}`);
+        return false;
+      }
     }
     
     // Check for Nexus engine binary and fall back to direct web3.js implementation if not available
