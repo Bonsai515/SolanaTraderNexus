@@ -8,10 +8,43 @@
 import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { logger } from '../logger';
 
-// Set of backup RPC endpoints
+// Validate URL formatting with enhanced error handling
+const validateRpcUrl = (url: string | undefined, defaultUrl: string = 'https://api.mainnet-beta.solana.com'): string => {
+  if (!url) return defaultUrl;
+  
+  try {
+    // Ensure URL has proper prefix
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    } else {
+      return `https://${url}`;
+    }
+  } catch (error) {
+    logger.error(`Invalid RPC URL format: ${error}`);
+    return defaultUrl;
+  }
+};
+
+// Set of backup RPC endpoints with validation and priority order
 const RPC_ENDPOINTS = {
-  primary: process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  helius: process.env.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : 'https://api.mainnet-beta.solana.com',
+  // Primary connection - Instant Nodes premium endpoint (4M daily limit)
+  primary: validateRpcUrl(
+    process.env.INSTANT_NODES_RPC_URL, 
+    'https://api.mainnet-beta.solana.com'
+  ),
+  
+  // Secondary connection - Alchemy endpoint
+  alchemy: validateRpcUrl(
+    process.env.ALCHEMY_RPC_URL,
+    'https://api.mainnet-beta.solana.com'
+  ),
+  
+  // Tertiary connection - Helius (if API key available)
+  helius: process.env.HELIUS_API_KEY ? 
+    validateRpcUrl(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`) : 
+    'https://api.mainnet-beta.solana.com',
+    
+  // Additional fallbacks in case all premium endpoints fail
   fallback1: 'https://solana-api.projectserum.com',
   fallback2: 'https://rpc.ankr.com/solana',
   fallback3: clusterApiUrl('mainnet-beta')

@@ -177,15 +177,35 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       console.warn('⚠️ Rust transformer binaries not fully available, using direct API integration');
     }
     
-    // Get Instant Nodes URLs from environment or use defaults with warning
-    const instantNodesRpcUrl = process.env.INSTANT_NODES_RPC_URL || 
-      'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-    const instantNodesWsUrl = process.env.INSTANT_NODES_WS_URL || 
-      'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-    const instantNodesGrpcUrl = process.env.INSTANT_NODES_GRPC_URL || 
-      'https://solana-grpc-geyser.instantnodes.io:443';
+    // Get Instant Nodes URLs from environment with validation for correct protocol
+    const getValidatedUrl = (url, defaultUrl, protocol) => {
+      if (!url) return defaultUrl;
+      if (url.startsWith(protocol)) return url;
+      return `${protocol}${url.startsWith('//') ? '' : '//'}${url}`;
+    };
     
-    console.log('Initializing Nexus Professional Engine with Instant Nodes endpoints');
+    const instantNodesRpcUrl = getValidatedUrl(
+      process.env.INSTANT_NODES_RPC_URL, 
+      'https://api.mainnet-beta.solana.com',
+      'https:'
+    );
+    
+    const instantNodesWsUrl = getValidatedUrl(
+      process.env.INSTANT_NODES_WS_URL,
+      'wss://api.mainnet-beta.solana.com',
+      'wss:'
+    );
+    
+    const instantNodesGrpcUrl = getValidatedUrl(
+      process.env.INSTANT_NODES_GRPC_URL,
+      'https://solana-grpc-geyser.instantnodes.io:443',
+      'https:'
+    );
+    
+    console.log('Initializing Nexus Professional Engine with validated RPC endpoints:');
+    console.log(`HTTP: ${instantNodesRpcUrl}`);
+    console.log(`WS: ${instantNodesWsUrl}`);
+    console.log(`gRPC: ${instantNodesGrpcUrl}`);
     
     // Initialize transaction engine with the Solana connection
     const success = await initializeTransactionEngine(

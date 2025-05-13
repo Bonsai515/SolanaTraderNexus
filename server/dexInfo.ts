@@ -14,7 +14,17 @@ export enum DexType {
   GMGN = 'gmgn',
   DexScreener = 'dexscreener',
   Moonshot = 'moonshot',
-  Birdeye = 'birdeye'
+  Birdeye = 'birdeye',
+  // New DEXs
+  Drift = 'drift',
+  Cykura = 'cykura',
+  Symmetry = 'symmetry',
+  GooseFX = 'goosefx',
+  Saros = 'saros',
+  Lifinity = 'lifinity',
+  Atrix = 'atrix',
+  Crema = 'crema',
+  Step = 'step'  
 }
 
 export enum DexCategory {
@@ -22,7 +32,14 @@ export enum DexCategory {
   OrderBook = 'orderbook',
   Aggregator = 'aggregator',
   Analytics = 'analytics',
-  Launchpad = 'launchpad'
+  Launchpad = 'launchpad',
+  Perps = 'perpetuals',
+  Options = 'options',
+  CLMMs = 'concentrated-liquidity',
+  Staking = 'staking',
+  Synthetics = 'synthetics',
+  Margin = 'margin',
+  Lending = 'lending'
 }
 
 export enum LendingProtocolType {
@@ -45,68 +62,111 @@ export interface DexInfo {
   };
 }
 
+// Pool pair information
+export interface PoolInfo {
+  id: string;                  // Unique identifier
+  address: string;             // On-chain address
+  dexId: string;               // DEX identifier
+  baseToken: string;           // Base token address/identifier
+  quoteToken: string;          // Quote token address/identifier
+  baseTokenSymbol: string;     // Base token symbol
+  quoteTokenSymbol: string;    // Quote token symbol
+  category: DexCategory;       // Pool category
+  tvl?: number;                // Total Value Locked in USD
+  volume24h?: number;          // 24h trading volume
+  apr?: number;                // Annual Percentage Rate if applicable
+  fee?: number;                // Fee percentage
+  feeTier?: string;            // Fee tier identifier
+  tickSpacing?: number;        // Tick spacing for CLMM pools
+  lastUpdate?: number;         // Last update timestamp
+  price?: number;              // Current price of baseToken in quoteToken
+  depth?: number;              // Market depth
+  priority?: number;           // Priority for arbitrage (internal scoring)
+}
+
+// Enhanced DEX info with pools
+export interface EnhancedDexInfo extends DexInfo {
+  category: DexCategory;
+  pools?: PoolInfo[];
+  programId?: string;  // Contract address for the DEX protocol
+  apiEndpoint?: string;  // API endpoint for direct integration
+  rateLimit?: number;  // API rate limit in requests per second
+}
+
 // List of supported DEXes
-const dexes: DexInfo[] = [
+const dexes: EnhancedDexInfo[] = [
   {
     id: 'jupiter',
     name: 'Jupiter',
     url: 'https://jup.ag',
     active: true,
+    category: DexCategory.Aggregator,
     features: ['swap', 'aggregator', 'limit-orders'],
     fees: {
       maker: 0.0,
       taker: 0.0003
-    }
+    },
+    apiEndpoint: 'https://quote-api.jup.ag/v6',
+    rateLimit: 1  // 1 request per second as per your specification
   },
   {
     id: 'openbook',
     name: 'Openbook',
     url: 'https://openbookdex.com',
     active: true,
+    category: DexCategory.OrderBook,
     features: ['orderbook', 'limit-orders'],
     fees: {
       maker: -0.0002,
       taker: 0.0004
-    }
+    },
+    programId: 'srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX'
   },
   {
     id: 'raydium',
     name: 'Raydium',
     url: 'https://raydium.io',
     active: true,
+    category: DexCategory.AMM,
     features: ['amm', 'pools', 'staking'],
     fees: {
       maker: 0.0,
       taker: 0.0005
-    }
+    },
+    programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8'
   },
   {
     id: 'orca',
     name: 'Orca',
     url: 'https://www.orca.so',
     active: true,
+    category: DexCategory.CLMMs,
     features: ['amm', 'pools', 'concentrated-liquidity'],
     fees: {
       maker: 0.0,
       taker: 0.0003
-    }
+    },
+    programId: '9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP'
   },
   {
     id: 'meteora',
     name: 'Meteora',
     url: 'https://meteora.ag',
     active: true,
+    category: DexCategory.CLMMs,
     features: ['amm', 'pools', 'concentrated-liquidity'],
     fees: {
       maker: 0.0,
       taker: 0.0004
-    }
+    },
+    programId: 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
   },
   {
     id: 'pump.fun',
     name: 'pump.fun',
     url: 'https://pump.fun',
     active: true,
+    category: DexCategory.Launchpad,
     features: ['memecoins', 'launchpad', 'swap'],
     fees: {
       maker: 0.0,
@@ -118,6 +178,7 @@ const dexes: DexInfo[] = [
     name: 'GMGN',
     url: 'https://gmgn.ai',
     active: true,
+    category: DexCategory.AMM,
     features: ['ai-powered', 'intelligent-swap', 'predictive-algo'],
     fees: {
       maker: 0.0,
@@ -129,17 +190,20 @@ const dexes: DexInfo[] = [
     name: 'DEX Screener',
     url: 'https://dexscreener.com',
     active: true,
+    category: DexCategory.Analytics,
     features: ['market-data', 'analytics', 'screening'],
     fees: {
       maker: 0.0,
       taker: 0.0
-    }
+    },
+    apiEndpoint: 'https://api.dexscreener.com/latest/dex'
   },
   {
     id: 'moonshot',
     name: 'Moonshot',
     url: 'https://moonshot.com',
     active: true,
+    category: DexCategory.Launchpad,
     features: ['launchpad', 'token-generator', 'staking'],
     fees: {
       maker: 0.0,
@@ -151,11 +215,131 @@ const dexes: DexInfo[] = [
     name: 'Birdeye',
     url: 'https://birdeye.so',
     active: true,
+    category: DexCategory.Analytics,
     features: ['analytics', 'real-time-data', 'portfolio-tracking'],
     fees: {
       maker: 0.0,
       taker: 0.0
-    }
+    },
+    apiEndpoint: 'https://public-api.birdeye.so'
+  },
+  // New DEXs
+  {
+    id: 'drift',
+    name: 'Drift Protocol',
+    url: 'https://www.drift.trade',
+    active: true,
+    category: DexCategory.Perps,
+    features: ['perpetuals', 'futures', 'margin', 'cross-collateral'],
+    fees: {
+      maker: -0.0001,
+      taker: 0.0008
+    },
+    programId: 'dRiftyHA39MWEi3m9aunc5MzRF1JYuBsbn6VPcn33UH'
+  },
+  {
+    id: 'cykura',
+    name: 'Cykura',
+    url: 'https://cykura.io',
+    active: true,
+    category: DexCategory.CLMMs,
+    features: ['concentrated-liquidity', 'custom-fees', 'multi-fee-tiers'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0003
+    },
+    programId: 'cysPXAjehMpVKUapzbMCCnpFxUFFryEWEaLgnb9NrR8'
+  },
+  {
+    id: 'symmetry',
+    name: 'Symmetry',
+    url: 'https://symmetry.fi',
+    active: true,
+    category: DexCategory.Synthetics,
+    features: ['synthetics', 'derivatives', 'forex', 'commodities'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0010
+    },
+    programId: 'SymjyfGKPqzCUKUfrS5X4iAmoBG66qgHrpKspYNSiL3'
+  },
+  {
+    id: 'goosefx',
+    name: 'GooseFX',
+    url: 'https://goosefx.io',
+    active: true,
+    category: DexCategory.AMM,
+    features: ['multi-asset-pools', 'cross-margin', 'nft-trading'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0005
+    },
+    programId: 'GFXsSL5sSaDfNFQUYsHjNKvzSjU4jSxSHXtLZ6sRs7Z'
+  },
+  {
+    id: 'saros',
+    name: 'Saros',
+    url: 'https://saros.finance',
+    active: true,
+    category: DexCategory.AMM,
+    features: ['amm', 'pools', 'yield-farming'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0004
+    },
+    programId: 'SSwapUtytfBdBn1b9NUGG6foMVPtcWgpRU32HToDUZr'
+  },
+  {
+    id: 'lifinity',
+    name: 'Lifinity',
+    url: 'https://lifinity.io',
+    active: true,
+    category: DexCategory.AMM,
+    features: ['adaptive-fee', 'concentrated-liquidity'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0001
+    },
+    programId: 'LFNVvCyYFNRqZ51FvuEsZURkatbwwPYH7MCzYEjyd9X'
+  },
+  {
+    id: 'atrix',
+    name: 'Atrix',
+    url: 'https://atrix.finance',
+    active: true,
+    category: DexCategory.AMM,
+    features: ['amm', 'farms', 'fixed-rate-pools'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0005
+    },
+    programId: 'AtrWTtUtjYvQDZYMFU8kBT43xrUmGEpnuYm6Zbsjd1Rf'
+  },
+  {
+    id: 'crema',
+    name: 'Crema Finance',
+    url: 'https://crema.finance',
+    active: true,
+    category: DexCategory.CLMMs,
+    features: ['concentrated-liquidity', 'tick-liquidity'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0003
+    },
+    programId: 'CRMxK5CEXTxaMfyUteYWBrwJzqiZZxW4TMYJy9qCASA'
+  },
+  {
+    id: 'step',
+    name: 'Step Finance',
+    url: 'https://step.finance',
+    active: true,
+    category: DexCategory.AMM,
+    features: ['staking', 'yield-farming', 'portfolio-tracker'],
+    fees: {
+      maker: 0.0,
+      taker: 0.0004
+    },
+    programId: 'StepAscQoEioFxxWGnh2sLBDFp9d8rvKz2Yp39iDpyT'
   }
 ];
 
