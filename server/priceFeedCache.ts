@@ -1,996 +1,512 @@
 /**
- * Price Feed Cache Service
+ * Price Feed System with Rate-Limited Cache
  * 
- * Provides a centralized caching mechanism for price data with:
- * - Real-time price data cache for all components
- * - Automatic backup functionality if main data sources fail
- * - Websocket broadcast of price updates to all connected clients
- * - Support for multiple data sources with failover
+ * This module provides a comprehensive price feed system for the entire application
+ * with automatic caching to respect RPC and API rate limits.
  */
 
-import { MarketData, PriceData } from '../shared/signalTypes';
+import axios from 'axios';
 import { logger } from './logger';
-import { WebSocket } from 'ws';
-import fs from 'fs/promises';
-import path from 'path';
+import * as web3 from '@solana/web3.js';
 
-// Directory for storing cached price data backups
-const CACHE_DIR = path.join(process.cwd(), 'data/price_cache');
+// Price Source Types
+type PriceSource = 'DEX' | 'CEX' | 'ORACLE' | 'CHAINLINK' | 'PYTH' | 'HELIUS' | 'WORMHOLE';
 
-// Refresh intervals
-const CACHE_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
-const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-interface CachedMarketData {
-  pair: string;
-  data: MarketData;
-  lastUpdated: Date;
-  backupTimestamp?: Date;
+// Token Price Entry Interface
+interface TokenPriceEntry {
+  symbol: string;
+  address: string;
+  price: number;
+  timestamp: number;
+  source: PriceSource;
+  confidence: number;
+  volume24h?: number;
+  change24h?: number;
 }
 
+// Cache Configuration
+const CACHE_TTL_MS = {
+  DEX: 30 * 1000,         // 30 seconds for DEX prices
+  CEX: 15 * 1000,         // 15 seconds for CEX prices
+  ORACLE: 60 * 1000,      // 1 minute for oracle prices
+  CHAINLINK: 90 * 1000,   // 1.5 minutes for Chainlink
+  PYTH: 15 * 1000,        // 15 seconds for Pyth
+  HELIUS: 2 * 60 * 1000,  // 2 minutes for Helius API
+  WORMHOLE: 2 * 60 * 1000 // 2 minutes for Wormhole
+};
+
+// Rate Limit Monitoring
+interface RateLimit {
+  dailyLimit: number;
+  currentUsage: number;
+  resetTime: number; // timestamp for reset
+}
+
+// Supported DEXs for pricing
+interface DexSource {
+  name: string;
+  enabled: boolean;
+  priority: number; // Lower is higher priority
+  rateLimitPerMinute: number;
+}
+
+// The main price cache
 class PriceFeedCache {
-  private priceCache: Map<string, PriceData> = new Map();
-  private marketDataCache: Map<string, CachedMarketData> = new Map();
-  private wsClients: Set<WebSocket> = new Set();
-  private refreshInterval: NodeJS.Timeout | null = null;
-  private backupInterval: NodeJS.Timeout | null = null;
-  private initialized: boolean = false;
-  private primaryDataSources: string[] = ['helius', 'instant_nodes', 'jupiter_api']; 
-  private backupDataSources: string[] = ['alchemy_rpc', 'public_rpc', 'cached_backup'];
-  private alchemyRequestCount: number = 0;
-  private alchemyRateLimit: number = 150; // Free tier, be conservative with usage
-  private alchemyRateLimitResetTimeout: NodeJS.Timeout | null = null;
-  private activeDataSource: string = 'instant_nodes'; // Default source
-
+  private priceCache: Map<string, TokenPriceEntry> = new Map();
+  private solanaConnection: web3.Connection | null = null;
+  private heliusApiKey: string | undefined;
+  private wormholeApiKey: string | undefined;
+  
+  private rateLimits: Record<string, RateLimit> = {
+    'INSTANT_NODES': {
+      dailyLimit: 40000,
+      currentUsage: 0,
+      resetTime: Date.now() + 24 * 60 * 60 * 1000
+    },
+    'HELIUS': {
+      dailyLimit: 100000,
+      currentUsage: 0,
+      resetTime: Date.now() + 24 * 60 * 60 * 1000
+    },
+    'BLOCKCHAIN_API': {
+      dailyLimit: 20000,
+      currentUsage: 0,
+      resetTime: Date.now() + 24 * 60 * 60 * 1000
+    }
+  };
+  
+  private dexSources: DexSource[] = [
+    { name: 'Jupiter', enabled: true, priority: 1, rateLimitPerMinute: 600 },
+    { name: 'Raydium', enabled: true, priority: 2, rateLimitPerMinute: 300 },
+    { name: 'Orca', enabled: true, priority: 3, rateLimitPerMinute: 300 },
+    { name: 'Openbook', enabled: true, priority: 4, rateLimitPerMinute: 200 }
+  ];
+  
+  // Popular token addresses for quick lookup
+  private readonly POPULAR_TOKENS: Record<string, string> = {
+    'SOL': 'So11111111111111111111111111111111111111112',
+    'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+    'BONK': '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+    'WIF': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+    'JUP': 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvkK',
+    'PYTH': 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3',
+    'ETH': '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs',
+    'BTC': '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'
+  };
+  
   constructor() {
-    this.ensureCacheDir();
-  }
-
-  /**
-   * Initialize the price feed cache service
-   */
-  public async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
-    logger.info('Initializing price feed cache service');
+    logger.info('Initializing Price Feed Cache system');
+    this.heliusApiKey = process.env.HELIUS_API_KEY;
+    this.wormholeApiKey = process.env.WORMHOLE_API_KEY;
     
+    // Connect to Solana with proper error handling for RPC URL
     try {
-      // Create cache directory if it doesn't exist
-      await this.ensureCacheDir();
+      const rpcUrl = process.env.INSTANT_NODES_RPC_URL;
       
-      // Try to load any existing cache data from backup files
-      await this.loadCachedBackups();
-      
-      // Start the refresh interval
-      this.startRefreshInterval();
-      
-      // Start the backup interval
-      this.startBackupInterval();
-      
-      this.initialized = true;
-      logger.info('Price feed cache service initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize price feed cache service:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to initialize price feed cache: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Add a WebSocket client to broadcast price updates to
-   */
-  public addClient(ws: WebSocket): void {
-    this.wsClients.add(ws);
-    
-    // Send initial cache data to client
-    this.sendCacheToClient(ws);
-    
-    // Remove client when connection closes
-    ws.on('close', () => {
-      this.wsClients.delete(ws);
-    });
-  }
-
-  /**
-   * Get the latest price data for a specific pair
-   */
-  public getPriceData(pair: string): PriceData | null {
-    return this.priceCache.get(pair) || null;
-  }
-
-  /**
-   * Get all cached price data
-   */
-  public getAllPriceData(): Map<string, PriceData> {
-    return new Map(this.priceCache);
-  }
-
-  /**
-   * Get all market data
-   */
-  public getAllMarketData(): Map<string, CachedMarketData> {
-    return new Map(this.marketDataCache);
-  }
-
-  /**
-   * Get the latest market data for a specific pair
-   */
-  public getMarketData(pair: string): MarketData | null {
-    const cached = this.marketDataCache.get(pair);
-    return cached ? cached.data : null;
-  }
-
-  /**
-   * Update price data in the cache
-   */
-  public updatePriceData(data: PriceData): void {
-    this.priceCache.set(data.pair, data);
-    
-    // Broadcast to all connected clients
-    this.broadcastPriceUpdate(data);
-  }
-
-  /**
-   * Update market data in the cache
-   */
-  public updateMarketData(pair: string, data: MarketData): void {
-    const now = new Date();
-    
-    this.marketDataCache.set(pair, {
-      pair,
-      data,
-      lastUpdated: now
-    });
-    
-    // Extract and update latest price
-    if (data.prices && data.prices.length > 0) {
-      const latestPriceData = data.prices[data.prices.length - 1];
-      
-      this.updatePriceData({
-        pair,
-        price: latestPriceData[1],
-        volume: data.volumes && data.volumes.length > 0 
-          ? data.volumes[data.volumes.length - 1][1] 
-          : 0,
-        timestamp: now,
-        source: this.activeDataSource
-      });
+      // Validate RPC URL format
+      if (rpcUrl && (rpcUrl.startsWith('http://') || rpcUrl.startsWith('https://'))) {
+        logger.info(`Using RPC URL from environment: ${rpcUrl.substring(0, 15)}...`);
+        this.solanaConnection = new web3.Connection(rpcUrl, 'confirmed');
+      } else {
+        // Fallback to public endpoint
+        logger.warn('Invalid or missing RPC URL, falling back to public Solana endpoint');
+        this.solanaConnection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      }
+    } catch (error: any) {
+      logger.error(`Error initializing Solana connection: ${error.message}`);
+      // Initialize with public endpoint as fallback
+      this.solanaConnection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
     }
     
-    // Broadcast to all connected clients
-    this.broadcastMarketDataUpdate(pair);
-  }
-
-  /**
-   * Switch to a different data source if the primary fails
-   */
-  public switchDataSource(reason: string): boolean {
-    const currentIndex = this.primaryDataSources.indexOf(this.activeDataSource);
+    // Initialize a housekeeping interval to clean up expired cache entries
+    setInterval(() => this.cleanExpiredEntries(), 5 * 60 * 1000); // Run every 5 minutes
     
-    // Try next primary source
-    if (currentIndex < this.primaryDataSources.length - 1) {
-      this.activeDataSource = this.primaryDataSources[currentIndex + 1];
-      logger.info(`Switching price feed to ${this.activeDataSource} (${reason})`);
+    // Initialize rate limit reset timers
+    Object.keys(this.rateLimits).forEach(api => {
+      const resetTimeMs = this.rateLimits[api].resetTime - Date.now();
+      if (resetTimeMs > 0) {
+        setTimeout(() => this.resetRateLimitCounter(api), resetTimeMs);
+      } else {
+        this.resetRateLimitCounter(api);
+      }
+    });
+  }
+  
+  /**
+   * Connect to required services for price data
+   */
+  public async connect(): Promise<boolean> {
+    try {
+      logger.info('Connecting to price feed services...');
+      
+      // Re-verify and potentially reconnect to Solana
+      if (!this.solanaConnection) {
+        logger.warn('No Solana connection, initializing new connection');
+        this.solanaConnection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      }
+      
+      // Verify Solana connection
+      try {
+        if (this.solanaConnection) {
+          await this.solanaConnection.getLatestBlockhash();
+          logger.info('Successfully connected to Solana RPC for price data');
+        } else {
+          throw new Error('Solana connection not initialized');
+        }
+      } catch (error: any) {
+        logger.warn(`Error connecting to Solana RPC: ${error.message}`);
+        
+        // Try to reconnect with the public API
+        try {
+          logger.info('Attempting to reconnect using public Solana API');
+          this.solanaConnection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+          await this.solanaConnection.getLatestBlockhash();
+          logger.info('Successfully reconnected to Solana using public API');
+        } catch (reconnectError: any) {
+          logger.error(`Failed to reconnect to Solana: ${reconnectError.message}`);
+          // Continue with limited functionality
+        }
+      }
+      
+      // Test Jupiter API connection
+      try {
+        const jupiterResponse = await axios.get('https://quote-api.jup.ag/v4/tokens');
+        logger.info(`Successfully connected to Jupiter API. Found ${jupiterResponse.data.length} tokens.`);
+      } catch (error: any) {
+        logger.warn(`Error connecting to Jupiter API: ${error.message}`);
+      }
+      
+      // Initialize price cache with major tokens
+      try {
+        await this.prefetchPopularTokens();
+      } catch (error: any) {
+        logger.warn(`Error prefetching token prices: ${error.message}`);
+      }
+      
+      // Even with errors, return true to continue with best effort
+      return true;
+    } catch (error: any) {
+      logger.error(`Failed to connect to price feed services: ${error.message}`);
+      // Return true anyway to allow the system to function with limited price capabilities
       return true;
     }
-    
-    // If all primary sources failed, try backup sources
-    for (const backupSource of this.backupDataSources) {
-      if (backupSource === 'cached_backup') {
-        logger.warn('All live price feeds failed, using cached backups');
-        // We're already using cached data at this point
-        this.activeDataSource = backupSource;
-        return true;
-      } else {
-        this.activeDataSource = backupSource;
-        logger.info(`Switching price feed to backup source ${backupSource} (${reason})`);
-        return true;
-      }
-    }
-    
-    logger.error('All price feed sources failed, no backup available');
-    return false;
   }
-
+  
   /**
-   * Check if price data is stale (older than a given threshold)
+   * Reset rate limit counter for an API
    */
-  public isPriceDataStale(pair: string, thresholdMs: number = 5 * 60 * 1000): boolean {
-    const priceData = this.priceCache.get(pair);
-    if (!priceData) return true;
-    
-    const now = new Date();
-    const dataAge = now.getTime() - priceData.timestamp.getTime();
-    
-    return dataAge > thresholdMs;
-  }
-
-  /**
-   * Check if market data is stale (older than a given threshold)
-   */
-  public isMarketDataStale(pair: string, thresholdMs: number = 5 * 60 * 1000): boolean {
-    const marketData = this.marketDataCache.get(pair);
-    if (!marketData) return true;
-    
-    const now = new Date();
-    const dataAge = now.getTime() - marketData.lastUpdated.getTime();
-    
-    return dataAge > thresholdMs;
-  }
-
-  /**
-   * Get the current active data source
-   */
-  public getActiveDataSource(): string {
-    return this.activeDataSource;
-  }
-
-  /**
-   * Check if we're currently using a backup data source
-   */
-  public isUsingBackupSource(): boolean {
-    return this.backupDataSources.includes(this.activeDataSource);
-  }
-
-  /**
-   * Broadcast a price update to all connected WebSocket clients
-   */
-  private broadcastPriceUpdate(data: PriceData): void {
-    const message = JSON.stringify({
-      type: 'PRICE_UPDATE',
-      data,
-      timestamp: new Date().toISOString()
-    });
-    
-    for (const client of this.wsClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
-  }
-
-  /**
-   * Broadcast a market data update to all connected WebSocket clients
-   */
-  private broadcastMarketDataUpdate(pair: string): void {
-    const cached = this.marketDataCache.get(pair);
-    if (!cached) return;
-    
-    // Don't send full market data over websocket as it can be large
-    // Just send a notification that it's been updated
-    const message = JSON.stringify({
-      type: 'MARKET_DATA_UPDATED',
-      pair,
-      timestamp: new Date().toISOString()
-    });
-    
-    for (const client of this.wsClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
+  private resetRateLimitCounter(api: string): void {
+    if (this.rateLimits[api]) {
+      this.rateLimits[api].currentUsage = 0;
+      this.rateLimits[api].resetTime = Date.now() + 24 * 60 * 60 * 1000; // Reset after 24 hours
+      
+      // Schedule next reset
+      setTimeout(() => this.resetRateLimitCounter(api), 24 * 60 * 60 * 1000);
+      
+      logger.info(`Rate limit counter reset for ${api}`);
     }
   }
   
   /**
-   * Broadcast all price updates to connected WebSocket clients
+   * Track API usage for rate limiting
    */
-  private broadcastPriceUpdates(): void {
-    for (const [pair, priceData] of this.priceCache.entries()) {
-      this.broadcastPriceUpdate(priceData);
-    }
-  }
-
-  /**
-   * Send cached data to a specific client
-   */
-  private sendCacheToClient(ws: WebSocket): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
+  private trackApiUsage(api: string): boolean {
+    if (!this.rateLimits[api]) return true; // No limits if not tracked
     
-    // Send all price data
-    const allPrices = Array.from(this.priceCache.values());
-    ws.send(JSON.stringify({
-      type: 'PRICE_CACHE',
-      data: allPrices,
-      timestamp: new Date().toISOString()
-    }));
-    
-    // Send list of available market data pairs
-    const availablePairs = Array.from(this.marketDataCache.keys());
-    ws.send(JSON.stringify({
-      type: 'AVAILABLE_MARKET_DATA',
-      pairs: availablePairs,
-      timestamp: new Date().toISOString()
-    }));
-  }
-
-  /**
-   * Start the cache refresh interval
-   */
-  private startRefreshInterval(): void {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
+    // Check if we need to reset
+    if (Date.now() > this.rateLimits[api].resetTime) {
+      this.resetRateLimitCounter(api);
     }
     
-    this.refreshInterval = setInterval(() => {
-      this.refreshCache();
-    }, CACHE_REFRESH_INTERVAL);
-  }
-
-  /**
-   * Start the backup interval
-   */
-  private startBackupInterval(): void {
-    if (this.backupInterval) {
-      clearInterval(this.backupInterval);
+    // Check if we're over limit
+    if (this.rateLimits[api].currentUsage >= this.rateLimits[api].dailyLimit) {
+      logger.warn(`Rate limit exceeded for ${api}, ${this.rateLimits[api].currentUsage}/${this.rateLimits[api].dailyLimit}`);
+      return false;
     }
     
-    this.backupInterval = setInterval(() => {
-      this.backupCache();
-    }, BACKUP_INTERVAL);
+    // Track usage
+    this.rateLimits[api].currentUsage++;
+    return true;
   }
-
+  
   /**
-   * Refresh the cache with latest data
+   * Clean expired cache entries
    */
-  private async refreshCache(): Promise<void> {
-    logger.debug('Refreshing price feed cache');
+  private cleanExpiredEntries(): void {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    for (const [key, entry] of this.priceCache.entries()) {
+      const ttl = CACHE_TTL_MS[entry.source] || 60 * 1000; // Default 1 minute
+      if (now - entry.timestamp > ttl) {
+        this.priceCache.delete(key);
+        expiredCount++;
+      }
+    }
+    
+    if (expiredCount > 0) {
+      logger.debug(`Cleaned ${expiredCount} expired price entries from cache`);
+    }
+  }
+  
+  /**
+   * Prefetch prices for popular tokens
+   */
+  private async prefetchPopularTokens(): Promise<void> {
+    logger.info('Prefetching prices for popular tokens...');
+    
+    const symbols = Object.keys(this.POPULAR_TOKENS);
+    const fetchPromises = symbols.map(symbol => 
+      this.getTokenPrice(this.POPULAR_TOKENS[symbol], symbol)
+    );
+    
+    await Promise.allSettled(fetchPromises);
+    
+    logger.info(`Completed prefetching prices for ${symbols.length} popular tokens`);
+  }
+  
+  /**
+   * Get the cache key for a token
+   */
+  private getCacheKey(tokenAddress: string): string {
+    return tokenAddress.toLowerCase();
+  }
+  
+  /**
+   * Get token price prioritizing cache
+   */
+  public async getTokenPrice(tokenAddress: string, tokenSymbol?: string): Promise<number> {
+    const cacheKey = this.getCacheKey(tokenAddress);
+    
+    // Check cache first
+    const cachedEntry = this.priceCache.get(cacheKey);
+    if (cachedEntry) {
+      const ttl = CACHE_TTL_MS[cachedEntry.source] || 60 * 1000; // Default 1 minute
+      
+      if (Date.now() - cachedEntry.timestamp < ttl) {
+        return cachedEntry.price;
+      }
+    }
+    
+    // Find token symbol if not provided
+    if (!tokenSymbol) {
+      for (const [symbol, address] of Object.entries(this.POPULAR_TOKENS)) {
+        if (address.toLowerCase() === tokenAddress.toLowerCase()) {
+          tokenSymbol = symbol;
+          break;
+        }
+      }
+    }
     
     try {
-      // First try current data source
-      let success = false;
+      // Try Jupiter first (lowest latency)
+      if (this.trackApiUsage('BLOCKCHAIN_API')) {
+        try {
+          const jupiterPrice = await this.fetchJupiterPrice(tokenAddress);
+          if (jupiterPrice > 0) {
+            this.updateCache(tokenAddress, tokenSymbol || 'UNKNOWN', jupiterPrice, 'DEX', 0.9);
+            return jupiterPrice;
+          }
+        } catch (error) {
+          // Ignore and try next source
+        }
+      }
       
+      // Try Helius API next
+      if (this.heliusApiKey && this.trackApiUsage('HELIUS')) {
+        try {
+          const heliusPrice = await this.fetchHeliusPrice(tokenAddress);
+          if (heliusPrice > 0) {
+            this.updateCache(tokenAddress, tokenSymbol || 'UNKNOWN', heliusPrice, 'HELIUS', 0.95);
+            return heliusPrice;
+          }
+        } catch (error) {
+          // Ignore and try next source
+        }
+      }
+      
+      // Fallback: use Raydium
+      if (this.trackApiUsage('BLOCKCHAIN_API')) {
+        try {
+          const raydiumPrice = await this.fetchRaydiumPrice(tokenAddress);
+          if (raydiumPrice > 0) {
+            this.updateCache(tokenAddress, tokenSymbol || 'UNKNOWN', raydiumPrice, 'DEX', 0.85);
+            return raydiumPrice;
+          }
+        } catch (error) {
+          // Ignore error
+        }
+      }
+      
+      // Return cached value if all else fails
+      if (cachedEntry) {
+        logger.warn(`Using outdated price for ${tokenSymbol || tokenAddress} from cache`);
+        return cachedEntry.price;
+      }
+      
+      // Last resort: make an educated guess based on addresses for well-known stablecoins
+      if (tokenAddress === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
+          tokenAddress === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') { // USDT
+        return 1.0;
+      }
+      
+      throw new Error(`Failed to fetch price for token ${tokenSymbol || tokenAddress}`);
+    } catch (error: any) {
+      logger.error(`Error fetching token price: ${error.message}`);
+      
+      // Return cached value even if expired as a last resort
+      if (cachedEntry) {
+        logger.warn(`Using expired price for ${tokenSymbol || tokenAddress} from cache as fallback`);
+        return cachedEntry.price;
+      }
+      
+      throw new Error(`Failed to get price for ${tokenSymbol || tokenAddress}: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Update price cache with new data
+   */
+  private updateCache(
+    tokenAddress: string,
+    tokenSymbol: string,
+    price: number,
+    source: PriceSource,
+    confidence: number,
+    volume24h?: number,
+    change24h?: number
+  ): void {
+    const cacheKey = this.getCacheKey(tokenAddress);
+    
+    this.priceCache.set(cacheKey, {
+      symbol: tokenSymbol,
+      address: tokenAddress,
+      price,
+      timestamp: Date.now(),
+      source,
+      confidence,
+      volume24h,
+      change24h
+    });
+  }
+  
+  /**
+   * Fetch price from Jupiter API
+   */
+  private async fetchJupiterPrice(tokenAddress: string): Promise<number> {
+    // For SOL (native token), use a special approach
+    if (tokenAddress === 'So11111111111111111111111111111111111111112') {
       try {
-        // Determine which data source to use
-        switch (this.activeDataSource) {
-          case 'helius':
-            await this.fetchHeliusData();
-            success = true;
-            break;
-          case 'instant_nodes':
-            await this.fetchInstantNodesData();
-            success = true;
-            break;
-          case 'jupiter_api':
-            await this.fetchJupiterData();
-            success = true;
-            break;
-          case 'alchemy_rpc':
-            await this.fetchAlchemyData();
-            success = true;
-            break;
-          case 'public_rpc':
-            await this.fetchPublicRpcData();
-            success = true;
-            break;
-          case 'cached_backup':
-            await this.loadFromBackup();
-            success = true;
-            break;
-          default:
-            logger.warn(`Unknown data source: ${this.activeDataSource}, falling back to parallel fetching`);
+        const response = await axios.get('https://price.jup.ag/v4/price?ids=SOL');
+        if (response.data && response.data.data && response.data.data.SOL) {
+          return response.data.data.SOL.price;
         }
-      } catch (sourceError) {
-        logger.error(`Error with source ${this.activeDataSource}:`, sourceError);
-        success = false;
+      } catch (error) {
+        // Fall through to regular approach
       }
-      
-      // If current source failed, try parallel fetching from all sources
-      if (!success) {
-        logger.info('Primary source failed, attempting parallel fetch from all sources');
-        
-        // Try all sources in parallel and use the first one that succeeds
-        const fetchPromises = [
-          this.safeFetch('jupiter_api', () => this.fetchJupiterData()),
-          this.safeFetch('helius', () => this.fetchHeliusData()),
-          this.safeFetch('instant_nodes', () => this.fetchInstantNodesData()),
-          this.safeFetch('alchemy_rpc', () => this.fetchAlchemyData()),
-          this.safeFetch('public_rpc', () => this.fetchPublicRpcData())
-        ];
-        
-        try {
-          // Race all fetches and use the first one that resolves
-          const firstSource = await Promise.any(fetchPromises);
-          logger.info(`Successfully fetched data from ${firstSource}`);
-          this.activeDataSource = firstSource;
-          success = true;
-        } catch (aggregateError) {
-          logger.error('All data sources failed in parallel fetch');
-          // Try to load from cached backup as last resort
-          try {
-            await this.loadFromBackup();
-            this.activeDataSource = 'cached_backup';
-            success = true;
-          } catch (backupError) {
-            logger.error('Even backup loading failed:', backupError);
-            success = false;
-          }
-        }
-      }
-      
-      // If cache is still empty, try to load from backup
-      if (this.priceCache.size === 0 && this.marketDataCache.size === 0) {
-        logger.warn('Price feed cache is empty during refresh');
-        
-        // If we still have no data after refresh, try to use the backup
-        if (this.activeDataSource !== 'cached_backup') {
-          logger.info('Attempting to load from backup due to empty cache');
-          await this.loadFromBackup();
-        }
-      } else {
-        logger.debug(`Price feed cache refreshed with ${this.priceCache.size} prices and ${this.marketDataCache.size} market data entries`);
-        
-        // Update market data from prices
-        this.updateMarketDataFromPrices();
-        
-        // Broadcast updates to connected clients
-        this.broadcastPriceUpdates();
-      }
-    } catch (error) {
-      logger.error('Error refreshing price cache:', error);
-      // Switch to an alternative data source
-      this.switchDataSource('Error during refresh');
     }
-  }
-  
-  /**
-   * Fetch data from Helius API
-   * @private
-   */
-  private async fetchHeliusData(): Promise<void> {
-    try {
-      if (!process.env.HELIUS_API_KEY) {
-        logger.warn('No Helius API key found, skipping Helius data fetch');
-        this.switchDataSource('No Helius API key found');
-        return;
-      }
-      
-      logger.info('Fetching price data from Helius API');
-      
-      // Default pairs to fetch
-      const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
-      
-      for (const pair of pairs) {
-        const [baseToken, quoteToken] = pair.split('/');
-        
-        // Determine token addresses
-        const baseAddress = this.getTokenAddress(baseToken);
-        const quoteAddress = this.getTokenAddress(quoteToken);
-        
-        if (!baseAddress || !quoteAddress) {
-          logger.warn(`Missing token address for ${pair}, skipping`);
-          continue;
-        }
-        
-        // Fetch token price data
-        const response = await fetch(`https://api.helius.xyz/v0/tokens/${baseAddress}?api-key=${process.env.HELIUS_API_KEY}`);
-        
-        if (!response.ok) {
-          logger.warn(`Failed to fetch Helius data for ${pair}: ${response.status} ${response.statusText}`);
-          continue;
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.price !== undefined) {
-          const priceData: PriceData = {
-            pair,
-            price: data.price,
-            volume: data.volume24h || 0,
-            timestamp: new Date(),
-            source: 'helius'
-          };
-          
-          this.priceCache.set(pair, priceData);
-          logger.debug(`Updated price for ${pair}: ${priceData.price} (source: helius)`);
-        }
-      }
-    } catch (error) {
-      logger.error('Error fetching Helius data:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fetch data from Instant Nodes RPC
-   * @private
-   */
-  private async fetchInstantNodesData(): Promise<void> {
-    try {
-      // Use trial URL directly if INSTANT_NODES_RPC_URL isn't available
-      const instantNodesUrl = process.env.INSTANT_NODES_RPC_URL || 'https://solana-grpc-geyser.instantnodes.io:443';
-      
-      logger.info(`Fetching price data using Instant Nodes RPC: ${instantNodesUrl}`);
-      
-      // Default pairs to fetch - we'll use Jupiter API as a reliable source for price data
-      const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
-      
-      for (const pair of pairs) {
-        const [baseToken, quoteToken] = pair.split('/');
-        
-        try {
-          // Generate mock data for each pair as a fallback while InstantNodes connects
-          // This creates realistic looking data based on the token pair
-          const now = new Date();
-          let basePrice = 0;
-          let volume = 0;
-          
-          // Use Jupiter API for real price data
-          try {
-            // Fetch price from Jupiter price API
-            const response = await fetch(`https://price.jup.ag/v4/price?ids=${baseToken}`);
-            
-            if (response.ok) {
-              const data = await response.json();
-              
-              if (data && data.data && data.data[baseToken]) {
-                const tokenData = data.data[baseToken];
-                basePrice = tokenData.price;
-                volume = tokenData.volume24h || Math.random() * 5000000;
-                logger.info(`Got real price data for ${pair}: ${basePrice} (via Jupiter API)`);
-              }
-            }
-          } catch (jupiterError) {
-            logger.warn(`Jupiter API fallback failed for ${pair}, using generated data`);
-            
-            // Generate realistic dummy data if Jupiter API fails
-            if (pair === 'SOL/USDC') {
-              basePrice = 150 + (Math.random() * 5 - 2.5); // $150 +/- $2.50
-              volume = 100000000 + (Math.random() * 25000000); // $100-125M volume
-            } else if (pair === 'BONK/USDC') {
-              basePrice = 0.00003 + (Math.random() * 0.000002); // BONK price
-              volume = 25000000 + (Math.random() * 10000000); // $25-35M volume
-            } else if (pair === 'JUP/USDC') {
-              basePrice = 1.25 + (Math.random() * 0.1); // $1.25 +/- $0.05
-              volume = 15000000 + (Math.random() * 5000000); // $15-20M volume
-            }
-          }
-          
-          const priceData: PriceData = {
-            pair,
-            price: basePrice,
-            volume: volume,
-            timestamp: now,
-            source: 'instant_nodes'
-          };
-          
-          this.priceCache.set(pair, priceData);
-          
-          // Create market data with appropriate structures
-          const marketData: MarketData = {
-            pair,
-            prices: [[now.toISOString(), basePrice]],
-            volumes: [[now.toISOString(), volume]],
-            currentPrice: basePrice,
-            volume24h: volume,
-            priceChange24h: basePrice * 0.02 * (Math.random() - 0.5), // +/- 2%
-            priceChangePct24h: 2 * (Math.random() - 0.5), // +/- 2%
-            lastUpdated: now,
-            highPrice24h: basePrice * (1 + Math.random() * 0.03), // Up to 3% higher
-            lowPrice24h: basePrice * (1 - Math.random() * 0.03), // Up to 3% lower
-            source: 'instant_nodes',
-            orderBooks: [[
-              now.toISOString(), 
-              [[basePrice * 0.999, 1000], [basePrice * 0.998, 2000], [basePrice * 0.995, 5000]], // bids
-              [[basePrice * 1.001, 1000], [basePrice * 1.002, 2000], [basePrice * 1.005, 5000]]  // asks
-            ]],
-            indicators: {
-              rsi: [[now.toISOString(), 50 + (Math.random() * 20 - 10)]],
-              macd: [[now.toISOString(), Math.random() * 0.4 - 0.2]],
-              volume: [[now.toISOString(), volume]]
-            }
-          };
-          
-          this.marketDataCache.set(pair, {
-            pair,
-            data: marketData,
-            lastUpdated: now
-          });
-          
-          logger.debug(`Updated market data for ${pair} (source: instant_nodes)`);
-        } catch (pairError) {
-          logger.warn(`Error processing pair ${pair}:`, pairError);
-        }
-      }
-    } catch (error) {
-      logger.error('Error fetching Instant Nodes data:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fetch data from Jupiter API
-   * @private
-   */
-  private async fetchJupiterData(): Promise<void> {
-    try {
-      logger.info('Fetching price data from Jupiter API');
-      
-      // Default pairs to fetch
-      const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
-      
-      for (const pair of pairs) {
-        const [baseToken, quoteToken] = pair.split('/');
-        
-        // Fetch price from Jupiter API
-        const response = await fetch(`https://price.jup.ag/v4/price?ids=${baseToken}`);
-        
-        if (!response.ok) {
-          logger.warn(`Failed to fetch Jupiter data for ${pair}: ${response.status} ${response.statusText}`);
-          continue;
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.data && data.data[baseToken]) {
-          const tokenData = data.data[baseToken];
-          
-          const priceData: PriceData = {
-            pair,
-            price: tokenData.price,
-            volume: tokenData.volume24h || 0,
-            timestamp: new Date(),
-            source: 'jupiter_api'
-          };
-          
-          this.priceCache.set(pair, priceData);
-          logger.debug(`Updated price for ${pair}: ${priceData.price} (source: jupiter_api)`);
-        }
-      }
-    } catch (error) {
-      logger.error('Error fetching Jupiter data:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fetch data from Public RPC
-   * @private
-   */
-  /**
-   * Fetch data from Alchemy RPC (free tier with rate limiting)
-   * @private
-   */
-  private async fetchAlchemyData(): Promise<void> {
-    try {
-      // Check if we've hit our rate limit
-      if (this.alchemyRequestCount >= this.alchemyRateLimit) {
-        logger.warn('Alchemy rate limit reached, switching to another data source');
-        this.switchDataSource('Alchemy rate limit reached');
-        return;
-      }
-      
-      logger.info('Fetching price data from Alchemy RPC (free tier)');
-      
-      // Increment our request counter for rate limiting
-      this.alchemyRequestCount++;
-      
-      // Reset counter every 24 hours - this is a simple implementation
-      // In production, we'd use a more sophisticated rate limiter
-      if (!this.alchemyRateLimitResetTimeout) {
-        this.alchemyRateLimitResetTimeout = setTimeout(() => {
-          logger.info('Resetting Alchemy rate limit counter');
-          this.alchemyRequestCount = 0;
-          this.alchemyRateLimitResetTimeout = null;
-        }, 24 * 60 * 60 * 1000); // 24 hours
-      }
-      
-      // Since we can't directly get price data from Alchemy RPC easily,
-      // we'll use Jupiter API for the actual price data but count it toward
-      // our Alchemy rate limit for demonstration purposes
-      
-      // Default pairs to fetch
-      const pairs = ['SOL/USDC', 'BONK/USDC', 'JUP/USDC'];
-      
-      for (const pair of pairs) {
-        const [baseToken, quoteToken] = pair.split('/');
-        
-        // Fetch price from Jupiter price API
-        const response = await fetch(`https://price.jup.ag/v4/price?ids=${baseToken}`);
-        
-        if (!response.ok) {
-          logger.warn(`Failed to fetch Alchemy price data for ${pair}: ${response.status} ${response.statusText}`);
-          continue;
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.data && data.data[baseToken]) {
-          const tokenData = data.data[baseToken];
-          
-          const priceData: PriceData = {
-            pair,
-            price: tokenData.price,
-            volume: tokenData.volume24h || 0,
-            timestamp: new Date(),
-            source: 'alchemy_rpc'
-          };
-          
-          this.priceCache.set(pair, priceData);
-          logger.debug(`Updated price for ${pair}: ${priceData.price} (source: alchemy_rpc)`);
-        }
-      }
-    } catch (error) {
-      logger.error('Error fetching Alchemy data:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fetch data from Public RPC
-   * @private
-   */
-  private async fetchPublicRpcData(): Promise<void> {
-    try {
-      logger.info('Fetching price data from Public RPC');
-      
-      // For public RPC, we'll actually use the Jupiter API since
-      // it's difficult to get accurate price data directly from RPC
-      await this.fetchJupiterData();
-    } catch (error) {
-      logger.error('Error fetching Public RPC data:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Get token address by symbol
-   * @private
-   */
-  private getTokenAddress(symbol: string): string | null {
-    // Solana token addresses
-    const tokenAddresses: Record<string, string> = {
-      'SOL': 'So11111111111111111111111111111111111111112', // Native SOL
-      'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-      'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
-      'JUP': 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
-      'RAY': '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', // Raydium
-      'MSOL': 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // Marinade Staked SOL
-      'SAMO': '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', // Samoyedcoin
-    };
     
-    return tokenAddresses[symbol] || null;
+    // For other tokens
+    try {
+      const response = await axios.get(`https://price.jup.ag/v4/price?ids=${tokenAddress}`);
+      if (response.data && response.data.data && response.data.data[tokenAddress]) {
+        return response.data.data[tokenAddress].price;
+      }
+      throw new Error('Token not found in Jupiter API');
+    } catch (error: any) {
+      logger.debug(`Jupiter price fetch failed for ${tokenAddress}: ${error.message}`);
+      throw error;
+    }
   }
   
   /**
-   * Update market data from prices
-   * @private
+   * Fetch price from Helius API
    */
-  private updateMarketDataFromPrices(): void {
-    try {
-      for (const [pair, priceData] of this.priceCache.entries()) {
-        // Generate timestamps for the last 24 hours at 15-minute intervals
-        const timestamps: string[] = [];
-        const now = new Date();
-        
-        for (let i = 0; i < 96; i++) { // 24 hours * 4 (15-min intervals)
-          const timestamp = new Date(now.getTime() - i * 15 * 60 * 1000);
-          timestamps.unshift(timestamp.toISOString());
-        }
-        
-        // Generate price data with some variation around the current price
-        // In a real implementation, this would use historical data from APIs
-        const currentPrice = priceData.price;
-        const prices: [string, number][] = timestamps.map((timestamp, index) => {
-          // Add some randomness to create realistic-looking historical data
-          const variation = (Math.sin(index / 10) * 0.05) + ((Math.random() - 0.5) * 0.02);
-          const historicalPrice = currentPrice * (1 + variation);
-          return [timestamp, parseFloat(historicalPrice.toFixed(6))];
-        });
-        
-        // Generate volume data with similar patterns
-        const volumes: [string, number][] = timestamps.map((timestamp, index) => {
-          const variation = (Math.sin(index / 8) * 0.2) + ((Math.random() - 0.5) * 0.1);
-          const volumeValue = priceData.volume * (1 + variation) / 96; // Distribute daily volume
-          return [timestamp, parseFloat(volumeValue.toFixed(2))];
-        });
-        
-        // Calculate 24h price change
-        const latestPrice = prices[prices.length - 1][1];
-        const yesterdayPrice = prices[0][1];
-        const priceChange = latestPrice - yesterdayPrice;
-        const priceChangePct = (priceChange / yesterdayPrice) * 100;
-        
-        // Create market data object
-        const marketData: MarketData = {
-          pair,
-          prices,
-          volumes,
-          currentPrice: latestPrice,
-          volume24h: priceData.volume,
-          priceChange24h: priceChange,
-          priceChangePct24h: parseFloat(priceChangePct.toFixed(2)),
-          lastUpdated: new Date(),
-          highPrice24h: Math.max(...prices.map(p => p[1])),
-          lowPrice24h: Math.min(...prices.map(p => p[1])),
-          source: priceData.source
-        };
-        
-        // Update market data cache
-        this.marketDataCache.set(pair, {
-          pair,
-          data: marketData,
-          lastUpdated: new Date()
-        });
-        
-        logger.debug(`Generated market data for ${pair} based on current price: ${currentPrice}`);
-      }
-    } catch (error) {
-      logger.error('Error updating market data from prices:', error);
+  private async fetchHeliusPrice(tokenAddress: string): Promise<number> {
+    if (!this.heliusApiKey) {
+      throw new Error('Helius API key not configured');
     }
-  }
-
-  /**
-   * Backup the cache to disk
-   */
-  private async backupCache(): Promise<void> {
+    
     try {
-      logger.debug('Backing up price feed cache');
-      
-      // Ensure cache directory exists
-      await this.ensureCacheDir();
-      
-      // Backup price data
-      const priceData = Array.from(this.priceCache.values());
-      await fs.writeFile(
-        path.join(CACHE_DIR, 'price_cache.json'),
-        JSON.stringify(priceData),
-        'utf8'
+      const response = await axios.post(
+        `https://api.helius.xyz/v0/tokens/price?api-key=${this.heliusApiKey}`,
+        { mintAddresses: [tokenAddress] }
       );
       
-      // Backup market data
-      for (const [pair, cacheData] of this.marketDataCache.entries()) {
-        const safeFilename = pair.replace('/', '_') + '.json';
-        
-        await fs.writeFile(
-          path.join(CACHE_DIR, safeFilename),
-          JSON.stringify(cacheData.data),
-          'utf8'
-        );
-        
-        // Update backup timestamp
-        const cached = this.marketDataCache.get(pair);
-        if (cached) {
-          cached.backupTimestamp = new Date();
-          this.marketDataCache.set(pair, cached);
-        }
+      if (response.data && response.data.length > 0 && response.data[0].price) {
+        return response.data[0].price;
       }
-      
-      logger.debug('Price feed cache backup completed');
-    } catch (error) {
-      logger.error('Failed to backup price feed cache:', error);
-    }
-  }
-
-  /**
-   * Load data from backup (used during active operation when a data source fails)
-   */
-  private async loadFromBackup(): Promise<void> {
-    logger.info('Loading price data from cached backup');
-    
-    // This just reloads the data from disk
-    await this.loadCachedBackups();
-  }
-  
-  /**
-   * Load cached backups from disk
-   */
-  private async loadCachedBackups(): Promise<void> {
-    try {
-      // Ensure cache directory exists
-      await this.ensureCacheDir();
-      
-      // Check if price cache file exists
-      try {
-        const priceCache = await fs.readFile(
-          path.join(CACHE_DIR, 'price_cache.json'),
-          'utf8'
-        );
-        
-        const prices = JSON.parse(priceCache) as PriceData[];
-        
-        for (const price of prices) {
-          // Convert string timestamp back to Date object
-          if (typeof price.timestamp === 'string') {
-            price.timestamp = new Date(price.timestamp);
-          }
-          
-          this.priceCache.set(price.pair, price);
-        }
-        
-        logger.info(`Loaded ${prices.length} price entries from backup cache`);
-      } catch (e) {
-        logger.debug('No price cache backup found or failed to load it');
-      }
-      
-      // Load individual market data files
-      try {
-        const files = await fs.readdir(CACHE_DIR);
-        const marketDataFiles = files.filter(f => 
-          f !== 'price_cache.json' && f.endsWith('.json')
-        );
-        
-        for (const file of marketDataFiles) {
-          try {
-            const data = await fs.readFile(path.join(CACHE_DIR, file), 'utf8');
-            const marketData = JSON.parse(data) as MarketData;
-            
-            // Extract pair from filename
-            const pair = file.replace('_', '/').replace('.json', '');
-            
-            this.marketDataCache.set(pair, {
-              pair,
-              data: marketData,
-              lastUpdated: new Date(), // This will be marked as fresh since we just loaded it
-              backupTimestamp: new Date()
-            });
-          } catch (err) {
-            logger.error(`Failed to load market data from ${file}:`, err);
-          }
-        }
-        
-        logger.info(`Loaded ${this.marketDataCache.size} market data entries from backup cache`);
-      } catch (e) {
-        logger.debug('No market data cache backups found or failed to load them');
-      }
-    } catch (error) {
-      logger.error('Failed to load cached backups:', error);
-    }
-  }
-
-  /**
-   * Ensure the cache directory exists
-   */
-  private async ensureCacheDir(): Promise<void> {
-    try {
-      await fs.mkdir(CACHE_DIR, { recursive: true });
-    } catch (error) {
-      logger.error('Failed to create cache directory:', error);
+      throw new Error('Token not found in Helius API');
+    } catch (error: any) {
+      logger.debug(`Helius price fetch failed for ${tokenAddress}: ${error.message}`);
       throw error;
     }
   }
-
+  
   /**
-   * Safe fetch wrapper to handle errors gracefully
-   * @private
+   * Fetch price from Raydium API
    */
-  private async safeFetch(sourceName: string, fetchFunction: () => Promise<void>): Promise<string> {
+  private async fetchRaydiumPrice(tokenAddress: string): Promise<number> {
     try {
-      await fetchFunction();
-      return sourceName;
-    } catch (error) {
-      logger.error(`Error fetching from ${sourceName}:`, error);
-      throw new Error(`Failed to fetch from ${sourceName}`);
+      const response = await axios.get(`https://api.raydium.io/v2/main/price?token=${tokenAddress}`);
+      if (response.data && response.data.data && !isNaN(parseFloat(response.data.data))) {
+        return parseFloat(response.data.data);
+      }
+      throw new Error('Token not found in Raydium API');
+    } catch (error: any) {
+      logger.debug(`Raydium price fetch failed for ${tokenAddress}: ${error.message}`);
+      throw error;
     }
   }
-
+  
   /**
-   * Stop the cache service
+   * Get all available token prices in cache
    */
-  public stop(): void {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
+  public getAllCachedPrices(): TokenPriceEntry[] {
+    return Array.from(this.priceCache.values());
+  }
+  
+  /**
+   * Get current cache statistics
+   */
+  public getCacheStats(): {
+    cacheSize: number;
+    sources: Record<PriceSource, number>;
+    avgAge: number;
+    rateLimits: Record<string, {current: number, limit: number, resetIn: number}>;
+  } {
+    const entries = Array.from(this.priceCache.values());
+    const now = Date.now();
     
-    if (this.backupInterval) {
-      clearInterval(this.backupInterval);
-      this.backupInterval = null;
-    }
-    
-    // Perform one final backup before stopping
-    this.backupCache().catch(err => {
-      logger.error('Failed to perform final cache backup:', err);
+    // Count by source
+    const sources: Partial<Record<PriceSource, number>> = {};
+    entries.forEach(entry => {
+      sources[entry.source] = (sources[entry.source] || 0) + 1;
     });
     
-    this.initialized = false;
-    logger.info('Price feed cache service stopped');
+    // Calculate average age
+    const totalAge = entries.reduce((sum, entry) => sum + (now - entry.timestamp), 0);
+    const avgAge = entries.length > 0 ? totalAge / entries.length : 0;
+    
+    // Format rate limits
+    const rateLimits: Record<string, {current: number, limit: number, resetIn: number}> = {};
+    Object.keys(this.rateLimits).forEach(api => {
+      rateLimits[api] = {
+        current: this.rateLimits[api].currentUsage,
+        limit: this.rateLimits[api].dailyLimit,
+        resetIn: Math.max(0, this.rateLimits[api].resetTime - now)
+      };
+    });
+    
+    return {
+      cacheSize: entries.length,
+      sources: sources as Record<PriceSource, number>,
+      avgAge: avgAge,
+      rateLimits
+    };
   }
 }
 
-// Create singleton instance
+// Export singleton instance
 export const priceFeedCache = new PriceFeedCache();
-
-// Export types
-export type { PriceData, CachedMarketData };
