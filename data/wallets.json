@@ -1,0 +1,34 @@
+[
+  {
+    "type": "PROFIT_COLLECTION",
+    "publicKey": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "label": "Profit Collection Wallet",
+    "isActive": false
+  },
+  {
+    "type": "PROFIT_COLLECTION",
+    "publicKey": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "privateKey": "fced8d5a72f2d389b12c3b27143c5cfc6ea01064143af365641a0944bcd7841b1de8311e4df9c5ba7c844a7a868d3399d9428b951916bb5085fd42205a5792c3",
+    "label": "Prophet Wallet (User Controlled)",
+    "isActive": true,
+    "profitShare": 100
+  },
+  {
+    "type": "TRADING",
+    "publicKey": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm",
+    "privateKey": "9fb95840b9bbeea045044f859cf74639fce71e78c1c95e23411b261ab343f1611b40c7c97815e628bbea174eba13763f6d4c8b6d5659d81098b97b62dcd98dac",
+    "label": "Trading Wallet 1 (95% reinvestment)",
+    "isActive": true,
+    "profitShare": 5,
+    "routedTo": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  {
+    "type": "TRADING",
+    "publicKey": "HLG44WF9VYquMGJGFoKP33D8H1iRTC2t8be6DAD5Wtqg",
+    "privateKey": "abbe6e9fb2734ace98c7047a3f2b5bd685f968681f7d1f637ac7bdd371fdbeb9f2aa0be1913871cf01070611b8417678e6f0aa5feb444e899f7cd85ee5cbc4bb",
+    "label": "Trading Wallet 2 (95% reinvestment)",
+    "isActive": false,
+    "profitShare": 5,
+    "routedTo": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  }
+]

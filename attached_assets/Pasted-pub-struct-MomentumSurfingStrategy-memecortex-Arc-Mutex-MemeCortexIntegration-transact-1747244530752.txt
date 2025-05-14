@@ -1,0 +1,68 @@
+pub struct MomentumSurfingStrategy {
+    memecortex: Arc<Mutex<MemeCortexIntegration>>,
+    transaction_engine: Arc<Mutex<EnhancedTransactionEngine>>,
+    entry_threshold: u32,
+    exit_threshold: u32,
+    trailing_stop_percentage: f64,
+}
+
+impl MomentumSurfingStrategy {
+    pub fn new() -> Self {
+        Self {
+            memecortex: QUANTUM_TRANSFORMERS.lock().unwrap().memecortex,
+            transaction_engine: QUANTUM_TRANSFORMERS.lock().unwrap().transaction_engine,
+            entry_threshold: 75, // Enter when momentum score exceeds 75
+            exit_threshold: 60, // Exit when momentum drops below 60
+            trailing_stop_percentage: 10.0, // 10% trailing stop
+        }
+    }
+    
+    pub fn scan_for_momentum_waves(&self) -> Vec<MomentumOpportunity> {
+        let mut opportunities = Vec::new();
+        
+        // Get top 100 tokens by volume
+        let tokens = self.get_top_volume_tokens(100);
+        
+        for token in tokens {
+            // Get current momentum score
+            let score = self.memecortex.lock().unwrap().analyze_token(&token);
+            
+            // Get historical scores (last 24 hours)
+            let historical_scores = self.get_historical_momentum_scores(&token, 24);
+            
+            // Calculate momentum change rate
+            let change_rate = self.calculate_momentum_change_rate(historical_scores, &score);
+            
+            // If momentum is rapidly increasing and above threshold
+            if change_rate > 15.0 && score.overall_score >= self.entry_threshold {
+                opportunities.push(MomentumOpportunity {
+                    token_address: token.clone(),
+                    current_score: score.overall_score,
+                    momentum_change_rate: change_rate,
+                    predicted_peak_score: self.predict_peak_score(&score, change_rate),
+                    optimal_entry_price: self.get_current_price(&token),
+                    recommended_exit_timeframe: self.calculate_optimal_exit_timeframe(change_rate),
+                });
+            }
+        }
+        
+        // Sort by momentum change rate
+        opportunities.sort_by(|a, b| b.momentum_change_rate.partial_cmp(&a.momentum_change_rate).unwrap());
+        opportunities
+    }
+    
+    pub fn execute_momentum_trade(&self, opportunity: &MomentumOpportunity, amount: f64) -> Result<String, String> {
+        // Execute buy with MEV protection
+        let tx_hash = self.transaction_engine.lock().unwrap()
+            .execute_buy(&opportunity.token_address, amount, Some(1.0))?;
+        
+        // Set up trailing stop monitoring in a separate thread
+        self.monitor_trailing_stop(
+            &opportunity.token_address,
+            self.get_current_price(&opportunity.token_address),
+            self.trailing_stop_percentage
+        );
+        
+        Ok(tx_hash)
+    }
+}
