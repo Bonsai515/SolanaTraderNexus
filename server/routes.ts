@@ -178,6 +178,56 @@ router.post('/api/engine/execute-swap', async (req, res) => {
   }
 });
 
+// Real Solana Transaction Endpoint for Live Trading
+router.post('/api/solana/execute-transaction', async (req, res) => {
+  try {
+    if (!nexusEngine.isInitialized()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nexus Professional Engine must be initialized before executing transactions' 
+      });
+    }
+    
+    if (!nexusEngine.isUsingRealFunds()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Real funds mode must be enabled to execute live market transactions' 
+      });
+    }
+    
+    const { type, walletPath, fromWalletPath, toWallet, amountSol, fromToken, toToken, 
+            amountIn, slippageBps, swapInstructions, route, arbitrageInstructions } = req.body;
+    
+    if (!type) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Transaction type is required (transfer, swap, or arbitrage)' 
+      });
+    }
+    
+    // Execute the real market transaction
+    const result = await nexusEngine.executeSolanaTransaction({
+      type,
+      walletPath,
+      fromWalletPath,
+      toWallet,
+      amountSol,
+      fromToken,
+      toToken,
+      amountIn,
+      slippageBps,
+      swapInstructions,
+      route,
+      arbitrageInstructions
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Error executing Solana transaction:', error);
+    res.status(500).json({ success: false, message: `Error: ${error.message}` });
+  }
+});
+
 router.post('/api/engine/check-token-security', async (req, res) => {
   try {
     if (!usingNexusEngine) {

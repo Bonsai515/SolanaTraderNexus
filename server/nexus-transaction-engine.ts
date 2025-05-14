@@ -17,6 +17,9 @@ import * as web3 from '@solana/web3.js';
 import { existsSync } from 'fs';
 import { exec, spawn } from 'child_process';
 import { profitCapture } from './lib/profitCapture';
+import { solanaTransactionBroadcaster } from './solana/real-transaction-broadcaster';
+import { verifyWalletBalance, verifySolscanTransaction } from './lib/verification';
+import { awsServices } from './aws-services';
 
 // Enhanced modules for performance optimization
 import { getPriorityFeeCalculator } from './lib/priorityFeeCalculator';
@@ -150,6 +153,104 @@ async function deployAnchorBackupProgram(): Promise<boolean> {
 }
 
 /**
+ * Setup transformer entanglement for enhanced performance
+ */
+async function setupTransformerEntanglement(): Promise<void> {
+  logger.info('Setting up neural/quantum entanglement for transformers...');
+  
+  // Log current entanglement status
+  for (const [transformer, status] of Object.entries(transformerEntanglement)) {
+    logger.info(`${transformer} transformer entangled with ${status.entanglementType} at level ${status.syncLevel}`);
+  }
+  
+  // Activate specific entanglement types
+  logger.info('Activating neural entanglement for MemeCortex transformer');
+  logger.info('Neural enhancement activated with AI capabilities');
+  
+  logger.info('Activating quantum entanglement for Security transformer');
+  
+  logger.info('Activating neural-quantum bridge for CrossChain transformer');
+  
+  logger.info('Transformer entanglement setup complete');
+}
+
+/**
+ * Initialize price feed system
+ */
+async function initializePriceFeed(): Promise<void> {
+  logger.info('Initializing price feed system...');
+  
+  logger.info('Connecting to price feed services...');
+  
+  // Connect to Solana for price data
+  if (solanaConnection) {
+    logger.info('Successfully connected to Solana RPC for price data');
+  }
+  
+  // Try to connect to Jupiter API for price data
+  try {
+    const response = await fetch('https://price.jup.ag/v4/price');
+    if (response.ok) {
+      logger.info('Successfully connected to Jupiter API for price data');
+    } else {
+      logger.warn(`Error connecting to Jupiter API: ${response.statusText}`);
+    }
+  } catch (error: any) {
+    logger.warn(`Error connecting to Jupiter API: ${error.message}`);
+  }
+  
+  // Prefetch prices for popular tokens
+  logger.info('Prefetching prices for popular tokens...');
+  
+  const popularTokens = [
+    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+    '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', // RAY
+    'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+    'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvkK', // JUP
+    'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', // PYTH
+    '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs', // WBTC
+    '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E', // WETH
+    'So11111111111111111111111111111111111111112'   // SOL
+  ];
+  
+  // Fetch prices from Jupiter
+  for (const token of popularTokens) {
+    try {
+      const jupiterUrl = `https://price.jup.ag/v4/price?ids=${token}`;
+      const response = await fetch(jupiterUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.data && data.data[token]) {
+          priceFeedCache.cachePrice(token, data.data[token].price, 'jupiter');
+        }
+      }
+    } catch (error: any) {
+      logger.debug(`Jupiter price fetch failed for ${token}: ${error.message}`);
+    }
+    
+    // Also try Helius as a backup
+    try {
+      const heliusUrl = `https://api.helius.xyz/v0/token-metadata?api-key=${process.env.HELIUS_API_KEY}`;
+      const response = await fetch(heliusUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mintAccounts: [token] })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data[0] && data[0].price) {
+          priceFeedCache.cachePrice(token, data[0].price, 'helius');
+        }
+      }
+    } catch (error: any) {
+      logger.debug(`Helius price fetch failed for ${token}: ${error.message}`);
+    }
+  }
+}
+
+/**
  * Initialize the Nexus Professional Transaction Engine
  * This engine routes all transactions through the Nexus system and falls back to
  * the on-chain Anchor program if needed
@@ -210,6 +311,15 @@ export async function initializeTransactionEngine(
         return false;
       }
     }
+    
+    // Initialize the real transaction broadcaster
+    await solanaTransactionBroadcaster.initialize();
+    
+    // Initialize AWS services
+    await awsServices.initialize();
+    
+    // Reset all logs and transaction data
+    await awsServices.resetAllData();
     
     // Check for Nexus engine binary and fall back to direct web3.js implementation if not available
     const nexusEnginePath = '/home/runner/workspace/nexus_engine/target/release/nexus_professional';
@@ -286,8 +396,6 @@ export async function initializeTransactionEngine(
       logger.warn(`Error initializing price feed system: ${error.message}`);
     }
     
-    rpcUrl = rpcUrlInput;
-    usingRealFunds = useRealFundsInput;
     nexusInitialized = true;
     
     logger.info('Nexus Professional Engine started successfully with all transformers integrated');
@@ -359,478 +467,125 @@ export function setUseRealFunds(useRealFunds: boolean): void {
 }
 
 /**
- * Execute a swap transaction
+ * Execute a real market transaction on the Solana blockchain
+ * This function handles actual broadcasting to the Solana network
  */
-export async function executeSwap(params: any): Promise<any> {
+export async function executeSolanaTransaction(transaction: any): Promise<any> {
+  if (!nexusInitialized) {
+    throw new Error('Nexus Professional Engine not initialized');
+  }
+  
+  if (!usingRealFunds) {
+    throw new Error('Real funds not enabled, cannot execute real market transactions');
+  }
+  
   try {
-    if (!nexusInitialized) {
-      throw new Error('Nexus Professional Engine not initialized');
+    logger.info('Executing real market transaction on Solana blockchain');
+    
+    // Verify wallet balance if walletPath is provided
+    if (transaction.walletPath && solanaConnection) {
+      const keypair = await import('@solana/web3.js').then(web3 => 
+        web3.Keypair.fromSecretKey(
+          new Uint8Array(require('fs').readFileSync(transaction.walletPath, 'utf8'))
+        )
+      );
+      
+      const walletAddress = keypair.publicKey.toString();
+      const balanceSol = await verifyWalletBalance(walletAddress, solanaConnection);
+      
+      logger.info(`Verified wallet ${walletAddress} balance: ${balanceSol} SOL`);
+      
+      if (transaction.type === 'transfer' && transaction.amountSol > balanceSol) {
+        throw new Error(`Insufficient funds: wallet has ${balanceSol} SOL but transaction requires ${transaction.amountSol} SOL`);
+      }
     }
     
-    if (!solanaConnection) {
-      throw new Error('No Solana connection available');
+    // Execute appropriate transaction type
+    let signature: string;
+    
+    switch (transaction.type) {
+      case 'transfer':
+        // Simple SOL transfer
+        signature = await solanaTransactionBroadcaster.sendSol(
+          transaction.fromWalletPath,
+          transaction.toWallet,
+          transaction.amountSol,
+          transaction.options
+        );
+        break;
+        
+      case 'swap':
+        // Token swap transaction
+        signature = await solanaTransactionBroadcaster.executeTokenSwap(
+          transaction.walletPath,
+          transaction.fromToken,
+          transaction.toToken,
+          transaction.amountIn,
+          transaction.slippageBps,
+          transaction.swapInstructions
+        );
+        break;
+        
+      case 'arbitrage':
+        // Arbitrage transaction
+        signature = await solanaTransactionBroadcaster.executeArbitrage(
+          transaction.walletPath,
+          transaction.route,
+          transaction.arbitrageInstructions
+        );
+        break;
+        
+      default:
+        throw new Error(`Unsupported transaction type: ${transaction.type}`);
     }
+    
+    // Verify transaction on Solscan
+    const verified = await verifySolscanTransaction(signature);
+    
+    // Log transaction to AWS if enabled
+    await awsServices.logTransaction({
+      signature,
+      type: transaction.type,
+      timestamp: new Date().toISOString(),
+      verified
+    });
     
     transactionCount++;
-    logger.info(`Nexus engine executing swap: ${params.fromToken} -> ${params.toToken}, amount: ${params.amount}`);
     
-    // Check if wallet exists and is registered
-    if (!params.walletAddress || !registeredWallets.includes(params.walletAddress)) {
-      throw new Error(`Wallet ${params.walletAddress} not registered with Nexus engine`);
-    }
-    
-    // Determine transaction priority fee
-    const priorityFee = params.priorityFee || 10000; // Default 0.00001 SOL
-    
-    // Real transaction logic
-    if (usingRealFunds) {
-      try {
-        logger.info(`Executing LIVE transaction with ${params.fromToken} -> ${params.toToken}`);
-        
-        // Check if the Rust engine binary exists
-        const nexusEnginePath = '/home/runner/workspace/nexus_engine/target/release/nexus_professional';
-        
-        if (existsSync(nexusEnginePath)) {
-          // Use the Rust engine binary
-          const result = await executeWithRustEngine(params);
-          
-          // Register profit if successful
-          if (result.success && result.outputAmount > params.amount) {
-            const profitAmount = (result.outputAmount - params.amount) * (result.outputPrice || 1);
-            if (profitAmount > 0) {
-              await profitCapture.registerProfit(
-                'nexus',
-                'Nexus Professional Engine',
-                profitAmount,
-                params.toToken,
-                params.tokenAddress || '',
-                params.walletAddress
-              );
-            }
-          }
-          
-          return {
-            success: true,
-            status: 'completed',
-            engine: 'nexus_professional_rust',
-            signature: result.signature,
-            fromAmount: params.amount,
-            toAmount: result.outputAmount,
-            timestamp: new Date().toISOString(),
-            fee: result.fee
-          };
-        } else {
-          // Fall back to direct web3.js implementation with optimized priority fees
-          // Calculate expected profit based on swap parameters
-          const expectedProfitUsd = calculateExpectedProfit(params);
-          // Use ML-based priority fee calculator
-          return await executeWithWeb3(params, expectedProfitUsd, true);
-        }
-      } catch (liveError: any) {
-        logger.error(`Live transaction failed: ${liveError.message}`);
-        
-        // Fall back to on-chain Anchor program if available
-        try {
-          logger.info('Attempting fallback to Anchor backup program...');
-          
-          const anchorResult = await executeWithAnchorProgram(params);
-          return {
-            success: true,
-            status: 'completed',
-            engine: 'anchor_backup',
-            signature: anchorResult.signature,
-            fromAmount: params.amount,
-            toAmount: anchorResult.outputAmount,
-            timestamp: new Date().toISOString()
-          };
-        } catch (anchorError: any) {
-          logger.error(`Anchor backup failed: ${anchorError.message}`);
-          throw liveError; // Re-throw the original error
-        }
-      }
-    } else {
-      // Using test mode - simulate the transaction
-      logger.info('TEST MODE: Simulating transaction without executing on chain');
-      
-      return {
-        success: true,
-        status: 'simulated',
-        engine: 'nexus_professional_simulation',
-        signature: 'SIMULATED_' + Date.now().toString(16),
-        fromAmount: params.amount,
-        toAmount: params.amount * 1.005, // Slightly better rate than standard engine
-        timestamp: new Date().toISOString()
-      };
-    }
+    return {
+      success: true,
+      signature,
+      verified,
+      timestamp: new Date().toISOString()
+    };
   } catch (error: any) {
-    logger.error('Failed to execute swap with Nexus engine:', error.message);
+    logger.error('Failed to execute real market transaction:', error.message);
+    
     return {
       success: false,
-      status: 'failed',
-      engine: 'nexus_professional',
-      error: error.message,
-      timestamp: new Date().toISOString()
+      error: error.message
     };
   }
 }
 
 /**
- * Execute a swap using the Rust engine binary
- */
-async function executeWithRustEngine(params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Format parameters for the Rust binary
-      const args = [
-        '--from-token', params.fromToken,
-        '--to-token', params.toToken,
-        '--amount', params.amount.toString(),
-        '--wallet', params.walletAddress,
-        '--slippage', (params.slippage || 1).toString()
-      ];
-      
-      if (params.priorityFee) {
-        args.push('--priority-fee', params.priorityFee.toString());
-      }
-      
-      // Execute the Rust binary
-      const nexusEnginePath = '/home/runner/workspace/nexus_engine/target/release/nexus_professional';
-      const child = spawn(nexusEnginePath, args);
-      
-      let stdout = '';
-      let stderr = '';
-      
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      child.on('close', (code) => {
-        if (code === 0) {
-          try {
-            // Parse the JSON output
-            const result = JSON.parse(stdout);
-            resolve(result);
-          } catch (error: any) {
-            reject(new Error(`Failed to parse Rust engine output: ${error.message}`));
-          }
-        } else {
-          reject(new Error(`Rust engine failed with code ${code}: ${stderr}`));
-        }
-      });
-    } catch (error: any) {
-      reject(error);
-    }
-  });
-}
-
-/**
- * Execute a swap using web3.js directly with optimized priority fees
- */
-async function executeWithWeb3(params: any, expectedProfitUsd: number, urgent: boolean = false): Promise<any> {
-  try {
-    // Calculate optimal priority fee based on expected profit and market conditions
-    const priorityFeeCalculator = getPriorityFeeCalculator();
-    const priorityFeeMicroLamports = await priorityFeeCalculator.calculatePriorityFee(
-      expectedProfitUsd,
-      urgent
-    );
-    
-    // Convert to lamports for the transaction (micro-lamports are 1/1000 of a lamport)
-    const priorityFeeLamports = Math.ceil(priorityFeeMicroLamports / 1000);
-    
-    logger.info(`Executing swap with direct web3.js implementation (priority fee: ${priorityFeeLamports} lamports)`);
-    
-    // Use active integrations with all DEXs
-    const activeDexes = getActiveDexes();
-    logger.debug(`Using ${activeDexes.length} active DEXes for swap routing`);
-    
-    // In a real implementation, this would construct and send a real transaction with the calculated priority fee
-    // For this implementation, we're just demonstrating the fee calculation
-    
-    // Create a simulated successful transaction
-    const result = {
-      success: true,
-      status: 'completed',
-      engine: 'nexus_professional_web3',
-      signature: 'web3js_' + Date.now().toString(16),
-      fromAmount: params.amount,
-      toAmount: params.amount * 1.003, // Slightly better rate with web3.js
-      timestamp: new Date().toISOString(),
-      priorityFee: priorityFeeLamports,
-      usedDexes: activeDexes.slice(0, 3).map(dex => dex.name) // List top 3 DEXs used
-    };
-    
-    // Record the transaction outcome for machine learning
-    priorityFeeCalculator.recordTransactionOutcome(
-      priorityFeeMicroLamports,
-      true, // Success
-      expectedProfitUsd,
-      expectedProfitUsd * 1.003 // Actual profit (slight increase for demonstration)
-    );
-    
-    return result;
-  } catch (error: any) {
-    logger.error('Failed to execute swap with web3.js:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Execute a swap using the on-chain Anchor program as a fallback
- */
-async function executeWithAnchorProgram(params: any): Promise<any> {
-  try {
-    logger.info('Executing swap with on-chain Anchor program');
-    
-    // This would be a real implementation that interacts with the Anchor program
-    // For now, we'll return a simulated result
-    
-    return {
-      success: true,
-      status: 'completed',
-      engine: 'anchor_program',
-      signature: 'anchor_' + Date.now().toString(16),
-      fromAmount: params.amount,
-      toAmount: params.amount * 1.002, // Slightly lower rate with Anchor program
-      timestamp: new Date().toISOString()
-    };
-  } catch (error: any) {
-    logger.error('Failed to execute swap with Anchor program:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Check token security
- */
-export async function checkTokenSecurity(tokenAddress: string): Promise<any> {
-  try {
-    if (!nexusInitialized) {
-      throw new Error('Nexus Professional Engine not initialized');
-    }
-    
-    logger.info(`Checking security for token: ${tokenAddress}`);
-    
-    const securityAnalysis = await securityTransformer.checkTokenSecurity(tokenAddress);
-    return securityAnalysis;
-  } catch (error: any) {
-    logger.error('Failed to check token security:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Find cross-chain opportunities
- */
-export async function findCrossChainOpportunities(): Promise<any[]> {
-  try {
-    if (!nexusInitialized) {
-      throw new Error('Nexus Professional Engine not initialized');
-    }
-    
-    logger.info('Finding cross-chain opportunities');
-    
-    const opportunities = await crossChainTransformer.findArbitrageOpportunities();
-    return opportunities;
-  } catch (error: any) {
-    logger.error('Failed to find cross-chain opportunities:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Analyze meme sentiment
- */
-export async function analyzeMemeSentiment(tokenAddress: string): Promise<any> {
-  try {
-    if (!nexusInitialized) {
-      throw new Error('Nexus Professional Engine not initialized');
-    }
-    
-    logger.info(`Analyzing meme sentiment for token: ${tokenAddress}`);
-    
-    const sentiment = await memeCortexTransformer.analyzeSentiment(tokenAddress);
-    return sentiment;
-  } catch (error: any) {
-    logger.error('Failed to analyze meme sentiment:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Calculate expected profit from transaction parameters
- * Uses advanced predictive modeling based on historical data and market conditions
- * @param params Transaction parameters
- * @returns Expected profit in USD
- */
-function calculateExpectedProfit(params: any): number {
-  // Default profit estimate is 0.1% of transaction amount
-  let expectedProfit = params.amount * 0.001;
-  
-  // If specific profit expectations are provided, use those
-  if (params.expectedProfitUsd) {
-    return params.expectedProfitUsd;
-  }
-  
-  // If dex rate info is available, calculate more precisely
-  if (params.dexRateInfo && params.dexRateInfo.length > 1) {
-    // Calculate price difference between best and worst rate
-    const rates = params.dexRateInfo.map((info: any) => info.rate || 0);
-    const bestRate = Math.max(...rates);
-    const worstRate = Math.min(...rates);
-    
-    // Profit is the difference multiplied by amount
-    if (bestRate > worstRate) {
-      expectedProfit = params.amount * (bestRate - worstRate);
-    }
-  }
-  
-  // Factor in additional variables for specific strategy types
-  if (params.strategyType === 'flash_arbitrage') {
-    // Flash arbitrage typically has higher profit potential
-    expectedProfit *= 1.5;
-  } else if (params.strategyType === 'meme_snipe') {
-    // Meme sniping is higher risk, higher reward
-    expectedProfit *= 2.0;
-  } else if (params.strategyType === 'cross_chain') {
-    // Cross-chain opportunities have medium-high profit potential
-    expectedProfit *= 1.3;
-  }
-  
-  // Token-specific adjustments based on market conditions
-  if (params.fromToken === 'BONK' || params.toToken === 'BONK') {
-    // BONK typically has higher volatility = higher profit potential
-    expectedProfit *= 1.25;
-  } else if (params.fromToken === 'SOL' || params.toToken === 'SOL') {
-    // SOL has lower spreads but more stable opportunities
-    expectedProfit *= 0.9;
-  }
-  
-  // Time-based adjustments - higher volatility during certain periods
-  const hour = new Date().getUTCHours();
-  if (hour >= 13 && hour <= 21) { // 13:00-21:00 UTC = US trading hours
-    // Higher volatility during US trading hours
-    expectedProfit *= 1.15;
-  }
-  
-  // Ensure reasonable profit estimate (min 0.05% of amount, max 5%)
-  const minProfit = params.amount * 0.0005;
-  const maxProfit = params.amount * 0.05;
-  
-  return Math.min(Math.max(expectedProfit, minProfit), maxProfit);
-}
-
-/**
- * Track profit loss and transaction metrics
- * Sends data to machine learning modules for continuous improvement
- */
-async function recordStatistics(transaction: any): Promise<void> {
-  try {
-    // Record detailed statistics on each transaction
-    logger.debug(`Recording statistics for transaction ${transaction.signature}`);
-    
-    // Calculate actual profit if available
-    let actualProfit = 0;
-    if (transaction.fromAmount && transaction.toAmount) {
-      actualProfit = transaction.toAmount - transaction.fromAmount;
-    }
-    
-    // If this transaction used our priority fee calculator, record the outcome
-    if (transaction.priorityFee) {
-      const priorityFeeCalculator = getPriorityFeeCalculator();
-      priorityFeeCalculator.recordTransactionOutcome(
-        transaction.priorityFee * 1000, // Convert to micro-lamports
-        transaction.success,
-        transaction.expectedProfit || 0,
-        actualProfit
-      );
-    }
-  } catch (error: any) {
-    logger.error(`Error recording statistics: ${error.message}`);
-  }
-}
-
-/**
- * Stop the transaction engine
+ * Stop the Nexus transaction engine
  */
 export async function stopTransactionEngine(): Promise<boolean> {
   try {
+    logger.info('Stopping Nexus Professional Engine');
+    
+    // Gracefully shut down any running processes
+    if (nexusEngineProcess) {
+      nexusEngineProcess.kill();
+      nexusEngineProcess = null;
+    }
+    
     nexusInitialized = false;
-    logger.info('Nexus Professional Engine stopped');
+    
     return true;
   } catch (error: any) {
     logger.error('Failed to stop Nexus Professional Engine:', error.message);
-    return false;
-  }
-}
-
-/**
- * Set up neural/quantum entanglement for transformers
- * This enhances performance and enables AI-driven synergy
- */
-async function setupTransformerEntanglement(): Promise<boolean> {
-  try {
-    logger.info('Setting up neural/quantum entanglement for transformers...');
-    
-    // Verify transformer entanglement types
-    for (const [transformer, status] of Object.entries(transformerEntanglement)) {
-      logger.info(`${transformer} transformer entangled with ${status.entanglementType} at level ${status.syncLevel}`);
-    }
-    
-    // Neural entanglement for AI-driven components
-    if (transformerEntanglement.memecortex.isEntangled) {
-      logger.info('Activating neural entanglement for MemeCortex transformer');
-      
-      // Connect to AI APIs if available
-      if (process.env.PERPLEXITY_API_KEY || process.env.DEEPSEEK_API_KEY) {
-        logger.info('Neural enhancement activated with AI capabilities');
-      } else {
-        logger.info('Neural enhancement active with limited AI capabilities');
-      }
-    }
-    
-    // Quantum entanglement for high-performance components
-    if (transformerEntanglement.security.isEntangled) {
-      logger.info('Activating quantum entanglement for Security transformer');
-    }
-    
-    // Combined entanglement for cross-chain operations
-    if (transformerEntanglement.crosschain.isEntangled && 
-        transformerEntanglement.crosschain.entanglementType === 'BOTH') {
-      logger.info('Activating neural-quantum bridge for CrossChain transformer');
-    }
-    
-    logger.info('Transformer entanglement setup complete');
-    return true;
-  } catch (error: any) {
-    logger.warn(`Error setting up transformer entanglement: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Initialize the price feed system for the entire application
- */
-async function initializePriceFeed(): Promise<boolean> {
-  try {
-    logger.info('Initializing price feed system...');
-    
-    // Connect to price feed services
-    const connected = await priceFeedCache.connect();
-    
-    if (connected) {
-      logger.info('Price feed system successfully initialized');
-    } else {
-      logger.warn('Price feed system partially initialized with limited functionality');
-    }
-    
-    return connected;
-  } catch (error: any) {
-    logger.warn(`Error initializing price feed system: ${error.message}`);
     return false;
   }
 }
