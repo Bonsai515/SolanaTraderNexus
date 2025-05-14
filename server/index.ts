@@ -1,7 +1,8 @@
-const express = require('express');
-const path = require('path');
+import express from 'express';
+import path from 'path';
+import { registerRoutes } from './routes';
+
 const app = express();
-const { registerRoutes } = require('./routes');
 
 // Middleware for parsing JSON bodies
 app.use(express.json());

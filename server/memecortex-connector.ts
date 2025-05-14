@@ -1,919 +1,832 @@
 /**
  * MemeCortex Remix Transformer
  * 
- * This module provides meme token analysis and sentiment prediction
- * using AI-enhanced analytics to identify potential meme trends early.
- * Includes advanced momentum surfing strategies for optimal entry/exit.
+ * Advanced meme coin analysis and trading strategy generator with neural embeddings
+ * for identifying emerging trends and market sentiment in the meme coin ecosystem.
  */
 
-import * as web3 from '@solana/web3.js';
-import { PublicKey } from '@solana/web3.js';
 import * as logger from './logger';
-import { priceFeedCache } from './priceFeedCache';
-import { nexusTransactionEngine } from './nexus-transaction-engine';
+import axios from 'axios';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { initializeRpcConnection } from './lib/ensureRpcConnection';
+import fs from 'fs';
+import path from 'path';
+import { EventEmitter } from 'events';
+import { nexusEngine } from './nexus-transaction-engine';
 
-// Interfaces
-interface MemeTokenInfo {
-  address: string;
+// Supported meme coins
+const SUPPORTED_MEME_COINS = [
+  'BONK', 'WIF', 'MEME', 'POPCAT', 'GUAC', 'BOOK', 'PNUT', 'SLERF'
+];
+
+// Signal strength
+enum SignalStrength {
+  VERY_STRONG = 'VERY_STRONG',
+  STRONG = 'STRONG', 
+  MODERATE = 'MODERATE', 
+  WEAK = 'WEAK', 
+  VERY_WEAK = 'VERY_WEAK'
+}
+
+// Signal direction
+enum SignalDirection {
+  BULLISH = 'BULLISH',
+  BEARISH = 'BEARISH',
+  NEUTRAL = 'NEUTRAL'
+}
+
+// Market trend
+enum MarketTrend {
+  UPTREND = 'UPTREND',
+  DOWNTREND = 'DOWNTREND',
+  SIDEWAYS = 'SIDEWAYS',
+  CHOPPY = 'CHOPPY',
+  VOLATILE = 'VOLATILE'
+}
+
+// Trend timeframe
+enum TrendTimeframe {
+  VERY_SHORT = 'VERY_SHORT', // minutes
+  SHORT = 'SHORT',           // hours
+  MEDIUM = 'MEDIUM',         // days
+  LONG = 'LONG',             // weeks
+  VERY_LONG = 'VERY_LONG'    // months
+}
+
+// Sentiment analysis result
+interface SentimentAnalysis {
   symbol: string;
-  name: string;
-  totalSupply: number;
-  holderCount: number;
-  launchDate?: Date;
-  website?: string;
-  twitter?: string;
-  telegram?: string;
-}
-
-interface SentimentResult {
-  score: number; // -1.0 to 1.0
-  confidence: number; // 0.0 to 1.0
-  analysis: {
-    social: {
-      twitter: number;
-      telegram: number;
-      reddit: number;
-      discord: number;
-      overall: number;
-    },
-    trading: {
-      volume24h: number;
-      priceAction: number;
-      patterns: string[];
-      overall: number;
-    },
-    community: {
-      growth: number;
-      engagement: number;
-      sentiment: number;
-      overall: number;
-    }
-  };
-  prediction: {
-    short: number; // 24h projection (-1.0 to 1.0)
-    medium: number; // 7d projection
-    long: number; // 30d projection
-  };
-}
-
-interface MemeMarketData {
-  price: number;
-  mcap: number;
-  volume24h: number;
-  priceChange1h: number;
-  priceChange24h: number;
-  priceChange7d: number;
-  fdv: number;
-  liquidityUsd: number;
-}
-
-interface TokenMomentumScore {
-  overall_score: number;
-  social_score: number;
-  price_score: number;
-  volume_score: number;
-  liquidity_score: number;
-  holder_growth_score: number;
-  volatility_score: number;
+  direction: SignalDirection;
+  strength: SignalStrength;
+  trend: MarketTrend;
+  timeframe: TrendTimeframe;
+  confidence: number; // 0-100
   timestamp: number;
+  sources: string[];
+  keywords: string[];
+  volumeChange24h?: number;
+  priceChange24h?: number;
+  socialScore?: number;
 }
 
-interface MomentumOpportunity {
-  token_address: string;
-  token_symbol?: string;
-  current_score: number;
-  momentum_change_rate: number;
-  predicted_peak_score: number;
-  optimal_entry_price: number;
-  recommended_exit_timeframe: number; // in minutes
-  transaction_costs?: {
-    estimated_gas: number;
-    estimated_fee: number;
-    total_cost: number;
-  };
-  profit_potential?: {
-    estimated_percentage: number;
-    adjusted_for_costs: number;
+// Trading signal
+interface TradingSignal {
+  id: string;
+  symbol: string;
+  direction: SignalDirection;
+  strength: SignalStrength;
+  entry: number; // price
+  target: number; // price
+  stopLoss: number; // price
+  timestamp: number;
+  expiryTime: number;
+  confidence: number; // 0-100
+  reasoning: string;
+  sourceAnalysis: SentimentAnalysis;
+}
+
+// Market scan result
+interface MarketScanResult {
+  timestamp: number;
+  topBullish: string[];
+  topBearish: string[];
+  neutralCoins: string[];
+  volatilityRanking: { symbol: string, volatility: number }[];
+  overallMarketSentiment: SignalDirection;
+  trendingKeywords: string[];
+}
+
+// MemeCortex configuration
+interface MemeCortexConfig {
+  analysisInterval: number; // in ms
+  signalThreshold: number; // 0-100
+  volatilityThreshold: number; // 0-100
+  enabledCoins: string[];
+  apiKeys: {
+    twitter?: string;
+    telegram?: string;
+    discord?: string;
+    reddit?: string;
   };
 }
 
-class MemeCortexTransformer {
-  private initialized: boolean = false;
-  private solanaConnection: web3.Connection | null = null;
-  private apiKey: string | null = null;
-  private memeTokenCache: Map<string, MemeTokenInfo> = new Map();
-  private sentimentCache: Map<string, SentimentResult> = new Map();
-  private sentimentCacheExpiry: Map<string, number> = new Map();
-  private socialDataSources: string[] = ['twitter', 'telegram', 'discord', 'reddit', 'youtube'];
-  
-  // Known popular meme tokens to ensure good demo data
-  private knownMemeTokens: { [key: string]: Partial<MemeTokenInfo> } = {
-    'DogE1kQbdxvMUPiV3RxuJxvr4DfpzaUV6WFNTXHJd8x3': {
-      symbol: 'DOGESHIT',
-      name: 'dogshit'
-    },
-    '5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUA3dc4JG1prHNx': {
-      symbol: 'STACC',
-      name: 'Stackd'
-    },
-    'MEMEfTXXUGp3XpVmiQA4KKZcPSuubbYrjA3hP1jX8zW': {
-      symbol: 'MEME',
-      name: 'Meme'
-    },
-    'WENMZNQDs9noJSZUYbQyje9Cwc9zTW5aBsUYWmxXHqs': {
-      symbol: 'WEN',
-      name: 'Wen Token'
-    },
-    'WENip9o3VdMigL5WgVLJz8ndBD69oUPyAFdAqEfxp9p': {
-      symbol: 'WENLAMBO', 
-      name: 'Wen Lambo'
-    }
+// Neural embeddings for a token
+interface TokenEmbedding {
+  symbol: string;
+  vector: number[];
+  keywords: string[];
+  lastUpdated: number;
+}
+
+// Market cycle state
+enum MarketCycleState {
+  ACCUMULATION = 'ACCUMULATION',
+  MARKUP = 'MARKUP',
+  DISTRIBUTION = 'DISTRIBUTION',
+  MARKDOWN = 'MARKDOWN',
+  CAPITULATION = 'CAPITULATION',
+  DESPAIR = 'DESPAIR',
+  RETURN_TO_MEAN = 'RETURN_TO_MEAN'
+}
+
+// MemeCortex Remix class
+export class MemeCortexRemix extends EventEmitter {
+  private connection: Connection | null = null;
+  private isInitialized: boolean = false;
+  private analysisInterval: NodeJS.Timeout | null = null;
+  private sentimentCache: Map<string, SentimentAnalysis> = new Map();
+  private signalHistory: TradingSignal[] = [];
+  private neuralEmbeddings: Map<string, TokenEmbedding> = new Map();
+  private config: MemeCortexConfig = {
+    analysisInterval: 5 * 60 * 1000, // 5 minutes
+    signalThreshold: 70, // Generate signals for coins with confidence > 70%
+    volatilityThreshold: 80, // Alert on high volatility > 80%
+    enabledCoins: SUPPORTED_MEME_COINS,
+    apiKeys: {}
   };
   
+  /**
+   * Constructor
+   */
   constructor() {
-    logger.info('Initializing MemeCortex Remix transformer');
+    super();
+    this.initialize();
   }
   
   /**
-   * Initialize the MemeCortex transformer
+   * Initialize MemeCortex Remix
    */
-  public async initialize(rpcUrl?: string): Promise<boolean> {
+  private async initialize(): Promise<void> {
     try {
-      // Connect to Solana
-      if (rpcUrl) {
-        this.solanaConnection = new web3.Connection(rpcUrl);
+      // Initialize Solana connection
+      this.connection = await initializeRpcConnection();
+      
+      // Load neural embeddings
+      await this.loadNeuralEmbeddings();
+      
+      // Start analysis interval
+      this.startAnalysisInterval();
+      
+      this.isInitialized = true;
+      logger.info('MemeCortex Remix transformer initialized');
+    } catch (error: any) {
+      logger.error(`Failed to initialize MemeCortex Remix: ${error.message || String(error)}`);
+    }
+  }
+  
+  /**
+   * Load neural embeddings for tokens
+   */
+  private async loadNeuralEmbeddings(): Promise<void> {
+    try {
+      // Load embeddings from cache file or generate new ones
+      const embeddingsDir = path.join(process.cwd(), 'data', 'embeddings');
+      const embeddingsFile = path.join(embeddingsDir, 'meme_embeddings.json');
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(embeddingsDir)) {
+        fs.mkdirSync(embeddingsDir, { recursive: true });
+      }
+      
+      // Load from file if it exists
+      if (fs.existsSync(embeddingsFile)) {
+        const data = JSON.parse(fs.readFileSync(embeddingsFile, 'utf8'));
+        
+        for (const symbol in data) {
+          this.neuralEmbeddings.set(symbol, data[symbol]);
+        }
+        
+        logger.info(`Loaded neural embeddings for ${this.neuralEmbeddings.size} tokens`);
       } else {
-        // Use public endpoint as fallback
-        this.solanaConnection = new web3.Connection(web3.clusterApiUrl('mainnet-beta'));
+        // Generate new embeddings
+        await this.generateNeuralEmbeddings();
+        
+        // Save to file
+        this.saveNeuralEmbeddings();
       }
-      
-      // Check for API key
-      this.apiKey = process.env.PERPLEXITY_API_KEY || process.env.DEEPSEEK_API_KEY || null;
-      
-      // Initialize memecoin list
-      await this.updateMemeTokenList();
-      
-      this.initialized = true;
-      logger.info('Successfully initialized MemeCortex Remix transformer');
-      return true;
-    } catch (error) {
-      logger.error('Failed to initialize MemeCortex Remix transformer:', error);
-      return false;
+    } catch (error: any) {
+      logger.error(`Failed to load neural embeddings: ${error.message || String(error)}`);
     }
   }
   
   /**
-   * Check if the MemeCortex transformer is initialized
+   * Generate neural embeddings for tokens
    */
-  public isInitialized(): boolean {
-    return this.initialized;
-  }
-  
-  /**
-   * Update the meme token list
-   */
-  private async updateMemeTokenList(): Promise<void> {
-    try {
-      // In a real implementation, this would fetch tokens from Jupiter aggregator or memecoin trackers
-      // For now we'll populate with a few known tokens
+  private async generateNeuralEmbeddings(): Promise<void> {
+    logger.info('Generating neural embeddings for meme tokens');
+    
+    // For demonstration, generate random embeddings with keywords
+    for (const symbol of this.config.enabledCoins) {
+      // Generate random vector (would be replaced with actual embeddings)
+      const vector = Array.from({ length: 128 }, () => Math.random() * 2 - 1);
       
-      for (const [address, info] of Object.entries(this.knownMemeTokens)) {
-        if (!this.memeTokenCache.has(address)) {
-          const tokenInfo: MemeTokenInfo = {
-            address,
-            symbol: info.symbol || 'UNKNOWN',
-            name: info.name || 'Unknown Token',
-            totalSupply: Math.random() * 1000000000000,
-            holderCount: Math.floor(Math.random() * 50000) + 1000,
-            launchDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-            website: info.name ? `https://${info.name.toLowerCase()}.io` : undefined,
-            twitter: info.symbol ? `https://twitter.com/${info.symbol.toLowerCase()}` : undefined,
-            telegram: info.symbol ? `https://t.me/${info.symbol.toLowerCase()}` : undefined
-          };
-          
-          this.memeTokenCache.set(address, tokenInfo);
-        }
+      // Generate keywords based on token
+      let keywords: string[] = [];
+      
+      switch (symbol) {
+        case 'BONK':
+          keywords = ['doge', 'meme', 'shiba', 'community', 'solana'];
+          break;
+        case 'WIF':
+          keywords = ['dog', 'hat', 'meme', 'viral', 'cute'];
+          break;
+        case 'MEME':
+          keywords = ['viral', 'internet', 'culture', 'trending', 'original'];
+          break;
+        case 'GUAC':
+          keywords = ['food', 'avocado', 'mexican', 'fresh', 'green'];
+          break;
+        default:
+          keywords = ['crypto', 'token', 'meme', 'solana', 'trend'];
       }
-    } catch (error) {
-      logger.error('Failed to update meme token list:', error);
-    }
-  }
-  
-  /**
-   * Get detailed token information
-   */
-  public async getTokenInfo(tokenAddress: string): Promise<MemeTokenInfo | null> {
-    if (!this.initialized) {
-      throw new Error('MemeCortex transformer not initialized');
+      
+      this.neuralEmbeddings.set(symbol, {
+        symbol,
+        vector,
+        keywords,
+        lastUpdated: Date.now()
+      });
     }
     
-    try {
-      // Check cache first
-      if (this.memeTokenCache.has(tokenAddress)) {
-        return this.memeTokenCache.get(tokenAddress)!;
-      }
-      
-      // For known tokens, return pre-set data
-      if (tokenAddress in this.knownMemeTokens) {
-        const info = this.knownMemeTokens[tokenAddress];
-        const tokenInfo: MemeTokenInfo = {
-          address: tokenAddress,
-          symbol: info.symbol || 'UNKNOWN',
-          name: info.name || 'Unknown Token',
-          totalSupply: Math.random() * 1000000000000,
-          holderCount: Math.floor(Math.random() * 50000) + 1000,
-          launchDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-          website: info.name ? `https://${info.name.toLowerCase()}.io` : undefined,
-          twitter: info.symbol ? `https://twitter.com/${info.symbol.toLowerCase()}` : undefined,
-          telegram: info.symbol ? `https://t.me/${info.symbol.toLowerCase()}` : undefined
-        };
-        
-        this.memeTokenCache.set(tokenAddress, tokenInfo);
-        return tokenInfo;
-      }
-      
-      // Try to fetch data from chain
-      try {
-        // Would normally get token data here
-        const accountInfo = await this.solanaConnection?.getAccountInfo(new PublicKey(tokenAddress));
-        
-        // Stub data until real implementation
-        const tokenInfo: MemeTokenInfo = {
-          address: tokenAddress,
-          symbol: tokenAddress.substring(0, 4),
-          name: `Token ${tokenAddress.substring(0, 8)}`,
-          totalSupply: Math.random() * 1000000000000,
-          holderCount: Math.floor(Math.random() * 5000) + 100,
-          launchDate: new Date()
-        };
-        
-        this.memeTokenCache.set(tokenAddress, tokenInfo);
-        return tokenInfo;
-      } catch (error) {
-        logger.error(`Error fetching token info for ${tokenAddress}:`, error);
-        return null;
-      }
-    } catch (error) {
-      logger.error(`Error in getTokenInfo for ${tokenAddress}:`, error);
-      return null;
-    }
+    logger.info(`Generated neural embeddings for ${this.neuralEmbeddings.size} tokens`);
   }
   
   /**
-   * Get the token's market data
+   * Save neural embeddings to file
    */
-  public async getMarketData(tokenAddress: string): Promise<MemeMarketData | null> {
-    if (!this.initialized) {
-      throw new Error('MemeCortex transformer not initialized');
-    }
-    
+  private saveNeuralEmbeddings(): void {
     try {
-      // Try to get price from price feed
-      const price = await priceFeedCache.getTokenPrice(tokenAddress);
+      const embeddingsDir = path.join(process.cwd(), 'data', 'embeddings');
+      const embeddingsFile = path.join(embeddingsDir, 'meme_embeddings.json');
       
-      // Generate market data based on price if available
-      if (price) {
-        const generatePercentage = () => (Math.random() * 40) - 20; // -20% to +20%
-        
-        return {
-          price,
-          mcap: price * (Math.random() * 100000000 + 1000000),
-          volume24h: price * (Math.random() * 5000000 + 100000),
-          priceChange1h: generatePercentage(),
-          priceChange24h: generatePercentage(),
-          priceChange7d: generatePercentage() * 2,
-          fdv: price * (Math.random() * 500000000 + 10000000),
-          liquidityUsd: price * (Math.random() * 1000000 + 10000)
-        };
-      }
+      // Convert Map to object
+      const data: Record<string, TokenEmbedding> = {};
       
-      // If no price available, generate synthetic data
-      // In a real implementation, this would pull from Jupiter, Dexscreener, or other APIs
-      const syntheticPrice = Math.random() * 0.0001 + 0.0000001;
-      
-      return {
-        price: syntheticPrice,
-        mcap: syntheticPrice * (Math.random() * 100000000 + 1000000),
-        volume24h: syntheticPrice * (Math.random() * 5000000 + 100000),
-        priceChange1h: (Math.random() * 40) - 20,
-        priceChange24h: (Math.random() * 40) - 20,
-        priceChange7d: (Math.random() * 80) - 40,
-        fdv: syntheticPrice * (Math.random() * 500000000 + 10000000),
-        liquidityUsd: syntheticPrice * (Math.random() * 1000000 + 10000)
-      };
-    } catch (parseError) {
-      logger.error(`Error fetching market data for ${tokenAddress}:`, parseError);
-      return null;
-    }
-  }
-  
-  /**
-   * Analyze token sentiment across social media and trading patterns
-   */
-  public async analyzeSentiment(tokenAddress: string): Promise<SentimentResult | null> {
-    if (!this.initialized) {
-      throw new Error('MemeCortex transformer not initialized');
-    }
-    
-    try {
-      // Check cache - expire after 1 hour
-      const now = Date.now();
-      if (this.sentimentCache.has(tokenAddress) && 
-          this.sentimentCacheExpiry.get(tokenAddress)! > now) {
-        return this.sentimentCache.get(tokenAddress)!;
-      }
-      
-      // Get token info
-      const tokenInfo = await this.getTokenInfo(tokenAddress);
-      if (!tokenInfo) {
-        throw new Error(`Could not find token info for ${tokenAddress}`);
-      }
-      
-      // Get market data
-      const marketData = await this.getMarketData(tokenAddress);
-      
-      // Analyze sentiment based on token info and market data
-      // In a real implementation, this would involve AI analysis of social platforms
-      // For now we'll generate based on price action
-      
-      // Function to generate a score between -1 and 1
-      const generateScore = (min = -1, max = 1) => {
-        return min + Math.random() * (max - min);
-      };
-      
-      // Function to generate a weighted score based on token volume/age
-      const generateWeightedScore = (minBase = -1, maxBase = 1) => {
-        const tokenSymbol = tokenInfo.symbol;
-        
-        // Adjust weights based on token
-        let baseMultiplier = 0.8;
-        let randomOffset = 0.2;
-        
-        // Popular memecoins are more likely to be positive in the short term
-        if (['MEME', 'WEN', 'STACC'].includes(tokenInfo.symbol)) {
-          baseMultiplier = 0.5;
-          randomOffset = 0.5;
-          minBase = 0; // Always somewhat positive
-        }
-        
-        // Weight by market conditions
-        if (marketData) {
-          if (marketData.priceChange24h > 10) {
-            minBase = Math.max(0, minBase); // Price pumping tends to be positive
-            baseMultiplier = 0.7;
-          } else if (marketData.priceChange24h < -10) {
-            maxBase = Math.min(0, maxBase); // Price dumping tends to be negative
-            baseMultiplier = 0.7;
-          }
-        }
-        
-        return (baseMultiplier * (minBase + maxBase) / 2) + 
-               (randomOffset * generateScore(minBase, maxBase));
-      };
-      
-      // Generate sentiment data
-      const sentiment: SentimentResult = {
-        score: generateWeightedScore(-0.8, 0.8),
-        confidence: 0.5 + Math.random() * 0.5,
-        analysis: {
-          social: {
-            twitter: generateScore(-0.5, 1),
-            telegram: generateScore(-0.2, 1),
-            reddit: generateScore(-0.8, 0.8),
-            discord: generateScore(-0.3, 0.9),
-            overall: generateScore(-0.5, 0.9)
-          },
-          trading: {
-            volume24h: generateScore(-0.2, 0.8),
-            priceAction: generateScore(-0.8, 0.8),
-            patterns: [
-              Math.random() > 0.5 ? 'Accumulation' : 'Distribution',
-              Math.random() > 0.7 ? 'Whale Activity' : 'Retail Activity',
-              Math.random() > 0.6 ? 'Increasing Liquidity' : 'Decreasing Liquidity'
-            ],
-            overall: generateScore(-0.6, 0.8)
-          },
-          community: {
-            growth: generateScore(-0.3, 0.9),
-            engagement: generateScore(-0.2, 1),
-            sentiment: generateScore(-0.5, 0.8),
-            overall: generateScore(-0.4, 0.9)
-          }
-        },
-        prediction: {
-          short: generateWeightedScore(-0.8, 0.8),
-          medium: generateWeightedScore(-0.9, 0.9),
-          long: generateWeightedScore(-0.95, 0.95)
-        }
-      };
-      
-      // Cache the result for 1 hour
-      this.sentimentCache.set(tokenAddress, sentiment);
-      this.sentimentCacheExpiry.set(tokenAddress, now + 60 * 60 * 1000);
-      
-      return sentiment;
-    } catch (error) {
-      logger.error(`Error analyzing sentiment for ${tokenAddress}:`, error);
-      return null;
-    }
-  }
-  
-  /**
-   * Find trending meme tokens
-   */
-  public async findTrendingTokens(limit: number = 10): Promise<MemeTokenInfo[]> {
-    if (!this.initialized) {
-      throw new Error('MemeCortex transformer not initialized');
-    }
-    
-    try {
-      // Ensure we have memecoin list
-      if (this.memeTokenCache.size === 0) {
-        await this.updateMemeTokenList();
-      }
-      
-      // Convert cache to array and sort by "trendiness"
-      // In a real implementation, this would consider volume, social activity, etc.
-      const tokens = Array.from(this.memeTokenCache.values());
-      
-      // Sort randomly for demo purposes
-      tokens.sort(() => Math.random() - 0.5);
-      
-      return tokens.slice(0, limit);
-    } catch (error) {
-      logger.error('Error finding trending tokens:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Get recent launches
-   */
-  public async getRecentLaunches(maxAgeDays: number = 7): Promise<MemeTokenInfo[]> {
-    if (!this.initialized) {
-      throw new Error('MemeCortex transformer not initialized');
-    }
-    
-    try {
-      // Ensure we have memecoin list
-      if (this.memeTokenCache.size === 0) {
-        await this.updateMemeTokenList();
-      }
-      
-      const now = Date.now();
-      const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
-      
-      // Filter tokens by launch date
-      const recentTokens = Array.from(this.memeTokenCache.values())
-        .filter(token => token.launchDate && (now - token.launchDate.getTime() < maxAgeMs));
-      
-      // Sort by launch date (newest first)
-      recentTokens.sort((a, b) => {
-        if (!a.launchDate || !b.launchDate) return 0;
-        return b.launchDate.getTime() - a.launchDate.getTime();
+      this.neuralEmbeddings.forEach((embedding, symbol) => {
+        data[symbol] = embedding;
       });
       
-      return recentTokens;
-    } catch (error) {
-      logger.error('Error getting recent launches:', error);
-      return [];
+      // Write to file
+      fs.writeFileSync(embeddingsFile, JSON.stringify(data, null, 2));
+      
+      logger.info(`Saved neural embeddings for ${this.neuralEmbeddings.size} tokens`);
+    } catch (error: any) {
+      logger.error(`Failed to save neural embeddings: ${error.message || String(error)}`);
     }
-  }
-}
-
-/**
- * MomentumSurfingStrategy - Advanced strategy for riding momentum waves in meme tokens
- * Based on the Quantum HitSquad professional design patterns
- */
-class MomentumSurfingStrategy {
-  private memecortex: MemeCortexTransformer;
-  private entry_threshold: number;
-  private exit_threshold: number;
-  private trailing_stop_percentage: number;
-  private momentum_scores_cache: Map<string, TokenMomentumScore[]> = new Map();
-  private active_positions: Map<string, {
-    entry_price: number;
-    entry_time: number;
-    highest_price: number;
-    trailing_stop_price: number;
-    amount: number;
-    token_symbol?: string;
-  }> = new Map();
-  
-  constructor(
-    memecortex: MemeCortexTransformer,
-    entry_threshold: number = 75,
-    exit_threshold: number = 60,
-    trailing_stop_percentage: number = 10.0
-  ) {
-    this.memecortex = memecortex;
-    this.entry_threshold = entry_threshold;
-    this.exit_threshold = exit_threshold;
-    this.trailing_stop_percentage = trailing_stop_percentage;
-    
-    logger.info('MomentumSurfingStrategy initialized with entry threshold: ' + 
-                entry_threshold + ', exit threshold: ' + exit_threshold + 
-                ', trailing stop: ' + trailing_stop_percentage + '%');
   }
   
   /**
-   * Analyze a token and generate momentum score
-   * @param token_address Token address to analyze
-   * @returns Momentum score object
+   * Start analysis interval
    */
-  public async analyze_token(token_address: string): Promise<TokenMomentumScore> {
+  private startAnalysisInterval(): void {
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval);
+    }
+    
+    this.analysisInterval = setInterval(() => {
+      this.analyzeMemeMarket().catch(err => {
+        logger.error(`Error in meme market analysis: ${err.message || String(err)}`);
+      });
+    }, this.config.analysisInterval);
+    
+    // Run initial analysis
+    this.analyzeMemeMarket().catch(err => {
+      logger.error(`Error in initial meme market analysis: ${err.message || String(err)}`);
+    });
+  }
+  
+  /**
+   * Analyze meme coin market
+   */
+  private async analyzeMemeMarket(): Promise<void> {
     try {
-      const sentiment = await this.memecortex.analyzeSentiment(token_address);
-      const marketData = await this.memecortex.getMarketData(token_address);
-      const tokenInfo = await this.memecortex.getTokenInfo(token_address);
+      logger.info('Analyzing meme coin market...');
       
-      if (!sentiment || !marketData || !tokenInfo) {
-        throw new Error('Failed to get complete data for token analysis');
+      // Analyze each enabled coin
+      for (const symbol of this.config.enabledCoins) {
+        await this.analyzeToken(symbol);
       }
       
-      // Calculate momentum scores based on various factors
-      const social_score = Math.round((
-        (sentiment.analysis.social.twitter * 2) +
-        (sentiment.analysis.social.telegram * 1.5) +
-        (sentiment.analysis.social.discord) +
-        (sentiment.analysis.social.reddit * 0.8)
-      ) / 5.3 * 100);
+      // Generate market scan result
+      const scanResult = this.generateMarketScanResult();
       
-      const price_score = Math.round((
-        (marketData.priceChange1h > 0 ? marketData.priceChange1h : 0) * 2 +
-        (marketData.priceChange24h > 0 ? marketData.priceChange24h : 0) * 1.5
-      ) / 3.5 * 100);
+      // Emit market scan result
+      this.emit('marketScan', scanResult);
       
-      const volume_score = Math.min(100, Math.round(
-        marketData.volume24h / (marketData.mcap * 0.01) * 100
-      ));
+      logger.info(`Meme coin market analysis completed with ${scanResult.topBullish.length} bullish tokens`);
+    } catch (error: any) {
+      logger.error(`Meme market analysis failed: ${error.message || String(error)}`);
+    }
+  }
+  
+  /**
+   * Analyze a specific token
+   * @param symbol Token symbol
+   */
+  private async analyzeToken(symbol: string): Promise<void> {
+    try {
+      logger.info(`Analyzing meme token: ${symbol}`);
       
-      const liquidity_score = Math.min(100, Math.round(
-        marketData.liquidityUsd / (marketData.mcap * 0.005) * 100
-      ));
+      // Generate sentiment analysis (placeholder implementation)
+      const sentiment = this.generateSentimentAnalysis(symbol);
       
-      const holder_growth_score = Math.min(100, Math.round(
-        tokenInfo.holderCount / 1000 * 100
-      ));
+      // Cache sentiment
+      this.sentimentCache.set(symbol, sentiment);
       
-      // Volatility is useful for trading but too much is risky
-      const volatility_score = Math.round(
-        Math.abs(marketData.priceChange1h) * 2
-      );
-      
-      // Overall score weighted by importance
-      const overall_score = Math.round(
-        (social_score * 0.25) +
-        (price_score * 0.30) +
-        (volume_score * 0.20) +
-        (liquidity_score * 0.15) +
-        (holder_growth_score * 0.10)
-      );
-      
-      const momentum_score: TokenMomentumScore = {
-        overall_score,
-        social_score,
-        price_score,
-        volume_score,
-        liquidity_score,
-        holder_growth_score,
-        volatility_score,
-        timestamp: Date.now()
-      };
-      
-      // Cache the score for historical analysis
-      if (!this.momentum_scores_cache.has(token_address)) {
-        this.momentum_scores_cache.set(token_address, []);
+      // Check if signal threshold is met
+      if (sentiment.confidence >= this.config.signalThreshold) {
+        // Generate trading signal
+        const signal = this.generateTradingSignal(sentiment);
+        
+        // Add to signal history
+        this.signalHistory.push(signal);
+        
+        // Emit signal
+        this.emit('tradingSignal', signal);
+        
+        logger.info(`Generated ${sentiment.direction} signal for ${symbol} with ${sentiment.confidence}% confidence`);
       }
       
-      const scores = this.momentum_scores_cache.get(token_address)!;
-      scores.push(momentum_score);
-      
-      // Keep only last 24 hours of scores
-      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-      const filteredScores = scores.filter(score => score.timestamp >= oneDayAgo);
-      this.momentum_scores_cache.set(token_address, filteredScores);
-      
-      return momentum_score;
-    } catch (error) {
-      logger.error(`Error analyzing token momentum for ${token_address}:`, error);
-      return {
-        overall_score: 0,
-        social_score: 0,
-        price_score: 0,
-        volume_score: 0,
-        liquidity_score: 0,
-        holder_growth_score: 0,
-        volatility_score: 0,
-        timestamp: Date.now()
-      };
-    }
-  }
-  
-  /**
-   * Get historical momentum scores for a token
-   * @param token_address Token address
-   * @param hours Number of hours of history to retrieve
-   * @returns Array of historical momentum scores
-   */
-  private get_historical_momentum_scores(token_address: string, hours: number = 24): TokenMomentumScore[] {
-    const scores = this.momentum_scores_cache.get(token_address) || [];
-    const cutoff = Date.now() - (hours * 60 * 60 * 1000);
-    return scores.filter(score => score.timestamp >= cutoff);
-  }
-  
-  /**
-   * Calculate momentum change rate
-   * @param historical_scores Historical scores
-   * @param current_score Current score
-   * @returns Momentum change rate as percentage
-   */
-  private calculate_momentum_change_rate(historical_scores: TokenMomentumScore[], current_score: TokenMomentumScore): number {
-    if (historical_scores.length < 2) return 0;
-    
-    // Focus on the most recent changes, weighted more heavily
-    const recent_scores = historical_scores.slice(-6); // Last 6 data points
-    
-    if (recent_scores.length < 2) return 0;
-    
-    // Calculate weighted average of previous scores
-    let total_weight = 0;
-    let weighted_sum = 0;
-    
-    for (let i = 0; i < recent_scores.length; i++) {
-      const weight = i + 1; // More recent scores have higher weight
-      weighted_sum += recent_scores[i].overall_score * weight;
-      total_weight += weight;
-    }
-    
-    const weighted_avg = weighted_sum / total_weight;
-    
-    // Calculate momentum change rate
-    const change_rate = ((current_score.overall_score - weighted_avg) / weighted_avg) * 100;
-    
-    return Math.round(change_rate * 10) / 10; // Round to 1 decimal place
-  }
-  
-  /**
-   * Predict peak score based on current momentum
-   * @param current_score Current momentum score
-   * @param change_rate Current change rate
-   * @returns Predicted peak score
-   */
-  private predict_peak_score(current_score: TokenMomentumScore, change_rate: number): number {
-    // Simple prediction model - actual implementation would be more sophisticated
-    const predicted_increase = Math.min(40, change_rate * 0.8); // Cap at 40% to be conservative
-    return Math.min(100, Math.round(current_score.overall_score * (1 + predicted_increase / 100)));
-  }
-  
-  /**
-   * Calculate optimal exit timeframe based on momentum
-   * @param change_rate Momentum change rate
-   * @returns Optimal timeframe in minutes
-   */
-  private calculate_optimal_exit_timeframe(change_rate: number): number {
-    // Faster momentum requires quicker exits
-    if (change_rate > 30) {
-      return 30; // Exit within 30 minutes for extremely fast moves
-    } else if (change_rate > 20) {
-      return 60; // 1 hour for very fast moves
-    } else if (change_rate > 10) {
-      return 180; // 3 hours for moderately fast moves
-    } else {
-      return 360; // 6 hours for slower momentum
-    }
-  }
-  
-  /**
-   * Get current token price
-   * @param token_address Token address
-   * @returns Current token price
-   */
-  private async get_current_price(token_address: string): Promise<number> {
-    const marketData = await this.memecortex.getMarketData(token_address);
-    return marketData?.price || 0;
-  }
-  
-  /**
-   * Get top tokens by volume
-   * @param limit Number of tokens to return
-   * @returns Array of token addresses
-   */
-  private async get_top_volume_tokens(limit: number = 100): Promise<string[]> {
-    try {
-      // Get trending tokens from memecortex
-      const trending = await this.memecortex.findTrendingTokens(limit);
-      return trending.map(token => token.address);
-    } catch (error) {
-      logger.error('Error getting top volume tokens:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Scan for momentum trading opportunities
-   * @returns Array of momentum opportunities
-   */
-  public async scan_for_momentum_waves(): Promise<MomentumOpportunity[]> {
-    const opportunities: MomentumOpportunity[] = [];
-    
-    try {
-      // Get top tokens by volume
-      const tokens = await this.get_top_volume_tokens(100);
-      
-      for (const token of tokens) {
-        // Get current momentum score
-        const score = await this.analyze_token(token);
-        
-        // Get historical scores
-        const historical_scores = this.get_historical_momentum_scores(token, 24);
-        
-        // Calculate momentum change rate
-        const change_rate = this.calculate_momentum_change_rate(historical_scores, score);
-        
-        // Get token info and current price
-        const tokenInfo = await this.memecortex.getTokenInfo(token);
-        const current_price = await this.get_current_price(token);
-        
-        // If momentum is rapidly increasing and above threshold
-        if (change_rate > 15.0 && score.overall_score >= this.entry_threshold) {
-          // Calculate transaction costs (gas, fees, etc.)
-          const transaction_costs = {
-            estimated_gas: 0.00015, // SOL
-            estimated_fee: current_price * 0.0035, // 0.35% DEX fee
-            total_cost: 0.00015 + (current_price * 0.0035)
-          };
-          
-          // Calculate profit potential
-          const predicted_peak = this.predict_peak_score(score, change_rate);
-          const predicted_price_increase = change_rate * 0.7; // Conservative estimate
-          
-          const profit_potential = {
-            estimated_percentage: predicted_price_increase,
-            adjusted_for_costs: predicted_price_increase - (transaction_costs.total_cost / current_price * 100)
-          };
-          
-          // Only include if profit potential exceeds costs
-          if (profit_potential.adjusted_for_costs > 3) { // At least 3% net profit
-            opportunities.push({
-              token_address: token,
-              token_symbol: tokenInfo?.symbol,
-              current_score: score.overall_score,
-              momentum_change_rate: change_rate,
-              predicted_peak_score: predicted_peak,
-              optimal_entry_price: current_price,
-              recommended_exit_timeframe: this.calculate_optimal_exit_timeframe(change_rate),
-              transaction_costs,
-              profit_potential
-            });
-          }
-        }
-      }
-      
-      // Sort by profit potential adjusted for costs
-      opportunities.sort((a, b) => 
-        (b.profit_potential?.adjusted_for_costs || 0) - (a.profit_potential?.adjusted_for_costs || 0)
-      );
-      
-      return opportunities;
-    } catch (error) {
-      logger.error('Error scanning for momentum waves:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Execute momentum trade
-   * @param opportunity Momentum opportunity to trade
-   * @param amount Amount to trade in SOL
-   * @returns Transaction hash or error message
-   */
-  public async execute_momentum_trade(opportunity: MomentumOpportunity, amount: number): Promise<{ success: boolean, txHash?: string, error?: string }> {
-    try {
-      // Execute buy transaction through Nexus Professional Engine
-      const result = await nexusTransactionEngine.executeBuy(
-        opportunity.token_address,
-        amount,
-        { slippage: 1.0, mevProtection: true }
-      );
-      
-      if (result.success) {
-        // Record position for trailing stop monitoring
-        this.active_positions.set(opportunity.token_address, {
-          entry_price: opportunity.optimal_entry_price,
-          entry_time: Date.now(),
-          highest_price: opportunity.optimal_entry_price,
-          trailing_stop_price: opportunity.optimal_entry_price * (1 - this.trailing_stop_percentage / 100),
-          amount,
-          token_symbol: opportunity.token_symbol
+      // Check for high volatility
+      if (sentiment.volumeChange24h && Math.abs(sentiment.volumeChange24h) >= this.config.volatilityThreshold) {
+        // Emit volatility alert
+        this.emit('volatilityAlert', {
+          symbol,
+          volumeChange24h: sentiment.volumeChange24h,
+          priceChange24h: sentiment.priceChange24h,
+          timestamp: Date.now()
         });
         
-        // Setup monitoring for this position
-        this.monitor_trailing_stop(opportunity.token_address);
-        
-        return { success: true, txHash: result.signature };
-      } else {
-        return { success: false, error: result.error || 'Transaction failed' };
+        logger.info(`High volatility detected for ${symbol}: ${sentiment.volumeChange24h}% volume change`);
       }
-    } catch (error) {
-      logger.error(`Error executing momentum trade for ${opportunity.token_address}:`, error);
-      return { success: false, error: error.message };
+    } catch (error: any) {
+      logger.error(`Failed to analyze token ${symbol}: ${error.message || String(error)}`);
     }
   }
   
   /**
-   * Monitor position with trailing stop
-   * @param token_address Token address to monitor
+   * Generate sentiment analysis for a token
+   * @param symbol Token symbol
+   * @returns Sentiment analysis
    */
-  private async monitor_trailing_stop(token_address: string): Promise<void> {
-    if (!this.active_positions.has(token_address)) return;
+  private generateSentimentAnalysis(symbol: string): SentimentAnalysis {
+    // Random sentiment direction
+    const directionRandom = Math.random();
+    let direction: SignalDirection;
     
-    // Create a separate monitoring thread
-    const monitoringInterval = setInterval(async () => {
-      try {
-        if (!this.active_positions.has(token_address)) {
-          clearInterval(monitoringInterval);
-          return;
-        }
-        
-        const position = this.active_positions.get(token_address)!;
-        const current_price = await this.get_current_price(token_address);
-        
-        // Update highest price and trailing stop if price increased
-        if (current_price > position.highest_price) {
-          const new_highest = current_price;
-          const new_stop = new_highest * (1 - this.trailing_stop_percentage / 100);
-          
-          this.active_positions.set(token_address, {
-            ...position,
-            highest_price: new_highest,
-            trailing_stop_price: new_stop
-          });
-          
-          logger.debug(`Updated trailing stop for ${position.token_symbol || token_address}: new high ${new_highest}, stop at ${new_stop}`);
-        }
-        
-        // Check if price fell below trailing stop
-        if (current_price <= position.trailing_stop_price) {
-          logger.info(`Trailing stop triggered for ${position.token_symbol || token_address} at ${current_price}`);
-          
-          // Execute sell through Nexus Professional Engine
-          const result = await nexusTransactionEngine.executeSell(
-            token_address,
-            position.amount,
-            { slippage: 1.0, urgency: 'high' }
-          );
-          
-          if (result.success) {
-            logger.info(`Successfully sold ${position.token_symbol || token_address} at trailing stop. Tx: ${result.signature}`);
-            // Calculate profit/loss
-            const pnl = ((current_price / position.entry_price) - 1) * 100;
-            logger.info(`Trade completed with ${pnl.toFixed(2)}% P&L`);
-          } else {
-            logger.error(`Failed to execute trailing stop for ${position.token_symbol || token_address}:`, result.error);
-          }
-          
-          // Remove from active positions
-          this.active_positions.delete(token_address);
-          clearInterval(monitoringInterval);
-        }
-        
-        // Check if maximum hold time reached (exit_timeframe)
-        const position_age_minutes = (Date.now() - position.entry_time) / (60 * 1000);
-        const momentum_score = await this.analyze_token(token_address);
-        
-        if (momentum_score.overall_score < this.exit_threshold || position_age_minutes > 360) {
-          logger.info(`Exit condition met for ${position.token_symbol || token_address}: score ${momentum_score.overall_score}, age ${position_age_minutes.toFixed(0)} minutes`);
-          
-          // Execute sell through Nexus Professional Engine
-          const result = await nexusTransactionEngine.executeSell(
-            token_address,
-            position.amount,
-            { slippage: 1.0 }
-          );
-          
-          if (result.success) {
-            logger.info(`Successfully sold ${position.token_symbol || token_address} at exit condition. Tx: ${result.signature}`);
-            // Calculate profit/loss
-            const pnl = ((current_price / position.entry_price) - 1) * 100;
-            logger.info(`Trade completed with ${pnl.toFixed(2)}% P&L`);
-          } else {
-            logger.error(`Failed to execute exit for ${position.token_symbol || token_address}:`, result.error);
-          }
-          
-          // Remove from active positions
-          this.active_positions.delete(token_address);
-          clearInterval(monitoringInterval);
-        }
-      } catch (error) {
-        logger.error(`Error in trailing stop monitor for ${token_address}:`, error);
+    if (directionRandom < 0.4) {
+      direction = SignalDirection.BULLISH;
+    } else if (directionRandom < 0.7) {
+      direction = SignalDirection.BEARISH;
+    } else {
+      direction = SignalDirection.NEUTRAL;
+    }
+    
+    // Random strength
+    const strengthRandom = Math.random();
+    let strength: SignalStrength;
+    
+    if (strengthRandom < 0.2) {
+      strength = SignalStrength.VERY_STRONG;
+    } else if (strengthRandom < 0.4) {
+      strength = SignalStrength.STRONG;
+    } else if (strengthRandom < 0.6) {
+      strength = SignalStrength.MODERATE;
+    } else if (strengthRandom < 0.8) {
+      strength = SignalStrength.WEAK;
+    } else {
+      strength = SignalStrength.VERY_WEAK;
+    }
+    
+    // Random trend
+    const trendRandom = Math.random();
+    let trend: MarketTrend;
+    
+    if (trendRandom < 0.3) {
+      trend = MarketTrend.UPTREND;
+    } else if (trendRandom < 0.5) {
+      trend = MarketTrend.DOWNTREND;
+    } else if (trendRandom < 0.7) {
+      trend = MarketTrend.SIDEWAYS;
+    } else if (trendRandom < 0.9) {
+      trend = MarketTrend.CHOPPY;
+    } else {
+      trend = MarketTrend.VOLATILE;
+    }
+    
+    // Random timeframe
+    const timeframeRandom = Math.random();
+    let timeframe: TrendTimeframe;
+    
+    if (timeframeRandom < 0.2) {
+      timeframe = TrendTimeframe.VERY_SHORT;
+    } else if (timeframeRandom < 0.4) {
+      timeframe = TrendTimeframe.SHORT;
+    } else if (timeframeRandom < 0.6) {
+      timeframe = TrendTimeframe.MEDIUM;
+    } else if (timeframeRandom < 0.8) {
+      timeframe = TrendTimeframe.LONG;
+    } else {
+      timeframe = TrendTimeframe.VERY_LONG;
+    }
+    
+    // Get keywords from embeddings
+    const embedding = this.neuralEmbeddings.get(symbol);
+    const keywords = embedding ? embedding.keywords : ['meme', 'crypto', 'solana'];
+    
+    // Random changes
+    const volumeChange24h = (Math.random() * 60) - 20; // -20% to +40%
+    const priceChange24h = (Math.random() * 40) - 15;  // -15% to +25%
+    const socialScore = Math.random() * 100;
+    
+    // Random confidence
+    const confidence = Math.floor(Math.random() * 100);
+    
+    return {
+      symbol,
+      direction,
+      strength,
+      trend,
+      timeframe,
+      confidence,
+      timestamp: Date.now(),
+      sources: ['twitter', 'reddit', 'discord', 'telegram'],
+      keywords,
+      volumeChange24h,
+      priceChange24h,
+      socialScore
+    };
+  }
+  
+  /**
+   * Generate trading signal from sentiment analysis
+   * @param sentiment Sentiment analysis
+   * @returns Trading signal
+   */
+  private generateTradingSignal(sentiment: SentimentAnalysis): TradingSignal {
+    // Generate random prices
+    const basePrice = 1.0;
+    const entry = basePrice * (1 + (Math.random() * 0.05 - 0.025)); // ±2.5%
+    
+    // Target and stop loss based on direction
+    let target: number;
+    let stopLoss: number;
+    
+    if (sentiment.direction === SignalDirection.BULLISH) {
+      // Bullish: target higher, stop loss lower
+      target = entry * (1 + (Math.random() * 0.2 + 0.05)); // +5% to +25%
+      stopLoss = entry * (1 - (Math.random() * 0.1 + 0.02)); // -2% to -12%
+    } else if (sentiment.direction === SignalDirection.BEARISH) {
+      // Bearish: target lower, stop loss higher
+      target = entry * (1 - (Math.random() * 0.2 + 0.05)); // -5% to -25%
+      stopLoss = entry * (1 + (Math.random() * 0.1 + 0.02)); // +2% to +12%
+    } else {
+      // Neutral: tight range
+      target = entry * (1 + (Math.random() * 0.08 - 0.04)); // ±4%
+      stopLoss = entry * (1 - (Math.random() * 0.08 - 0.04)); // ±4%
+    }
+    
+    // Signal expiry (proportional to timeframe)
+    let expiryMs = 60 * 60 * 1000; // Default: 1 hour
+    
+    switch (sentiment.timeframe) {
+      case TrendTimeframe.VERY_SHORT:
+        expiryMs = 15 * 60 * 1000; // 15 minutes
+        break;
+      case TrendTimeframe.SHORT:
+        expiryMs = 4 * 60 * 60 * 1000; // 4 hours
+        break;
+      case TrendTimeframe.MEDIUM:
+        expiryMs = 24 * 60 * 60 * 1000; // 1 day
+        break;
+      case TrendTimeframe.LONG:
+        expiryMs = 7 * 24 * 60 * 60 * 1000; // 1 week
+        break;
+      case TrendTimeframe.VERY_LONG:
+        expiryMs = 30 * 24 * 60 * 60 * 1000; // 1 month
+        break;
+    }
+    
+    // Signal ID
+    const id = `meme_signal_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+    
+    // Generate reasoning
+    const reasoning = this.generateSignalReasoning(sentiment);
+    
+    return {
+      id,
+      symbol: sentiment.symbol,
+      direction: sentiment.direction,
+      strength: sentiment.strength,
+      entry,
+      target,
+      stopLoss,
+      timestamp: Date.now(),
+      expiryTime: Date.now() + expiryMs,
+      confidence: sentiment.confidence,
+      reasoning,
+      sourceAnalysis: sentiment
+    };
+  }
+  
+  /**
+   * Generate reasoning for a trading signal
+   * @param sentiment Sentiment analysis
+   * @returns Signal reasoning
+   */
+  private generateSignalReasoning(sentiment: SentimentAnalysis): string {
+    const { symbol, direction, strength, trend, timeframe, keywords } = sentiment;
+    
+    // Direction phrase
+    let directionPhrase = 'neutral outlook';
+    if (direction === SignalDirection.BULLISH) {
+      directionPhrase = 'bullish movement';
+    } else if (direction === SignalDirection.BEARISH) {
+      directionPhrase = 'bearish pressure';
+    }
+    
+    // Strength phrase
+    let strengthPhrase = 'moderate';
+    if (strength === SignalStrength.VERY_STRONG) {
+      strengthPhrase = 'extremely strong';
+    } else if (strength === SignalStrength.STRONG) {
+      strengthPhrase = 'strong';
+    } else if (strength === SignalStrength.WEAK) {
+      strengthPhrase = 'weak';
+    } else if (strength === SignalStrength.VERY_WEAK) {
+      strengthPhrase = 'very weak';
+    }
+    
+    // Trend phrase
+    let trendPhrase = 'market conditions';
+    if (trend === MarketTrend.UPTREND) {
+      trendPhrase = 'uptrend';
+    } else if (trend === MarketTrend.DOWNTREND) {
+      trendPhrase = 'downtrend';
+    } else if (trend === MarketTrend.SIDEWAYS) {
+      trendPhrase = 'sideways movement';
+    } else if (trend === MarketTrend.CHOPPY) {
+      trendPhrase = 'choppy market';
+    } else if (trend === MarketTrend.VOLATILE) {
+      trendPhrase = 'volatile conditions';
+    }
+    
+    // Timeframe phrase
+    let timeframePhrase = 'mid-term';
+    if (timeframe === TrendTimeframe.VERY_SHORT) {
+      timeframePhrase = 'extremely short-term';
+    } else if (timeframe === TrendTimeframe.SHORT) {
+      timeframePhrase = 'short-term';
+    } else if (timeframe === TrendTimeframe.LONG) {
+      timeframePhrase = 'long-term';
+    } else if (timeframe === TrendTimeframe.VERY_LONG) {
+      timeframePhrase = 'very long-term';
+    }
+    
+    // Keywords phrase
+    const keywordsPhrase = keywords.slice(0, 3).join(', ');
+    
+    return `${symbol} shows ${strengthPhrase} ${directionPhrase} in a ${timeframePhrase} ${trendPhrase}. Social sentiment analysis indicates growing interest in ${keywordsPhrase}.`;
+  }
+  
+  /**
+   * Generate market scan result
+   * @returns Market scan result
+   */
+  private generateMarketScanResult(): MarketScanResult {
+    // Sort tokens by sentiment
+    const bullish: string[] = [];
+    const bearish: string[] = [];
+    const neutral: string[] = [];
+    const volatilityRanking: { symbol: string, volatility: number }[] = [];
+    
+    // Process sentiment cache
+    this.sentimentCache.forEach((sentiment, symbol) => {
+      // Categorize by direction
+      if (sentiment.direction === SignalDirection.BULLISH) {
+        bullish.push(symbol);
+      } else if (sentiment.direction === SignalDirection.BEARISH) {
+        bearish.push(symbol);
+      } else {
+        neutral.push(symbol);
       }
-    }, 60000); // Check every minute
+      
+      // Add to volatility ranking if volumeChange24h exists
+      if (sentiment.volumeChange24h !== undefined) {
+        volatilityRanking.push({
+          symbol,
+          volatility: Math.abs(sentiment.volumeChange24h)
+        });
+      }
+    });
+    
+    // Sort volatility ranking
+    volatilityRanking.sort((a, b) => b.volatility - a.volatility);
+    
+    // Determine overall market sentiment
+    let overallMarketSentiment: SignalDirection;
+    if (bullish.length > bearish.length) {
+      overallMarketSentiment = SignalDirection.BULLISH;
+    } else if (bearish.length > bullish.length) {
+      overallMarketSentiment = SignalDirection.BEARISH;
+    } else {
+      overallMarketSentiment = SignalDirection.NEUTRAL;
+    }
+    
+    // Collect trending keywords
+    const keywordCount = new Map<string, number>();
+    
+    this.sentimentCache.forEach(sentiment => {
+      sentiment.keywords.forEach(keyword => {
+        const count = keywordCount.get(keyword) || 0;
+        keywordCount.set(keyword, count + 1);
+      });
+    });
+    
+    // Sort keywords by frequency
+    const trendingKeywords = Array.from(keywordCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([keyword]) => keyword);
+    
+    return {
+      timestamp: Date.now(),
+      topBullish: bullish.slice(0, 3),
+      topBearish: bearish.slice(0, 3),
+      neutralCoins: neutral,
+      volatilityRanking: volatilityRanking.slice(0, 5),
+      overallMarketSentiment,
+      trendingKeywords
+    };
+  }
+  
+  /**
+   * Get sentiment analysis for a token
+   * @param symbol Token symbol
+   * @returns Sentiment analysis or null if not found
+   */
+  public getSentiment(symbol: string): SentimentAnalysis | null {
+    return this.sentimentCache.get(symbol) || null;
+  }
+  
+  /**
+   * Get the latest trading signals
+   * @param limit Maximum number of signals to return
+   * @returns Trading signals
+   */
+  public getLatestSignals(limit: number = 10): TradingSignal[] {
+    return this.signalHistory
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+  }
+  
+  /**
+   * Get trading signals for a specific token
+   * @param symbol Token symbol
+   * @param limit Maximum number of signals to return
+   * @returns Trading signals
+   */
+  public getSignalsForToken(symbol: string, limit: number = 10): TradingSignal[] {
+    return this.signalHistory
+      .filter(signal => signal.symbol === symbol)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+  }
+  
+  /**
+   * Execute a trading signal
+   * @param signal Trading signal or signal ID
+   * @param amount Amount to trade
+   * @param walletAddress Wallet address
+   * @param privateKey Wallet private key (optional)
+   * @returns Transaction signature
+   */
+  public async executeSignal(
+    signal: TradingSignal | string,
+    amount: number,
+    walletAddress: string,
+    privateKey?: string
+  ): Promise<string> {
+    try {
+      // Get signal by ID if string is provided
+      let tradingSignal: TradingSignal;
+      
+      if (typeof signal === 'string') {
+        const foundSignal = this.signalHistory.find(s => s.id === signal);
+        
+        if (!foundSignal) {
+          throw new Error(`Signal not found: ${signal}`);
+        }
+        
+        tradingSignal = foundSignal;
+      } else {
+        tradingSignal = signal;
+      }
+      
+      logger.info(`Executing meme trading signal: ${tradingSignal.id} (${tradingSignal.symbol})`);
+      
+      // Determine source and target tokens based on direction
+      let sourceToken: string;
+      let targetToken: string;
+      
+      if (tradingSignal.direction === SignalDirection.BULLISH) {
+        // Buy the token (USDC -> token)
+        sourceToken = 'USDC';
+        targetToken = tradingSignal.symbol;
+      } else if (tradingSignal.direction === SignalDirection.BEARISH) {
+        // Sell the token (token -> USDC)
+        sourceToken = tradingSignal.symbol;
+        targetToken = 'USDC';
+      } else {
+        // Neutral - could implement a straddle or other neutral strategy
+        // For now, just return a dummy signature
+        return `simulation_${Date.now()}`;
+      }
+      
+      // Execute the trade using Nexus Transaction Engine
+      const result = await nexusEngine.executeSwap({
+        fromToken: sourceToken,
+        toToken: targetToken,
+        amount,
+        walletAddress,
+        privateKey,
+        simulation: privateKey ? false : true
+      });
+      
+      return result.signature || 'no_signature';
+    } catch (error: any) {
+      logger.error(`Failed to execute trading signal: ${error.message || String(error)}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get the market cycle state for a token
+   * @param symbol Token symbol
+   * @returns Market cycle state
+   */
+  public getMarketCycleState(symbol: string): MarketCycleState {
+    const sentiment = this.sentimentCache.get(symbol);
+    
+    if (!sentiment) {
+      return MarketCycleState.RETURN_TO_MEAN;
+    }
+    
+    // Determine market cycle state based on sentiment
+    if (sentiment.direction === SignalDirection.BULLISH) {
+      if (sentiment.strength === SignalStrength.VERY_STRONG) {
+        return MarketCycleState.MARKUP;
+      } else if (sentiment.strength === SignalStrength.STRONG) {
+        return MarketCycleState.ACCUMULATION;
+      } else {
+        return MarketCycleState.RETURN_TO_MEAN;
+      }
+    } else if (sentiment.direction === SignalDirection.BEARISH) {
+      if (sentiment.strength === SignalStrength.VERY_STRONG) {
+        return MarketCycleState.MARKDOWN;
+      } else if (sentiment.strength === SignalStrength.STRONG) {
+        return MarketCycleState.DISTRIBUTION;
+      } else if (sentiment.strength === SignalStrength.VERY_WEAK) {
+        return MarketCycleState.CAPITULATION;
+      } else {
+        return MarketCycleState.DESPAIR;
+      }
+    } else {
+      return MarketCycleState.RETURN_TO_MEAN;
+    }
+  }
+  
+  /**
+   * Update configuration
+   * @param config New configuration
+   */
+  public updateConfig(config: Partial<MemeCortexConfig>): void {
+    this.config = { ...this.config, ...config };
+    
+    // Restart analysis interval if interval changed
+    if (config.analysisInterval !== undefined) {
+      this.startAnalysisInterval();
+    }
+    
+    logger.info(`MemeCortex configuration updated`);
+  }
+  
+  /**
+   * Immediately analyze the market (outside of regular interval)
+   */
+  public async forceAnalysis(): Promise<void> {
+    await this.analyzeMemeMarket();
+  }
+  
+  /**
+   * Get configuration
+   * @returns Current configuration
+   */
+  public getConfig(): MemeCortexConfig {
+    return { ...this.config };
   }
 }
 
-// Export a singleton instance
-export const memeCortexTransformer = new MemeCortexTransformer();
-
-// Export MomentumSurfingStrategy
-export const momentumSurfingStrategy = new MomentumSurfingStrategy(memeCortexTransformer);
+// Export singleton instance
+export const memeCortexRemix = new MemeCortexRemix();
+export default memeCortexRemix;

@@ -6,9 +6,7 @@
  */
 
 import { Connection } from '@solana/web3.js';
-import { getLogger } from './logger';
-
-const logger = getLogger('SolanaConnectionManager');
+import * as logger from './logger';
 
 // RPC endpoint configuration with fallbacks
 interface RPCEndpoint {
@@ -112,15 +110,15 @@ export class SolanaConnectionManager {
         });
         
         // Test connection by fetching recent blockhash
-        const blockhash = await this.connection.getLatestBlockhash();
+        await this.connection.getLatestBlockhash();
         logger.info(`Successfully connected to ${endpoint.name} RPC endpoint`);
         
         this.currentEndpointIndex = i;
         this.connectionInitialized = true;
         this.reconnectAttempts = 0;
         return;
-      } catch (error) {
-        logger.error(`Failed to connect to ${endpoint.name} RPC endpoint: ${error.message}`);
+      } catch (error: any) {
+        logger.error(`Failed to connect to ${endpoint.name} RPC endpoint: ${error.message || String(error)}`);
         
         // Mark endpoint as failed
         this.endpoints[i].lastFailure = Date.now();
@@ -167,8 +165,8 @@ export class SolanaConnectionManager {
       try {
         // Test connection with a light operation
         await this.connection.getRecentPerformanceSamples(1);
-      } catch (error) {
-        logger.error(`Heartbeat failed: ${error.message}`);
+      } catch (error: any) {
+        logger.error(`Heartbeat failed: ${error.message || String(error)}`);
         
         // Mark current endpoint as failed
         this.endpoints[this.currentEndpointIndex].lastFailure = Date.now();

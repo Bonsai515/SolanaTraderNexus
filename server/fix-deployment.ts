@@ -6,12 +6,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
 
 // Import our fixes
 import { solanaConnection } from './fix-solana-connection';
-import { transactionVerifier } from './fix-transaction-verifier';
 
 // Set up logger
 const log = (message: string): void => console.log(`[${new Date().toISOString()}] ${message}`);
@@ -170,8 +167,8 @@ async function testSolanaConnection(): Promise<boolean> {
         const blockhash = await connection.getLatestBlockhash();
         log(`✅ Solana connection successful! Latest blockhash: ${blockhash.blockhash.substr(0, 10)}...`);
         return true;
-      } catch (error) {
-        log(`⚠️ Solana connection test failed: ${error.message}`);
+      } catch (error: any) {
+        log(`⚠️ Solana connection test failed: ${error.message || String(error)}`);
       }
     }
     
