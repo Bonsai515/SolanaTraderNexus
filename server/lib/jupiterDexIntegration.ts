@@ -6,9 +6,11 @@
  * and executing real token swaps with verification.
  */
 
-import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { Connection, Transaction, TransactionInstruction } from '@solana/web3.js';
 import axios from 'axios';
 import { logger } from '../logger';
+import https from 'https';
+import { heliusApiIntegration } from './heliusIntegration';
 
 // Token information interface
 interface Token {

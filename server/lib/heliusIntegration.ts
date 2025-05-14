@@ -67,6 +67,48 @@ export class HeliusApiIntegration {
       logger.info('Helius API integration initialized');
     }
   }
+  
+  /**
+   * Initialize the Helius API integration
+   * @param apiKey Optional API key, uses environment variable if not provided
+   * @returns Boolean indicating if initialization was successful
+   */
+  public async initialize(apiKey?: string): Promise<boolean> {
+    if (this.initialized) {
+      return true;
+    }
+    
+    if (apiKey) {
+      this.apiKey = apiKey;
+    } else if (!this.apiKey && process.env.HELIUS_API_KEY) {
+      this.apiKey = process.env.HELIUS_API_KEY;
+    }
+    
+    if (!this.apiKey) {
+      logger.warn('Helius API key not found, cannot initialize');
+      return false;
+    }
+    
+    try {
+      // Initialize Solana connection with Helius endpoint
+      this.connection = new Connection(
+        `https://mainnet.helius-rpc.com/?api-key=${this.apiKey}`,
+        'confirmed'
+      );
+      
+      // Test connection with a simple call
+      const version = await this.connection.getVersion();
+      logger.info(`Connected to Solana cluster version: ${version['solana-core']}`);
+      
+      this.initialized = true;
+      logger.info('Helius API integration initialized successfully');
+      return true;
+    } catch (error: any) {
+      logger.error('Failed to initialize Helius API integration:', error.message);
+      this.initialized = false;
+      return false;
+    }
+  }
 
   /**
    * Check if the integration is initialized

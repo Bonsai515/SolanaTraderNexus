@@ -1,21 +1,196 @@
 import express from 'express';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { ArbitrageOpportunity } from './signalTypes';
 import { getAllDexes } from './dexInfo';
 import * as nexusEngine from './nexus-transaction-engine';
 import { logger } from './logger';
 import * as agents from './agents';
 import { AgentType } from './agents';
+import { perplexityAI } from './perplexity-integration';
+import { localMarketAnalysis } from './lib/localMarketAnalysis';
 
 const router = express.Router();
 let usingNexusEngine = true; // Always use the Nexus Professional Engine
 
+// Perplexity AI API Routes
+router.get('/api/perplexity/status', (req, res) => {
+  const status = {
+    status: 'operational',
+    initialized: perplexityAI.isInitialized(),
+    model: 'llama-3.1-sonar-small-128k-online',
+    timestamp: new Date().toISOString()
+  };
+  res.json(status);
+});
+
+router.get('/api/perplexity/analyze/:token', async (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    const analysis = await perplexityAI.analyzeToken(token);
+    res.json({
+      token,
+      analysis,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/perplexity/analyze/${req.params.token}:`, error);
+    res.status(500).json({
+      error: 'Failed to analyze token',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/perplexity/sentiment/:token', async (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    const sentiment = await perplexityAI.getMarketSentiment(token);
+    res.json({
+      token,
+      sentiment,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/perplexity/sentiment/${req.params.token}:`, error);
+    res.status(500).json({
+      error: 'Failed to get market sentiment',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/perplexity/arbitrage', async (req, res) => {
+  try {
+    const opportunities = await perplexityAI.findArbitrageOpportunities();
+    res.json({
+      opportunities,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error in /api/perplexity/arbitrage:', error);
+    res.status(500).json({
+      error: 'Failed to find arbitrage opportunities',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/perplexity/strategies', async (req, res) => {
+  try {
+    const strategies = await perplexityAI.recommendTradingStrategies();
+    res.json({
+      strategies,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error in /api/perplexity/strategies:', error);
+    res.status(500).json({
+      error: 'Failed to recommend trading strategies',
+      message: error.message
+    });
+  }
+});
+
+// Local Market Analysis Fallback Routes
+router.get('/api/market/local/analyze/:token', (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    const analysis = localMarketAnalysis.analyzeToken(token);
+    res.json({
+      token,
+      analysis,
+      timestamp: new Date().toISOString(),
+      source: 'local'
+    });
+  } catch (error) {
+    logger.error(`Error in /api/market/local/analyze/${req.params.token}:`, error);
+    res.status(500).json({
+      error: 'Failed to analyze token with local market analysis',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/market/local/sentiment/:token', (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    const sentiment = localMarketAnalysis.getMarketSentiment(token);
+    res.json({
+      token,
+      sentiment,
+      timestamp: new Date().toISOString(),
+      source: 'local'
+    });
+  } catch (error) {
+    logger.error(`Error in /api/market/local/sentiment/${req.params.token}:`, error);
+    res.status(500).json({
+      error: 'Failed to get market sentiment with local market analysis',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/market/local/arbitrage', (req, res) => {
+  try {
+    const opportunities = localMarketAnalysis.findArbitrageOpportunities();
+    res.json({
+      opportunities,
+      timestamp: new Date().toISOString(),
+      source: 'local'
+    });
+  } catch (error) {
+    logger.error('Error in /api/market/local/arbitrage:', error);
+    res.status(500).json({
+      error: 'Failed to find arbitrage opportunities with local market analysis',
+      message: error.message
+    });
+  }
+});
+
+router.get('/api/market/local/strategies', (req, res) => {
+  try {
+    const strategies = localMarketAnalysis.recommendTradingStrategies();
+    res.json({
+      strategies,
+      timestamp: new Date().toISOString(),
+      source: 'local'
+    });
+  } catch (error) {
+    logger.error('Error in /api/market/local/strategies:', error);
+    res.status(500).json({
+      error: 'Failed to recommend trading strategies with local market analysis',
+      message: error.message
+    });
+  }
+});
+
+// Combined Market Analysis Route (tries Perplexity first, falls back to local)
 router.get('/api/market/analyze/:token', async (req, res) => {
   try {
-    const token = req.params.token;
-
-    // Return basic market analysis
+    const token = req.params.token.toUpperCase();
+    
+    let analysis;
+    let source = 'perplexity';
+    
+    try {
+      if (perplexityAI.isInitialized()) {
+        analysis = await perplexityAI.analyzeToken(token);
+      } else {
+        throw new Error('Perplexity API not initialized');
+      }
+    } catch (aiError) {
+      logger.warn(`Falling back to local market analysis for ${token}:`, aiError);
+      analysis = localMarketAnalysis.analyzeToken(token);
+      source = 'local';
+    }
+    
+    // Return market analysis
     res.json({
+      token,
+      source,
       token_info: {
+        analysis,
         name: token.toUpperCase(),
         symbol: token.toUpperCase(),
         category: "token",
@@ -433,6 +608,140 @@ router.post('/agents/deactivate-all', async (req, res) => {
   }
 });
 
-module.exports = function(app) {
+export function registerRoutes(app: express.Express) {
+  // Import Perplexity AI integration
+  const { perplexityAI } = require('./perplexity-integration');
+
+  // Perplexity AI routes
+  router.get('/api/perplexity/status', (req, res) => {
+    const initialized = perplexityAI.isInitialized();
+    res.json({
+      status: initialized ? 'operational' : 'not_configured',
+      initialized,
+      model: 'llama-3.1-sonar-small-128k-online',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  router.get('/api/perplexity/analyze/:token', async (req, res) => {
+    try {
+      const token = req.params.token.toUpperCase();
+      const analysis = await perplexityAI.analyzeToken(token);
+      res.json({
+        success: true,
+        token,
+        analysis,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to analyze token',
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/api/perplexity/sentiment/:token', async (req, res) => {
+    try {
+      const token = req.params.token.toUpperCase();
+      const sentiment = await perplexityAI.getMarketSentiment(token);
+      res.json({
+        success: true,
+        token,
+        sentiment,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get market sentiment',
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/api/perplexity/arbitrage', async (req, res) => {
+    try {
+      const opportunities = await perplexityAI.findArbitrageOpportunities();
+      res.json({
+        success: true,
+        opportunities,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to find arbitrage opportunities',
+        error: error.message
+      });
+    }
+  });
+
+  router.get('/api/perplexity/strategies', async (req, res) => {
+    try {
+      const strategies = await perplexityAI.recommendTradingStrategies();
+      res.json({
+        success: true,
+        strategies,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to recommend trading strategies',
+        error: error.message
+      });
+    }
+  });
+
+  // Set up routes
   app.use(router);
-};
+  
+  // Create HTTP server
+  const httpServer = createServer(app);
+  
+  // Create WebSocket server for real-time data
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Set up WebSocket connection handler
+  wss.on('connection', (ws) => {
+    logger.info('WebSocket client connected');
+    
+    // Send initial data to the client
+    ws.send(JSON.stringify({ 
+      type: 'status',
+      data: {
+        nexusEngineActive: usingNexusEngine,
+        usingRealFunds: nexusEngine.isUsingRealFunds(),
+        transformersActive: true,
+        transformerEntanglementLevel: {
+          security: 95,
+          crosschain: 92,
+          memecortex: 98
+        }
+      }
+    }));
+    
+    // Handle messages from clients
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle different message types
+        if (data.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong', time: Date.now() }));
+        }
+      } catch (error) {
+        logger.error('Error handling WebSocket message:', error);
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      logger.info('WebSocket client disconnected');
+    });
+  });
+  
+  return httpServer;
+}
