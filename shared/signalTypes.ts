@@ -27,13 +27,52 @@ export interface ArbitrageOpportunity {
 export type TransactionType = 'swap' | 'arbitrage' | 'snipe' | 'crosschain';
 
 // Signal types
-export type SignalType = 'BUY' | 'SELL' | 'NEUTRAL';
+export enum SignalType {
+  BUY = 'BUY',
+  SELL = 'SELL',
+  NEUTRAL = 'NEUTRAL',
+  PATTERN_RECOGNITION = 'PATTERN_RECOGNITION',
+  VOLATILITY_ALERT = 'VOLATILITY_ALERT',
+  ARBITRAGE_OPPORTUNITY = 'ARBITRAGE_OPPORTUNITY',
+  MARKET_SENTIMENT = 'MARKET_SENTIMENT',
+  STRATEGY_RECOMMENDATION = 'STRATEGY_RECOMMENDATION',
+  CUSTOM = 'CUSTOM'
+}
 
 // Signal strength
-export type SignalStrength = 'WEAK' | 'MEDIUM' | 'STRONG';
+export enum SignalStrength {
+  WEAK = 'WEAK',
+  MEDIUM = 'MEDIUM',
+  STRONG = 'STRONG'
+}
+
+// Signal direction (more granular than just buy/sell)
+export enum SignalDirection {
+  BULLISH = 'BULLISH',
+  BEARISH = 'BEARISH',
+  NEUTRAL = 'NEUTRAL',
+  SLIGHTLY_BULLISH = 'SLIGHTLY_BULLISH',
+  SLIGHTLY_BEARISH = 'SLIGHTLY_BEARISH'
+}
+
+// Signal priority for processing order
+export enum SignalPriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL'
+}
 
 // Signal source
-export type SignalSource = 'MicroQHC' | 'MEME Cortex' | 'MemeCortexRemix' | 'Security' | 'CrossChain';
+export enum SignalSource {
+  MICRO_QHC = 'MicroQHC',
+  MEME_CORTEX = 'MEME Cortex',
+  MEME_CORTEX_REMIX = 'MemeCortexRemix',
+  SECURITY = 'Security',
+  CROSS_CHAIN = 'CrossChain',
+  PERPLEXITY_AI = 'PerplexityAI',
+  LOCAL_ANALYSIS = 'LocalAnalysis'
+}
 
 // Base signal interface
 export interface BaseSignal {
@@ -44,6 +83,15 @@ export interface BaseSignal {
   timestamp: string;
   source: SignalSource;
   confidence: number;
+  direction: SignalDirection;
+  priority: SignalPriority;
+  description: string;
+  metadata?: Record<string, any>;
+  actionable: boolean;
+  token_address?: string;
+  analysis?: Record<string, any>;
+  metrics?: Record<string, any>;
+  relatedSignals?: string[];
 }
 
 // Trading signal with price target
