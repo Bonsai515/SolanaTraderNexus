@@ -6,7 +6,7 @@
  */
 
 import { Connection, clusterApiUrl, Commitment } from '@solana/web3.js';
-import { logger } from '../logger';
+import { logger, debug, info, error } from '../logger';
 
 // Connection configuration
 interface ConnectionConfig {
