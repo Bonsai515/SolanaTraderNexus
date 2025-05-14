@@ -30,9 +30,10 @@ interface PriceSource {
 // Cache file path
 const CACHE_FILE_PATH = path.join(process.cwd(), 'data', 'price_cache.json');
 
-// Known tokens to track
+// Known tokens to track (Solana ecosystem + popular memecoins)
 const KNOWN_TOKENS = [
-  'SOL', 'BONK', 'JUP', 'USDC', 'USDT', 'ETH', 'BTC', 'WIF', 'MEME', 'GUAC'
+  'SOL', 'BONK', 'JUP', 'USDC', 'USDT', 'ETH', 'BTC', 'WIF', 'MEME', 'GUAC',
+  'POPCAT', 'BOOK', 'PNUT', 'SLERF', 'SAMO', 'RAY', 'PYTH', 'ORCA', 'COPE'
 ];
 
 // Price Feed Cache class
@@ -57,7 +58,7 @@ export class PriceFeedCache {
    * Initialize price sources
    */
   private initializeSources(): void {
-    // Add CoinGecko
+    // Add CoinGecko (popular free API)
     this.sources.push({
       name: 'CoinGecko',
       priority: 1,
@@ -65,7 +66,7 @@ export class PriceFeedCache {
       enabled: true
     });
     
-    // Add Jupiter Aggregator
+    // Add Jupiter Aggregator (Solana-specific with excellent coverage)
     this.sources.push({
       name: 'Jupiter',
       priority: 2,
@@ -73,7 +74,7 @@ export class PriceFeedCache {
       enabled: true
     });
     
-    // Add Birdeye
+    // Add Birdeye (Solana-specific with great meme coin coverage)
     this.sources.push({
       name: 'Birdeye',
       priority: 3,
@@ -81,8 +82,54 @@ export class PriceFeedCache {
       enabled: true
     });
     
+    // Add DexScreener (multiple chains with good Solana coverage)
+    this.sources.push({
+      name: 'DexScreener',
+      priority: 4,
+      fetcher: this.fetchDexScreenerPrices.bind(this),
+      enabled: true
+    });
+    
+    // Add SolScan (Solana blockchain explorer with price data)
+    this.sources.push({
+      name: 'SolScan',
+      priority: 5,
+      fetcher: this.fetchSolScanPrices.bind(this),
+      enabled: true
+    });
+    
+    // Add Binance API (major exchange with reliable data)
+    this.sources.push({
+      name: 'Binance',
+      priority: 6,
+      fetcher: this.fetchBinancePrices.bind(this),
+      enabled: true
+    });
+    
+    // Add CryptoCompare (reliable aggregator for price data)
+    /*
+    this.sources.push({
+      name: 'CryptoCompare',
+      priority: 7,
+      fetcher: this.fetchCryptoComparePrices.bind(this),
+      enabled: true
+    });
+    */
+    
+    // Add on-chain RPC price (direct from Solana RPC endpoints)
+    /*
+    this.sources.push({
+      name: 'OnChainRPC',
+      priority: 8,
+      fetcher: this.fetchOnChainPrices.bind(this),
+      enabled: true
+    });
+    */
+    
     // Sort sources by priority
     this.sources.sort((a, b) => a.priority - b.priority);
+    
+    logger.info(`Initialized ${this.sources.length} price feed sources`);
   }
   
   /**
@@ -154,16 +201,45 @@ export class PriceFeedCache {
   }
   
   /**
-   * Update prices from all sources
+   * Update prices from all sources with advanced rate limiting handling
    */
   public async updatePrices(): Promise<void> {
     try {
+      let updatedTokenCount = 0;
+      let updatedFromSource = '';
+      
       // Attempt to fetch from each source in priority order
       for (const source of this.sources) {
         if (!source.enabled) continue;
         
         try {
-          const newPrices = await source.fetcher();
+          // Use exponential backoff for retries on rate limiting
+          let retryCount = 0;
+          let success = false;
+          let newPrices: Map<string, TokenPrice> = new Map();
+          
+          while (retryCount < 3 && !success) {
+            try {
+              newPrices = await source.fetcher();
+              success = true;
+            } catch (error: any) {
+              // Check if it's a rate limiting error
+              if (error.response && error.response.status === 429) {
+                retryCount++;
+                const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+                logger.warn(`Rate limit hit for ${source.name}, retrying in ${delay}ms (attempt ${retryCount}/3)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              } else {
+                // Not a rate limiting error, just throw it
+                throw error;
+              }
+            }
+          }
+          
+          if (!success) {
+            logger.warn(`Skipping ${source.name} after 3 failed retry attempts due to rate limiting`);
+            continue;
+          }
           
           // Update prices with new data
           newPrices.forEach((price, symbol) => {
@@ -172,12 +248,13 @@ export class PriceFeedCache {
             // Only update if price is newer
             if (!existingPrice || price.lastUpdated > existingPrice.lastUpdated) {
               this.prices.set(symbol, price);
+              updatedTokenCount++;
             }
           });
           
           // If we got data from this source, we can stop trying others
           if (newPrices.size > 0) {
-            logger.info(`Updated ${newPrices.size} token prices from ${source.name}`);
+            updatedFromSource = source.name;
             break;
           }
         } catch (error: any) {
@@ -185,7 +262,14 @@ export class PriceFeedCache {
         }
       }
       
-      // Save to cache
+      // If we didn't get any updates from any source, log a warning but don't fail
+      if (updatedTokenCount === 0) {
+        logger.warn('Failed to update prices from any source, using cached data');
+      } else {
+        logger.info(`Updated ${updatedTokenCount} token prices from ${updatedFromSource}`);
+      }
+      
+      // Save to cache regardless of update success to ensure we have the latest
       this.saveToCache();
       
       // Update timestamp
@@ -194,6 +278,7 @@ export class PriceFeedCache {
       logger.debug(`Updated local market data at ${new Date(this.lastFullUpdate).toISOString()}`);
     } catch (error: any) {
       logger.error(`Failed to update prices: ${error.message || String(error)}`);
+      logger.info('Using cached price data due to update failure');
     }
   }
   
@@ -366,24 +451,241 @@ export class PriceFeedCache {
     const prices = new Map<string, TokenPrice>();
     
     try {
-      // Placeholder implementation
       // In a real implementation, you would use Birdeye's API to fetch prices
-      logger.info('Placeholder: Fetching prices from Birdeye');
+      logger.info('Fetching prices from Birdeye');
       
-      // Use sample prices for testing (simulating Birdeye's response)
-      const now = Date.now();
+      // Birdeye API endpoint for token prices
+      const response = await axios.get('https://public-api.birdeye.so/defi/tokens', {
+        params: {
+          sort_by: 'v24hUSD',
+          sort_type: 'desc',
+          offset: 0,
+          limit: 20,
+          chain: 'solana'
+        },
+        headers: {
+          'X-API-KEY': process.env.BIRDEYE_API_KEY || 'not-required-for-public-endpoint'
+        },
+        timeout: 5000
+      });
       
-      prices.set('SOL', { symbol: 'SOL', priceUsd: 132.67, lastUpdated: now, source: 'Birdeye' });
-      prices.set('BONK', { symbol: 'BONK', priceUsd: 0.0000232, lastUpdated: now, source: 'Birdeye' });
-      prices.set('JUP', { symbol: 'JUP', priceUsd: 0.763, lastUpdated: now, source: 'Birdeye' });
-      prices.set('USDC', { symbol: 'USDC', priceUsd: 0.999, lastUpdated: now, source: 'Birdeye' });
-      prices.set('USDT', { symbol: 'USDT', priceUsd: 0.997, lastUpdated: now, source: 'Birdeye' });
-      prices.set('ETH', { symbol: 'ETH', priceUsd: 3748.91, lastUpdated: now, source: 'Birdeye' });
-      prices.set('WIF', { symbol: 'WIF', priceUsd: 0.648, lastUpdated: now, source: 'Birdeye' });
-      prices.set('MEME', { symbol: 'MEME', priceUsd: 0.03189, lastUpdated: now, source: 'Birdeye' });
-      prices.set('GUAC', { symbol: 'GUAC', priceUsd: 0.001178, lastUpdated: now, source: 'Birdeye' });
+      if (response.status === 200 && response.data && response.data.data && response.data.data.tokens) {
+        const tokens = response.data.data.tokens;
+        const now = Date.now();
+        
+        for (const token of tokens) {
+          // Map tokens to our known tokens
+          let symbol = token.symbol;
+          if (KNOWN_TOKENS.includes(symbol)) {
+            prices.set(symbol, {
+              symbol: symbol,
+              priceUsd: parseFloat(token.price),
+              lastUpdated: now,
+              source: 'Birdeye',
+              change24h: parseFloat(token.priceChange24h) * 100 // Convert to percentage
+            });
+          }
+        }
+      }
     } catch (error: any) {
       logger.error(`Error fetching Birdeye prices: ${error.message || String(error)}`);
+      throw error;
+    }
+    
+    return prices;
+  }
+  
+  /**
+   * Fetch prices from DexScreener
+   * @returns Map of token symbols to prices
+   */
+  private async fetchDexScreenerPrices(): Promise<Map<string, TokenPrice>> {
+    const prices = new Map<string, TokenPrice>();
+    
+    try {
+      logger.info('Fetching prices from DexScreener');
+      
+      // DexScreener API endpoint for Solana DEXes
+      const response = await axios.get('https://api.dexscreener.com/latest/dex/tokens/solana', {
+        timeout: 5000
+      });
+      
+      if (response.status === 200 && response.data && response.data.pairs) {
+        const pairs = response.data.pairs;
+        const now = Date.now();
+        const processedTokens = new Set<string>();
+        
+        for (const pair of pairs) {
+          // Get base token (usually the token we're interested in)
+          const symbol = pair.baseToken.symbol;
+          
+          // Skip if we've already processed this token or it's not in our known tokens
+          if (processedTokens.has(symbol) || !KNOWN_TOKENS.includes(symbol)) {
+            continue;
+          }
+          
+          // Mark token as processed
+          processedTokens.add(symbol);
+          
+          // Add to prices map
+          prices.set(symbol, {
+            symbol: symbol,
+            priceUsd: parseFloat(pair.priceUsd),
+            lastUpdated: now,
+            source: 'DexScreener',
+            change24h: parseFloat(pair.priceChange.h24) * 100 // Convert to percentage
+          });
+        }
+      }
+    } catch (error: any) {
+      logger.error(`Error fetching DexScreener prices: ${error.message || String(error)}`);
+      throw error;
+    }
+    
+    return prices;
+  }
+  
+  /**
+   * Fetch prices from SolScan
+   * @returns Map of token symbols to prices
+   */
+  private async fetchSolScanPrices(): Promise<Map<string, TokenPrice>> {
+    const prices = new Map<string, TokenPrice>();
+    
+    try {
+      logger.info('Fetching prices from SolScan');
+      
+      // Map of known token symbols to SolScan token addresses
+      const tokenAddressMap: Record<string, string> = {
+        'SOL': 'So11111111111111111111111111111111111111112', // Native SOL
+        'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+        'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+        'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+        'JUP': 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
+        'WIF': 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', // WIF 
+        'MEME': 'MiVnxQ3F8iUF2LaQvHvBPFdZs3VGsz7U8UNzCUmXvZ5', // MEME
+        'GUAC': 'GkVbJ8G3b7V3pJta1ynHHDGNLZVUdQxq6HYjQoAJSnAK'  // GUAC
+      };
+      
+      // Process each token in parallel
+      const fetchPromises: Promise<void>[] = [];
+      const now = Date.now();
+      
+      for (const [symbol, address] of Object.entries(tokenAddressMap)) {
+        // Don't fetch if it's not in our known tokens list
+        if (!KNOWN_TOKENS.includes(symbol)) {
+          continue;
+        }
+        
+        const fetchTokenPrice = async () => {
+          try {
+            // Fetch token info from SolScan
+            const response = await axios.get(`https://public-api.solscan.io/token/meta?tokenAddress=${address}`, {
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'Quantum-Trading-Bot/1.0'
+              },
+              timeout: 5000
+            });
+            
+            if (response.status === 200 && response.data) {
+              const priceData = response.data;
+              
+              // Extract price and add to map
+              if (priceData.priceUsdt) {
+                prices.set(symbol, {
+                  symbol: symbol,
+                  priceUsd: parseFloat(priceData.priceUsdt),
+                  lastUpdated: now,
+                  source: 'SolScan',
+                  change24h: priceData.priceChange24h || 0
+                });
+              }
+            }
+          } catch (error: any) {
+            // Log error but don't throw to allow other tokens to be processed
+            logger.error(`Error fetching price for ${symbol} from SolScan: ${error.message || String(error)}`);
+          }
+        };
+        
+        fetchPromises.push(fetchTokenPrice());
+      }
+      
+      // Wait for all price fetches to complete
+      await Promise.all(fetchPromises);
+      
+      logger.info(`Updated ${prices.size} token prices from SolScan`);
+    } catch (error: any) {
+      logger.error(`Error fetching SolScan prices: ${error.message || String(error)}`);
+      throw error;
+    }
+    
+    return prices;
+  }
+  
+  /**
+   * Fetch prices from Binance
+   * @returns Map of token symbols to prices
+   */
+  private async fetchBinancePrices(): Promise<Map<string, TokenPrice>> {
+    const prices = new Map<string, TokenPrice>();
+    
+    try {
+      logger.info('Fetching prices from Binance');
+      
+      // Binance API endpoint for ticker prices
+      const response = await axios.get('https://api.binance.com/api/v3/ticker/price', {
+        timeout: 5000
+      });
+      
+      if (response.status === 200 && response.data) {
+        const tickerData = response.data;
+        const now = Date.now();
+        
+        // Get 24h price change data
+        const changeResponse = await axios.get('https://api.binance.com/api/v3/ticker/24hr', {
+          timeout: 5000
+        });
+        
+        // Create map of symbol to price change percentage
+        const changeMap: Record<string, number> = {};
+        if (changeResponse.status === 200 && changeResponse.data) {
+          for (const item of changeResponse.data) {
+            changeMap[item.symbol] = parseFloat(item.priceChangePercent);
+          }
+        }
+        
+        // Map of known token symbols to Binance trading pairs
+        const symbolMap: Record<string, string> = {
+          'SOL': 'SOLUSDT',
+          'BTC': 'BTCUSDT',
+          'ETH': 'ETHUSDT',
+          'USDC': 'USDCUSDT',
+          'USDT': 'USDTBUSD', // USDT doesn't have a direct USD pair
+          'JUP': 'JUPUSDT',
+          'BONK': 'BONKUSDT',
+          'WIF': 'WIFUSDT'
+        };
+        
+        // Process ticker data
+        for (const ticker of tickerData) {
+          // Check if this is a trading pair we're interested in
+          for (const [symbol, pairSymbol] of Object.entries(symbolMap)) {
+            if (ticker.symbol === pairSymbol) {
+              prices.set(symbol, {
+                symbol: symbol,
+                priceUsd: parseFloat(ticker.price),
+                lastUpdated: now,
+                source: 'Binance',
+                change24h: changeMap[pairSymbol] || 0
+              });
+              break;
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      logger.error(`Error fetching Binance prices: ${error.message || String(error)}`);
       throw error;
     }
     
