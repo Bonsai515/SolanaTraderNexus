@@ -9,6 +9,7 @@ import * as agents from './agents';
 import { AgentType } from './agents';
 import { perplexityAI } from './perplexity-integration';
 import { localMarketAnalysis } from './lib/localMarketAnalysis';
+import { marketAnalysisSignalGenerator } from './lib/marketAnalysisSignalGenerator';
 
 const router = express.Router();
 let usingNexusEngine = true; // Always use the Nexus Professional Engine
@@ -608,7 +609,31 @@ router.post('/agents/deactivate-all', async (req, res) => {
   }
 });
 
-export function registerRoutes(app: express.Express) {
+export async function registerRoutes(app: express.Express) {
+  // Initialize market analysis signal generator
+  logger.info('Initializing Market Analysis Signal Generator for trading signals');
+  try {
+    await marketAnalysisSignalGenerator.start();
+    logger.info('Market Analysis Signal Generator started successfully');
+    
+    // Schedule periodic generation of arbitrage and strategy signals
+    setInterval(() => {
+      marketAnalysisSignalGenerator.generateArbitrageSignals().catch(err => {
+        logger.error('Error generating arbitrage signals:', err);
+      });
+    }, 10 * 60 * 1000); // Every 10 minutes
+    
+    setInterval(() => {
+      marketAnalysisSignalGenerator.generateStrategySignals().catch(err => {
+        logger.error('Error generating strategy signals:', err);
+      });
+    }, 15 * 60 * 1000); // Every 15 minutes
+    
+    logger.info('Scheduled periodic market analysis for trading signals');
+  } catch (error) {
+    logger.error('Failed to start Market Analysis Signal Generator:', error);
+  }
+  
   // Import Perplexity AI integration
   const { perplexityAI } = require('./perplexity-integration');
 

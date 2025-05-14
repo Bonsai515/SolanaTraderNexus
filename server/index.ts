@@ -246,12 +246,18 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
   }
 })();
 
-// Register all API routes
-const appServer = registerRoutes(app);
-
-// Listen on port 5000 for production deployment
-const port = process.env.PORT || 5000;
-appServer.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
-});
+// Register all API routes asynchronously
+(async function startServer() {
+  try {
+    const appServer = await registerRoutes(app);
+    
+    // Listen on port 5000 for production deployment
+    const port = process.env.PORT || 5000;
+    appServer.listen(port, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${port}`);
+      console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
+    });
+  } catch (error) {
+    console.error('❌ Error registering API routes:', error.message);
+  }
+})();
