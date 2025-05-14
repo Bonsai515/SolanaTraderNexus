@@ -136,10 +136,12 @@ wss.on('connection', (ws) => {
 });
 
 // Import enhanced modules
-const { initializeTransactionEngine, registerWallet } = require('./nexus-transaction-engine');
+const { initializeTransactionEngine, registerWallet, executeSolanaTransaction } = require('./nexus-transaction-engine');
 const { initializeRpcConnection, verifyWalletConnection } = require('./lib/ensureRpcConnection');
 const { profitCapture } = require('./lib/profitCapture');
 const { connectToRustTransformers } = require('./connect-transformer-rust');
+const { resetTransactionLogs, verifySolscanTransaction, verifyWalletBalance } = require('./lib/verification');
+const { awsServices } = require('./aws-services');
 
 // System wallet for all trading operations
 const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
@@ -149,15 +151,29 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
   try {
     console.log('Initializing Hyperion Trading System with enhanced reliability...');
     
+    // Reset all transaction logs to zero
+    console.log('Resetting all transaction logs and data to zero...');
+    await resetTransactionLogs();
+    await awsServices.resetAllData();
+    console.log('✅ All transaction logs and data reset to zero');
+    
     // Initialize Solana RPC connection with automatic fallback
     console.log('Connecting to Solana blockchain via high-reliability connection...');
     const solanaConnection = await initializeRpcConnection();
     console.log('✅ Successfully established connection to Solana blockchain');
     
-    // Verify the system wallet exists and has SOL
+    // Verify the system wallet exists and has SOL using Solscan and direct blockchain query
     const walletVerified = await verifyWalletConnection(SYSTEM_WALLET);
     if (walletVerified) {
       console.log(`✅ System wallet ${SYSTEM_WALLET} verified and has SOL balance`);
+      
+      // Verify wallet balance with direct blockchain query
+      try {
+        const balance = await verifyWalletBalance(SYSTEM_WALLET, solanaConnection);
+        console.log(`✅ System wallet balance verified: ${balance} SOL`);
+      } catch (error) {
+        console.warn(`⚠️ Could not verify system wallet balance: ${error.message}`);
+      }
     } else {
       console.warn(`⚠️ System wallet ${SYSTEM_WALLET} verification failed - check balance`);
     }
