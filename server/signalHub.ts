@@ -343,11 +343,18 @@ class SignalHub extends EventEmitter {
   private async processTradingSignal(signal: Signal): Promise<void> {
     logger.info(`Processing trading signal ${signal.id} of type ${signal.type}`);
     
-    // Validate signal has required fields
-    if (!signal.sourceToken && !signal.targetToken) {
+    // Validate and ensure signal has required token fields
+    const sourceTokenFromSignal = signal.sourceToken || signal.targetToken || signal.token_address;
+    const targetTokenFromSignal = signal.targetToken || signal.sourceToken;
+    
+    if (!sourceTokenFromSignal && !targetTokenFromSignal) {
       logger.error(`Signal ${signal.id} missing required token information`);
       return;
     }
+    
+    // Make sure the signal has these fields updated for future processing
+    signal.sourceToken = sourceTokenFromSignal;
+    signal.targetToken = targetTokenFromSignal;
     
     // Get trading direction
     const direction = signal.direction || SignalDirection.BUY;
@@ -358,7 +365,12 @@ class SignalHub extends EventEmitter {
     if (direction === SignalDirection.BUY || direction === SignalDirection.LONG) {
       // Buy/Long: Use USDC as source token
       sourceToken = 'USDC';
-      targetToken = signal.targetToken || signal.sourceToken;
+      targetToken = signal.targetToken;
+      
+      if (!targetToken) {
+        logger.error(`Signal ${signal.id} missing target token for BUY/LONG operation`);
+        return;
+      }
       
       // Determine position size based on signal strength
       let positionSizeMultiplier = 0.5; // Default 50% of max size
@@ -380,6 +392,11 @@ class SignalHub extends EventEmitter {
       // Sell/Short: Use token as source
       sourceToken = signal.sourceToken;
       targetToken = 'USDC';
+      
+      if (!sourceToken) {
+        logger.error(`Signal ${signal.id} missing source token for SELL/SHORT operation`);
+        return;
+      }
       
       // For a sell/short, we need to determine how much of the token we have
       // This would connect to portfolio management in a real system
