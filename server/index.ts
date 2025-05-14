@@ -107,6 +107,14 @@ app.get('/api/executions', (req, res) => {
 
 // WebSocket support is handled in routes.ts
 
+// Initialize SignalHub as a global object for API access
+const { signalHub } = require('./signalHub');
+// Create global signalHub instance if it doesn't exist
+if (!global.signalHub) {
+  global.signalHub = signalHub;
+  console.log('Initialized SignalHub for global access to trading signals');
+}
+
 // Import enhanced modules
 const { initializeTransactionEngine, registerWallet, executeSolanaTransaction } = require('./nexus-transaction-engine');
 const { initializeRpcConnection, verifyWalletConnection } = require('./lib/ensureRpcConnection');

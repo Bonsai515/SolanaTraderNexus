@@ -212,6 +212,12 @@ class PerplexityAIIntegration {
       throw new Error('Perplexity API key not found.');
     }
     
+    // If the API key has changed since initialization, update the initialization state
+    if (!this.initialized && this.apiKey) {
+      this.initialized = true;
+      logger.info('Perplexity API key now available, enabling advanced market analysis');
+    }
+    
     const request: PerplexityRequest = {
       model: 'llama-3.1-sonar-small-128k-online',
       messages,
@@ -228,21 +234,90 @@ class PerplexityAIIntegration {
     };
     
     try {
-      const response = await axios.post<PerplexityResponse>(
-        this.apiEndpoint,
-        request,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
+      // Add timeout and retry logic
+      const maxRetries = 2;
+      let retries = 0;
+      let lastError = null;
+      
+      while (retries <= maxRetries) {
+        try {
+          const response = await axios.post<PerplexityResponse>(
+            this.apiEndpoint,
+            request,
+            {
+              headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 15000 // 15 second timeout
+            }
+          );
+          
+          if (response.status === 200 && response.data?.choices?.[0]?.message?.content) {
+            return response.data.choices[0].message.content;
+          } else {
+            throw new Error(`Unexpected response: ${response.status} ${JSON.stringify(response.data)}`);
+          }
+        } catch (error: any) {
+          lastError = error;
+          
+          // Handle specific error cases
+          if (error.response?.status === 401) {
+            logger.error('Perplexity API authentication failed - invalid API key');
+            // No need to retry on auth failures
+            throw new Error('Invalid Perplexity API key. Please check your credentials.');
+          } else if (error.response?.status === 429) {
+            logger.warn('Perplexity API rate limit exceeded, retrying after delay');
+            // Wait longer before retrying on rate limit errors
+            await new Promise(resolve => setTimeout(resolve, (retries + 1) * 2000));
+          } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            logger.warn(`Perplexity API request timed out (attempt ${retries + 1}/${maxRetries + 1})`);
+            // For timeouts, retry with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.min(retries * 1000, 5000)));
+          } else {
+            // For other errors, shorter retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            logger.error(`Perplexity API error (attempt ${retries + 1}/${maxRetries + 1}):`, error.message);
+          }
+          
+          retries++;
+          
+          // If this was the last retry, throw the error
+          if (retries > maxRetries) {
+            logger.error(`Failed to query Perplexity API after ${maxRetries + 1} attempts`);
+            throw lastError;
           }
         }
-      );
+      }
       
-      return response.data.choices[0].message.content;
-    } catch (error) {
-      logger.error('Error querying Perplexity API:', error);
+      // Should never reach here due to the throw in the last retry
+      throw lastError || new Error('Unknown error querying Perplexity API');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+      logger.error(`Error querying Perplexity API: ${errorMessage}`);
       throw error;
+    }
+  }
+  
+  /**
+   * Update the API key
+   * @param newApiKey The new API key to use
+   * @returns True if the API key was successfully updated
+   */
+  public updateApiKey(newApiKey: string): boolean {
+    if (!newApiKey || !newApiKey.startsWith('pplx-')) {
+      logger.error('Invalid Perplexity API key format');
+      return false;
+    }
+    
+    try {
+      this.apiKey = newApiKey;
+      this.initialized = true;
+      logger.info('Perplexity API key updated successfully');
+      return true;
+    } catch (error: any) {
+      logger.error(`Failed to update Perplexity API key: ${error.message}`);
+      return false;
     }
   }
 }
