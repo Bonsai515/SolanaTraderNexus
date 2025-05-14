@@ -16,10 +16,19 @@ use log::{debug, info, warn, error};
 mod transaction;
 mod parallel;
 mod strategy;
+mod timewarp;
 
 use transaction::Transaction;
 use parallel::{init_parallel_processing, process_transactions_parallel, process_price_feeds_parallel};
 use strategy::{StrategyType, FlashLoanArbitrageStrategy, MomentumSurfingStrategy};
+use timewarp::{
+    TimeWarpManager, 
+    TimeRange, 
+    MarketCondition, 
+    SimulationConfig, 
+    SimulationResult,
+    create_time_range
+};
 
 fn main() {
     // Parse command-line arguments

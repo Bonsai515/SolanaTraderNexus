@@ -40,6 +40,7 @@ futures = "0.3.28"
 async-trait = "0.1.73"
 rayon = "1.8.0"  # High-level parallel processing library
 crossbeam = "0.8.2"  # Low-level concurrent primitives
+time-warp = "0.5.0"  # Time manipulation for testing and simulation
 
 # Logging
 log = "0.4.19"
