@@ -1,133 +1,230 @@
 /**
- * RPC Connection Initialization with Robust Fallback
- * 
- * This module ensures the Solana RPC connection is established
- * and remains active, with automatic fallback capabilities.
+ * Ensure RPC Connection to Solana
+ *
+ * This module ensures a stable and reliable connection to Solana RPC nodes,
+ * with automatic fallback and connection verification.
  */
 
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import * as logger from '../logger';
-import axios from 'axios';
-const SOLSCAN_API_BASE = 'https://api.solscan.io';
 
-// Initialize the Solana connection with fallback capabilities
+type EndpointKey = 'instantNodes' | 'alchemy' | 'helius' | 'fallback1' | 'fallback2' | 'fallback3';
+
+// Validate URL formatting with enhanced error handling
+const validateRpcUrl = (url?: string, defaultUrl: string = 'https://api.mainnet-beta.solana.com'): string => {
+  if (!url) return defaultUrl;
+  
+  try {
+    // Ensure URL has proper prefix
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    } else {
+      return `https://${url}`;
+    }
+  } catch (error) {
+    logger.error(`Invalid RPC URL format: ${error}`);
+    return defaultUrl;
+  }
+};
+
+// Set of backup RPC endpoints with validation and priority order
+const RPC_ENDPOINTS: Record<EndpointKey, string> = {
+  // Primary connection - Instant Nodes premium endpoint (4M daily limit)
+  instantNodes: validateRpcUrl(process.env.INSTANT_NODES_RPC_URL, 'https://api.mainnet-beta.solana.com'),
+  // Secondary connection - Alchemy endpoint
+  alchemy: validateRpcUrl(process.env.ALCHEMY_RPC_URL, 'https://api.mainnet-beta.solana.com'),
+  // Tertiary connection - Helius (if API key available)
+  helius: process.env.HELIUS_API_KEY ?
+    validateRpcUrl(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`) :
+    'https://api.mainnet-beta.solana.com',
+  // Additional fallbacks in case all premium endpoints fail
+  fallback1: 'https://solana-api.projectserum.com',
+  fallback2: 'https://rpc.ankr.com/solana',
+  fallback3: clusterApiUrl('mainnet-beta')
+};
+
+// Track connection status
+let currentEndpoint: EndpointKey = 'instantNodes';
+let connectionActive = false;
+let lastConnectionCheck = 0;
+let connectionFailures: Record<EndpointKey, number> = {
+  instantNodes: 0,
+  alchemy: 0,
+  helius: 0,
+  fallback1: 0,
+  fallback2: 0,
+  fallback3: 0
+};
+
+// Main connection instance
+let solanaConnection: Connection | null = null;
+
+/**
+ * Initialize and verify Solana RPC connection
+ */
 export async function initializeRpcConnection(): Promise<Connection> {
   logger.info('Initializing Solana RPC connection with auto-fallback...');
-  
-  // Try different RPC endpoints in order of preference
-  const endpoints = [
-    {
-      name: 'Helius',
-      url: process.env.HELIUS_API_KEY ? 
-        `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : '',
-      priority: 1
-    },
-    {
-      name: 'Alchemy', 
-      url: process.env.ALCHEMY_RPC_URL || '',
-      priority: 2
-    },
-    {
-      name: 'Instant Nodes',
-      url: process.env.INSTANT_NODES_RPC_URL || '',
-      priority: 3
-    },
-    {
-      name: 'Solana Public RPC',
-      url: 'https://api.mainnet-beta.solana.com',
-      priority: 4
-    }
-  ].filter(endpoint => endpoint.url); // Filter out empty URLs
-  
-  // Sort by priority
-  endpoints.sort((a, b) => a.priority - b.priority);
-  
-  let connection: Connection | null = null;
-  let connectionError: Error | null = null;
-  
-  // Try each endpoint
-  for (const endpoint of endpoints) {
+
+  try {
+    // Try Instant Nodes first - this is the fastest and most reliable premium endpoint
+    logger.info('Attempting to connect to Instant Nodes RPC endpoint...');
+    solanaConnection = new Connection(RPC_ENDPOINTS.instantNodes, {
+      commitment: 'confirmed',
+      disableRetryOnRateLimit: false,
+      confirmTransactionInitialTimeout: 60000
+    });
+
+    const blockchainInfo = await solanaConnection.getVersion();
+    logger.info(`✅ Connected to Instant Nodes RPC endpoint (Solana version ${blockchainInfo['solana-core']}))`);
+    connectionActive = true;
+    lastConnectionCheck = Date.now();
+    
+    // Start connection monitoring
+    startConnectionMonitoring();
+    return solanaConnection;
+  } catch (error: any) {
+    logger.error(`Failed to connect to Instant Nodes RPC: ${error.message || String(error)}`);
+    connectionFailures.instantNodes++;
+    
+    // Try Helius next
     try {
-      logger.info(`Attempting to connect to ${endpoint.name} RPC endpoint...`);
-      connection = new Connection(endpoint.url, {
+      logger.info('Attempting to connect to Helius RPC endpoint...');
+      solanaConnection = new Connection(RPC_ENDPOINTS.helius, {
         commitment: 'confirmed',
+        disableRetryOnRateLimit: false,
         confirmTransactionInitialTimeout: 60000
       });
       
-      // Test the connection
-      const version = await connection.getVersion();
-      logger.info(`✅ Connected to ${endpoint.name} RPC endpoint (Solana version ${version['solana-core']}))`);
+      const blockchainInfo = await solanaConnection.getVersion();
+      logger.info(`✅ Connected to Helius RPC endpoint (Solana version ${blockchainInfo['solana-core']}))`);
+      connectionActive = true;
+      lastConnectionCheck = Date.now();
+      currentEndpoint = 'helius';
       
-      // Connection successful
-      break;
-    } catch (error: any) {
-      logger.error(`Failed to connect to ${endpoint.name} RPC endpoint: ${error.message || String(error)}`);
-      connectionError = error;
-      connection = null;
+      // Start connection monitoring
+      startConnectionMonitoring();
+      return solanaConnection;
+    } catch (heliusError: any) {
+      logger.error(`Failed to connect to Helius RPC: ${heliusError.message || String(heliusError)}`);
+      connectionFailures.helius++;
+      
+      // Try fallbacks
+      return switchToFallbackRpc();
     }
   }
-  
-  // If all endpoints failed, throw error
-  if (!connection) {
-    const errorMessage = 'Failed to connect to any Solana RPC endpoint';
-    logger.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-  
-  // Return the successful connection
-  return connection;
 }
 
-// Verify a wallet exists and has SOL balance
-export async function verifyWalletConnection(walletAddress: string): Promise<boolean> {
+/**
+ * Switch to a fallback RPC if primary fails
+ */
+async function switchToFallbackRpc(): Promise<Connection> {
+  const endpoints = Object.keys(RPC_ENDPOINTS) as EndpointKey[];
+  
+  // Sort by failure count (prioritize least failed)
+  const sortedEndpoints = endpoints.sort((a, b) => 
+    (connectionFailures[a] || 0) - (connectionFailures[b] || 0)
+  );
+  
+  const currentKey = currentEndpoint;
+  const nextEndpoint = sortedEndpoints.find(ep => ep !== currentKey) || 'fallback3';
+  
+  logger.info(`Switching from ${currentEndpoint} to ${nextEndpoint} RPC endpoint`);
+  currentEndpoint = nextEndpoint;
+  
+  const endpoint = RPC_ENDPOINTS[nextEndpoint];
+  solanaConnection = new Connection(endpoint, {
+    commitment: 'confirmed',
+    disableRetryOnRateLimit: false,
+    confirmTransactionInitialTimeout: 60000
+  });
+  
   try {
-    logger.info(`Verifying wallet ${walletAddress}...`);
+    // Test connection
+    const blockchainInfo = await solanaConnection.getVersion();
+    connectionActive = true;
+    lastConnectionCheck = Date.now();
+    logger.info(`✅ Successfully switched to ${nextEndpoint} RPC endpoint (Solana version ${blockchainInfo['solana-core']})`);
+    return solanaConnection;
+  } catch (error: any) {
+    logger.error(`Failed to connect to ${nextEndpoint} RPC: ${error.message || String(error)}`);
+    connectionFailures[nextEndpoint]++;
     
-    // First verify via Solscan (external source)
+    // Try another one recursively
+    return switchToFallbackRpc();
+  }
+}
+
+/**
+ * Start monitoring the RPC connection
+ */
+function startConnectionMonitoring(): void {
+  setInterval(async () => {
+    const now = Date.now();
+    if (now - lastConnectionCheck < 30000) return;
+    
+    lastConnectionCheck = now;
+    
     try {
-      const response = await axios.get(`${SOLSCAN_API_BASE}/account`, {
-        params: { address: walletAddress },
-        timeout: 5000
-      });
-      
-      if (response.status === 200 && response.data) {
-        const solBalance = response.data.lamports ? response.data.lamports / 1e9 : 0;
-        logger.info(`Wallet verified via Solscan with ${solBalance} SOL balance`);
-        return true;
+      if (solanaConnection) {
+        await solanaConnection.getLatestBlockhash();
+        connectionActive = true;
+      } else {
+        throw new Error('Connection object is null');
       }
     } catch (error: any) {
-      logger.warn(`Solscan verification failed: ${error.message || String(error)}`);
-      // Continue to RPC verification
+      logger.warn(`RPC connection check failed for ${currentEndpoint}: ${error.message || String(error)}`);
+      connectionActive = false;
+      connectionFailures[currentEndpoint]++;
+      
+      // Switch to fallback
+      await switchToFallbackRpc();
     }
+  }, 5000); // Check every 5 seconds
+}
+
+/**
+ * Get current Solana connection
+ */
+export function getSolanaConnection(): Connection {
+  if (!solanaConnection) {
+    // Create on demand if not exists
+    const endpointKey = currentEndpoint;
+    const endpoint = RPC_ENDPOINTS[endpointKey] || 'https://api.mainnet-beta.solana.com';
     
-    // Fallback to direct RPC verification
-    try {
-      const connection = await initializeRpcConnection();
-      const publicKey = new PublicKey(walletAddress);
-      const balance = await connection.getBalance(publicKey);
-      
-      const solBalance = balance / 1e9;
-      logger.info(`Wallet verified via RPC with ${solBalance} SOL balance`);
-      
-      return solBalance > 0;
-    } catch (error: any) {
-      logger.error(`RPC wallet verification failed: ${error.message || String(error)}`);
-      return false;
+    solanaConnection = new Connection(endpoint, {
+      commitment: 'confirmed',
+      disableRetryOnRateLimit: false
+    });
+    
+    // Start monitoring if not already
+    if (!connectionActive) {
+      startConnectionMonitoring();
     }
+  }
+  
+  return solanaConnection;
+}
+
+/**
+ * Check if wallet exists and has SOL
+ */
+export async function verifyWalletConnection(walletAddress: string): Promise<boolean> {
+  try {
+    const connection = getSolanaConnection();
+    const pubkey = new PublicKey(walletAddress);
+    
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    const balance = await connection.getBalance(pubkey);
+    
+    logger.info(`Wallet ${walletAddress.substring(0, 10)}... has ${balance / 1e9} SOL`);
+    return accountInfo !== null && balance > 0;
   } catch (error: any) {
-    logger.error(`Wallet verification failed: ${error.message || String(error)}`);
+    logger.error(`Failed to verify wallet ${walletAddress}: ${error.message || String(error)}`);
     return false;
   }
 }
 
-// Verify wallet balance
-export async function verifyWalletBalance(walletAddress: string, connection: Connection): Promise<number> {
-  try {
-    const publicKey = new PublicKey(walletAddress);
-    const balance = await connection.getBalance(publicKey);
-    return balance / 1e9; // Convert lamports to SOL
-  } catch (error: any) {
-    logger.error(`Error checking wallet balance: ${error.message || String(error)}`);
-    throw error;
-  }
-}
+// Initialize on module load
+initializeRpcConnection().catch(err => {
+  logger.error(`Failed to initialize any Solana RPC connection: ${err}`);
+});

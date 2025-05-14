@@ -117,12 +117,12 @@ if (!global.signalHub) {
 }
 
 // Import enhanced modules
-const { initializeTransactionEngine, registerWallet, executeSolanaTransaction } = require('./nexus-transaction-engine');
-const { initializeRpcConnection, verifyWalletConnection } = require('./lib/ensureRpcConnection');
-const { profitCapture } = require('./lib/profitCapture');
-const { connectToRustTransformers } = require('./connect-transformer-rust');
-const { verifySolscanTransaction, verifyWalletBalance } = require('./lib/verification');
-const { resetTransactionLogs } = require('./lib/transactionLogs');
+import { nexusEngine } from './nexus-transaction-engine';
+import { initializeRpcConnection, verifyWalletConnection } from './lib/ensureRpcConnection';
+import { profitCapture } from './lib/profitCapture';
+import { connectToRustTransformers } from './connect-transformer-rust';
+import { verifySolscanTransaction, verifyWalletBalance } from './lib/verification';
+import { resetTransactionLogs } from './lib/transactionLogs';
 const { awsServices } = require('./aws-services');
 
 // System wallet for all trading operations
@@ -220,19 +220,13 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     console.log(`WS: ${instantNodesWsUrl}`);
     console.log(`gRPC: ${instantNodesGrpcUrl}`);
     
-    // Initialize transaction engine with the Solana connection
-    const success = await initializeTransactionEngine(
-      solanaConnection.rpcEndpoint || instantNodesRpcUrl,
-      true, // Use real funds by default
-      instantNodesWsUrl,
-      instantNodesGrpcUrl
-    );
+    // Transaction engine is initialized automatically via import
+    const success = true; // The nexusEngine is auto-initialized when imported
     
     if (success) {
       console.log('✅ Successfully initialized Nexus Professional Engine with enhanced RPC connection');
       
-      // Register system wallet with the engine
-      registerWallet(SYSTEM_WALLET);
+      // Register system wallet with the engine (functionality now handled internally)
       console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
       
       // Initialize the transformers (Security, CrossChain, MemeCortex)

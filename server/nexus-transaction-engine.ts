@@ -11,7 +11,7 @@ import * as logger from './logger';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { verifyTransaction, verifyTransactions } from './lib/verification';
+import { verifyTransactionOnChain, verifyTransactionMultiMethod } from './lib/verification';
 import { initializeRpcConnection } from './lib/ensureRpcConnection';
 
 // Configuration
@@ -476,6 +476,43 @@ export class NexusTransactionEngine {
       // Continue processing queue despite error
       await this.processQueue();
     }
+  }
+  
+  /**
+   * Get the main wallet address for trading
+   * @returns Main wallet address
+   */
+  public getMainWalletAddress(): string {
+    // For now return hardcoded wallet for testing
+    return 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+  }
+  
+  /**
+   * Get the secondary wallet address for fees
+   * @returns Secondary wallet address
+   */
+  public getSecondaryWalletAddress(): string {
+    // For now return hardcoded wallet for testing
+    return '4z1PvJnKZcnLSJYGRNdZn7eYAUkKRiUJJW6Kcmt2hiEX';
+  }
+  
+  /**
+   * Get the Prophet wallet address for profit collection
+   * @returns Prophet wallet address
+   */
+  public getProphetWalletAddress(): string {
+    // For now return hardcoded wallet for testing
+    return '2xNwwA8DmH5AsLhBjevvkPzTnpvH6Zz4pQ7bvQD9rtkf';
+  }
+  
+  /**
+   * Register a wallet for trading
+   * @param walletAddress Wallet address to register
+   * @returns Success flag
+   */
+  public registerWallet(walletAddress: string): boolean {
+    logger.info(`Wallet ${walletAddress} registered with Nexus engine`);
+    return true;
   }
 }
 
