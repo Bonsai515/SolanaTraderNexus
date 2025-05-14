@@ -5,7 +5,7 @@
  * multiple verification methods and robust error handling.
  */
 
-import { Connection, TransactionSignature, TransactionConfirmationStatus } from '@solana/web3.js';
+import { TransactionConfirmationStatus } from '@solana/web3.js';
 import axios from 'axios';
 import { solanaConnection } from './fix-solana-connection';
 import { getLogger } from './logger';
@@ -97,11 +97,11 @@ export class TransactionVerifier {
         source: 'on-chain',
         timestamp: Date.now()
       };
-    } catch (error) {
-      logger.error(`On-chain verification error for ${signature}: ${error.message}`);
+    } catch (error: any) {
+      logger.error(`On-chain verification error for ${signature}: ${error.message || String(error)}`);
       return {
         success: false,
-        error: `On-chain verification error: ${error.message}`,
+        error: `On-chain verification error: ${error.message || String(error)}`,
         source: 'on-chain',
         timestamp: Date.now()
       };

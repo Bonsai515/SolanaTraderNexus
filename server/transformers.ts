@@ -5,7 +5,8 @@
  * to the trading system, enabling advanced pattern recognition and analysis.
  */
 
-import logger from './logger';
+import { getLogger } from './logger';
+const logger = getLogger('Transformers');
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';

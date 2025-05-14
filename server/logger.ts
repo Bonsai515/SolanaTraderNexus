@@ -1,8 +1,8 @@
 /**
  * Enhanced Logger Module
  * 
- * Provides consistent logging functionality across the application
- * with support for different log levels and output formats.
+ * Provides structured logging capabilities with multiple severity levels
+ * and automatic timestamping. Supports both console and file output.
  */
 
 import fs from 'fs';
@@ -10,146 +10,129 @@ import path from 'path';
 
 // Log levels
 export enum LogLevel {
-  ERROR = 0,
-  WARN = 1,
-  INFO = 2,
-  DEBUG = 3
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3
 }
 
-// Logger interface
-export interface Logger {
-  error(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  debug(message: string, ...args: any[]): void;
+// Current log level (can be changed at runtime)
+let currentLogLevel: LogLevel = LogLevel.INFO;
+
+// Directory for log files
+const LOG_DIR = path.join(process.cwd(), 'logs');
+
+// Ensure log directory exists
+try {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error(`Failed to create log directory: ${error}`);
 }
 
-// Logger implementation
-class LoggerImpl implements Logger {
-  private name: string;
-  private level: LogLevel;
-  private logToFile: boolean;
-  private logDir: string;
-  private logFileName: string;
-  
-  constructor(name: string, level: LogLevel = LogLevel.INFO, logToFile: boolean = true) {
-    this.name = name;
-    this.level = level;
-    this.logToFile = logToFile;
-    this.logDir = path.join(process.cwd(), 'logs');
-    this.logFileName = path.join(this.logDir, `${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.log`);
-    
-    // Ensure log directory exists
-    if (this.logToFile && !fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
-  }
-  
-  private log(level: string, message: string, ...args: any[]): void {
-    const timestamp = new Date().toISOString();
-    const formattedMessage = `${timestamp} ${level} [${this.name}] ${message}`;
-    
-    // Format additional arguments
-    let logLine = formattedMessage;
-    if (args.length > 0) {
-      const argsStr = args.map(arg => {
-        if (typeof arg === 'object') {
-          try {
-            return JSON.stringify(arg);
-          } catch (e) {
-            return String(arg);
-          }
-        }
-        return String(arg);
-      }).join(' ');
-      
-      logLine = `${formattedMessage} ${argsStr}`;
-    }
-    
-    // Log to console
-    switch (level) {
-      case 'ERROR':
-        console.error(logLine);
-        break;
-      case 'WARN':
-        console.warn(logLine);
-        break;
-      case 'INFO':
-        console.info(logLine);
-        break;
-      case 'DEBUG':
-        console.debug(logLine);
-        break;
-      default:
-        console.log(logLine);
-    }
-    
-    // Log to file if enabled
-    if (this.logToFile) {
-      try {
-        fs.appendFileSync(this.logFileName, `${logLine}\n`);
-      } catch (error) {
-        console.error(`Failed to write to log file: ${error.message}`);
-      }
-    }
-  }
-  
-  error(message: string, ...args: any[]): void {
-    if (this.level >= LogLevel.ERROR) {
-      this.log('ERROR', message, ...args);
-    }
-  }
-  
-  warn(message: string, ...args: any[]): void {
-    if (this.level >= LogLevel.WARN) {
-      this.log('WARN', message, ...args);
-    }
-  }
-  
-  info(message: string, ...args: any[]): void {
-    if (this.level >= LogLevel.INFO) {
-      this.log('INFO', message, ...args);
-    }
-  }
-  
-  debug(message: string, ...args: any[]): void {
-    if (this.level >= LogLevel.DEBUG) {
-      this.log('DEBUG', message, ...args);
-    }
+// Log file path
+const LOG_FILE = path.join(LOG_DIR, `system_${new Date().toISOString().split('T')[0]}.log`);
+
+/**
+ * Write to log file
+ * @param message Message to log
+ */
+function writeToFile(message: string): void {
+  try {
+    fs.appendFileSync(LOG_FILE, message + '\n');
+  } catch (error) {
+    console.error(`Failed to write to log file: ${error}`);
   }
 }
 
-// Logger cache to avoid creating multiple loggers with the same name
-const loggers: Map<string, Logger> = new Map();
+/**
+ * Format timestamp for logging
+ * @returns Formatted timestamp
+ */
+function getTimestamp(): string {
+  const now = new Date();
+  return now.toISOString();
+}
 
-// Get log level from environment or use INFO as default
-function getLogLevelFromEnv(): LogLevel {
-  const envLevel = process.env.LOG_LEVEL?.toLowerCase();
-  
-  switch (envLevel) {
-    case 'error':
-      return LogLevel.ERROR;
-    case 'warn':
-      return LogLevel.WARN;
-    case 'debug':
-      return LogLevel.DEBUG;
-    case 'info':
-    default:
-      return LogLevel.INFO;
+/**
+ * Log a debug message
+ * @param message Message to log
+ * @param args Additional arguments
+ */
+export function debug(message: string, ...args: any[]): void {
+  if (currentLogLevel <= LogLevel.DEBUG) {
+    const formattedMessage = `${getTimestamp()} [DEBUG] ${message}`;
+    console.debug(formattedMessage, ...args);
+    writeToFile(`${formattedMessage} ${args.length ? JSON.stringify(args) : ''}`);
   }
 }
 
-// Create or get a logger instance
-export function getLogger(name: string): Logger {
-  if (loggers.has(name)) {
-    return loggers.get(name)!;
+/**
+ * Log an info message
+ * @param message Message to log
+ * @param args Additional arguments
+ */
+export function info(message: string, ...args: any[]): void {
+  if (currentLogLevel <= LogLevel.INFO) {
+    const formattedMessage = `${getTimestamp()} [INFO] ${message}`;
+    console.log(formattedMessage, ...args);
+    writeToFile(`${formattedMessage} ${args.length ? JSON.stringify(args) : ''}`);
   }
-  
-  const logger = new LoggerImpl(name, getLogLevelFromEnv());
-  loggers.set(name, logger);
-  
-  return logger;
 }
 
-// Default logger
-export const logger = getLogger('App');
+/**
+ * Log a warning message
+ * @param message Message to log
+ * @param args Additional arguments
+ */
+export function warn(message: string, ...args: any[]): void {
+  if (currentLogLevel <= LogLevel.WARN) {
+    const formattedMessage = `${getTimestamp()} [WARN] ${message}`;
+    console.warn(formattedMessage, ...args);
+    writeToFile(`${formattedMessage} ${args.length ? JSON.stringify(args) : ''}`);
+  }
+}
+
+/**
+ * Log an error message
+ * @param message Message to log
+ * @param args Additional arguments
+ */
+export function error(message: string, ...args: any[]): void {
+  if (currentLogLevel <= LogLevel.ERROR) {
+    const formattedMessage = `${getTimestamp()} [ERROR] ${message}`;
+    console.error(formattedMessage, ...args);
+    writeToFile(`${formattedMessage} ${args.length ? JSON.stringify(args) : ''}`);
+  }
+}
+
+/**
+ * Set the current log level
+ * @param level New log level
+ */
+export function setLogLevel(level: LogLevel): void {
+  currentLogLevel = level;
+  info(`Log level set to ${LogLevel[level]}`);
+}
+
+/**
+ * Get the current log level
+ * @returns Current log level
+ */
+export function getLogLevel(): LogLevel {
+  return currentLogLevel;
+}
+
+// Export the logger object for compatibility with JavaScript's logger.js
+export const logger = {
+  debug,
+  info,
+  warn,
+  error,
+  setLogLevel,
+  getLogLevel
+};
+
+// Export default logger for convenience
+export default logger;

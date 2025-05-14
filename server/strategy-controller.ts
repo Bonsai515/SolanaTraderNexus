@@ -5,7 +5,7 @@
  * with a focus on selecting top strategies by yield and success rate.
  */
 
-import { logger } from './logger';
+import logger from "./logger";
 import { Strategy, selectTopStrategies, getStrategyById } from './strategy-selector';
 import { wormholeClient } from './wormhole/client';
 
@@ -64,17 +64,17 @@ const agents: Record<string, Agent> = {
     name: 'Singularity Cross-Chain Oracle',
     executeStrategy: async (strategy) => {
       logger.info(`Singularity executing strategy: ${strategy.name}`);
-      
+
       if (strategy.category === 'cross_chain') {
         // For cross-chain strategies, use the Wormhole client
         const opportunity = await wormholeClient.getBestArbitrageOpportunity();
-        
+
         if (opportunity) {
           const result = await wormholeClient.executeArbitrage(
             opportunity,
             'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb' // System wallet
           );
-          
+
           return {
             status: result.status === 'executed' ? 'success' : 'failed',
             strategy: strategy.id,
@@ -94,7 +94,7 @@ const agents: Record<string, Agent> = {
           };
         }
       }
-      
+
       // For other strategies
       return {
         status: 'success',
@@ -118,18 +118,18 @@ export class StrategyController {
   private activeStrategies: Strategy[] = [];
   private executionInterval: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
-  
+
   constructor() {
     // Initialize with empty strategy set
   }
-  
+
   /**
    * Initialize the controller with the top strategies
    */
   init(): void {
     this.selectAndActivateTopStrategies();
   }
-  
+
   /**
    * Select and activate the top strategies
    * @param yieldCount - Number of strategies to select based on yield (default: 2)
@@ -144,7 +144,7 @@ export class StrategyController {
     const envSuccessRateCount = process.env.SUCCESS_RATE_COUNT ? parseInt(process.env.SUCCESS_RATE_COUNT, 10) : successRateCount;
     const envMinSuccessRate = process.env.MIN_SUCCESS_RATE ? parseInt(process.env.MIN_SUCCESS_RATE, 10) : 30;
     const envMinYield = process.env.MIN_YIELD ? parseInt(process.env.MIN_YIELD, 10) : 5;
-    
+
     // Select top strategies
     this.activeStrategies = selectTopStrategies(
       envYieldCount,
@@ -152,10 +152,10 @@ export class StrategyController {
       envMinSuccessRate,
       envMinYield
     );
-    
+
     // Log the selected strategies
     logger.info(`Selected ${this.activeStrategies.length} top strategies for live trading`);
-    
+
     for (const strategy of this.activeStrategies) {
       logger.info(`- ${strategy.name}`);
       logger.info(`  Agent: ${strategy.agent}, Yield: ${strategy.yield}%, Success Rate: ${strategy.successRate}%`);
@@ -163,7 +163,7 @@ export class StrategyController {
       logger.info(`  DEXes: ${strategy.dexes.join(', ')}`);
     }
   }
-  
+
   /**
    * Manually activate specific strategies by ID
    * @param strategyIds - Array of strategy IDs to activate
@@ -171,7 +171,7 @@ export class StrategyController {
   activateStrategies(strategyIds: string[]): void {
     for (const id of strategyIds) {
       const strategy = getStrategyById(id);
-      
+
       if (strategy) {
         // Check if strategy is already active
         if (!this.activeStrategies.some(s => s.id === id)) {
@@ -183,7 +183,7 @@ export class StrategyController {
       }
     }
   }
-  
+
   /**
    * Deactivate specific strategies by ID
    * @param strategyIds - Array of strategy IDs to deactivate
@@ -191,15 +191,15 @@ export class StrategyController {
   deactivateStrategies(strategyIds: string[]): void {
     this.activeStrategies = this.activeStrategies.filter(strategy => {
       const shouldDeactivate = strategyIds.includes(strategy.id);
-      
+
       if (shouldDeactivate) {
         logger.info(`Deactivated strategy: ${strategy.name}`);
       }
-      
+
       return !shouldDeactivate;
     });
   }
-  
+
   /**
    * Start strategy execution
    * @param intervalMs - Interval in milliseconds between strategy execution cycles
@@ -209,21 +209,21 @@ export class StrategyController {
       logger.info('Strategy controller is already running');
       return;
     }
-    
+
     logger.info(`Starting strategy controller with ${this.activeStrategies.length} active strategies`);
     logger.info(`Execution interval: ${intervalMs}ms`);
-    
+
     this.isRunning = true;
-    
+
     // Execute strategies immediately once
     this.executeStrategies();
-    
+
     // Set up interval for continuous execution
     this.executionInterval = setInterval(() => {
       this.executeStrategies();
     }, intervalMs);
   }
-  
+
   /**
    * Stop strategy execution
    */
@@ -232,33 +232,33 @@ export class StrategyController {
       logger.info('Strategy controller is not running');
       return;
     }
-    
+
     logger.info('Stopping strategy controller');
-    
+
     if (this.executionInterval) {
       clearInterval(this.executionInterval);
       this.executionInterval = null;
     }
-    
+
     this.isRunning = false;
   }
-  
+
   /**
    * Execute active strategies
    */
   private async executeStrategies(): Promise<void> {
     logger.info(`Executing ${this.activeStrategies.length} active strategies`);
-    
+
     for (const strategy of this.activeStrategies) {
       const agent = agents[strategy.agent];
-      
+
       if (agent && agent.isAvailable()) {
         try {
           logger.info(`Executing strategy: ${strategy.name} with agent: ${agent.name}`);
-          
+
           // Execute the strategy
           const result = await agent.executeStrategy(strategy);
-          
+
           // Log the result
           if (result.status === 'success') {
             logger.info(`Successfully executed strategy: ${strategy.name}`);
@@ -277,7 +277,7 @@ export class StrategyController {
       }
     }
   }
-  
+
   /**
    * Get the current active strategies
    * @returns Array of active strategies
@@ -285,7 +285,7 @@ export class StrategyController {
   getActiveStrategies(): Strategy[] {
     return this.activeStrategies;
   }
-  
+
   /**
    * Check if the controller is running
    * @returns Whether the controller is running
