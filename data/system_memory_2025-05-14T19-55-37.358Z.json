@@ -1,0 +1,426 @@
+{
+  "timestamp": 1747252537358,
+  "events": {
+    "evt_1747252237359_l8ys7yn": {
+      "id": "evt_1747252237359_l8ys7yn",
+      "timestamp": 1747252237359,
+      "type": "SYSTEM_START",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "System Memory initialized"
+    },
+    "evt_1747252245069_9bv0dhl": {
+      "id": "evt_1747252245069_9bv0dhl",
+      "timestamp": 1747252245069,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "Process started: Transaction Verification",
+      "data": {
+        "signature": "sim-1747252245069-z442yfjy4t8",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "WIF",
+        "amount": 53.8538271038455
+      },
+      "processId": "proc_1747252245069_kz029ug"
+    },
+    "evt_1747252245073_e79b27j": {
+      "id": "evt_1747252245073_e79b27j",
+      "timestamp": 1747252245073,
+      "type": "TRANSACTION_FAILED",
+      "component": "TRANSACTION_VERIFIER",
+      "severity": "WARNING",
+      "message": "Transaction verification failed: sim-1747...",
+      "data": {
+        "signature": "sim-1747252245069-z442yfjy4t8",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "WIF",
+        "amount": 53.8538271038455,
+        "solscanTxUrl": "https://solscan.io/tx/sim-1747252245069-z442yfjy4t8",
+        "solscanWalletUrl": "https://solscan.io/account/5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG"
+      }
+    },
+    "evt_1747252245073_2lizcp5": {
+      "id": "evt_1747252245073_2lizcp5",
+      "timestamp": 1747252245073,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "ERROR",
+      "message": "Process failed: Transaction Verification",
+      "data": {
+        "result": null,
+        "error": "Transaction could not be verified on-chain",
+        "duration": 4
+      },
+      "processId": "proc_1747252245069_kz029ug"
+    },
+    "evt_1747252245073_vx0yvq3": {
+      "id": "evt_1747252245073_vx0yvq3",
+      "timestamp": 1747252245073,
+      "type": "COMPONENT_STATUS_CHANGE",
+      "component": "SYSTEM",
+      "severity": "ERROR",
+      "message": "Component SYSTEM status changed to ERROR",
+      "data": {
+        "previousStatus": "INITIALIZING",
+        "newStatus": "ERROR",
+        "details": {
+          "lastError": "Process failed: Transaction Verification",
+          "errorTimestamp": 1747252245073,
+          "errorData": {
+            "result": null,
+            "error": "Transaction could not be verified on-chain",
+            "duration": 4
+          }
+        }
+      }
+    },
+    "evt_1747252247516_kqnnkaq": {
+      "id": "evt_1747252247516_kqnnkaq",
+      "timestamp": 1747252247516,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "Process started: Transaction Verification",
+      "data": {
+        "signature": "sim-1747252247516-8ju2fda7744",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "SOL",
+        "amount": 0.5674962983989363
+      },
+      "processId": "proc_1747252247516_ezjh1bz"
+    },
+    "evt_1747252247517_fk9r2yc": {
+      "id": "evt_1747252247517_fk9r2yc",
+      "timestamp": 1747252247517,
+      "type": "TRANSACTION_FAILED",
+      "component": "TRANSACTION_VERIFIER",
+      "severity": "WARNING",
+      "message": "Transaction verification failed: sim-1747...",
+      "data": {
+        "signature": "sim-1747252247516-8ju2fda7744",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "SOL",
+        "amount": 0.5674962983989363,
+        "solscanTxUrl": "https://solscan.io/tx/sim-1747252247516-8ju2fda7744",
+        "solscanWalletUrl": "https://solscan.io/account/5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG"
+      }
+    },
+    "evt_1747252247517_z1ei15p": {
+      "id": "evt_1747252247517_z1ei15p",
+      "timestamp": 1747252247517,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "ERROR",
+      "message": "Process failed: Transaction Verification",
+      "data": {
+        "result": null,
+        "error": "Transaction could not be verified on-chain",
+        "duration": 1
+      },
+      "processId": "proc_1747252247516_ezjh1bz"
+    },
+    "evt_1747252249497_9q1htcs": {
+      "id": "evt_1747252249497_9q1htcs",
+      "timestamp": 1747252249497,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "Process started: Transaction Verification",
+      "data": {
+        "signature": "sim-1747252249497-fskhgmaupv4",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "GUAC",
+        "amount": 83943.88938710182
+      },
+      "processId": "proc_1747252249497_jiuei9x"
+    },
+    "evt_1747252249497_u2eteu9": {
+      "id": "evt_1747252249497_u2eteu9",
+      "timestamp": 1747252249497,
+      "type": "TRANSACTION_FAILED",
+      "component": "TRANSACTION_VERIFIER",
+      "severity": "WARNING",
+      "message": "Transaction verification failed: sim-1747...",
+      "data": {
+        "signature": "sim-1747252249497-fskhgmaupv4",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "GUAC",
+        "amount": 83943.88938710182,
+        "solscanTxUrl": "https://solscan.io/tx/sim-1747252249497-fskhgmaupv4",
+        "solscanWalletUrl": "https://solscan.io/account/5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG"
+      }
+    },
+    "evt_1747252249497_f5vgpro": {
+      "id": "evt_1747252249497_f5vgpro",
+      "timestamp": 1747252249497,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "ERROR",
+      "message": "Process failed: Transaction Verification",
+      "data": {
+        "result": null,
+        "error": "Transaction could not be verified on-chain",
+        "duration": 0
+      },
+      "processId": "proc_1747252249497_jiuei9x"
+    },
+    "evt_1747252250246_xp4ee1p": {
+      "id": "evt_1747252250246_xp4ee1p",
+      "timestamp": 1747252250246,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "Process started: Transaction Verification",
+      "data": {
+        "signature": "sim-1747252250246-n1muq2k545n",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "BONK",
+        "amount": 4414464.509468603
+      },
+      "processId": "proc_1747252250246_vkxjbeq"
+    },
+    "evt_1747252250246_blu81hb": {
+      "id": "evt_1747252250246_blu81hb",
+      "timestamp": 1747252250246,
+      "type": "TRANSACTION_FAILED",
+      "component": "TRANSACTION_VERIFIER",
+      "severity": "WARNING",
+      "message": "Transaction verification failed: sim-1747...",
+      "data": {
+        "signature": "sim-1747252250246-n1muq2k545n",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "BONK",
+        "amount": 4414464.509468603,
+        "solscanTxUrl": "https://solscan.io/tx/sim-1747252250246-n1muq2k545n",
+        "solscanWalletUrl": "https://solscan.io/account/5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG"
+      }
+    },
+    "evt_1747252250246_ck11ish": {
+      "id": "evt_1747252250246_ck11ish",
+      "timestamp": 1747252250246,
+      "type": "CUSTOM",
+      "component": "SYSTEM",
+      "severity": "ERROR",
+      "message": "Process failed: Transaction Verification",
+      "data": {
+        "result": null,
+        "error": "Transaction could not be verified on-chain",
+        "duration": 0
+      },
+      "processId": "proc_1747252250246_vkxjbeq"
+    }
+  },
+  "components": {
+    "SYSTEM:SYSTEM": {
+      "type": "SYSTEM",
+      "name": "SYSTEM",
+      "status": "ERROR",
+      "lastUpdated": 1747252250246,
+      "metrics": {},
+      "errors": [
+        "Process failed: Transaction Verification",
+        "Component SYSTEM status changed to ERROR",
+        "Process failed: Transaction Verification",
+        "Process failed: Transaction Verification",
+        "Process failed: Transaction Verification"
+      ],
+      "details": {
+        "lastError": "Process failed: Transaction Verification",
+        "errorTimestamp": 1747252250246,
+        "errorData": {
+          "result": null,
+          "error": "Transaction could not be verified on-chain",
+          "duration": 0
+        }
+      }
+    }
+  },
+  "processes": {
+    "proc_1747252245069_kz029ug": {
+      "id": "proc_1747252245069_kz029ug",
+      "name": "Transaction Verification",
+      "startTime": 1747252245069,
+      "status": "FAILED",
+      "steps": [
+        {
+          "id": "evt_1747252245069_9bv0dhl",
+          "timestamp": 1747252245069,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "INFO",
+          "message": "Process started: Transaction Verification",
+          "data": {
+            "signature": "sim-1747252245069-z442yfjy4t8",
+            "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+            "token": "WIF",
+            "amount": 53.8538271038455
+          },
+          "processId": "proc_1747252245069_kz029ug"
+        },
+        {
+          "id": "evt_1747252245073_2lizcp5",
+          "timestamp": 1747252245073,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "ERROR",
+          "message": "Process failed: Transaction Verification",
+          "data": {
+            "result": null,
+            "error": "Transaction could not be verified on-chain",
+            "duration": 4
+          },
+          "processId": "proc_1747252245069_kz029ug"
+        }
+      ],
+      "details": {
+        "signature": "sim-1747252245069-z442yfjy4t8",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "WIF",
+        "amount": 53.8538271038455
+      },
+      "endTime": 1747252245073,
+      "result": null,
+      "error": "Process failed: Transaction Verification"
+    },
+    "proc_1747252247516_ezjh1bz": {
+      "id": "proc_1747252247516_ezjh1bz",
+      "name": "Transaction Verification",
+      "startTime": 1747252247516,
+      "status": "FAILED",
+      "steps": [
+        {
+          "id": "evt_1747252247516_kqnnkaq",
+          "timestamp": 1747252247516,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "INFO",
+          "message": "Process started: Transaction Verification",
+          "data": {
+            "signature": "sim-1747252247516-8ju2fda7744",
+            "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+            "token": "SOL",
+            "amount": 0.5674962983989363
+          },
+          "processId": "proc_1747252247516_ezjh1bz"
+        },
+        {
+          "id": "evt_1747252247517_z1ei15p",
+          "timestamp": 1747252247517,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "ERROR",
+          "message": "Process failed: Transaction Verification",
+          "data": {
+            "result": null,
+            "error": "Transaction could not be verified on-chain",
+            "duration": 1
+          },
+          "processId": "proc_1747252247516_ezjh1bz"
+        }
+      ],
+      "details": {
+        "signature": "sim-1747252247516-8ju2fda7744",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "SOL",
+        "amount": 0.5674962983989363
+      },
+      "endTime": 1747252247517,
+      "result": null,
+      "error": "Process failed: Transaction Verification"
+    },
+    "proc_1747252249497_jiuei9x": {
+      "id": "proc_1747252249497_jiuei9x",
+      "name": "Transaction Verification",
+      "startTime": 1747252249497,
+      "status": "FAILED",
+      "steps": [
+        {
+          "id": "evt_1747252249497_9q1htcs",
+          "timestamp": 1747252249497,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "INFO",
+          "message": "Process started: Transaction Verification",
+          "data": {
+            "signature": "sim-1747252249497-fskhgmaupv4",
+            "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+            "token": "GUAC",
+            "amount": 83943.88938710182
+          },
+          "processId": "proc_1747252249497_jiuei9x"
+        },
+        {
+          "id": "evt_1747252249497_f5vgpro",
+          "timestamp": 1747252249497,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "ERROR",
+          "message": "Process failed: Transaction Verification",
+          "data": {
+            "result": null,
+            "error": "Transaction could not be verified on-chain",
+            "duration": 0
+          },
+          "processId": "proc_1747252249497_jiuei9x"
+        }
+      ],
+      "details": {
+        "signature": "sim-1747252249497-fskhgmaupv4",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "GUAC",
+        "amount": 83943.88938710182
+      },
+      "endTime": 1747252249497,
+      "result": null,
+      "error": "Process failed: Transaction Verification"
+    },
+    "proc_1747252250246_vkxjbeq": {
+      "id": "proc_1747252250246_vkxjbeq",
+      "name": "Transaction Verification",
+      "startTime": 1747252250246,
+      "status": "FAILED",
+      "steps": [
+        {
+          "id": "evt_1747252250246_xp4ee1p",
+          "timestamp": 1747252250246,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "INFO",
+          "message": "Process started: Transaction Verification",
+          "data": {
+            "signature": "sim-1747252250246-n1muq2k545n",
+            "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+            "token": "BONK",
+            "amount": 4414464.509468603
+          },
+          "processId": "proc_1747252250246_vkxjbeq"
+        },
+        {
+          "id": "evt_1747252250246_ck11ish",
+          "timestamp": 1747252250246,
+          "type": "CUSTOM",
+          "component": "SYSTEM",
+          "severity": "ERROR",
+          "message": "Process failed: Transaction Verification",
+          "data": {
+            "result": null,
+            "error": "Transaction could not be verified on-chain",
+            "duration": 0
+          },
+          "processId": "proc_1747252250246_vkxjbeq"
+        }
+      ],
+      "details": {
+        "signature": "sim-1747252250246-n1muq2k545n",
+        "wallet": "5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG",
+        "token": "BONK",
+        "amount": 4414464.509468603
+      },
+      "endTime": 1747252250246,
+      "result": null,
+      "error": "Process failed: Transaction Verification"
+    }
+  },
+  "metrics": {}
+}
