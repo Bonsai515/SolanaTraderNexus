@@ -34,10 +34,12 @@ sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "chr
 anyhow = "1.0.72"
 thiserror = "1.0.44"
 
-# Async runtime
-tokio = { version = "1.29.1", features = ["full"] }
+# Async runtime and parallel processing
+tokio = { version = "1.29.1", features = ["full", "rt-multi-thread", "macros", "sync", "time"] }
 futures = "0.3.28"
 async-trait = "0.1.73"
+rayon = "1.8.0"  # High-level parallel processing library
+crossbeam = "0.8.2"  # Low-level concurrent primitives
 
 # Logging
 log = "0.4.19"
