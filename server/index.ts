@@ -140,7 +140,8 @@ const { initializeTransactionEngine, registerWallet, executeSolanaTransaction } 
 const { initializeRpcConnection, verifyWalletConnection } = require('./lib/ensureRpcConnection');
 const { profitCapture } = require('./lib/profitCapture');
 const { connectToRustTransformers } = require('./connect-transformer-rust');
-const { resetTransactionLogs, verifySolscanTransaction, verifyWalletBalance } = require('./lib/verification');
+const { verifySolscanTransaction, verifyWalletBalance } = require('./lib/verification');
+const { resetTransactionLogs } = require('./lib/transactionLogs');
 const { awsServices } = require('./aws-services');
 
 // System wallet for all trading operations

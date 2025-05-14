@@ -480,7 +480,7 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
   }
   
   try {
-    logger.info('Executing real market transaction on Solana blockchain');
+    logger.info(`Executing real market transaction on Solana blockchain - Type: ${transaction.type}`);
     
     // Verify wallet balance if walletPath is provided
     if (transaction.walletPath && solanaConnection) {
@@ -502,10 +502,12 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
     
     // Execute appropriate transaction type
     let signature: string;
+    let additionalData: any = {};
     
     switch (transaction.type) {
       case 'transfer':
         // Simple SOL transfer
+        logger.info(`Executing SOL transfer of ${transaction.amountSol} SOL to ${transaction.toWallet}`);
         signature = await solanaTransactionBroadcaster.sendSol(
           transaction.fromWalletPath,
           transaction.toWallet,
@@ -516,6 +518,7 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
         
       case 'swap':
         // Token swap transaction
+        logger.info(`Executing token swap from ${transaction.fromToken} to ${transaction.toToken}, amount: ${transaction.amountIn}`);
         signature = await solanaTransactionBroadcaster.executeTokenSwap(
           transaction.walletPath,
           transaction.fromToken,
@@ -528,11 +531,212 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
         
       case 'arbitrage':
         // Arbitrage transaction
+        logger.info(`Executing arbitrage from ${transaction.route.sourceExchange} to ${transaction.route.targetExchange}, expected profit: ${transaction.route.expectedProfit}`);
         signature = await solanaTransactionBroadcaster.executeArbitrage(
           transaction.walletPath,
           transaction.route,
           transaction.arbitrageInstructions
         );
+        additionalData.profit = transaction.route.expectedProfit;
+        break;
+        
+      case 'flash_loan':
+        // Flash loan transaction
+        logger.info(`Executing flash loan of ${transaction.amount} from ${transaction.flashLoanProvider}`);
+        
+        // For flash loans, we need to build a complete transaction from the instructions
+        // and sign it with the wallet keypair
+        try {
+          const web3 = await import('@solana/web3.js');
+          const fs = require('fs');
+          const keypair = web3.Keypair.fromSecretKey(
+            new Uint8Array(JSON.parse(fs.readFileSync(transaction.walletPath, 'utf8')))
+          );
+          
+          // Create a new transaction
+          const tx = new web3.Transaction();
+          
+          // Add all flash loan instructions
+          for (const instruction of transaction.flashLoanInstructions) {
+            tx.add(instruction);
+          }
+          
+          // Get recent blockhash
+          if (!solanaConnection) {
+            throw new Error('Solana connection not initialized');
+          }
+          
+          const { blockhash } = await solanaConnection.getLatestBlockhash('finalized');
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = keypair.publicKey;
+          
+          // Sign and send transaction
+          signature = await web3.sendAndConfirmTransaction(
+            solanaConnection,
+            tx,
+            [keypair],
+            {
+              skipPreflight: true, // Skip preflight for complex flash loan transactions
+              preflightCommitment: 'finalized',
+              maxRetries: 5
+            }
+          );
+          
+          additionalData.provider = transaction.flashLoanProvider;
+          additionalData.amount = transaction.amount;
+        } catch (error) {
+          logger.error(`Failed to execute flash loan transaction: ${error.message}`);
+          throw error;
+        }
+        break;
+        
+      case 'cross_dex':
+        // Cross-DEX transactions (combines multiple DEXes)
+        logger.info(`Executing cross-DEX transaction between ${transaction.sourceDex} and ${transaction.targetDex}`);
+        
+        try {
+          // Load wallet keypair
+          const web3 = await import('@solana/web3.js');
+          const fs = require('fs');
+          const keypair = web3.Keypair.fromSecretKey(
+            new Uint8Array(JSON.parse(fs.readFileSync(transaction.walletPath, 'utf8')))
+          );
+          
+          // Create a new transaction
+          const tx = new web3.Transaction();
+          
+          // Add all cross-DEX instructions
+          for (const instruction of transaction.crossDexInstructions) {
+            tx.add(instruction);
+          }
+          
+          // Get recent blockhash
+          if (!solanaConnection) {
+            throw new Error('Solana connection not initialized');
+          }
+          
+          const { blockhash } = await solanaConnection.getLatestBlockhash('finalized');
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = keypair.publicKey;
+          
+          // Sign and send transaction
+          signature = await web3.sendAndConfirmTransaction(
+            solanaConnection,
+            tx,
+            [keypair],
+            {
+              skipPreflight: false,
+              preflightCommitment: 'finalized',
+              maxRetries: 5
+            }
+          );
+          
+          additionalData.sourceDex = transaction.sourceDex;
+          additionalData.targetDex = transaction.targetDex;
+        } catch (error: any) {
+          logger.error(`Failed to execute cross-DEX transaction: ${error.message}`);
+          throw error;
+        }
+        break;
+        
+      case 'lending':
+        // Lending platform interactions (deposit, borrow, repay, withdraw)
+        logger.info(`Executing lending transaction - Action: ${transaction.action}, Platform: ${transaction.platform}`);
+        
+        try {
+          // Load wallet keypair
+          const web3 = await import('@solana/web3.js');
+          const fs = require('fs');
+          const keypair = web3.Keypair.fromSecretKey(
+            new Uint8Array(JSON.parse(fs.readFileSync(transaction.walletPath, 'utf8')))
+          );
+          
+          // Create a new transaction
+          const tx = new web3.Transaction();
+          
+          // Add all lending instructions
+          for (const instruction of transaction.lendingInstructions) {
+            tx.add(instruction);
+          }
+          
+          // Get recent blockhash
+          if (!solanaConnection) {
+            throw new Error('Solana connection not initialized');
+          }
+          
+          const { blockhash } = await solanaConnection.getLatestBlockhash('finalized');
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = keypair.publicKey;
+          
+          // Sign and send transaction
+          signature = await web3.sendAndConfirmTransaction(
+            solanaConnection,
+            tx,
+            [keypair],
+            {
+              skipPreflight: false,
+              preflightCommitment: 'finalized',
+              maxRetries: 5
+            }
+          );
+          
+          additionalData.action = transaction.action;
+          additionalData.platform = transaction.platform;
+          additionalData.amount = transaction.amount;
+        } catch (error: any) {
+          logger.error(`Failed to execute lending transaction: ${error.message}`);
+          throw error;
+        }
+        break;
+        
+      case 'staking':
+        // Staking transactions (stake, unstake, claim rewards)
+        logger.info(`Executing staking transaction - Action: ${transaction.action}, Platform: ${transaction.platform}`);
+        
+        try {
+          // Load wallet keypair
+          const web3 = await import('@solana/web3.js');
+          const fs = require('fs');
+          const keypair = web3.Keypair.fromSecretKey(
+            new Uint8Array(JSON.parse(fs.readFileSync(transaction.walletPath, 'utf8')))
+          );
+          
+          // Create a new transaction
+          const tx = new web3.Transaction();
+          
+          // Add all staking instructions
+          for (const instruction of transaction.stakingInstructions) {
+            tx.add(instruction);
+          }
+          
+          // Get recent blockhash
+          if (!solanaConnection) {
+            throw new Error('Solana connection not initialized');
+          }
+          
+          const { blockhash } = await solanaConnection.getLatestBlockhash('finalized');
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = keypair.publicKey;
+          
+          // Sign and send transaction
+          signature = await web3.sendAndConfirmTransaction(
+            solanaConnection,
+            tx,
+            [keypair],
+            {
+              skipPreflight: false,
+              preflightCommitment: 'finalized',
+              maxRetries: 5
+            }
+          );
+          
+          additionalData.action = transaction.action;
+          additionalData.platform = transaction.platform;
+          additionalData.amount = transaction.amount;
+        } catch (error) {
+          logger.error(`Failed to execute staking transaction: ${error.message}`);
+          throw error;
+        }
         break;
         
       default:
@@ -540,14 +744,17 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
     }
     
     // Verify transaction on Solscan
+    logger.info(`Transaction submitted with signature: ${signature}, verifying with Solscan...`);
     const verified = await verifySolscanTransaction(signature);
+    logger.info(`Transaction verification result: ${verified ? 'VERIFIED' : 'NOT VERIFIED'}`);
     
     // Log transaction to AWS if enabled
     await awsServices.logTransaction({
       signature,
       type: transaction.type,
       timestamp: new Date().toISOString(),
-      verified
+      verified,
+      ...additionalData
     });
     
     transactionCount++;
@@ -556,7 +763,8 @@ export async function executeSolanaTransaction(transaction: any): Promise<any> {
       success: true,
       signature,
       verified,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...additionalData
     };
   } catch (error: any) {
     logger.error('Failed to execute real market transaction:', error.message);
