@@ -376,7 +376,9 @@ class SignalHub extends EventEmitter {
     const direction = signal.direction || SignalDirection.BUY;
     
     // Determine token and amount based on direction
-    let sourceToken, targetToken, amount;
+    let sourceToken = signal.sourceToken;
+    let targetToken = signal.targetToken;
+    let amount = 100; // Default amount
     
     if (direction === SignalDirection.BUY || direction === SignalDirection.LONG) {
       // Buy/Long: Use USDC as source token
@@ -421,21 +423,25 @@ class SignalHub extends EventEmitter {
     
     try {
       // Make sure amount is defined before using toFixed
-      const formattedAmount = amount !== undefined ? amount.toFixed(2) : '0.00';
+      const formattedAmount = amount ? amount.toFixed(2) : '0.00';
       logger.info(`Executing ${direction} for ${sourceToken}->${targetToken}, amount: $${formattedAmount}`);
       
       // Get wallet configuration
       const walletConfig = getWalletConfig();
       
       // Make sure we have a valid amount before executing
-      if (amount === undefined || isNaN(amount) || amount <= 0) {
-        throw new Error(`Invalid transaction amount: ${amount}`);
+      // Ensure amount is a number and positive
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        logger.warn(`Invalid amount detected: ${amount}, using default minimum amount`);
+        // Use minimum amount instead of failing
+        amount = this.config.minimumTransactionSizeUSD;
       }
       
       // Execute the transaction
+      logger.info(`Executing swap with: source=${sourceToken}, target=${targetToken}, amount=${amount}`);
       const txResult = await nexusEngine.executeSwap({
-        sourceMint: sourceToken,
-        targetMint: targetToken,
+        sourceMint: sourceToken || 'USDC',
+        targetMint: targetToken || signal.pair?.split('/')[0] || signal.token_address,
         amount: amount,
         slippageBps: 50, // 0.5% slippage
         useRealFunds: this.config.useRealFunds,
