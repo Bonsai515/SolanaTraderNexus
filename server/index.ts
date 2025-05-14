@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const app = express();
-const routes = require('./routes');
+const { registerRoutes } = require('./routes');
 
 // Middleware for parsing JSON bodies
 app.use(express.json());
@@ -105,35 +105,7 @@ app.get('/api/executions', (req, res) => {
   res.json(executions);
 });
 
-// Add WebSocket support
-const http = require('http');
-const { Server } = require('ws');
-
-const server = http.createServer(app);
-const wss = new Server({ 
-  server, 
-  path: '/ws',
-  perMessageDeflate: false
-});
-
-wss.on('connection', (ws) => {
-  console.log('Client connected to WebSocket');
-
-  // Send welcome message
-  ws.send(JSON.stringify({
-    type: 'WELCOME',
-    message: 'Connected to Solana Trading Platform WebSocket',
-    timestamp: new Date().toISOString()
-  }));
-
-  ws.on('close', () => {
-    console.log('Client disconnected from WebSocket');
-  });
-
-  ws.on('message', (message) => {
-    console.log('Received message:', message.toString());
-  });
-});
+// WebSocket support is handled in routes.ts
 
 // Import enhanced modules
 const { initializeTransactionEngine, registerWallet, executeSolanaTransaction } = require('./nexus-transaction-engine');
@@ -274,12 +246,12 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
   }
 })();
 
-// Register routes
-routes(app);
+// Register all API routes
+const appServer = registerRoutes(app);
 
 // Listen on port 5000 for production deployment
 const port = process.env.PORT || 5000;
-server.listen(port, '0.0.0.0', () => {
+appServer.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
 });

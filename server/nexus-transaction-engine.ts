@@ -14,7 +14,7 @@ import { crossChainTransformer } from './crosschain-connector';
 import { memeCortexTransformer } from './memecortex-connector';
 import { priceFeedCache } from './priceFeedCache';
 import * as web3 from '@solana/web3.js';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { exec, spawn } from 'child_process';
 import { profitCapture } from './lib/profitCapture';
 import { solanaTransactionBroadcaster } from './solana/real-transaction-broadcaster';
@@ -426,6 +426,205 @@ export function getRpcUrl(): string {
  */
 export function getTransactionCount(): number {
   return transactionCount;
+}
+
+/**
+ * Execute a market trade using Nexus Professional Engine
+ */
+export async function executeMarketTrade(options: {
+  fromToken: string;
+  toToken: string;
+  amount: number;
+  slippageBps: number;
+  dex?: string;
+  walletPath?: string;
+}): Promise<{
+  success: boolean;
+  signature?: string;
+  amount?: number;
+  error?: string;
+}> {
+  if (!nexusInitialized) {
+    return {
+      success: false,
+      error: 'Nexus Transaction Engine not initialized'
+    };
+  }
+  
+  try {
+    logger.info(`Executing market trade: ${options.amount} ${options.fromToken} -> ${options.toToken} on ${options.dex || 'Jupiter'}`);
+    
+    // Load wallet
+    const walletPath = options.walletPath || './wallet.json';
+    let wallet;
+    
+    try {
+      const walletData = readFileSync(walletPath, 'utf8');
+      wallet = web3.Keypair.fromSecretKey(
+        new Uint8Array(JSON.parse(walletData))
+      );
+    } catch (error: any) {
+      logger.error(`Failed to load wallet from ${walletPath}:`, error.message);
+      return {
+        success: false,
+        error: `Failed to load wallet: ${error.message}`
+      };
+    }
+    
+    // Connect to Solana
+    const connection = new web3.Connection(rpcUrl, 'confirmed');
+    
+    // Determine token addresses
+    let fromTokenAddress = options.fromToken;
+    let toTokenAddress = options.toToken;
+    
+    // Handle SOL (native token)
+    if (options.fromToken === 'SOL') {
+      fromTokenAddress = 'So11111111111111111111111111111111111111112'; // Wrapped SOL address
+    }
+    
+    if (options.toToken === 'SOL') {
+      toTokenAddress = 'So11111111111111111111111111111111111111112'; // Wrapped SOL address
+    }
+    
+    // USDC address
+    if (options.fromToken === 'USDC') {
+      fromTokenAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC address
+    }
+    
+    if (options.toToken === 'USDC') {
+      toTokenAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC address
+    }
+    
+    // BONK address
+    if (options.fromToken === 'BONK') {
+      fromTokenAddress = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'; // BONK address
+    }
+    
+    if (options.toToken === 'BONK') {
+      toTokenAddress = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'; // BONK address
+    }
+    
+    // Get quote from Jupiter
+    const amount = options.fromToken === 'SOL' ? 
+      Math.floor(options.amount * web3.LAMPORTS_PER_SOL) : 
+      options.amount;
+    
+    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${fromTokenAddress}&outputMint=${toTokenAddress}&amount=${amount}&slippageBps=${options.slippageBps}`;
+    
+    logger.info(`Getting quote from Jupiter: ${quoteUrl}`);
+    
+    const quoteResponse = await fetch(quoteUrl);
+    
+    if (!quoteResponse.ok) {
+      const errorText = await quoteResponse.text();
+      logger.error('Failed to get quote from Jupiter:', errorText);
+      return {
+        success: false,
+        error: `Failed to get quote: ${errorText}`
+      };
+    }
+    
+    const quoteData = await quoteResponse.json();
+    
+    if (!quoteData || !quoteData.data) {
+      logger.error('Invalid quote response from Jupiter');
+      return {
+        success: false,
+        error: 'Invalid quote response'
+      };
+    }
+    
+    // Log quote details
+    logger.info(`Quote details:
+      - Input: ${amount} ${options.fromToken}
+      - Output: ${quoteData.data.outAmount} ${options.toToken} 
+      - Price impact: ${quoteData.data.priceImpactPct}%
+      - Route type: ${quoteData.data.routePlan[0].swapInfo.label}
+    `);
+    
+    // Get swap transaction
+    const swapUrl = 'https://quote-api.jup.ag/v6/swap';
+    
+    const swapData = {
+      quoteResponse: quoteData.data,
+      userPublicKey: wallet.publicKey.toString(),
+      wrapAndUnwrapSol: true,
+      prioritizationFeeLamports: 1000 // 0.000001 SOL
+    };
+    
+    const swapResponse = await fetch(swapUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(swapData)
+    });
+    
+    if (!swapResponse.ok) {
+      const errorText = await swapResponse.text();
+      logger.error('Failed to get swap transaction from Jupiter:', errorText);
+      return {
+        success: false,
+        error: `Failed to create swap transaction: ${errorText}`
+      };
+    }
+    
+    const { swapTransaction } = await swapResponse.json();
+    
+    if (!swapTransaction) {
+      logger.error('No swap transaction returned from Jupiter');
+      return {
+        success: false,
+        error: 'No swap transaction returned'
+      };
+    }
+    
+    // Deserialize and sign the transaction
+    const transactionBuffer = Buffer.from(swapTransaction, 'base64');
+    const transaction = web3.Transaction.from(transactionBuffer);
+    
+    // Set recent blockhash and sign
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = wallet.publicKey;
+    
+    // Sign the transaction
+    transaction.sign(wallet);
+    
+    // Send the transaction
+    logger.info('Sending swap transaction to Solana blockchain...');
+    const signature = await connection.sendRawTransaction(transaction.serialize());
+    
+    // Wait for confirmation
+    logger.info(`Transaction sent with signature: ${signature}`);
+    logger.info('Waiting for transaction confirmation...');
+    
+    const confirmation = await connection.confirmTransaction(signature);
+    
+    if (confirmation.value.err) {
+      logger.error('Transaction confirmed with error:', confirmation.value.err);
+      return {
+        success: false,
+        signature,
+        error: `Transaction confirmed with error: ${JSON.stringify(confirmation.value.err)}`
+      };
+    }
+    
+    logger.info(`✅ Transaction confirmed successfully!`);
+    transactionCount++;
+    
+    return {
+      success: true,
+      signature,
+      amount: Number(quoteData.data.outAmount)
+    };
+  } catch (error: any) {
+    logger.error('Error executing market trade:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
 
 /**

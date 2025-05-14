@@ -6,13 +6,21 @@
 
 // Arbitrage opportunity structure
 export interface ArbitrageOpportunity {
-  pair: string;
-  dexA: string;
-  dexB: string;
-  priceA: number;
-  priceB: number;
+  id: string;
+  token: string;
+  pair?: string;
+  buyDex: string;
+  sellDex: string;
+  buyPrice: number;
+  sellPrice: number;
+  dexA?: string;
+  dexB?: string;
+  priceA?: number;
+  priceB?: number;
   profitPercent: number;
   timestamp: string;
+  confidence: number;
+  verified: boolean;
 }
 
 // Transaction types
