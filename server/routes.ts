@@ -1580,6 +1580,134 @@ export async function registerRoutes(app: express.Express) {
   });
 
   // Set up routes
+  // Configure wallet setup for trading and profit collection
+  router.post('/api/wallet/configure', async (req, res) => {
+    try {
+      const { configureWallets } = require('./walletManager');
+      
+      const { tradingWallet, profitWallet, profitReinvestmentRatio, profitCollectionThreshold } = req.body;
+      
+      if (!tradingWallet) {
+        return res.status(400).json({
+          success: false,
+          message: 'Trading wallet address is required'
+        });
+      }
+      
+      if (!profitWallet) {
+        return res.status(400).json({
+          success: false,
+          message: 'Profit collection wallet address is required'
+        });
+      }
+      
+      const walletConfig = await configureWallets({
+        tradingWallet,
+        profitWallet,
+        profitReinvestmentRatio: profitReinvestmentRatio || 0.95, // Default to 95% reinvestment
+        profitCollectionThreshold: profitCollectionThreshold || 100 // Default to $100 threshold
+      });
+      
+      logger.info(`Wallet configuration updated. Trading: ${tradingWallet}, Prophet: ${profitWallet}`);
+      
+      res.json({
+        success: walletConfig.success,
+        message: walletConfig.success ? 'Wallet configuration updated successfully' : 'Failed to update wallet configuration',
+        config: {
+          tradingWallet,
+          profitWallet,
+          profitSplit: `${(walletConfig.config.profitReinvestmentRatio * 100).toFixed(0)}/${((1 - walletConfig.config.profitReinvestmentRatio) * 100).toFixed(0)}` // e.g. "95/5"
+        }
+      });
+    } catch (error) {
+      logger.error('Error configuring wallets:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error configuring wallets: ' + (error?.message || 'Unknown error')
+      });
+    }
+  });
+  
+  // Get current wallet configuration
+  router.get('/api/wallet/config', (req, res) => {
+    try {
+      const { getWalletConfig } = require('./walletManager');
+      
+      const config = getWalletConfig();
+      
+      // Only return partial addresses for security
+      const maskAddress = (address: string) => 
+        address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : '';
+      
+      res.json({
+        success: true,
+        config: {
+          tradingWallet: maskAddress(config.tradingWallet),
+          profitWallet: maskAddress(config.profitWallet),
+          profitSplit: `${(config.profitReinvestmentRatio * 100).toFixed(0)}/${((1 - config.profitReinvestmentRatio) * 100).toFixed(0)}`, // e.g. "95/5"
+          profitCollectionThreshold: config.profitCollectionThreshold
+        }
+      });
+    } catch (error) {
+      logger.error('Error getting wallet configuration:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error getting wallet configuration: ' + (error?.message || 'Unknown error')
+      });
+    }
+  });
+
+  // Activate live trading with real funds
+  router.post('/api/live-trading/activate', async (req, res) => {
+    try {
+      const { activateLiveTrading } = require('./activateLiveTrading');
+      const { getWalletConfig } = require('./walletManager');
+      
+      // Check if wallets are configured
+      const walletConfig = getWalletConfig();
+      if (!walletConfig.tradingWallet || !walletConfig.profitWallet) {
+        return res.status(400).json({
+          success: false,
+          message: 'Wallet configuration is incomplete. Please configure trading and profit wallets before activating live trading.',
+          status: 'CONFIG_REQUIRED',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      logger.info('Activating live trading with real funds via API call');
+      const result = await activateLiveTrading();
+      
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Live trading activated successfully! Your system is now trading with real funds.',
+          status: 'ACTIVE',
+          timestamp: new Date().toISOString(),
+          wallets: {
+            trading: `${walletConfig.tradingWallet.substring(0, 6)}...${walletConfig.tradingWallet.substring(walletConfig.tradingWallet.length - 4)}`,
+            profit: `${walletConfig.profitWallet.substring(0, 6)}...${walletConfig.profitWallet.substring(walletConfig.profitWallet.length - 4)}`,
+            profitSplit: `${(walletConfig.profitReinvestmentRatio * 100).toFixed(0)}/${((1 - walletConfig.profitReinvestmentRatio) * 100).toFixed(0)}`
+          }
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to activate live trading',
+          status: 'FAILED',
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      logger.error('Error activating live trading:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error activating live trading: ' + (error?.message || 'Unknown error'),
+        status: 'ERROR',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   app.use(router);
   
   // Create HTTP server
