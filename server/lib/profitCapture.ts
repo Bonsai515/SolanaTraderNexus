@@ -1,429 +1,427 @@
 /**
- * Profit Capture Mechanism
+ * Profit Capture System for Solana Trading
  * 
- * This module handles automatic profit capture and transfer to designated wallets
- * ensuring that trading profits are secured and properly accounted for.
+ * This module handles collecting trading profits to the system wallet.
+ * It manages periodic capture of profits, ensuring they are securely
+ * transferred to the designated wallet for further capital deployment.
  */
 
-import { Connection, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction, Keypair } from '@solana/web3.js';
-import { logger } from '../logger';
-import { getSolanaConnection } from './ensureRpcConnection';
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as fs from 'fs';
+import { logger } from '../logger';
+import { heliusApiIntegration } from './heliusIntegration';
+import { transactionVerifier } from './transactionVerifier';
 
-interface ProfitTransfer {
-  timestamp: number;
-  amountUsd: number;
-  tokenSymbol: string;
-  tokenAddress: string;
-  fromWallet: string;
-  toWallet: string;
-  txSignature?: string;
-  status: 'pending' | 'confirmed' | 'failed';
+// Interfaces for profit tracking
+export interface AgentProfit {
+  agentId: string;
+  agentName: string;
+  totalProfit: number; // In SOL
+  lastCapture: number;
+  walletAddress: string;
+}
+
+export interface CaptureResult {
+  success: boolean;
+  signature?: string;
+  amount?: number;
   error?: string;
 }
 
-interface AgentProfit {
-  agentId: string;
-  agentName: string;
-  totalProfitUsd: number;
-  lastCaptureTimestamp: number;
-  transfers: ProfitTransfer[];
-}
-
-class ProfitCapture {
-  private connection: Connection;
-  private systemWallet: string = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb'; // System profit collection wallet
-  private profitsByAgent: Map<string, AgentProfit> = new Map();
-  private captureInterval: NodeJS.Timeout | null = null;
-  private walletSecretKey: Uint8Array | null = null;
+/**
+ * Profit Capture System
+ */
+export class ProfitCapture {
+  private initialized: boolean = false;
+  private systemWalletAddress: string;
+  private agentProfits: Map<string, AgentProfit> = new Map();
+  private captureInterval: number = 30 * 60 * 1000; // 30 minutes
+  private lastCaptureTime: number = 0;
+  private connection: Connection | null = null;
+  private autoCapture: boolean = true;
+  private captureTimerId: NodeJS.Timeout | null = null;
   
-  constructor() {
-    this.connection = getSolanaConnection();
-    this.loadWalletSecretKey();
+  /**
+   * Constructor
+   * @param systemWalletAddress System wallet address for profit collection
+   */
+  constructor(systemWalletAddress?: string) {
+    this.systemWalletAddress = systemWalletAddress || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
-    // Initialize profit history directory
-    if (!fs.existsSync('./data/profits')) {
-      fs.mkdirSync('./data/profits', { recursive: true });
+    // Try to use Helius connection if available
+    if (heliusApiIntegration.isInitialized()) {
+      this.connection = heliusApiIntegration.getConnection();
+      this.initialized = true;
+      logger.info('Profit capture system initialized with Helius connection');
+    } else if (process.env.HELIUS_API_KEY) {
+      this.connection = new Connection(
+        `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
+        'confirmed'
+      );
+      this.initialized = true;
+      logger.info('Profit capture system initialized with Helius connection');
+    } else {
+      logger.warn('No valid RPC connection for profit capture system');
     }
+    
+    // Load saved profit data if available
+    this.loadProfitData();
   }
   
   /**
-   * Load wallet secret key from environment or keyfile
+   * Initialize the profit capture system
    */
-  private loadWalletSecretKey(): void {
+  public async initialize(rpcUrl?: string): Promise<boolean> {
+    if (this.initialized) {
+      return true;
+    }
+    
     try {
-      // First try from environment variable
-      if (process.env.WALLET_SECRET_KEY) {
-        const secretKeyString = process.env.WALLET_SECRET_KEY;
-        this.walletSecretKey = Buffer.from(JSON.parse(secretKeyString));
-        logger.info('Loaded wallet secret key from environment variable');
-        return;
+      if (heliusApiIntegration.isInitialized()) {
+        this.connection = heliusApiIntegration.getConnection();
+      } else if (rpcUrl) {
+        this.connection = new Connection(rpcUrl, 'confirmed');
+      } else if (process.env.HELIUS_API_KEY) {
+        this.connection = new Connection(
+          `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
+          'confirmed'
+        );
+      } else {
+        throw new Error('No valid RPC connection for profit capture system');
       }
       
-      // Then try from keypair file
-      if (process.env.WALLET_KEYPAIR_PATH && fs.existsSync(process.env.WALLET_KEYPAIR_PATH)) {
-        const keypairJson = JSON.parse(fs.readFileSync(process.env.WALLET_KEYPAIR_PATH, 'utf-8'));
-        this.walletSecretKey = new Uint8Array(keypairJson);
-        logger.info('Loaded wallet secret key from keypair file');
-        return;
+      // Verify system wallet exists
+      const systemWallet = new PublicKey(this.systemWalletAddress);
+      const accountInfo = await this.connection.getAccountInfo(systemWallet);
+      
+      if (!accountInfo) {
+        logger.warn(`System wallet ${this.systemWalletAddress} not found on blockchain`);
+      } else {
+        const balance = await this.connection.getBalance(systemWallet);
+        logger.info(`System wallet ${this.systemWalletAddress} found with balance: ${balance / LAMPORTS_PER_SOL} SOL`);
       }
       
-      logger.warn('No wallet secret key found. Profit capture will be simulation-only.');
-    } catch (error) {
-      logger.error('Error loading wallet secret key:', error);
+      this.initialized = true;
+      
+      // Start automatic capture if enabled
+      if (this.autoCapture) {
+        this.startAutomaticCapture();
+      }
+      
+      logger.info('Profit capture system initialized successfully');
+      return true;
+    } catch (error: any) {
+      logger.error('Failed to initialize profit capture system:', error.message);
+      return false;
     }
   }
   
   /**
-   * Register profit from a trading agent
+   * Check if the system is initialized
    */
-  public async registerProfit(
+  public isInitialized(): boolean {
+    return this.initialized;
+  }
+  
+  /**
+   * Load profit data from file
+   */
+  private loadProfitData(): void {
+    try {
+      const dataPath = './data/profit_data.json';
+      
+      if (fs.existsSync(dataPath)) {
+        const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        
+        if (data && Array.isArray(data)) {
+          this.agentProfits.clear();
+          data.forEach((agentProfit: AgentProfit) => {
+            this.agentProfits.set(agentProfit.agentId, agentProfit);
+          });
+          
+          logger.info(`Loaded profit data for ${data.length} agents`);
+        }
+      } else {
+        logger.info('No profit data file found, starting with empty data');
+      }
+    } catch (error: any) {
+      logger.error('Failed to load profit data:', error.message);
+    }
+  }
+  
+  /**
+   * Save profit data to file
+   */
+  private saveProfitData(): void {
+    try {
+      const dataPath = './data/profit_data.json';
+      
+      // Create data directory if it doesn't exist
+      if (!fs.existsSync('./data')) {
+        fs.mkdirSync('./data', { recursive: true });
+      }
+      
+      const data = Array.from(this.agentProfits.values());
+      fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+      
+      logger.debug(`Saved profit data for ${data.length} agents`);
+    } catch (error: any) {
+      logger.error('Failed to save profit data:', error.message);
+    }
+  }
+  
+  /**
+   * Record profit for an agent
+   */
+  public recordProfit(
     agentId: string,
     agentName: string,
-    amountUsd: number,
-    tokenSymbol: string,
-    tokenAddress: string,
+    amount: number,
     walletAddress: string
-  ): Promise<boolean> {
+  ): void {
     try {
-      logger.info(`Registering profit of $${amountUsd} from ${agentName} (${tokenSymbol})`);
-      
-      // Create agent profit entry if not exists
-      if (!this.profitsByAgent.has(agentId)) {
-        this.profitsByAgent.set(agentId, {
-          agentId,
-          agentName,
-          totalProfitUsd: 0,
-          lastCaptureTimestamp: 0,
-          transfers: []
-        });
-      }
-      
-      // Get agent profit
-      const agentProfit = this.profitsByAgent.get(agentId)!;
-      
-      // Add to total profit
-      agentProfit.totalProfitUsd += amountUsd;
-      
-      // Create profit transfer record
-      const transfer: ProfitTransfer = {
-        timestamp: Date.now(),
-        amountUsd,
-        tokenSymbol,
-        tokenAddress,
-        fromWallet: walletAddress,
-        toWallet: this.systemWallet,
-        status: 'pending'
-      };
-      
-      // Add to transfers
-      agentProfit.transfers.push(transfer);
-      
-      // Save profit data
-      this.saveProfitData(agentId);
-      
-      // If amount is significant, capture immediately
-      if (amountUsd > 100) {
-        await this.captureProfits(agentId);
-      }
-      
-      return true;
-    } catch (error) {
-      logger.error(`Error registering profit for ${agentId}:`, error);
-      return false;
-    }
-  }
-  
-  /**
-   * Start automatic profit capture
-   */
-  public startAutomaticCapture(intervalMinutes: number = 60): void {
-    if (this.captureInterval) {
-      clearInterval(this.captureInterval);
-    }
-    
-    logger.info(`Starting automatic profit capture every ${intervalMinutes} minutes`);
-    
-    this.captureInterval = setInterval(() => {
-      this.captureAllProfits();
-    }, intervalMinutes * 60 * 1000);
-  }
-  
-  /**
-   * Stop automatic profit capture
-   */
-  public stopAutomaticCapture(): void {
-    if (this.captureInterval) {
-      clearInterval(this.captureInterval);
-      this.captureInterval = null;
-      
-      logger.info('Automatic profit capture stopped');
-    }
-  }
-  
-  /**
-   * Capture profits for all agents
-   */
-  public async captureAllProfits(): Promise<boolean> {
-    try {
-      logger.info('Capturing profits for all agents');
-      
-      let success = true;
-      
-      // Capture profits for each agent
-      for (const agentId of this.profitsByAgent.keys()) {
-        const result = await this.captureProfits(agentId);
-        if (!result) {
-          success = false;
-        }
-      }
-      
-      return success;
-    } catch (error) {
-      logger.error('Error capturing all profits:', error);
-      return false;
-    }
-  }
-  
-  /**
-   * Capture profits for a specific agent
-   */
-  public async captureProfits(agentId: string): Promise<boolean> {
-    try {
-      // Get agent profit
-      const agentProfit = this.profitsByAgent.get(agentId);
+      let agentProfit = this.agentProfits.get(agentId);
       
       if (!agentProfit) {
-        logger.warn(`No profit data found for agent ${agentId}`);
-        return false;
+        agentProfit = {
+          agentId,
+          agentName,
+          totalProfit: 0,
+          lastCapture: 0,
+          walletAddress
+        };
       }
       
-      logger.info(`Capturing profits for ${agentProfit.agentName} (${agentId}): $${agentProfit.totalProfitUsd}`);
+      agentProfit.totalProfit += amount;
+      this.agentProfits.set(agentId, agentProfit);
       
-      // Find pending transfers
-      const pendingTransfers = agentProfit.transfers.filter(t => t.status === 'pending');
+      logger.info(`Recorded profit of ${amount} SOL for agent ${agentName} (${agentId})`);
       
-      if (pendingTransfers.length === 0) {
-        logger.info(`No pending transfers for agent ${agentId}`);
-        return true;
-      }
-      
-      // Process each pending transfer
-      for (const transfer of pendingTransfers) {
-        // Group by token and from wallet
-        const result = await this.executeTransfer(transfer);
-        
-        if (result) {
-          transfer.status = 'confirmed';
-          transfer.txSignature = result;
-        } else {
-          transfer.status = 'failed';
-          transfer.error = 'Transfer failed';
-        }
-      }
-      
-      // Update last capture timestamp
-      agentProfit.lastCaptureTimestamp = Date.now();
-      
-      // Save updated profit data
-      this.saveProfitData(agentId);
-      
-      return true;
-    } catch (error) {
-      logger.error(`Error capturing profits for agent ${agentId}:`, error);
-      return false;
+      // Save updated data
+      this.saveProfitData();
+    } catch (error: any) {
+      logger.error(`Failed to record profit for agent ${agentId}:`, error.message);
     }
   }
   
   /**
-   * Execute a profit transfer
+   * Get total profits
    */
-  private async executeTransfer(transfer: ProfitTransfer): Promise<string | null> {
-    try {
-      logger.info(`Executing profit transfer of ${transfer.tokenSymbol}: $${transfer.amountUsd}`);
-      
-      // Check if we have wallet secret key
-      if (!this.walletSecretKey) {
-        logger.warn('No wallet secret key available, simulating transfer');
-        return 'simulated-signature-' + Date.now().toString(16);
-      }
-      
-      // Check token type
-      if (transfer.tokenSymbol === 'SOL') {
-        return this.transferSOL(transfer);
-      } else {
-        return this.transferSPLToken(transfer);
-      }
-    } catch (error) {
-      logger.error('Error executing profit transfer:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Transfer SOL for profit capture
-   */
-  private async transferSOL(transfer: ProfitTransfer): Promise<string | null> {
-    try {
-      // Create send transaction
-      const fromWallet = Keypair.fromSecretKey(this.walletSecretKey!);
-      const toWallet = new PublicKey(transfer.toWallet);
-      
-      // Convert USD amount to SOL
-      // In a real implementation, we would use a price oracle
-      const solPrice = 100; // Assume $100 per SOL
-      const solAmount = transfer.amountUsd / solPrice;
-      const lamports = Math.floor(solAmount * 1e9); // Convert to lamports
-      
-      // Create transfer transaction
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: fromWallet.publicKey,
-          toPubkey: toWallet,
-          lamports
-        })
-      );
-      
-      // Sign and send transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [fromWallet]
-      );
-      
-      logger.info(`SOL profit transfer successful: ${signature}`);
-      return signature;
-    } catch (error) {
-      logger.error('Error transferring SOL for profit capture:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Transfer SPL token for profit capture
-   */
-  private async transferSPLToken(transfer: ProfitTransfer): Promise<string | null> {
-    try {
-      // Create send transaction
-      const fromWallet = Keypair.fromSecretKey(this.walletSecretKey!);
-      const toWallet = new PublicKey(transfer.toWallet);
-      
-      // In a real implementation, this would use proper SPL token transfers
-      // For now, we'll simulate the transaction with a simple SOL transfer
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: fromWallet.publicKey,
-          toPubkey: toWallet,
-          lamports: 10000 // Small amount for tracking purposes
-        })
-      );
-      
-      // Sign and send transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [fromWallet]
-      );
-      
-      logger.info(`Token profit transfer successful: ${signature}`);
-      return signature;
-    } catch (error) {
-      logger.error('Error transferring token for profit capture:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Save profit data to disk
-   */
-  private saveProfitData(agentId: string): void {
-    try {
-      const agentProfit = this.profitsByAgent.get(agentId);
-      
-      if (!agentProfit) return;
-      
-      const filePath = `./data/profits/${agentId}.json`;
-      
-      fs.writeFileSync(
-        filePath,
-        JSON.stringify(agentProfit, null, 2),
-        'utf-8'
-      );
-    } catch (error) {
-      logger.error(`Error saving profit data for agent ${agentId}:`, error);
-    }
-  }
-  
-  /**
-   * Load profit data from disk
-   */
-  public loadProfitData(): void {
-    try {
-      const profitDir = './data/profits';
-      
-      if (!fs.existsSync(profitDir)) {
-        return;
-      }
-      
-      const files = fs.readdirSync(profitDir);
-      
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue;
-        
-        const filePath = `${profitDir}/${file}`;
-        const agentId = file.replace('.json', '');
-        
-        const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        
-        this.profitsByAgent.set(agentId, data);
-      }
-      
-      logger.info(`Loaded profit data for ${this.profitsByAgent.size} agents`);
-    } catch (error) {
-      logger.error('Error loading profit data:', error);
-    }
-  }
-  
-  /**
-   * Get total profit for all agents
-   */
-  public getTotalProfit(): number {
+  public getTotalProfits(): number {
     let total = 0;
     
-    for (const agentProfit of this.profitsByAgent.values()) {
-      total += agentProfit.totalProfitUsd;
+    for (const agentProfit of this.agentProfits.values()) {
+      total += agentProfit.totalProfit;
     }
     
     return total;
   }
   
   /**
-   * Get profit for a specific agent
+   * Get profits by agent
    */
-  public getAgentProfit(agentId: string): AgentProfit | null {
-    return this.profitsByAgent.get(agentId) || null;
+  public getProfitsByAgent(): AgentProfit[] {
+    return Array.from(this.agentProfits.values());
   }
   
   /**
-   * Get profit summary for all agents
+   * Capture profits from agent wallet to system wallet
    */
-  public getProfitSummary(): any {
-    const agents = Array.from(this.profitsByAgent.values()).map(agent => ({
-      id: agent.agentId,
-      name: agent.agentName,
-      totalProfitUsd: agent.totalProfitUsd,
-      lastCapture: agent.lastCaptureTimestamp,
-      transferCount: agent.transfers.length,
-      pendingTransfers: agent.transfers.filter(t => t.status === 'pending').length
-    }));
+  public async captureProfit(
+    agentId: string,
+    walletPath: string,
+    amount?: number
+  ): Promise<CaptureResult> {
+    try {
+      if (!this.initialized || !this.connection) {
+        await this.initialize();
+        if (!this.connection) {
+          throw new Error('Profit capture system not properly initialized');
+        }
+      }
+      
+      const agentProfit = this.agentProfits.get(agentId);
+      
+      if (!agentProfit) {
+        throw new Error(`No profit data found for agent ${agentId}`);
+      }
+      
+      // Load agent wallet
+      const agentKeyData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+      const agentKeypair = Keypair.fromSecretKey(new Uint8Array(agentKeyData));
+      
+      // Get agent wallet balance
+      const balance = await this.connection.getBalance(agentKeypair.publicKey);
+      const balanceInSol = balance / LAMPORTS_PER_SOL;
+      
+      logger.info(`Agent ${agentProfit.agentName} wallet balance: ${balanceInSol} SOL`);
+      
+      // Determine capture amount
+      const captureAmount = amount !== undefined ? amount : Math.min(balanceInSol * 0.9, agentProfit.totalProfit);
+      
+      if (captureAmount <= 0 || captureAmount > balanceInSol - 0.01) { // Keep at least 0.01 SOL for fees
+        logger.warn(`Insufficient balance to capture profit from agent ${agentProfit.agentName}`);
+        return {
+          success: false,
+          error: 'Insufficient balance for profit capture'
+        };
+      }
+      
+      // Create transfer transaction
+      const transaction = new Transaction();
+      
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: agentKeypair.publicKey,
+          toPubkey: new PublicKey(this.systemWalletAddress),
+          lamports: Math.floor(captureAmount * LAMPORTS_PER_SOL)
+        })
+      );
+      
+      // Sign and send transaction
+      transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+      transaction.feePayer = agentKeypair.publicKey;
+      
+      const signature = await this.connection.sendTransaction(transaction, [agentKeypair]);
+      
+      // Verify transaction
+      const verification = await transactionVerifier.monitorUntilConfirmed(signature);
+      
+      if (!verification.verified) {
+        throw new Error(`Transaction failed: ${verification.error}`);
+      }
+      
+      // Update agent profit data
+      agentProfit.lastCapture = Date.now();
+      this.agentProfits.set(agentId, agentProfit);
+      this.saveProfitData();
+      
+      logger.info(`Successfully captured ${captureAmount} SOL from agent ${agentProfit.agentName} to system wallet`);
+      
+      return {
+        success: true,
+        signature,
+        amount: captureAmount
+      };
+    } catch (error: any) {
+      logger.error(`Failed to capture profit from agent ${agentId}:`, error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Capture profits from all agents
+   */
+  public async captureAllProfits(): Promise<CaptureResult[]> {
+    const results: CaptureResult[] = [];
     
-    return {
-      totalProfitUsd: this.getTotalProfit(),
-      agents,
-      lastUpdateTimestamp: Date.now()
-    };
+    if (this.agentProfits.size === 0) {
+      logger.info('No agents with profits to capture');
+      return [];
+    }
+    
+    logger.info(`Capturing profits from ${this.agentProfits.size} agents...`);
+    
+    for (const [agentId, agentProfit] of this.agentProfits.entries()) {
+      // Skip agents with zero profit
+      if (agentProfit.totalProfit <= 0) {
+        continue;
+      }
+      
+      // Determine wallet path based on agent ID
+      const walletPath = `./wallets/${agentId}.json`;
+      
+      if (!fs.existsSync(walletPath)) {
+        results.push({
+          success: false,
+          error: `Wallet not found for agent ${agentId}`
+        });
+        continue;
+      }
+      
+      const result = await this.captureProfit(agentId, walletPath);
+      results.push(result);
+    }
+    
+    this.lastCaptureTime = Date.now();
+    
+    logger.info(`Completed profit capture for ${results.length} agents`);
+    return results;
+  }
+  
+  /**
+   * Start automatic profit capture
+   */
+  public startAutomaticCapture(): void {
+    if (this.captureTimerId) {
+      clearInterval(this.captureTimerId);
+    }
+    
+    this.autoCapture = true;
+    
+    logger.info(`Starting automatic profit capture every ${this.captureInterval / 60000} minutes`);
+    
+    this.captureTimerId = setInterval(async () => {
+      logger.info('Running scheduled profit capture...');
+      await this.captureAllProfits();
+    }, this.captureInterval);
+  }
+  
+  /**
+   * Stop automatic profit capture
+   */
+  public stopAutomaticCapture(): void {
+    if (this.captureTimerId) {
+      clearInterval(this.captureTimerId);
+      this.captureTimerId = null;
+    }
+    
+    this.autoCapture = false;
+    logger.info('Stopped automatic profit capture');
+  }
+  
+  /**
+   * Set capture interval
+   */
+  public setCaptureInterval(minutes: number): void {
+    if (minutes < 1) {
+      throw new Error('Capture interval must be at least 1 minute');
+    }
+    
+    this.captureInterval = minutes * 60 * 1000;
+    
+    logger.info(`Set profit capture interval to ${minutes} minutes`);
+    
+    // Restart automatic capture if enabled
+    if (this.autoCapture) {
+      this.startAutomaticCapture();
+    }
+  }
+  
+  /**
+   * Get time until next capture
+   */
+  public getTimeUntilNextCapture(): number {
+    if (!this.autoCapture || !this.captureTimerId) {
+      return -1;
+    }
+    
+    const elapsed = Date.now() - this.lastCaptureTime;
+    return Math.max(0, this.captureInterval - elapsed);
+  }
+  
+  /**
+   * Reset profit data
+   */
+  public resetProfitData(): void {
+    this.agentProfits.clear();
+    this.saveProfitData();
+    logger.info('Reset all profit data');
   }
 }
 
-// Export singleton instance
+// Create singleton instance
 export const profitCapture = new ProfitCapture();
