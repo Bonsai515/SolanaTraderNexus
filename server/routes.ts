@@ -14,6 +14,14 @@ import { WalletManager, WalletType } from './lib/walletManager';
 import { verificationIntegration } from './verification-integration';
 import { transactionVerifier } from './aws-services';
 import { memeCortexTransformer, momentumSurfingStrategy } from './memecortex-connector';
+import { priceFeedCache } from './priceFeedCache';
+import { 
+  SignalType, 
+  SignalStrength, 
+  SignalDirection, 
+  SignalPriority,
+  SignalSource 
+} from '../shared/signalTypes';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -63,6 +71,153 @@ router.get('/api/perplexity/sentiment/:token', async (req, res) => {
     res.status(500).json({
       error: 'Failed to get market sentiment',
       message: error.message
+    });
+  }
+});
+
+// Signal Hub API Routes
+router.get('/api/signals', (req, res) => {
+  try {
+    // Check if signalHub is initialized
+    if (!global.signalHub) {
+      return res.status(503).json({
+        error: 'Signal Hub not initialized',
+        message: 'The Signal Hub service is not currently available'
+      });
+    }
+
+    // Get query parameters
+    const types = req.query.types ? (req.query.types as string).split(',') : [];
+    const sources = req.query.sources ? (req.query.sources as string).split(',') : [];
+    const pairs = req.query.pairs ? (req.query.pairs as string).split(',') : [];
+    const sinceStr = req.query.since as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    
+    // Convert types and sources to enums if provided
+    const typesEnum = types.length > 0 
+      ? types.map(t => SignalType[t as keyof typeof SignalType]).filter(Boolean) 
+      : undefined;
+    
+    const sourcesEnum = sources.length > 0 
+      ? sources.map(s => SignalSource[s as keyof typeof SignalSource]).filter(Boolean) 
+      : undefined;
+    
+    // Parse the since parameter if provided
+    const since = sinceStr ? new Date(sinceStr) : new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to last 24 hours
+    
+    // Get signals from the hub
+    const signals = global.signalHub.getSignals({
+      types: typesEnum,
+      sources: sourcesEnum,
+      pairs: pairs.length > 0 ? pairs : undefined,
+      since,
+      limit
+    });
+    
+    // Return the signals
+    res.json({
+      count: signals.length,
+      signals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error in /api/signals:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve signals',
+      message: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Get signals for a specific token
+router.get('/api/signals/:token', (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    
+    // Check if signalHub is initialized
+    if (!global.signalHub) {
+      return res.status(503).json({
+        error: 'Signal Hub not initialized',
+        message: 'The Signal Hub service is not currently available'
+      });
+    }
+    
+    // Get query parameters
+    const types = req.query.types ? (req.query.types as string).split(',') : [];
+    const sources = req.query.sources ? (req.query.sources as string).split(',') : [];
+    const sinceStr = req.query.since as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+    
+    // Convert types and sources to enums if provided
+    const typesEnum = types.length > 0 
+      ? types.map(t => SignalType[t as keyof typeof SignalType]).filter(Boolean) 
+      : undefined;
+    
+    const sourcesEnum = sources.length > 0 
+      ? sources.map(s => SignalSource[s as keyof typeof SignalSource]).filter(Boolean) 
+      : undefined;
+    
+    // Parse the since parameter if provided
+    const since = sinceStr ? new Date(sinceStr) : new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to last 24 hours
+    
+    // Get signals from the hub
+    const signals = global.signalHub.getSignals({
+      types: typesEnum,
+      sources: sourcesEnum,
+      pairs: [token],
+      since,
+      limit
+    });
+    
+    // Return the signals
+    res.json({
+      token,
+      count: signals.length,
+      signals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/signals/${req.params.token}:`, error);
+    res.status(500).json({
+      error: 'Failed to retrieve signals for token',
+      message: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Get signal by ID
+router.get('/api/signal/:id', (req, res) => {
+  try {
+    const signalId = req.params.id;
+    
+    // Check if signalHub is initialized
+    if (!global.signalHub) {
+      return res.status(503).json({
+        error: 'Signal Hub not initialized',
+        message: 'The Signal Hub service is not currently available'
+      });
+    }
+    
+    // Get signal from the hub
+    const signal = global.signalHub.getSignal(signalId);
+    
+    if (!signal) {
+      return res.status(404).json({
+        error: 'Signal not found',
+        message: `No signal found with ID ${signalId}`
+      });
+    }
+    
+    // Return the signal
+    res.json({
+      signal,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error in /api/signal/${req.params.id}:`, error);
+    res.status(500).json({
+      error: 'Failed to retrieve signal',
+      message: error.message || 'Unknown error'
     });
   }
 });
@@ -741,13 +896,34 @@ router.get('/api/system/price-feed', async (req, res) => {
     
     // If a specific token is requested
     if (token && typeof token === 'string') {
-      const tokenPrice = await priceFeedCache.getTokenPrice(token);
-      return res.json({
-        success: true,
-        token,
-        price: tokenPrice,
-        timestamp: new Date().toISOString()
-      });
+      // Try to get price directly, with error handling inside try/catch
+      try {
+        const tokenPrice = await priceFeedCache.getTokenPrice(token);
+        return res.json({
+          success: true,
+          token,
+          price: tokenPrice,
+          timestamp: new Date().toISOString()
+        });
+      } catch (err) {
+        // Access backup prices directly as a fallback
+        if (token.toUpperCase() in priceFeedCache.BACKUP_PRICES) {
+          const backupPrice = priceFeedCache.BACKUP_PRICES[token.toUpperCase()];
+          return res.json({
+            success: true,
+            token,
+            price: backupPrice,
+            source: 'backup_data',
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          return res.status(404).json({
+            success: false,
+            token,
+            error: `No price data available for ${token}`
+          });
+        }
+      }
     }
     
     // Otherwise return status of multiple tokens
@@ -762,10 +938,24 @@ router.get('/api/system/price-feed', async (req, res) => {
           prices[symbol] = price;
           successCount++;
         } else {
-          errors[symbol] = 'Price returned zero or null';
+          // Try backup prices if external fetch fails
+          if (symbol in priceFeedCache.BACKUP_PRICES) {
+            prices[symbol] = priceFeedCache.BACKUP_PRICES[symbol];
+            prices[`${symbol}_source`] = 'backup_data';
+            successCount++;
+          } else {
+            errors[symbol] = 'Price returned zero or null';
+          }
         }
       } catch (err) {
-        errors[symbol] = err.message;
+        // Access backup prices on error
+        if (symbol in priceFeedCache.BACKUP_PRICES) {
+          prices[symbol] = priceFeedCache.BACKUP_PRICES[symbol];
+          prices[`${symbol}_source`] = 'backup_data';
+          successCount++;
+        } else {
+          errors[symbol] = err.message;
+        }
       }
     }
     
@@ -790,6 +980,143 @@ router.get('/api/system/price-feed', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: `Error checking price feed: ${error.message}`
+    });
+  }
+});
+
+// AI Integration status endpoint
+router.get('/api/system/ai-status', async (req, res) => {
+  try {
+    // Check Perplexity API status
+    const perplexityInitialized = perplexityAI.isInitialized();
+    let perplexityStatus = 'not_initialized';
+    let perplexityTestResult = null;
+    
+    if (perplexityInitialized) {
+      try {
+        // Simple test of the Perplexity API
+        const testResult = await perplexityAI.getMarketSentiment('SOL');
+        perplexityStatus = 'operational';
+        perplexityTestResult = testResult.substring(0, 100) + '...'; // Truncate for response
+      } catch (error) {
+        perplexityStatus = 'error';
+        perplexityTestResult = error.message;
+      }
+    }
+    
+    // Check DeepSeek AI status if available
+    let deepseekStatus = 'not_configured';
+    if (process.env.DEEPSEEK_API_KEY) {
+      deepseekStatus = 'configured'; // We would need actual testing logic for DeepSeek
+    }
+    
+    res.json({
+      success: true,
+      ai_systems: {
+        perplexity: {
+          status: perplexityStatus,
+          initialized: perplexityInitialized,
+          test_result: perplexityTestResult
+        },
+        deepseek: {
+          status: deepseekStatus
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error checking AI integration status:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error checking AI status: ${error.message}`
+    });
+  }
+});
+
+// Get recent market analysis signals
+router.get('/api/signals/market-analysis', (req, res) => {
+  try {
+    // Access the signalHub to get recent signals
+    const recentSignals = [];
+    
+    if (global.signalHub && global.signalHub.getRecentSignals) {
+      const allSignals = global.signalHub.getRecentSignals(20); // Get last 20 signals
+      
+      // Filter for market analysis signals only
+      for (const signal of allSignals) {
+        if (signal.type === 'MARKET_SENTIMENT' || 
+            signal.type === 'PRICE_TARGET' || 
+            signal.type === 'VOLATILITY_ALERT' ||
+            signal.type === 'MOMENTUM_SIGNAL') {
+          // Clone and clean the signal for API response
+          const cleanSignal = {
+            id: signal.id,
+            type: signal.type,
+            token: signal.token,
+            source: signal.source,
+            timestamp: signal.timestamp,
+            confidence: signal.confidence || 0,
+            direction: signal.direction || 'neutral',
+            priority: signal.priority || 'medium'
+          };
+          
+          // Add content if available but trim it
+          if (signal.content) {
+            cleanSignal.content = typeof signal.content === 'string' 
+              ? signal.content.substring(0, 200) + '...' 
+              : JSON.stringify(signal.content).substring(0, 200) + '...';
+          }
+          
+          recentSignals.push(cleanSignal);
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      signals_count: recentSignals.length,
+      signals: recentSignals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error retrieving market analysis signals:', error);
+    res.status(500).json({
+      success: false, 
+      message: error instanceof Error ? error.message : 'Unknown error retrieving signals'
+    });
+  }
+});
+
+// Update Perplexity API key
+router.post('/api/system/update-perplexity-key', (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    
+    if (!apiKey || typeof apiKey !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid API key required'
+      });
+    }
+    
+    const success = perplexityAI.updateApiKey(apiKey);
+    
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Perplexity API key updated successfully'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Failed to update Perplexity API key'
+      });
+    }
+  } catch (error) {
+    logger.error('Error updating Perplexity API key:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error: ${error.message}`
     });
   }
 });
