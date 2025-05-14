@@ -53,6 +53,9 @@ fn main() {
         "security" => execute_transformer("security"),
         "crosschain" => execute_transformer("crosschain"),
         "microqhc" => execute_transformer("microqhc"),
+        "simulate" => run_time_warp_simulation(&args),
+        "optimize" => optimize_strategies(&args),
+        "backtest" => run_backtest(&args),
         _ => {
             eprintln!("Error: Unknown command '{}'", command);
             println!("{{\"error\": \"Unknown command '{}'\"", command);
