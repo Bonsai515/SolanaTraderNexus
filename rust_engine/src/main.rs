@@ -1,12 +1,25 @@
 // Quantum HitSquad Nexus Professional Transaction Engine
-// Main entry point - implements transaction routing and execution
+// Main entry point - implements transaction routing and execution with parallel processing
 
 use std::env;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::process;
 use std::time::Instant;
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
+use rayon::prelude::*;
+use log::{debug, info, warn, error};
+
+// Import local modules
+mod transaction;
+mod parallel;
+mod strategy;
+
+use transaction::Transaction;
+use parallel::{init_parallel_processing, process_transactions_parallel, process_price_feeds_parallel};
+use strategy::{StrategyType, FlashLoanArbitrageStrategy, MomentumSurfingStrategy};
 
 fn main() {
     // Parse command-line arguments
@@ -40,27 +53,60 @@ fn main() {
 }
 
 fn process_transaction(args: &[String]) {
+    // Initialize parallel processing environment
+    init_parallel_processing();
+    
     // Read JSON input from stdin
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer).expect("Failed to read from stdin");
     
     let now = Instant::now();
     
-    // For now, simulate a successful transaction
-    let elapsed = now.elapsed();
-    let elapsed_ms = elapsed.as_millis();
+    // Parse transaction details from JSON
+    // This would parse actual transaction data in a real implementation
+    // For now, we'll simulate a transaction
+    let from_token = if args.len() > 2 { &args[2] } else { "USDC" };
+    let to_token = if args.len() > 3 { &args[3] } else { "SOL" };
+    let amount = if args.len() > 4 { args[4].parse::<f64>().unwrap_or(100.0) } else { 100.0 };
     
-    // Generate a fake transaction signature
-    let signature = "5KtPn1LGuxhFr6KTNKcShZi4CmzPVP4WhnTDDMN48kAJNpJfJQuTDio3x38mo4r6Ge7dGHf4zXwVkoLgC7QKLmbF";
+    // Create a transaction object
+    let transaction = Transaction::new(
+        from_token,
+        to_token,
+        amount,
+        0.005, // 0.5% slippage
+        "jupiter", // Default DEX
+        "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb" // Default wallet
+    );
     
-    println!("{{");
-    println!("  \"success\": true,");
-    println!("  \"signature\": \"{}\",", signature);
-    println!("  \"outputAmount\": 1.045,");
-    println!("  \"outputPrice\": 0.99,");
-    println!("  \"fee\": 0.00025,");
-    println!("  \"runtimeMs\": {}",  elapsed_ms);
-    println!("}}");
+    // Execute the transaction
+    let result = match transaction.execute() {
+        Ok(tx_result) => {
+            // Execute completed successfully
+            let elapsed = now.elapsed();
+            let elapsed_ms = elapsed.as_millis();
+            
+            println!("{{");
+            println!("  \"success\": true,");
+            println!("  \"signature\": \"{}\",", tx_result.signature);
+            println!("  \"outputAmount\": {},", tx_result.output_amount);
+            println!("  \"outputPrice\": 0.99,"); // This would be the actual price
+            println!("  \"fee\": {},", tx_result.fee);
+            println!("  \"runtimeMs\": {}",  elapsed_ms);
+            println!("}}");
+        },
+        Err(err) => {
+            // Transaction failed
+            let elapsed = now.elapsed();
+            let elapsed_ms = elapsed.as_millis();
+            
+            println!("{{");
+            println!("  \"success\": false,");
+            println!("  \"error\": \"{}\",", err);
+            println!("  \"runtimeMs\": {}",  elapsed_ms);
+            println!("}}");
+        }
+    };
 }
 
 fn get_token_info(args: &[String]) {
