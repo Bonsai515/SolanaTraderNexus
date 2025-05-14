@@ -344,10 +344,24 @@ class SignalHub extends EventEmitter {
     logger.info(`Processing trading signal ${signal.id} of type ${signal.type}`);
     
     // Validate and ensure signal has required token fields
-    const sourceTokenFromSignal = signal.sourceToken || signal.targetToken || signal.token_address;
-    const targetTokenFromSignal = signal.targetToken || signal.sourceToken;
+    // First try direct values
+    let sourceTokenFromSignal = signal.sourceToken;
+    let targetTokenFromSignal = signal.targetToken;
     
-    if (!sourceTokenFromSignal && !targetTokenFromSignal) {
+    // If not found, try to extract from pair field
+    if (!sourceTokenFromSignal && signal.pair) {
+      const pairParts = signal.pair.split('/');
+      if (pairParts.length === 2) {
+        sourceTokenFromSignal = pairParts[1]; // Usually USDC
+        targetTokenFromSignal = pairParts[0];  // The token being analyzed
+      }
+    }
+    
+    // If still not found, use fallbacks
+    sourceTokenFromSignal = sourceTokenFromSignal || signal.token_address || 'USDC';
+    targetTokenFromSignal = targetTokenFromSignal || signal.token_address;
+    
+    if (!targetTokenFromSignal) {
       logger.error(`Signal ${signal.id} missing required token information`);
       return;
     }
@@ -355,6 +369,8 @@ class SignalHub extends EventEmitter {
     // Make sure the signal has these fields updated for future processing
     signal.sourceToken = sourceTokenFromSignal;
     signal.targetToken = targetTokenFromSignal;
+    
+    logger.info(`Signal ${signal.id} tokens: source=${sourceTokenFromSignal}, target=${targetTokenFromSignal}`);
     
     // Get trading direction
     const direction = signal.direction || SignalDirection.BUY;

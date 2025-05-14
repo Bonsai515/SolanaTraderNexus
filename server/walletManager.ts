@@ -223,5 +223,61 @@ function validateSolanaAddress(address: string): void {
   }
 }
 
+/**
+ * Export wallet private keys in a format compatible with Phantom wallet
+ * @returns Object with wallet keys
+ */
+export function exportWalletPrivateKeys(): { 
+  tradingWallet: { publicKey: string, privateKey: string }, 
+  profitWallet: { publicKey: string, privateKey: string }
+} {
+  try {
+    logger.info('Exporting wallet private keys for external use');
+    
+    // Get private keys from Nexus engine
+    const tradingWalletKey = nexusEngine.exportWalletPrivateKey(currentWalletConfig.tradingWallet);
+    const profitWalletKey = nexusEngine.exportWalletPrivateKey(currentWalletConfig.profitWallet);
+    
+    logger.info('Successfully exported wallet private keys');
+    
+    return {
+      tradingWallet: {
+        publicKey: currentWalletConfig.tradingWallet,
+        privateKey: tradingWalletKey
+      },
+      profitWallet: {
+        publicKey: currentWalletConfig.profitWallet,
+        privateKey: profitWalletKey
+      }
+    };
+  } catch (error) {
+    logger.error('Error exporting wallet private keys:', error);
+    throw new Error('Failed to export wallet private keys');
+  }
+}
+
+/**
+ * Get all wallet addresses and balances
+ * @returns Object with wallets and their balances
+ */
+export async function getAllWalletBalances(): Promise<any> {
+  try {
+    logger.info('Retrieving all wallet balances');
+    
+    const balances = await nexusEngine.getWalletBalances([
+      currentWalletConfig.tradingWallet,
+      currentWalletConfig.profitWallet,
+      ...(currentWalletConfig.feeWallet ? [currentWalletConfig.feeWallet] : [])
+    ]);
+    
+    logger.info('Successfully retrieved wallet balances');
+    
+    return balances;
+  } catch (error) {
+    logger.error('Error retrieving wallet balances:', error);
+    throw new Error('Failed to retrieve wallet balances');
+  }
+}
+
 // Initialize by trying to load existing configuration
 loadWalletConfig();
