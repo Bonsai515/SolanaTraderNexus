@@ -3,12 +3,14 @@
  * 
  * This module provides meme token analysis and sentiment prediction
  * using AI-enhanced analytics to identify potential meme trends early.
+ * Includes advanced momentum surfing strategies for optimal entry/exit.
  */
 
 import * as web3 from '@solana/web3.js';
 import { PublicKey } from '@solana/web3.js';
 import { logger } from './logger';
 import { priceFeedCache } from './priceFeedCache';
+import { nexusTransactionEngine } from './nexus-transaction-engine';
 
 // Interfaces
 interface MemeTokenInfo {
@@ -63,6 +65,36 @@ interface MemeMarketData {
   priceChange7d: number;
   fdv: number;
   liquidityUsd: number;
+}
+
+interface TokenMomentumScore {
+  overall_score: number;
+  social_score: number;
+  price_score: number;
+  volume_score: number;
+  liquidity_score: number;
+  holder_growth_score: number;
+  volatility_score: number;
+  timestamp: number;
+}
+
+interface MomentumOpportunity {
+  token_address: string;
+  token_symbol?: string;
+  current_score: number;
+  momentum_change_rate: number;
+  predicted_peak_score: number;
+  optimal_entry_price: number;
+  recommended_exit_timeframe: number; // in minutes
+  transaction_costs?: {
+    estimated_gas: number;
+    estimated_fee: number;
+    total_cost: number;
+  };
+  profit_potential?: {
+    estimated_percentage: number;
+    adjusted_for_costs: number;
+  };
 }
 
 class MemeCortexTransformer {
@@ -449,5 +481,439 @@ class MemeCortexTransformer {
   }
 }
 
+/**
+ * MomentumSurfingStrategy - Advanced strategy for riding momentum waves in meme tokens
+ * Based on the Quantum HitSquad professional design patterns
+ */
+class MomentumSurfingStrategy {
+  private memecortex: MemeCortexTransformer;
+  private entry_threshold: number;
+  private exit_threshold: number;
+  private trailing_stop_percentage: number;
+  private momentum_scores_cache: Map<string, TokenMomentumScore[]> = new Map();
+  private active_positions: Map<string, {
+    entry_price: number;
+    entry_time: number;
+    highest_price: number;
+    trailing_stop_price: number;
+    amount: number;
+    token_symbol?: string;
+  }> = new Map();
+  
+  constructor(
+    memecortex: MemeCortexTransformer,
+    entry_threshold: number = 75,
+    exit_threshold: number = 60,
+    trailing_stop_percentage: number = 10.0
+  ) {
+    this.memecortex = memecortex;
+    this.entry_threshold = entry_threshold;
+    this.exit_threshold = exit_threshold;
+    this.trailing_stop_percentage = trailing_stop_percentage;
+    
+    logger.info('MomentumSurfingStrategy initialized with entry threshold: ' + 
+                entry_threshold + ', exit threshold: ' + exit_threshold + 
+                ', trailing stop: ' + trailing_stop_percentage + '%');
+  }
+  
+  /**
+   * Analyze a token and generate momentum score
+   * @param token_address Token address to analyze
+   * @returns Momentum score object
+   */
+  public async analyze_token(token_address: string): Promise<TokenMomentumScore> {
+    try {
+      const sentiment = await this.memecortex.analyzeSentiment(token_address);
+      const marketData = await this.memecortex.getMarketData(token_address);
+      const tokenInfo = await this.memecortex.getTokenInfo(token_address);
+      
+      if (!sentiment || !marketData || !tokenInfo) {
+        throw new Error('Failed to get complete data for token analysis');
+      }
+      
+      // Calculate momentum scores based on various factors
+      const social_score = Math.round((
+        (sentiment.analysis.social.twitter * 2) +
+        (sentiment.analysis.social.telegram * 1.5) +
+        (sentiment.analysis.social.discord) +
+        (sentiment.analysis.social.reddit * 0.8)
+      ) / 5.3 * 100);
+      
+      const price_score = Math.round((
+        (marketData.priceChange1h > 0 ? marketData.priceChange1h : 0) * 2 +
+        (marketData.priceChange24h > 0 ? marketData.priceChange24h : 0) * 1.5
+      ) / 3.5 * 100);
+      
+      const volume_score = Math.min(100, Math.round(
+        marketData.volume24h / (marketData.mcap * 0.01) * 100
+      ));
+      
+      const liquidity_score = Math.min(100, Math.round(
+        marketData.liquidityUsd / (marketData.mcap * 0.005) * 100
+      ));
+      
+      const holder_growth_score = Math.min(100, Math.round(
+        tokenInfo.holderCount / 1000 * 100
+      ));
+      
+      // Volatility is useful for trading but too much is risky
+      const volatility_score = Math.round(
+        Math.abs(marketData.priceChange1h) * 2
+      );
+      
+      // Overall score weighted by importance
+      const overall_score = Math.round(
+        (social_score * 0.25) +
+        (price_score * 0.30) +
+        (volume_score * 0.20) +
+        (liquidity_score * 0.15) +
+        (holder_growth_score * 0.10)
+      );
+      
+      const momentum_score: TokenMomentumScore = {
+        overall_score,
+        social_score,
+        price_score,
+        volume_score,
+        liquidity_score,
+        holder_growth_score,
+        volatility_score,
+        timestamp: Date.now()
+      };
+      
+      // Cache the score for historical analysis
+      if (!this.momentum_scores_cache.has(token_address)) {
+        this.momentum_scores_cache.set(token_address, []);
+      }
+      
+      const scores = this.momentum_scores_cache.get(token_address)!;
+      scores.push(momentum_score);
+      
+      // Keep only last 24 hours of scores
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+      const filteredScores = scores.filter(score => score.timestamp >= oneDayAgo);
+      this.momentum_scores_cache.set(token_address, filteredScores);
+      
+      return momentum_score;
+    } catch (error) {
+      logger.error(`Error analyzing token momentum for ${token_address}:`, error);
+      return {
+        overall_score: 0,
+        social_score: 0,
+        price_score: 0,
+        volume_score: 0,
+        liquidity_score: 0,
+        holder_growth_score: 0,
+        volatility_score: 0,
+        timestamp: Date.now()
+      };
+    }
+  }
+  
+  /**
+   * Get historical momentum scores for a token
+   * @param token_address Token address
+   * @param hours Number of hours of history to retrieve
+   * @returns Array of historical momentum scores
+   */
+  private get_historical_momentum_scores(token_address: string, hours: number = 24): TokenMomentumScore[] {
+    const scores = this.momentum_scores_cache.get(token_address) || [];
+    const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+    return scores.filter(score => score.timestamp >= cutoff);
+  }
+  
+  /**
+   * Calculate momentum change rate
+   * @param historical_scores Historical scores
+   * @param current_score Current score
+   * @returns Momentum change rate as percentage
+   */
+  private calculate_momentum_change_rate(historical_scores: TokenMomentumScore[], current_score: TokenMomentumScore): number {
+    if (historical_scores.length < 2) return 0;
+    
+    // Focus on the most recent changes, weighted more heavily
+    const recent_scores = historical_scores.slice(-6); // Last 6 data points
+    
+    if (recent_scores.length < 2) return 0;
+    
+    // Calculate weighted average of previous scores
+    let total_weight = 0;
+    let weighted_sum = 0;
+    
+    for (let i = 0; i < recent_scores.length; i++) {
+      const weight = i + 1; // More recent scores have higher weight
+      weighted_sum += recent_scores[i].overall_score * weight;
+      total_weight += weight;
+    }
+    
+    const weighted_avg = weighted_sum / total_weight;
+    
+    // Calculate momentum change rate
+    const change_rate = ((current_score.overall_score - weighted_avg) / weighted_avg) * 100;
+    
+    return Math.round(change_rate * 10) / 10; // Round to 1 decimal place
+  }
+  
+  /**
+   * Predict peak score based on current momentum
+   * @param current_score Current momentum score
+   * @param change_rate Current change rate
+   * @returns Predicted peak score
+   */
+  private predict_peak_score(current_score: TokenMomentumScore, change_rate: number): number {
+    // Simple prediction model - actual implementation would be more sophisticated
+    const predicted_increase = Math.min(40, change_rate * 0.8); // Cap at 40% to be conservative
+    return Math.min(100, Math.round(current_score.overall_score * (1 + predicted_increase / 100)));
+  }
+  
+  /**
+   * Calculate optimal exit timeframe based on momentum
+   * @param change_rate Momentum change rate
+   * @returns Optimal timeframe in minutes
+   */
+  private calculate_optimal_exit_timeframe(change_rate: number): number {
+    // Faster momentum requires quicker exits
+    if (change_rate > 30) {
+      return 30; // Exit within 30 minutes for extremely fast moves
+    } else if (change_rate > 20) {
+      return 60; // 1 hour for very fast moves
+    } else if (change_rate > 10) {
+      return 180; // 3 hours for moderately fast moves
+    } else {
+      return 360; // 6 hours for slower momentum
+    }
+  }
+  
+  /**
+   * Get current token price
+   * @param token_address Token address
+   * @returns Current token price
+   */
+  private async get_current_price(token_address: string): Promise<number> {
+    const marketData = await this.memecortex.getMarketData(token_address);
+    return marketData?.price || 0;
+  }
+  
+  /**
+   * Get top tokens by volume
+   * @param limit Number of tokens to return
+   * @returns Array of token addresses
+   */
+  private async get_top_volume_tokens(limit: number = 100): Promise<string[]> {
+    try {
+      // Get trending tokens from memecortex
+      const trending = await this.memecortex.findTrendingTokens(limit);
+      return trending.map(token => token.address);
+    } catch (error) {
+      logger.error('Error getting top volume tokens:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Scan for momentum trading opportunities
+   * @returns Array of momentum opportunities
+   */
+  public async scan_for_momentum_waves(): Promise<MomentumOpportunity[]> {
+    const opportunities: MomentumOpportunity[] = [];
+    
+    try {
+      // Get top tokens by volume
+      const tokens = await this.get_top_volume_tokens(100);
+      
+      for (const token of tokens) {
+        // Get current momentum score
+        const score = await this.analyze_token(token);
+        
+        // Get historical scores
+        const historical_scores = this.get_historical_momentum_scores(token, 24);
+        
+        // Calculate momentum change rate
+        const change_rate = this.calculate_momentum_change_rate(historical_scores, score);
+        
+        // Get token info and current price
+        const tokenInfo = await this.memecortex.getTokenInfo(token);
+        const current_price = await this.get_current_price(token);
+        
+        // If momentum is rapidly increasing and above threshold
+        if (change_rate > 15.0 && score.overall_score >= this.entry_threshold) {
+          // Calculate transaction costs (gas, fees, etc.)
+          const transaction_costs = {
+            estimated_gas: 0.00015, // SOL
+            estimated_fee: current_price * 0.0035, // 0.35% DEX fee
+            total_cost: 0.00015 + (current_price * 0.0035)
+          };
+          
+          // Calculate profit potential
+          const predicted_peak = this.predict_peak_score(score, change_rate);
+          const predicted_price_increase = change_rate * 0.7; // Conservative estimate
+          
+          const profit_potential = {
+            estimated_percentage: predicted_price_increase,
+            adjusted_for_costs: predicted_price_increase - (transaction_costs.total_cost / current_price * 100)
+          };
+          
+          // Only include if profit potential exceeds costs
+          if (profit_potential.adjusted_for_costs > 3) { // At least 3% net profit
+            opportunities.push({
+              token_address: token,
+              token_symbol: tokenInfo?.symbol,
+              current_score: score.overall_score,
+              momentum_change_rate: change_rate,
+              predicted_peak_score: predicted_peak,
+              optimal_entry_price: current_price,
+              recommended_exit_timeframe: this.calculate_optimal_exit_timeframe(change_rate),
+              transaction_costs,
+              profit_potential
+            });
+          }
+        }
+      }
+      
+      // Sort by profit potential adjusted for costs
+      opportunities.sort((a, b) => 
+        (b.profit_potential?.adjusted_for_costs || 0) - (a.profit_potential?.adjusted_for_costs || 0)
+      );
+      
+      return opportunities;
+    } catch (error) {
+      logger.error('Error scanning for momentum waves:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Execute momentum trade
+   * @param opportunity Momentum opportunity to trade
+   * @param amount Amount to trade in SOL
+   * @returns Transaction hash or error message
+   */
+  public async execute_momentum_trade(opportunity: MomentumOpportunity, amount: number): Promise<{ success: boolean, txHash?: string, error?: string }> {
+    try {
+      // Execute buy transaction through Nexus Professional Engine
+      const result = await nexusTransactionEngine.executeBuy(
+        opportunity.token_address,
+        amount,
+        { slippage: 1.0, mevProtection: true }
+      );
+      
+      if (result.success) {
+        // Record position for trailing stop monitoring
+        this.active_positions.set(opportunity.token_address, {
+          entry_price: opportunity.optimal_entry_price,
+          entry_time: Date.now(),
+          highest_price: opportunity.optimal_entry_price,
+          trailing_stop_price: opportunity.optimal_entry_price * (1 - this.trailing_stop_percentage / 100),
+          amount,
+          token_symbol: opportunity.token_symbol
+        });
+        
+        // Setup monitoring for this position
+        this.monitor_trailing_stop(opportunity.token_address);
+        
+        return { success: true, txHash: result.signature };
+      } else {
+        return { success: false, error: result.error || 'Transaction failed' };
+      }
+    } catch (error) {
+      logger.error(`Error executing momentum trade for ${opportunity.token_address}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  /**
+   * Monitor position with trailing stop
+   * @param token_address Token address to monitor
+   */
+  private async monitor_trailing_stop(token_address: string): Promise<void> {
+    if (!this.active_positions.has(token_address)) return;
+    
+    // Create a separate monitoring thread
+    const monitoringInterval = setInterval(async () => {
+      try {
+        if (!this.active_positions.has(token_address)) {
+          clearInterval(monitoringInterval);
+          return;
+        }
+        
+        const position = this.active_positions.get(token_address)!;
+        const current_price = await this.get_current_price(token_address);
+        
+        // Update highest price and trailing stop if price increased
+        if (current_price > position.highest_price) {
+          const new_highest = current_price;
+          const new_stop = new_highest * (1 - this.trailing_stop_percentage / 100);
+          
+          this.active_positions.set(token_address, {
+            ...position,
+            highest_price: new_highest,
+            trailing_stop_price: new_stop
+          });
+          
+          logger.debug(`Updated trailing stop for ${position.token_symbol || token_address}: new high ${new_highest}, stop at ${new_stop}`);
+        }
+        
+        // Check if price fell below trailing stop
+        if (current_price <= position.trailing_stop_price) {
+          logger.info(`Trailing stop triggered for ${position.token_symbol || token_address} at ${current_price}`);
+          
+          // Execute sell through Nexus Professional Engine
+          const result = await nexusTransactionEngine.executeSell(
+            token_address,
+            position.amount,
+            { slippage: 1.0, urgency: 'high' }
+          );
+          
+          if (result.success) {
+            logger.info(`Successfully sold ${position.token_symbol || token_address} at trailing stop. Tx: ${result.signature}`);
+            // Calculate profit/loss
+            const pnl = ((current_price / position.entry_price) - 1) * 100;
+            logger.info(`Trade completed with ${pnl.toFixed(2)}% P&L`);
+          } else {
+            logger.error(`Failed to execute trailing stop for ${position.token_symbol || token_address}:`, result.error);
+          }
+          
+          // Remove from active positions
+          this.active_positions.delete(token_address);
+          clearInterval(monitoringInterval);
+        }
+        
+        // Check if maximum hold time reached (exit_timeframe)
+        const position_age_minutes = (Date.now() - position.entry_time) / (60 * 1000);
+        const momentum_score = await this.analyze_token(token_address);
+        
+        if (momentum_score.overall_score < this.exit_threshold || position_age_minutes > 360) {
+          logger.info(`Exit condition met for ${position.token_symbol || token_address}: score ${momentum_score.overall_score}, age ${position_age_minutes.toFixed(0)} minutes`);
+          
+          // Execute sell through Nexus Professional Engine
+          const result = await nexusTransactionEngine.executeSell(
+            token_address,
+            position.amount,
+            { slippage: 1.0 }
+          );
+          
+          if (result.success) {
+            logger.info(`Successfully sold ${position.token_symbol || token_address} at exit condition. Tx: ${result.signature}`);
+            // Calculate profit/loss
+            const pnl = ((current_price / position.entry_price) - 1) * 100;
+            logger.info(`Trade completed with ${pnl.toFixed(2)}% P&L`);
+          } else {
+            logger.error(`Failed to execute exit for ${position.token_symbol || token_address}:`, result.error);
+          }
+          
+          // Remove from active positions
+          this.active_positions.delete(token_address);
+          clearInterval(monitoringInterval);
+        }
+      } catch (error) {
+        logger.error(`Error in trailing stop monitor for ${token_address}:`, error);
+      }
+    }, 60000); // Check every minute
+  }
+}
+
 // Export a singleton instance
 export const memeCortexTransformer = new MemeCortexTransformer();
+
+// Export MomentumSurfingStrategy
+export const momentumSurfingStrategy = new MomentumSurfingStrategy(memeCortexTransformer);

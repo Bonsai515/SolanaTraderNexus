@@ -1,0 +1,77 @@
+pub struct FlashLoanArbitrageStrategy {
+    nexus_engine: Arc<Mutex<EnhancedTransactionEngine>>,
+    price_feed: SolanaPriceFeed,
+    minimum_profit_threshold: f64, // In SOL
+}
+
+impl FlashLoanArbitrageStrategy {
+    pub fn new() -> Self {
+        Self {
+            nexus_engine: QUANTUM_TRANSFORMERS.lock().unwrap().transaction_engine,
+            price_feed: SolanaPriceFeed::new(500), // 500ms updates
+            minimum_profit_threshold: 0.05, // 0.05 SOL minimum profit
+        }
+    }
+    
+    pub fn find_flash_loan_opportunities(&self) -> Vec<FlashLoanOpportunity> {
+        let mut opportunities = Vec::new();
+        
+        // Get top tokens by liquidity
+        let tokens = self.get_top_liquidity_tokens(50);
+        
+        for token in tokens {
+            // Find price differences across DEXs
+            let price_differences = self.get_price_differences_across_dexes(&token);
+            
+            // If price difference exceeds gas + fees
+            for pd in price_differences {
+                // Calculate optimal loan amount
+                let optimal_amount = self.calculate_optimal_loan_amount(
+                    pd.buy_price,
+                    pd.sell_price,
+                    pd.buy_dex_fee,
+                    pd.sell_dex_fee,
+                    0.003 // Flash loan fee (0.3%)
+                );
+                
+                // Calculate expected profit
+                let expected_profit = self.calculate_expected_profit(
+                    optimal_amount,
+                    pd.buy_price,
+                    pd.sell_price,
+                    pd.buy_dex_fee,
+                    pd.sell_dex_fee,
+                    0.003 // Flash loan fee
+                );
+                
+                if expected_profit >= self.minimum_profit_threshold {
+                    opportunities.push(FlashLoanOpportunity {
+                        token_address: token.clone(),
+                        buy_dex: pd.buy_dex.clone(),
+                        sell_dex: pd.sell_dex.clone(),
+                        optimal_loan_amount: optimal_amount,
+                        expected_profit,
+                        complexity: self.calculate_transaction_complexity(pd.buy_dex.clone(), pd.sell_dex.clone()),
+                    });
+                }
+            }
+        }
+        
+        // Sort by expected profit
+        opportunities.sort_by(|a, b| b.expected_profit.partial_cmp(&a.expected_profit).unwrap());
+        opportunities
+    }
+    
+    pub fn execute_flash_loan_arbitrage(&self, opportunity: &FlashLoanOpportunity) -> Result<String, String> {
+        // Construct flash loan arbitrage transaction
+        let flash_loan_tx = self.nexus_engine.lock().unwrap()
+            .execute_flash_loan_arbitrage(
+                &opportunity.token_address,
+                &opportunity.buy_dex,
+                &opportunity.sell_dex,
+                opportunity.optimal_loan_amount
+            )?;
+        
+        Ok(flash_loan_tx)
+    }
+}

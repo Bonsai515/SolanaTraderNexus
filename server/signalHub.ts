@@ -12,6 +12,19 @@ import { Server } from 'http';
 import { logger } from './logger';
 import { MarketData } from './priceFeedCache';
 import { v4 as uuidv4 } from 'uuid';
+
+// Import signal monitoring safely with fallback
+let signalMonitoring: any;
+try {
+  const monitoring = require('./signalMonitoring');
+  signalMonitoring = monitoring.default || monitoring;
+  if (!signalMonitoring) {
+    logger.warn('SignalMonitoring module loaded but has no exports');
+  }
+} catch (error) {
+  logger.warn(`Failed to import signalMonitoring: ${error}`);
+  signalMonitoring = null;
+}
 import { 
   SignalType, 
   SignalStrength, 
@@ -171,7 +184,7 @@ class SignalHub extends EventEmitter {
     try {
       // Import here to avoid circular dependency
       const { signalValidator } = require('./signalValidator');
-      const { signalMonitoring } = require('./signalMonitoring');
+      // Use our global signalMonitoring that we already imported safely at the top
       
       // Generate ID if not provided
       if (!signal.id) {
@@ -191,7 +204,18 @@ class SignalHub extends EventEmitter {
       
       // End validation time tracking
       validationTime = Date.now() - validationStartTime;
-      signalMonitoring.trackLatency(signal.id, 'validation', validationTime);
+      
+      // Safely track latency with fallback
+      try {
+        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
+          signalMonitoring.trackLatency(signal.id, 'validation', validationTime);
+        } else {
+          // Fallback logging if tracking is unavailable
+          logger.debug(`Signal ${signal.id} validation latency: ${validationTime}ms`);
+        }
+      } catch (error) {
+        logger.debug(`Signal ${signal.id} validation latency: ${validationTime}ms`);
+      }
       
       // Only process valid signals
       if (!validationResult.valid) {
@@ -221,10 +245,16 @@ class SignalHub extends EventEmitter {
       }
       
       // Add performance metrics tracking
+      const generatedAtTimestamp = signal.timestamp instanceof Date 
+        ? signal.timestamp.getTime() 
+        : (typeof signal.timestamp === 'string' 
+            ? new Date(signal.timestamp).getTime() 
+            : Date.now());
+            
       signal.metadata = {
         ...signal.metadata,
         performance: {
-          generatedAt: signal.timestamp.getTime(),
+          generatedAt: generatedAtTimestamp,
           processedAt: Date.now(),
           validationTimeMs: validationTime
         }
@@ -255,7 +285,15 @@ class SignalHub extends EventEmitter {
       broadcastTime = Date.now() - broadcastStartTime;
       
       // Track broadcast latency
-      signalMonitoring.trackLatency(signal.id, 'delivery', broadcastTime);
+      try {
+        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
+          signalMonitoring.trackLatency(signal.id, 'delivery', broadcastTime);
+        } else {
+          logger.debug(`Signal ${signal.id} delivery latency: ${broadcastTime}ms`);
+        }
+      } catch (error) {
+        logger.debug(`Signal ${signal.id} delivery latency: ${broadcastTime}ms`);
+      }
       
       // Process through registered processors
       const processingStartTime = Date.now();
@@ -292,14 +330,41 @@ class SignalHub extends EventEmitter {
       processingTime = Date.now() - processingStartTime;
       
       // Track processing latency
-      signalMonitoring.trackLatency(signal.id, 'processing', processingTime);
+      try {
+        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
+          signalMonitoring.trackLatency(signal.id, 'processing', processingTime);
+        } else {
+          logger.debug(`Signal ${signal.id} processing latency: ${processingTime}ms`);
+        }
+      } catch (error) {
+        logger.debug(`Signal ${signal.id} processing latency: ${processingTime}ms`);
+      }
       
       // Calculate generation time (time between signal timestamp and when it was received)
-      const generationTime = signal.timestamp.getTime() < startTime ? 
-        startTime - signal.timestamp.getTime() : 0;
+      let generationTime = 0;
+      try {
+        const signalTime = signal.timestamp instanceof Date 
+          ? signal.timestamp.getTime() 
+          : (typeof signal.timestamp === 'string' 
+              ? new Date(signal.timestamp).getTime() 
+              : startTime);
+              
+        generationTime = signalTime < startTime ? startTime - signalTime : 0;
+      } catch (error) {
+        generationTime = 0;
+        logger.debug(`Error calculating generation time for signal ${signal.id}: ${error}`);
+      }
       
       // Track generation latency
-      signalMonitoring.trackLatency(signal.id, 'generation', generationTime);
+      try {
+        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
+          signalMonitoring.trackLatency(signal.id, 'generation', generationTime);
+        } else {
+          logger.debug(`Signal ${signal.id} generation latency: ${generationTime}ms`);
+        }
+      } catch (error) {
+        logger.debug(`Signal ${signal.id} generation latency: ${generationTime}ms`);
+      }
       
       // Update signal with performance data
       signal.metadata.performance = {
@@ -314,7 +379,15 @@ class SignalHub extends EventEmitter {
       this.signalStore.set(signal.id, signal);
       
       // Track entire signal processing
-      signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
+      try {
+        if (signalMonitoring && typeof signalMonitoring.trackSignal === 'function') {
+          signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
+        } else {
+          logger.debug(`Signal ${signal.id} full processing time: ${Date.now() - startTime}ms`);
+        }
+      } catch (error) {
+        logger.debug(`Signal ${signal.id} full processing time: ${Date.now() - startTime}ms`);
+      }
       
       logger.debug(`Processed signal ${signal.id} of type ${signal.type} from ${signal.source} in ${Date.now() - startTime}ms`);
     } catch (error) {
@@ -332,8 +405,12 @@ class SignalHub extends EventEmitter {
       signal.id = this.generateSignalId();
     }
     
-    // Process the signal
-    await this.processSignal(signal);
+    // Process the signal with error handling
+    try {
+      await this.processSignal(signal);
+    } catch (error) {
+      logger.error(`Error processing signal: ${error}`);
+    }
     
     return signal.id;
   }
@@ -380,11 +457,43 @@ class SignalHub extends EventEmitter {
     }
     
     if (criteria.since) {
-      signals = signals.filter(s => s.timestamp >= criteria.since);
+      signals = signals.filter(s => {
+        try {
+          const signalTime = s.timestamp instanceof Date 
+            ? s.timestamp 
+            : (typeof s.timestamp === 'string' 
+                ? new Date(s.timestamp) 
+                : new Date());
+                
+          return signalTime >= criteria.since;
+        } catch (error) {
+          logger.debug(`Error comparing signal timestamp: ${error}`);
+          return false;
+        }
+      });
     }
     
     // Sort by timestamp (newest first)
-    signals.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    signals.sort((a, b) => {
+      try {
+        const timeA = a.timestamp instanceof Date 
+          ? a.timestamp.getTime() 
+          : (typeof a.timestamp === 'string' 
+              ? new Date(a.timestamp).getTime() 
+              : 0);
+              
+        const timeB = b.timestamp instanceof Date 
+          ? b.timestamp.getTime() 
+          : (typeof b.timestamp === 'string' 
+              ? new Date(b.timestamp).getTime() 
+              : 0);
+              
+        return timeB - timeA;
+      } catch (error) {
+        logger.debug(`Error sorting signals by timestamp: ${error}`);
+        return 0;
+      }
+    });
     
     // Apply limit
     if (criteria.limit) {
