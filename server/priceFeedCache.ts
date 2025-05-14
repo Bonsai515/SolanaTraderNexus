@@ -6,7 +6,7 @@
  */
 
 import axios from 'axios';
-import { logger } from './logger';
+import * as logger from './logger';
 import * as web3 from '@solana/web3.js';
 
 // Price Source Types

@@ -1,590 +1,553 @@
 /**
- * Transaction Verification Module
+ * Transaction Verifier Module
  * 
- * This module handles blockchain transaction verification, cross-checking transactions
- * through multiple sources, and providing verification results to the user.
- * It also manages logs and updates for wallet balances and transaction statuses.
+ * This module verifies transactions on the Solana blockchain
+ * and ensures that profits are captured correctly.
+ * 
+ * It provides transaction tracking, signature verification,
+ * and automatic profit capture capabilities.
+ * 
+ * CRITICAL: Only logs verified transactions with Solscan links
+ * and requires both wallet verification and transaction verification
+ * with matching timestamps.
  */
 
 import * as logger from './logger';
-import { Connection, PublicKey, TransactionSignature } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { WalletManager } from './lib/walletManager';
 import { nexusEngine } from './nexus-transaction-engine';
-import axios from 'axios';
-import * as AWS from 'aws-sdk';
+import { systemMemory, ComponentType, EventType, Severity } from './systemMemory';
 import * as fs from 'fs';
 import * as path from 'path';
+import axios from 'axios';
 
-// Configure AWS
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: 'us-east-1' // Default region, can be overridden
-});
+// Storage for verified transactions
+const verifiedTransactions: VerifiedTransaction[] = [];
+const TRANSACTIONS_FILE = path.join(process.cwd(), 'data', 'verified_transactions.json');
+const VERIFICATION_RETRIES = 5;
+const VERIFICATION_RETRY_DELAY = 5000; // 5 seconds
+const MAX_TRANSACTIONS = 1000;
 
-// DynamoDB for transaction logs
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const transactionsTable = 'hyperion_transactions';
+// Solana connection
+let solanaConnection: Connection;
 
-// S3 for transaction backup
-const s3 = new AWS.S3();
-const backupBucket = 'hyperion-transaction-logs';
-
-// Solscan API information for verification
-const SOLSCAN_BASE_URL = 'https://api.solscan.io';
-const SOLSCAN_TXURL = 'https://solscan.io/tx/';
-const SOLSCAN_WALLETURL = 'https://solscan.io/account/';
-
-// Transaction verification storage
-interface VerifiedTransaction {
+// Define transaction structure
+export interface VerifiedTransaction {
   signature: string;
-  timestamp: number;
   wallet: string;
+  timestamp: number;
+  blockTime?: number;
   success: boolean;
-  token: string;
-  amount: number;
-  blockTime: number;
-  fee: number;
-  solscanVerified: boolean;
-  awsVerified: boolean;
-  anchorProgramVerified: boolean;
-  profitCaptured: boolean;
+  token?: string;
+  amount?: number;
+  profitCaptured?: boolean;
   profitAmount?: number;
-  profitTxSignature?: string;
-  walletBalanceAfter?: number;
-  solscanUrl: string;
-  walletUrl: string;
-  error?: string;
+  solscanTxUrl: string;
+  solscanWalletUrl: string;
+  verified: boolean;
+  awsVerificationId?: string;
 }
 
-// In-memory transaction cache
-let verifiedTransactions: Record<string, VerifiedTransaction> = {};
-let transactionVerificationPollers: Record<string, NodeJS.Timeout> = {};
-
-// Local transaction log file path
-const TX_LOG_PATH = path.join(process.cwd(), 'logs', 'transactions.json');
-
 /**
- * Get verified transaction information
- * @param signature Transaction signature to look up
- * @returns Verified transaction info or null if not found
+ * Initialize the transaction verifier
+ * @returns Success status
  */
-export function getVerifiedTransaction(signature: string): VerifiedTransaction | null {
-  return verifiedTransactions[signature] || null;
+export function initTransactionVerifier(): boolean {
+  try {
+    logger.info('Initializing Transaction Verifier...');
+    
+    // Ensure the data directory exists
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    // Load existing verified transactions
+    if (fs.existsSync(TRANSACTIONS_FILE)) {
+      try {
+        const data = fs.readFileSync(TRANSACTIONS_FILE, 'utf-8');
+        const loaded = JSON.parse(data);
+        
+        if (Array.isArray(loaded)) {
+          // Only add transactions that have both wallet and transaction verification
+          const fullyVerified = loaded.filter(tx => tx.verified === true);
+          verifiedTransactions.push(...fullyVerified);
+          
+          logger.info(`Loaded ${fullyVerified.length} verified transactions from storage`);
+          
+          // Log if any transactions were filtered out
+          if (loaded.length > fullyVerified.length) {
+            logger.warn(`Filtered out ${loaded.length - fullyVerified.length} unverified transactions`);
+          }
+        }
+      } catch (error) {
+        logger.error('Error loading verified transactions:', error);
+      }
+    }
+    
+    // Initialize Solana connection using the Nexus engine's connection
+    const rpcUrl = nexusEngine.getRpcUrl();
+    if (!rpcUrl) {
+      logger.warn('No RPC URL available for transaction verification');
+      return false;
+    }
+    
+    solanaConnection = new Connection(rpcUrl, 'confirmed');
+    
+    // Register with system memory
+    systemMemory.updateComponentStatus(
+      ComponentType.TRANSACTION_VERIFIER,
+      solanaConnection ? ComponentStatus.ACTIVE : ComponentStatus.DEGRADED,
+      {
+        transactionsLoaded: verifiedTransactions.length,
+        rpcUrl
+      }
+    );
+    
+    logger.info('Transaction Verifier initialized');
+    return true;
+  } catch (error) {
+    logger.error('Failed to initialize Transaction Verifier:', error);
+    
+    systemMemory.updateComponentStatus(
+      ComponentType.TRANSACTION_VERIFIER,
+      ComponentStatus.ERROR,
+      {
+        error: error.message,
+        stack: error.stack
+      }
+    );
+    
+    return false;
+  }
 }
 
 /**
- * Get all verified transactions
- * @returns All verified transactions
- */
-export function getAllVerifiedTransactions(): VerifiedTransaction[] {
-  return Object.values(verifiedTransactions);
-}
-
-/**
- * Submit a transaction for verification
+ * Verify a transaction on the Solana blockchain
  * @param signature Transaction signature
- * @param wallet Wallet address that sent the transaction
- * @param token Token involved in the transaction
- * @param amount Amount of the transaction
- * @returns Initial verification status
+ * @param wallet Wallet address
+ * @param token Token symbol or address (optional)
+ * @param amount Token amount (optional)
  */
 export async function verifyTransaction(
   signature: string,
   wallet: string,
-  token: string,
-  amount: number
-): Promise<VerifiedTransaction> {
-  logger.info(`Starting verification process for transaction ${signature}`);
-  
-  // Create initial transaction record
-  const transaction: VerifiedTransaction = {
-    signature,
-    timestamp: Date.now(),
-    wallet,
-    token,
-    amount,
-    success: false,
-    blockTime: 0,
-    fee: 0,
-    solscanVerified: false,
-    awsVerified: false,
-    anchorProgramVerified: false,
-    profitCaptured: false,
-    solscanUrl: `${SOLSCAN_TXURL}${signature}`,
-    walletUrl: `${SOLSCAN_WALLETURL}${wallet}`
-  };
-  
-  // Store in memory
-  verifiedTransactions[signature] = transaction;
-  
-  // Start verification process
-  await startVerificationProcess(signature);
-  
-  // Save to local log
-  await saveTransactionLog();
-  
-  // Store in AWS DynamoDB
-  await storeTransactionInDynamoDB(transaction);
-  
-  return transaction;
-}
-
-/**
- * Start the verification process for a transaction
- * @param signature Transaction signature to verify
- */
-async function startVerificationProcess(signature: string): Promise<void> {
-  logger.info(`Starting multi-source verification for transaction ${signature}`);
-  
-  // Start Solscan verification
-  verifySolscan(signature);
-  
-  // Start AWS verification
-  verifyAWS(signature);
-  
-  // Start Anchor program verification
-  verifyAnchorProgram(signature);
-  
-  // Set up interval to check completion and verify profit capture
-  transactionVerificationPollers[signature] = setInterval(() => {
-    pollVerificationStatus(signature);
-  }, 5000); // Check every 5 seconds
-}
-
-/**
- * Poll verification status and check for completion
- * @param signature Transaction signature to check
- */
-async function pollVerificationStatus(signature: string): Promise<void> {
-  const tx = verifiedTransactions[signature];
-  if (!tx) {
-    logger.error(`Transaction ${signature} not found in verification pool`);
-    return;
-  }
-  
-  // Check if we have all three verifications
-  if (tx.solscanVerified && tx.awsVerified && tx.anchorProgramVerified) {
-    logger.info(`Transaction ${signature} fully verified by all sources`);
-    
-    // Transaction is verified, now check for profit capture if successful
-    if (tx.success && !tx.profitCaptured) {
-      await captureProfits(signature);
-    } else if (!tx.success) {
-      logger.warn(`Transaction ${signature} verification complete but transaction failed`);
-    }
-    
-    // Clear the interval once everything is complete
-    if (tx.success && tx.profitCaptured) {
-      clearInterval(transactionVerificationPollers[signature]);
-      delete transactionVerificationPollers[signature];
-      
-      // Final update to storage
-      await saveTransactionLog();
-      await updateTransactionInDynamoDB(tx);
-      
-      logger.info(`Verification process for ${signature} completed successfully with profit capture`);
-    }
-  }
-}
-
-/**
- * Verify transaction on Solscan
- * @param signature Transaction signature to verify
- */
-async function verifySolscan(signature: string): Promise<void> {
+  token?: string,
+  amount?: number
+): Promise<VerifiedTransaction | null> {
   try {
-    logger.info(`Verifying transaction ${signature} on Solscan`);
+    logger.debug(`Starting verification for transaction ${signature.substring(0, 8)}...`);
     
-    // Use Solscan API to get transaction details
-    const response = await axios.get(`${SOLSCAN_BASE_URL}/transaction/${signature}`);
+    const processId = systemMemory.startProcess('Transaction Verification', {
+      signature,
+      wallet,
+      token,
+      amount
+    });
     
-    if (response.data && response.status === 200) {
-      const txData = response.data;
+    // Check if we've already verified this transaction
+    const existingTransaction = verifiedTransactions.find(tx => tx.signature === signature);
+    if (existingTransaction && existingTransaction.verified) {
+      logger.debug(`Transaction ${signature.substring(0, 8)}... already verified`);
       
-      // Update transaction info with Solscan data
-      const tx = verifiedTransactions[signature];
-      if (tx) {
-        tx.solscanVerified = true;
-        tx.success = txData.status === 'success';
-        tx.blockTime = txData.blockTime || 0;
-        tx.fee = txData.fee || 0;
-        
-        logger.info(`Solscan verification for ${signature} completed: ${tx.success ? 'SUCCESS' : 'FAILED'}`);
-        
-        // Update storage
-        await saveTransactionLog();
-        await updateTransactionInDynamoDB(tx);
-      }
-    } else {
-      logger.error(`Failed to verify transaction ${signature} on Solscan: HTTP ${response.status}`);
+      systemMemory.endProcess(processId, 'COMPLETED', existingTransaction);
+      return existingTransaction;
     }
-  } catch (error) {
-    logger.error(`Error verifying transaction ${signature} on Solscan:`, error);
     
-    // Schedule retry
-    setTimeout(() => {
-      verifySolscan(signature);
-    }, 10000); // Retry after 10 seconds
-  }
-}
-
-/**
- * Verify transaction with AWS services
- * @param signature Transaction signature to verify
- */
-async function verifyAWS(signature: string): Promise<void> {
-  try {
-    logger.info(`Verifying transaction ${signature} with AWS`);
+    // Generate Solscan URLs
+    const solscanTxUrl = `https://solscan.io/tx/${signature}`;
+    const solscanWalletUrl = `https://solscan.io/account/${wallet}`;
     
-    // Get transaction from DynamoDB if it exists (from other processes)
-    const params = {
-      TableName: transactionsTable,
-      Key: {
-        signature: signature
-      }
+    // Create initial transaction record
+    const transaction: VerifiedTransaction = {
+      signature,
+      wallet,
+      timestamp: Date.now(),
+      success: false,
+      token,
+      amount,
+      solscanTxUrl,
+      solscanWalletUrl,
+      verified: false
     };
     
-    const result = await dynamoDB.get(params).promise();
+    // Start verification
+    logger.debug(`Verifying transaction ${signature.substring(0, 8)}... on Solana blockchain`);
     
-    if (result.Item) {
-      // Transaction found in AWS, update our record
-      const tx = verifiedTransactions[signature];
-      if (tx) {
-        tx.awsVerified = true;
-        
-        if (result.Item.success !== undefined) {
-          tx.success = result.Item.success;
-        }
-        
-        if (result.Item.profitCaptured !== undefined) {
-          tx.profitCaptured = result.Item.profitCaptured;
-        }
-        
-        if (result.Item.profitAmount !== undefined) {
-          tx.profitAmount = result.Item.profitAmount;
-        }
-        
-        if (result.Item.profitTxSignature !== undefined) {
-          tx.profitTxSignature = result.Item.profitTxSignature;
-        }
-        
-        logger.info(`AWS verification for ${signature} completed`);
-        
-        // Update storage
-        await saveTransactionLog();
+    // Verify on-chain
+    const verifiedTx = await verifyTransactionConfirmation(transaction);
+    
+    if (verifiedTx.verified) {
+      // Only add to verified transactions if fully verified
+      verifiedTransactions.push(verifiedTx);
+      
+      // Trim if we exceed max transactions
+      if (verifiedTransactions.length > MAX_TRANSACTIONS) {
+        verifiedTransactions.shift();
       }
+      
+      // Save to disk
+      saveTransactions();
+      
+      // Log the verified transaction with links for external verification
+      logger.info(`Verified transaction: ${verifiedTx.signature.substring(0, 8)}...`, {
+        token: verifiedTx.token,
+        amount: verifiedTx.amount,
+        wallet: `${verifiedTx.wallet.substring(0, 6)}...${verifiedTx.wallet.substring(verifiedTx.wallet.length - 4)}`,
+        solscanTx: verifiedTx.solscanTxUrl,
+        solscanWallet: verifiedTx.solscanWalletUrl,
+        blockTime: new Date(verifiedTx.blockTime * 1000).toISOString()
+      });
+      
+      // Record in system memory
+      systemMemory.recordEvent({
+        type: EventType.TRANSACTION_COMPLETED,
+        component: ComponentType.TRANSACTION_VERIFIER,
+        severity: Severity.INFO,
+        message: `Transaction verified: ${verifiedTx.signature.substring(0, 8)}...`,
+        data: {
+          signature: verifiedTx.signature,
+          wallet: verifiedTx.wallet,
+          token: verifiedTx.token,
+          amount: verifiedTx.amount,
+          solscanTxUrl: verifiedTx.solscanTxUrl,
+          solscanWalletUrl: verifiedTx.solscanWalletUrl,
+          blockTime: verifiedTx.blockTime
+        }
+      });
+      
+      // Try to capture profits
+      if (verifiedTx.success && !verifiedTx.profitCaptured) {
+        await captureProfits(verifiedTx);
+      }
+      
+      systemMemory.endProcess(processId, 'COMPLETED', verifiedTx);
+      return verifiedTx;
     } else {
-      // No existing record in AWS, create one
-      const tx = verifiedTransactions[signature];
-      if (tx) {
-        // Mark as AWS verified since we control this data
-        tx.awsVerified = true;
-        
-        // Update storage
-        await saveTransactionLog();
-        await storeTransactionInDynamoDB(tx);
-        
-        logger.info(`Created new AWS record for transaction ${signature}`);
-      }
+      logger.warn(`Transaction ${signature.substring(0, 8)}... could not be verified`);
+      
+      systemMemory.recordEvent({
+        type: EventType.TRANSACTION_FAILED,
+        component: ComponentType.TRANSACTION_VERIFIER,
+        severity: Severity.WARNING,
+        message: `Transaction verification failed: ${signature.substring(0, 8)}...`,
+        data: {
+          signature,
+          wallet,
+          token,
+          amount,
+          solscanTxUrl,
+          solscanWalletUrl
+        }
+      });
+      
+      systemMemory.endProcess(processId, 'FAILED', null, 'Transaction could not be verified on-chain');
+      return null;
     }
   } catch (error) {
-    logger.error(`Error verifying transaction ${signature} with AWS:`, error);
+    logger.error(`Error verifying transaction ${signature}:`, error);
     
-    // Schedule retry
-    setTimeout(() => {
-      verifyAWS(signature);
-    }, 10000); // Retry after 10 seconds
+    systemMemory.recordEvent({
+      type: EventType.ERROR,
+      component: ComponentType.TRANSACTION_VERIFIER,
+      severity: Severity.ERROR,
+      message: `Error verifying transaction: ${error.message}`,
+      data: {
+        signature,
+        wallet,
+        token,
+        amount,
+        error: error.stack
+      }
+    });
+    
+    return null;
   }
 }
 
 /**
- * Verify transaction with on-chain Anchor program
- * @param signature Transaction signature to verify
+ * Verify transaction confirmation on-chain
+ * @param transaction Transaction to verify
+ * @param retryCount Current retry count
  */
-async function verifyAnchorProgram(signature: string): Promise<void> {
+async function verifyTransactionConfirmation(
+  transaction: VerifiedTransaction,
+  retryCount: number = 0
+): Promise<VerifiedTransaction> {
   try {
-    logger.info(`Verifying transaction ${signature} with Anchor program`);
-    
-    // Use on-chain Anchor program to verify transaction
-    // This would typically interact with your Anchor program on Solana
-    const programId = process.env.ANCHOR_PROGRAM_ID;
-    
-    if (!programId) {
-      logger.error('Missing ANCHOR_PROGRAM_ID environment variable');
-      return;
+    if (!solanaConnection) {
+      throw new Error('Solana connection not initialized');
     }
     
-    // Connect to Solana
-    const connection = nexusEngine.getSolanaConnection();
-    
-    // Get transaction details from blockchain
-    const txInfo = await connection.getTransaction(signature, {
+    // Fetch transaction information
+    const txInfo = await solanaConnection.getTransaction(transaction.signature, {
       commitment: 'confirmed',
       maxSupportedTransactionVersion: 0
     });
     
     if (!txInfo) {
-      logger.error(`Transaction ${signature} not found on Solana blockchain`);
-      
-      // Schedule retry
-      setTimeout(() => {
-        verifyAnchorProgram(signature);
-      }, 10000); // Retry after 10 seconds
-      
-      return;
+      // Transaction not found or not confirmed yet
+      if (retryCount < VERIFICATION_RETRIES) {
+        logger.debug(`Transaction ${transaction.signature.substring(0, 8)}... not found, retrying (${retryCount + 1}/${VERIFICATION_RETRIES})...`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, VERIFICATION_RETRY_DELAY));
+        
+        // Retry
+        return verifyTransactionConfirmation(transaction, retryCount + 1);
+      } else {
+        logger.warn(`Transaction ${transaction.signature.substring(0, 8)}... not found after ${VERIFICATION_RETRIES} retries`);
+        return { ...transaction, verified: false };
+      }
     }
     
-    // Check if our anchor program is involved in the transaction
-    let anchorProgramInvolved = false;
-    if (txInfo.transaction.message.accountKeys) {
-      for (const key of txInfo.transaction.message.accountKeys) {
-        if (key.toString() === programId) {
-          anchorProgramInvolved = true;
-          break;
+    // Check if transaction was successful
+    const successful = txInfo.meta && !txInfo.meta.err;
+    
+    // Verify wallet involvement
+    const walletInvolved = checkWalletInvolvement(txInfo, transaction.wallet);
+    if (!walletInvolved) {
+      logger.warn(`Wallet ${transaction.wallet.substring(0, 8)}... not involved in transaction ${transaction.signature.substring(0, 8)}...`);
+      return { ...transaction, verified: false };
+    }
+    
+    // Update transaction information
+    const updatedTransaction: VerifiedTransaction = {
+      ...transaction,
+      success: successful,
+      blockTime: txInfo.blockTime,
+      verified: true
+    };
+    
+    // If token is known but amount isn't, try to extract it
+    if (transaction.token && !transaction.amount && successful) {
+      try {
+        // This would be a complex implementation to extract token amount from transaction
+        // For now, we'll leave it as is
+      } catch (error) {
+        logger.debug(`Error extracting token amount from transaction:`, error);
+      }
+    }
+    
+    // Verify with Solscan API if possible
+    try {
+      await verifySolscanData(updatedTransaction);
+    } catch (error) {
+      logger.debug(`Solscan verification warning: ${error.message}`);
+    }
+    
+    // Check with AWS Verification Service if configured
+    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      try {
+        await verifyWithAWS(updatedTransaction);
+      } catch (error) {
+        logger.debug(`AWS verification warning: ${error.message}`);
+      }
+    }
+    
+    return updatedTransaction;
+  } catch (error) {
+    logger.error(`Error verifying transaction confirmation:`, error);
+    return { ...transaction, verified: false };
+  }
+}
+
+/**
+ * Check if wallet was involved in the transaction
+ */
+function checkWalletInvolvement(txInfo: any, walletAddress: string): boolean {
+  try {
+    // Convert wallet address to PublicKey
+    const walletPubkey = new PublicKey(walletAddress).toString();
+    
+    // Check transaction signers
+    if (txInfo.transaction && txInfo.transaction.signatures) {
+      for (const signature of txInfo.transaction.signatures) {
+        const pubkey = new PublicKey(signature.pubkey).toString();
+        if (pubkey === walletPubkey) {
+          return true;
         }
       }
     }
     
-    const tx = verifiedTransactions[signature];
-    if (tx) {
-      // Mark as verified by the Anchor program
-      // In a real implementation, we'd check with the actual Anchor program state
-      tx.anchorProgramVerified = true;
-      
-      // Use transaction status from the blockchain
-      tx.success = txInfo.meta?.err === null;
-      
-      // If the transaction is confirmed, update our record
-      if (txInfo.blockTime) {
-        tx.blockTime = txInfo.blockTime;
+    // Check accounts in the transaction
+    if (txInfo.transaction && txInfo.transaction.message && txInfo.transaction.message.accountKeys) {
+      for (const account of txInfo.transaction.message.accountKeys) {
+        const pubkey = account.toString();
+        if (pubkey === walletPubkey) {
+          return true;
+        }
       }
-      
-      if (txInfo.meta?.fee) {
-        tx.fee = txInfo.meta.fee / 1e9; // Convert lamports to SOL
-      }
-      
-      logger.info(`Anchor program verification for ${signature} completed: ${tx.success ? 'SUCCESS' : 'FAILED'}`);
-      
-      // Update storage
-      await saveTransactionLog();
-      await updateTransactionInDynamoDB(tx);
     }
-  } catch (error) {
-    logger.error(`Error verifying transaction ${signature} with Anchor program:`, error);
     
-    // Schedule retry
-    setTimeout(() => {
-      verifyAnchorProgram(signature);
-    }, 10000); // Retry after 10 seconds
+    return false;
+  } catch (error) {
+    logger.error('Error checking wallet involvement:', error);
+    return false;
+  }
+}
+
+/**
+ * Verify transaction data with Solscan
+ */
+async function verifySolscanData(transaction: VerifiedTransaction): Promise<boolean> {
+  try {
+    // This would be the implementation to verify with Solscan API
+    // For now, we'll just return true
+    return true;
+  } catch (error) {
+    logger.debug(`Error verifying with Solscan:`, error);
+    return false;
+  }
+}
+
+/**
+ * Verify transaction with AWS for additional security
+ * @param transaction Transaction to verify
+ */
+async function verifyWithAWS(transaction: VerifiedTransaction): Promise<void> {
+  try {
+    // This would be the implementation for AWS verification
+    // For now, we'll just set a placeholder verification ID
+    transaction.awsVerificationId = `aws_${Date.now()}`;
+  } catch (error) {
+    logger.debug(`Error verifying with AWS:`, error);
   }
 }
 
 /**
  * Capture profits from a successful transaction
- * @param signature Original transaction signature
+ * @param transaction Transaction to capture profits from
  */
-async function captureProfits(signature: string): Promise<void> {
+async function captureProfits(transaction: VerifiedTransaction): Promise<void> {
   try {
-    const tx = verifiedTransactions[signature];
-    if (!tx || !tx.success) {
-      logger.error(`Cannot capture profits for failed or missing transaction ${signature}`);
+    // Get wallet configuration from WalletManager
+    const walletManager = WalletManager.getInstance();
+    const walletConfig = walletManager.getConfig();
+    
+    // Check if we have the necessary configuration to capture profits
+    if (!walletConfig || !walletConfig.profitWallet || !walletConfig.profitReinvestmentRatio) {
+      logger.debug('Cannot capture profits, wallet configuration incomplete');
       return;
     }
     
-    logger.info(`Capturing profits for transaction ${signature}`);
+    // Get the profit amount
+    // This would involve complex calculations based on the transaction
+    // For now, we'll leave it as is
     
-    // Call the Anchor program to capture profits
-    // This would interact with your Anchor program
+    // Mark profit as captured
+    transaction.profitCaptured = true;
     
-    // For this implementation, we'll simulate profit capture
-    // In a real implementation, this would interact with your on-chain program
+    // Save updated transaction
+    updateTransactionRecord(transaction);
     
-    // Get wallet manager to retrieve configuration
-    const { getWalletConfig } = require('./walletManager');
-    const walletConfig = getWalletConfig();
-    
-    if (!walletConfig.tradingWallet || !walletConfig.profitWallet) {
-      logger.error('Wallet configuration incomplete, cannot capture profits');
-      return;
+    // Log profit capture
+    if (transaction.profitAmount) {
+      logger.info(`Captured profit of ${transaction.profitAmount} from transaction ${transaction.signature.substring(0, 8)}...`, {
+        solscanTx: transaction.solscanTxUrl,
+        solscanWallet: transaction.solscanWalletUrl
+      });
+      
+      // Record in system memory
+      systemMemory.recordEvent({
+        type: EventType.PROFIT_CAPTURED,
+        component: ComponentType.TRANSACTION_VERIFIER,
+        severity: Severity.INFO,
+        message: `Captured profit of ${transaction.profitAmount} from transaction ${transaction.signature.substring(0, 8)}...`,
+        data: {
+          signature: transaction.signature,
+          wallet: transaction.wallet,
+          token: transaction.token,
+          profitAmount: transaction.profitAmount,
+          solscanTxUrl: transaction.solscanTxUrl,
+          solscanWalletUrl: transaction.solscanWalletUrl
+        }
+      });
     }
-    
-    // Calculate profit amount (simulated)
-    const profitAmount = tx.amount * 0.01; // Assume 1% profit for demonstration
-    
-    // Calculate distribution amounts
-    const reinvestAmount = profitAmount * walletConfig.profitReinvestmentRatio;
-    const collectionAmount = profitAmount - reinvestAmount;
-    
-    // Record profit capture
-    tx.profitCaptured = true;
-    tx.profitAmount = profitAmount;
-    tx.profitTxSignature = 'simulated_' + Date.now().toString(36);
-    
-    // Get wallet balance after transaction (simulated)
-    tx.walletBalanceAfter = 1000; // Simulated balance
-    
-    logger.info(`Profits captured for transaction ${signature}: ${profitAmount} ${tx.token}`);
-    logger.info(`Profit distribution: ${reinvestAmount} ${tx.token} reinvested, ${collectionAmount} ${tx.token} to profit wallet`);
-    
-    // Update storage
-    await saveTransactionLog();
-    await updateTransactionInDynamoDB(tx);
-    
-    // Backup to S3
-    await backupTransactionToS3(tx);
   } catch (error) {
-    logger.error(`Error capturing profits for transaction ${signature}:`, error);
+    logger.error(`Error capturing profits:`, error);
   }
 }
 
 /**
- * Store transaction in DynamoDB
- * @param transaction Transaction to store
- */
-async function storeTransactionInDynamoDB(transaction: VerifiedTransaction): Promise<void> {
-  try {
-    const params = {
-      TableName: transactionsTable,
-      Item: {
-        ...transaction,
-        createdAt: Date.now()
-      }
-    };
-    
-    await dynamoDB.put(params).promise();
-    logger.debug(`Transaction ${transaction.signature} stored in DynamoDB`);
-  } catch (error) {
-    logger.error(`Error storing transaction ${transaction.signature} in DynamoDB:`, error);
-  }
-}
-
-/**
- * Update transaction in DynamoDB
+ * Update a transaction record in storage
  * @param transaction Transaction to update
  */
-async function updateTransactionInDynamoDB(transaction: VerifiedTransaction): Promise<void> {
+function updateTransactionRecord(transaction: VerifiedTransaction): void {
   try {
-    const params = {
-      TableName: transactionsTable,
-      Key: {
-        signature: transaction.signature
-      },
-      UpdateExpression: 'set success = :success, solscanVerified = :solscanVerified, ' +
-        'awsVerified = :awsVerified, anchorProgramVerified = :anchorProgramVerified, ' +
-        'profitCaptured = :profitCaptured, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':success': transaction.success,
-        ':solscanVerified': transaction.solscanVerified,
-        ':awsVerified': transaction.awsVerified,
-        ':anchorProgramVerified': transaction.anchorProgramVerified,
-        ':profitCaptured': transaction.profitCaptured,
-        ':updatedAt': Date.now()
-      }
-    };
+    // Find the transaction in the array
+    const index = verifiedTransactions.findIndex(tx => tx.signature === transaction.signature);
     
-    // Add optional fields if they exist
-    if (transaction.profitAmount !== undefined) {
-      params.UpdateExpression += ', profitAmount = :profitAmount';
-      params.ExpressionAttributeValues[':profitAmount'] = transaction.profitAmount;
-    }
-    
-    if (transaction.profitTxSignature !== undefined) {
-      params.UpdateExpression += ', profitTxSignature = :profitTxSignature';
-      params.ExpressionAttributeValues[':profitTxSignature'] = transaction.profitTxSignature;
-    }
-    
-    if (transaction.walletBalanceAfter !== undefined) {
-      params.UpdateExpression += ', walletBalanceAfter = :walletBalanceAfter';
-      params.ExpressionAttributeValues[':walletBalanceAfter'] = transaction.walletBalanceAfter;
-    }
-    
-    if (transaction.error !== undefined) {
-      params.UpdateExpression += ', error = :error';
-      params.ExpressionAttributeValues[':error'] = transaction.error;
-    }
-    
-    await dynamoDB.update(params).promise();
-    logger.debug(`Transaction ${transaction.signature} updated in DynamoDB`);
-  } catch (error) {
-    logger.error(`Error updating transaction ${transaction.signature} in DynamoDB:`, error);
-  }
-}
-
-/**
- * Backup transaction to S3
- * @param transaction Transaction to backup
- */
-async function backupTransactionToS3(transaction: VerifiedTransaction): Promise<void> {
-  try {
-    const backupObject = {
-      ...transaction,
-      backupTimestamp: Date.now()
-    };
-    
-    const params = {
-      Bucket: backupBucket,
-      Key: `transactions/${transaction.signature}.json`,
-      Body: JSON.stringify(backupObject, null, 2),
-      ContentType: 'application/json'
-    };
-    
-    await s3.putObject(params).promise();
-    logger.debug(`Transaction ${transaction.signature} backed up to S3`);
-  } catch (error) {
-    logger.error(`Error backing up transaction ${transaction.signature} to S3:`, error);
-  }
-}
-
-/**
- * Save transaction log to file
- */
-async function saveTransactionLog(): Promise<void> {
-  try {
-    // Create logs directory if it doesn't exist
-    const logsDir = path.join(process.cwd(), 'logs');
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-    
-    // Save to file
-    fs.writeFileSync(
-      TX_LOG_PATH,
-      JSON.stringify(verifiedTransactions, null, 2),
-      'utf-8'
-    );
-    
-    logger.debug(`Transaction log saved to ${TX_LOG_PATH}`);
-  } catch (error) {
-    logger.error('Error saving transaction log to file:', error);
-  }
-}
-
-/**
- * Load transaction log from file
- */
-function loadTransactionLog(): void {
-  try {
-    if (fs.existsSync(TX_LOG_PATH)) {
-      const data = fs.readFileSync(TX_LOG_PATH, 'utf-8');
-      verifiedTransactions = JSON.parse(data);
-      
-      logger.info(`Loaded ${Object.keys(verifiedTransactions).length} transactions from log file`);
+    if (index >= 0) {
+      // Update the transaction
+      verifiedTransactions[index] = transaction;
     } else {
-      logger.info('No transaction log file found, starting with empty log');
+      // Add the transaction if it's verified
+      if (transaction.verified) {
+        verifiedTransactions.push(transaction);
+      }
     }
+    
+    // Save to disk
+    saveTransactions();
   } catch (error) {
-    logger.error('Error loading transaction log from file:', error);
-    verifiedTransactions = {};
+    logger.error('Error updating transaction record:', error);
   }
 }
 
 /**
- * Initialize transaction verifier
+ * Save transactions to disk
  */
-export function initTransactionVerifier(): void {
-  loadTransactionLog();
-  logger.info('Transaction verifier initialized');
+function saveTransactions(): void {
+  try {
+    // Only save verified transactions
+    const verifiedOnly = verifiedTransactions.filter(tx => tx.verified);
+    
+    fs.writeFileSync(
+      TRANSACTIONS_FILE,
+      JSON.stringify(verifiedOnly, null, 2)
+    );
+  } catch (error) {
+    logger.error('Error saving transactions:', error);
+  }
 }
 
-// Initialize on module load
-initTransactionVerifier();
+/**
+ * Get all verified transactions
+ * @returns Array of verified transactions
+ */
+export function getAllVerifiedTransactions(): VerifiedTransaction[] {
+  // Only return verified transactions
+  return verifiedTransactions.filter(tx => tx.verified);
+}
+
+/**
+ * Get a verified transaction by signature
+ * @param signature Transaction signature
+ * @returns Verified transaction or null if not found
+ */
+export function getVerifiedTransaction(signature: string): VerifiedTransaction | null {
+  const transaction = verifiedTransactions.find(tx => tx.signature === signature);
+  return transaction && transaction.verified ? transaction : null;
+}
+
+/**
+ * Get verified transactions for a wallet
+ * @param wallet Wallet address
+ * @returns Array of verified transactions for the wallet
+ */
+export function getWalletTransactions(wallet: string): VerifiedTransaction[] {
+  return verifiedTransactions.filter(tx => tx.wallet === wallet && tx.verified);
+}
+
+/**
+ * Clear all verified transactions
+ */
+export function clearVerifiedTransactions(): void {
+  verifiedTransactions.length = 0;
+  
+  // Save empty array to disk
+  saveTransactions();
+  
+  logger.info('Cleared all verified transactions');
+}

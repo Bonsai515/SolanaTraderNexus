@@ -6,7 +6,7 @@
  */
 
 import * as web3 from '@solana/web3.js';
-import { logger } from './logger';
+import * as logger from './logger';
 
 interface TokenSecurityResult {
   isSafe: boolean;

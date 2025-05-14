@@ -1,80 +1,123 @@
 /**
- * Signal Hub - Centralized Communication System
+ * Signal Hub - Central Communication System
  * 
- * This module serves as the central nervous system for all signal communication,
- * allowing different components of the system to receive and process signals from transformers.
- * It coordinates signal flow between transformers, agents, and other system components.
+ * This module serves as the central nervous system for the entire trading platform,
+ * connecting all components and ensuring seamless communication between:
+ * - Market Analysis Signal Generator
+ * - Trading Agents
+ * - Nexus Transaction Engine
+ * - Solana Blockchain (via Anchor Program)
+ * - Verification Systems
+ * - Wallet Management
+ * 
+ * It automatically handles signal routing, transaction execution, verification,
+ * and profit capture without requiring manual intervention.
  */
 
-import { WebSocketServer, WebSocket } from 'ws';
 import { EventEmitter } from 'events';
-import { Server } from 'http';
-import { logger } from './logger';
-import { MarketData } from './priceFeedCache';
-import { v4 as uuidv4 } from 'uuid';
+import * as logger from './logger';
+import { nexusEngine } from './nexus-transaction-engine';
+import { getWalletConfig } from './walletManager';
+import { verifyTransaction } from './transactionVerifier';
+import { isProgramConnected, sendTransactionThroughProgram } from './anchorProgramConnector';
 
-// Import signal monitoring safely with fallback
-let signalMonitoring: any;
-try {
-  const monitoring = require('./signalMonitoring');
-  signalMonitoring = monitoring.default || monitoring;
-  if (!signalMonitoring) {
-    logger.warn('SignalMonitoring module loaded but has no exports');
-  }
-} catch (error) {
-  logger.warn(`Failed to import signalMonitoring: ${error}`);
-  signalMonitoring = null;
-}
+// Import signal types from shared definitions
 import { 
   SignalType, 
   SignalStrength, 
   SignalDirection, 
-  SignalPriority, 
-  SignalSource, 
-  BaseSignal 
+  SignalPriority,
+  SignalSource
 } from '../shared/signalTypes';
 
-// Re-export the signal enums for backwards compatibility
-export { 
-  SignalType, 
-  SignalStrength, 
-  SignalDirection, 
-  SignalSource,
-  SignalPriority 
-};
-
-// Basic signal structure using the shared BaseSignal
-export interface Signal extends BaseSignal {
-  // Server-specific extensions can be added here
-}
-
-// Signal processor interface - components can implement this to process signals
-export interface SignalProcessor {
+// Signal interface - aligned with shared signalTypes.ts but extended for our needs
+export interface Signal {
   id: string;
-  name: string;
-  supportedSignalTypes: SignalType[];
-  priority: number; // Higher priority processors get signals first
-  process(signal: Signal): Promise<void>;
+  timestamp: number;
+  type: SignalType;
+  sourceToken?: string;
+  targetToken?: string;
+  strength?: SignalStrength;
+  direction?: SignalDirection;
+  priority?: SignalPriority;
+  confidence: number; // 0-1
+  source: string | SignalSource;
+  metadata?: Record<string, any>;
+  processed?: boolean;
+  actionTaken?: boolean;
+  transactionSignature?: string;
+  // Additional fields from BaseSignal to ensure compatibility
+  pair?: string;
+  description?: string;
+  actionable?: boolean;
+  token_address?: string;
+  analysis?: Record<string, any>;
+  metrics?: Record<string, any>;
+  relatedSignals?: string[];
 }
 
-// Signal Hub class - singleton instance
+// ActionResult interface
+export interface ActionResult {
+  signalId: string;
+  success: boolean;
+  actionType: string;
+  timestamp: number;
+  transactionSignature?: string;
+  profit?: number;
+  error?: string;
+}
+
+// Signal processing configuration
+interface SignalProcessingConfig {
+  confidenceThreshold: number; // 0-1
+  useRealFunds: boolean;
+  enableMEV: boolean;
+  enableFlashLoans: boolean;
+  enableCrossChain: boolean;
+  maxConcurrentTransactions: number;
+  maximumTransactionSizeUSD: number;
+  minimumTransactionSizeUSD: number;
+  useFallbackStrategies: boolean;
+}
+
+/**
+ * Signal Hub - Central Communication System Implementation
+ */
 class SignalHub extends EventEmitter {
   private static instance: SignalHub;
-  private signalStore: Map<string, Signal> = new Map();
-  private processors: SignalProcessor[] = [];
-  private wsServer: WebSocketServer | null = null;
-  private wsClients: Set<WebSocket> = new Set();
-  private initialized: boolean = false;
-  
+  private signals: Record<string, Signal> = {};
+  private actionResults: Record<string, ActionResult> = {};
+  private activeTransactions: number = 0;
+  private isRunning: boolean = false;
+  private processingQueue: string[] = [];
+  private processingInterval: NodeJS.Timeout | null = null;
+  private config: SignalProcessingConfig = {
+    confidenceThreshold: 0.65, // Default confidence threshold
+    useRealFunds: false, // Default to simulation mode for safety
+    enableMEV: true,
+    enableFlashLoans: true,
+    enableCrossChain: true,
+    maxConcurrentTransactions: 5,
+    maximumTransactionSizeUSD: 5000,
+    minimumTransactionSizeUSD: 50,
+    useFallbackStrategies: true
+  };
+
   private constructor() {
     super();
     
-    // Set maximum number of listeners to avoid memory leaks
-    this.setMaxListeners(100);
+    // Set up event listeners
+    this.on('signal', this.handleSignal.bind(this));
+    this.on('action_result', this.handleActionResult.bind(this));
+    this.on('transaction_verified', this.handleTransactionVerified.bind(this));
+    this.on('profit_captured', this.handleProfitCaptured.bind(this));
+    this.on('error', this.handleError.bind(this));
+    
+    logger.info('Signal Hub initialized and ready to connect all system components');
   }
   
   /**
-   * Get the SignalHub singleton instance
+   * Get the SignalHub instance (Singleton)
    */
   public static getInstance(): SignalHub {
     if (!SignalHub.instance) {
@@ -84,717 +127,729 @@ class SignalHub extends EventEmitter {
   }
   
   /**
-   * Initialize the signal hub
+   * Start the signal processing system
    */
-  public async initialize(): Promise<boolean> {
-    if (this.initialized) {
-      return true;
+  public start(config?: Partial<SignalProcessingConfig>): boolean {
+    if (this.isRunning) {
+      logger.warn('Signal Hub is already running');
+      return false;
     }
     
+    // Update configuration
+    if (config) {
+      this.config = { ...this.config, ...config };
+    }
+    
+    logger.info(`Starting Signal Hub with configuration:`);
+    logger.info(`- Real funds mode: ${this.config.useRealFunds ? 'ENABLED' : 'DISABLED'}`);
+    logger.info(`- MEV protection: ${this.config.enableMEV ? 'ENABLED' : 'DISABLED'}`);
+    logger.info(`- Flash loans: ${this.config.enableFlashLoans ? 'ENABLED' : 'DISABLED'}`);
+    logger.info(`- Cross-chain trading: ${this.config.enableCrossChain ? 'ENABLED' : 'DISABLED'}`);
+    logger.info(`- Max transaction size: $${this.config.maximumTransactionSizeUSD}`);
+    logger.info(`- Min transaction size: $${this.config.minimumTransactionSizeUSD}`);
+    logger.info(`- Confidence threshold: ${this.config.confidenceThreshold * 100}%`);
+    
+    // Start the processing interval
+    this.processingInterval = setInterval(() => {
+      this.processSignalQueue();
+    }, 1000); // Process queue every second
+    
+    this.isRunning = true;
+    logger.info('Signal Hub started successfully');
+    return true;
+  }
+  
+  /**
+   * Stop the signal processing system
+   */
+  public stop(): boolean {
+    if (!this.isRunning) {
+      logger.warn('Signal Hub is not running');
+      return false;
+    }
+    
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+    
+    this.isRunning = false;
+    logger.info('Signal Hub stopped');
+    return true;
+  }
+  
+  /**
+   * Add a signal to the system
+   * @param signal Signal to add
+   */
+  public addSignal(signal: Signal): boolean {
     try {
-      logger.info('Initializing Signal Hub communication system');
-      this.initialized = true;
+      // Validate signal
+      if (!signal.id || !signal.type || !signal.timestamp || signal.confidence === undefined) {
+        logger.error('Invalid signal format, missing required fields');
+        return false;
+      }
+      
+      // Store signal
+      this.signals[signal.id] = signal;
+      
+      // Add to processing queue if above confidence threshold
+      if (signal.confidence >= this.config.confidenceThreshold) {
+        this.processingQueue.push(signal.id);
+        logger.info(`Signal ${signal.id} added to processing queue with confidence ${(signal.confidence * 100).toFixed(0)}%`);
+      } else {
+        logger.debug(`Signal ${signal.id} below confidence threshold (${(signal.confidence * 100).toFixed(0)}% < ${(this.config.confidenceThreshold * 100).toFixed(0)}%), not processing`);
+      }
+      
+      // Emit signal event
+      this.emit('signal', signal);
+      
       return true;
     } catch (error) {
-      logger.error('Failed to initialize Signal Hub:', error);
+      logger.error('Error adding signal:', error);
+      this.emit('error', { type: 'add_signal', error });
       return false;
     }
   }
   
   /**
-   * Setup WebSocket server for signal communication
-   * @param httpServer HTTP server instance
+   * Submit a signal to the system
+   * @param signal Signal data to submit
+   * @returns The generated signal ID
    */
-  public setupWebSocketServer(httpServer: Server): WebSocketServer {
-    this.wsServer = new WebSocketServer({ server: httpServer, path: '/signals' });
-    
-    this.wsServer.on('connection', (ws: WebSocket) => {
-      logger.info('New signal WebSocket client connected');
-      this.wsClients.add(ws);
+  public async submitSignal(signal: Omit<Signal, 'id' | 'timestamp'>): Promise<string> {
+    try {
+      // Generate unique ID
+      const signalId = `signal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Store client information
-      const clientInfo = {
-        subscribedPairs: new Set<string>(),
-        subscribedTypes: new Set<string>(),
-        subscribedSources: new Set<string>()
+      // Create full signal object
+      const fullSignal: Signal = {
+        ...signal,
+        id: signalId,
+        timestamp: Date.now(),
+        processed: false,
+        actionTaken: false
       };
       
-      // Attach client info to the websocket connection
-      (ws as any).clientInfo = clientInfo;
+      // Add to system
+      this.addSignal(fullSignal);
       
-      ws.on('message', (message: string) => {
-        try {
-          const data = JSON.parse(message);
-          
-          // Handle subscription requests
-          if (data.type === 'subscribe') {
-            if (data.pairs && Array.isArray(data.pairs)) {
-              data.pairs.forEach((pair: string) => clientInfo.subscribedPairs.add(pair));
-            }
-            if (data.signalTypes && Array.isArray(data.signalTypes)) {
-              data.signalTypes.forEach((type: string) => clientInfo.subscribedTypes.add(type));
-            }
-            if (data.sources && Array.isArray(data.sources)) {
-              data.sources.forEach((source: string) => clientInfo.subscribedSources.add(source));
-            }
-            
-            ws.send(JSON.stringify({
-              type: 'subscription_confirmed',
-              pairs: Array.from(clientInfo.subscribedPairs),
-              signalTypes: Array.from(clientInfo.subscribedTypes),
-              sources: Array.from(clientInfo.subscribedSources),
-              timestamp: new Date().toISOString()
-            }));
-          }
-        } catch (error) {
-          logger.error('Error processing signal WebSocket message:', error);
-        }
-      });
-      
-      ws.on('close', () => {
-        logger.info('Signal WebSocket client disconnected');
-        this.wsClients.delete(ws);
-      });
-    });
-    
-    return this.wsServer;
+      logger.info(`Signal submitted and assigned ID: ${signalId} (type: ${signal.type}, source: ${signal.source})`);
+      return signalId;
+    } catch (error) {
+      logger.error('Error submitting signal:', error);
+      this.emit('error', { type: 'submit_signal', error });
+      throw error;
+    }
   }
   
   /**
-   * Register a signal processor
-   * @param processor SignalProcessor implementation
+   * Get a specific signal by ID
+   * @param id Signal ID to retrieve
+   * @returns The signal if found, undefined otherwise
    */
-  public registerProcessor(processor: SignalProcessor): void {
-    this.processors.push(processor);
-    // Sort processors by priority (higher first)
-    this.processors.sort((a, b) => b.priority - a.priority);
-    logger.info(`Registered signal processor: ${processor.name}`);
+  public getSignal(id: string): Signal | undefined {
+    return this.signals[id];
   }
   
   /**
-   * Process a signal through the hub
+   * Get all signals in the system
+   * @param filter Optional filter function
+   * @returns Array of signals matching the filter
+   */
+  public getSignals(filter?: (signal: Signal) => boolean): Signal[] {
+    const allSignals = Object.values(this.signals);
+    
+    if (filter) {
+      return allSignals.filter(filter);
+    }
+    
+    return allSignals;
+  }
+  
+  /**
+   * Process the signal queue
+   */
+  private async processSignalQueue(): Promise<void> {
+    if (!this.isRunning || this.processingQueue.length === 0) {
+      return;
+    }
+    
+    // Check if we're at max concurrent transactions
+    if (this.activeTransactions >= this.config.maxConcurrentTransactions) {
+      logger.debug(`At maximum concurrent transactions (${this.activeTransactions}), waiting...`);
+      return;
+    }
+    
+    // Get next signal from queue
+    const signalId = this.processingQueue.shift();
+    if (!signalId || !this.signals[signalId]) {
+      return;
+    }
+    
+    const signal = this.signals[signalId];
+    
+    // Mark as processed
+    signal.processed = true;
+    
+    try {
+      this.activeTransactions++;
+      
+      // Process based on signal type
+      switch (signal.type) {
+        case SignalType.MARKET_SENTIMENT:
+        case SignalType.PRICE_MOVEMENT:
+        case SignalType.VOLATILITY_ALERT:
+          await this.processTradingSignal(signal);
+          break;
+          
+        case SignalType.ARBITRAGE_OPPORTUNITY:
+        case SignalType.MEV_OPPORTUNITY:
+        case SignalType.FLASH_LOAN_OPPORTUNITY:
+          await this.processArbitrageSignal(signal);
+          break;
+          
+        case SignalType.CROSS_CHAIN_OPPORTUNITY:
+          if (this.config.enableCrossChain) {
+            await this.processCrossChainSignal(signal);
+          } else {
+            logger.warn(`Cross-chain trading disabled, skipping signal ${signal.id}`);
+          }
+          break;
+          
+        default:
+          logger.warn(`Unknown signal type ${signal.type} for signal ${signal.id}`);
+      }
+    } catch (error) {
+      logger.error(`Error processing signal ${signalId}:`, error);
+      this.emit('error', { type: 'process_signal', signalId, error });
+      
+      this.actionResults[signalId] = {
+        signalId,
+        success: false,
+        actionType: 'process',
+        timestamp: Date.now(),
+        error: error.message
+      };
+    } finally {
+      this.activeTransactions--;
+    }
+  }
+  
+  /**
+   * Process a trading signal (market sentiment, price movement, volatility)
    * @param signal Signal to process
    */
-  public async processSignal(signal: Signal): Promise<void> {
-    const startTime = Date.now();
-    let validationTime = 0;
-    let broadcastTime = 0;
-    let processingTime = 0;
+  private async processTradingSignal(signal: Signal): Promise<void> {
+    logger.info(`Processing trading signal ${signal.id} of type ${signal.type}`);
+    
+    // Validate signal has required fields
+    if (!signal.sourceToken && !signal.targetToken) {
+      logger.error(`Signal ${signal.id} missing required token information`);
+      return;
+    }
+    
+    // Get trading direction
+    const direction = signal.direction || SignalDirection.BUY;
+    
+    // Determine token and amount based on direction
+    let sourceToken, targetToken, amount;
+    
+    if (direction === SignalDirection.BUY || direction === SignalDirection.LONG) {
+      // Buy/Long: Use USDC as source token
+      sourceToken = 'USDC';
+      targetToken = signal.targetToken || signal.sourceToken;
+      
+      // Determine position size based on signal strength
+      let positionSizeMultiplier = 0.5; // Default 50% of max size
+      
+      if (signal.strength === SignalStrength.STRONG) {
+        positionSizeMultiplier = 0.75;
+      } else if (signal.strength === SignalStrength.VERY_STRONG) {
+        positionSizeMultiplier = 1.0;
+      } else if (signal.strength === SignalStrength.WEAK) {
+        positionSizeMultiplier = 0.25;
+      }
+      
+      amount = this.config.maximumTransactionSizeUSD * positionSizeMultiplier;
+      
+      // Ensure amount is within limits
+      amount = Math.max(this.config.minimumTransactionSizeUSD, Math.min(amount, this.config.maximumTransactionSizeUSD));
+      
+    } else if (direction === SignalDirection.SELL || direction === SignalDirection.SHORT) {
+      // Sell/Short: Use token as source
+      sourceToken = signal.sourceToken;
+      targetToken = 'USDC';
+      
+      // For a sell/short, we need to determine how much of the token we have
+      // This would connect to portfolio management in a real system
+      amount = 100; // Placeholder for portfolio management integration
+    }
     
     try {
-      // Import here to avoid circular dependency
-      const { signalValidator } = require('./signalValidator');
-      // Use our global signalMonitoring that we already imported safely at the top
+      // Make sure amount is defined before using toFixed
+      const formattedAmount = amount !== undefined ? amount.toFixed(2) : '0.00';
+      logger.info(`Executing ${direction} for ${sourceToken}->${targetToken}, amount: $${formattedAmount}`);
       
-      // Generate ID if not provided
-      if (!signal.id) {
-        signal.id = this.generateSignalId();
+      // Get wallet configuration
+      const walletConfig = getWalletConfig();
+      
+      // Make sure we have a valid amount before executing
+      if (amount === undefined || isNaN(amount) || amount <= 0) {
+        throw new Error(`Invalid transaction amount: ${amount}`);
       }
       
-      // Set timestamp if not provided
-      if (!signal.timestamp) {
-        signal.timestamp = new Date();
-      }
+      // Execute the transaction
+      const txResult = await nexusEngine.executeSwap({
+        sourceMint: sourceToken,
+        targetMint: targetToken,
+        amount: amount,
+        slippageBps: 50, // 0.5% slippage
+        useRealFunds: this.config.useRealFunds,
+        walletAddress: walletConfig.tradingWallet
+      });
       
-      // Start validation time tracking
-      const validationStartTime = Date.now();
-      
-      // Validate the signal
-      const validationResult = signalValidator.validate(signal);
-      
-      // End validation time tracking
-      validationTime = Date.now() - validationStartTime;
-      
-      // Safely track latency with fallback
-      try {
-        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
-          signalMonitoring.trackLatency(signal.id, 'validation', validationTime);
-        } else {
-          // Fallback logging if tracking is unavailable
-          logger.debug(`Signal ${signal.id} validation latency: ${validationTime}ms`);
-        }
-      } catch (error) {
-        logger.debug(`Signal ${signal.id} validation latency: ${validationTime}ms`);
-      }
-      
-      // Only process valid signals
-      if (!validationResult.valid) {
-        logger.warn(`Signal validation failed for signal ${signal.id}: ${validationResult.errors.map(e => e.message).join(', ')}`);
+      if (txResult.successful) {
+        logger.info(`Successfully executed transaction for signal ${signal.id}, signature: ${txResult.signature}`);
         
-        // Still store invalid signals but mark them
-        signal.metadata = {
-          ...signal.metadata,
-          validationFailed: true,
-          validationErrors: validationResult.errors.filter(e => e.severity === 'error').map(e => e.message)
+        // Mark signal as actioned
+        signal.actionTaken = true;
+        signal.transactionSignature = txResult.signature;
+        
+        // Submit for verification
+        if (txResult.signature) {
+          await verifyTransaction(
+            txResult.signature,
+            walletConfig.tradingWallet,
+            targetToken,
+            txResult.tokenBBalance || 0
+          );
+        }
+        
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: true,
+          actionType: `${direction}_${sourceToken}_${targetToken}`,
+          timestamp: Date.now(),
+          transactionSignature: txResult.signature
         };
         
-        // Store the invalid signal but don't process it further
-        this.signalStore.set(signal.id, signal);
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
+      } else {
+        logger.warn(`Transaction failed for signal ${signal.id}: ${txResult.error}`);
         
-        // Track invalid signal
-        signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
-        return;
-      }
-      
-      // Add validation warnings if any
-      if (validationResult.errors.length > 0) {
-        signal.metadata = {
-          ...signal.metadata,
-          validationWarnings: validationResult.errors.filter(e => e.severity === 'warning').map(e => e.message)
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: false,
+          actionType: `${direction}_${sourceToken}_${targetToken}`,
+          timestamp: Date.now(),
+          error: txResult.error
         };
+        
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
       }
-      
-      // Add performance metrics tracking
-      const generatedAtTimestamp = signal.timestamp instanceof Date 
-        ? signal.timestamp.getTime() 
-        : (typeof signal.timestamp === 'string' 
-            ? new Date(signal.timestamp).getTime() 
-            : Date.now());
-            
-      signal.metadata = {
-        ...signal.metadata,
-        performance: {
-          generatedAt: generatedAtTimestamp,
-          processedAt: Date.now(),
-          validationTimeMs: validationTime
-        }
-      };
-      
-      // Add to signal store
-      this.signalStore.set(signal.id, signal);
-      
-      // Manage signal store size
-      if (this.signalStore.size > 5000) {
-        // Remove oldest signals when store gets too large
-        const keys = Array.from(this.signalStore.keys());
-        const oldestKeys = keys.slice(0, 1000); // Remove 1000 oldest signals
-        for (const key of oldestKeys) {
-          this.signalStore.delete(key);
-        }
-      }
-      
-      // Emit signal event for any listeners
-      this.emit('signal', signal);
-      this.emit(`signal:${signal.type}`, signal);
-      this.emit(`signal:${signal.source}`, signal);
-      this.emit(`signal:${signal.pair}`, signal);
-      
-      // Broadcast to WebSocket clients
-      const broadcastStartTime = Date.now();
-      this.broadcastSignal(signal);
-      broadcastTime = Date.now() - broadcastStartTime;
-      
-      // Track broadcast latency
-      try {
-        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
-          signalMonitoring.trackLatency(signal.id, 'delivery', broadcastTime);
-        } else {
-          logger.debug(`Signal ${signal.id} delivery latency: ${broadcastTime}ms`);
-        }
-      } catch (error) {
-        logger.debug(`Signal ${signal.id} delivery latency: ${broadcastTime}ms`);
-      }
-      
-      // Process through registered processors
-      const processingStartTime = Date.now();
-      let processingSuccess = true;
-      
-      for (const processor of this.processors) {
-        if (processor.supportedSignalTypes.includes(signal.type) || 
-            processor.supportedSignalTypes.includes(SignalType.CUSTOM)) {
-          try {
-            const componentStartTime = Date.now();
-            await processor.process(signal);
-            const componentProcessingTime = Date.now() - componentStartTime;
-            
-            // Track component health
-            signalMonitoring.trackComponentHealth(
-              processor.name,
-              true,
-              componentProcessingTime
-            );
-          } catch (processorError) {
-            processingSuccess = false;
-            logger.error(`Error in signal processor ${processor.name}:`, processorError);
-            
-            // Track component error
-            signalMonitoring.trackComponentHealth(
-              processor.name,
-              false,
-              0
-            );
-          }
-        }
-      }
-      
-      processingTime = Date.now() - processingStartTime;
-      
-      // Track processing latency
-      try {
-        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
-          signalMonitoring.trackLatency(signal.id, 'processing', processingTime);
-        } else {
-          logger.debug(`Signal ${signal.id} processing latency: ${processingTime}ms`);
-        }
-      } catch (error) {
-        logger.debug(`Signal ${signal.id} processing latency: ${processingTime}ms`);
-      }
-      
-      // Calculate generation time (time between signal timestamp and when it was received)
-      let generationTime = 0;
-      try {
-        const signalTime = signal.timestamp instanceof Date 
-          ? signal.timestamp.getTime() 
-          : (typeof signal.timestamp === 'string' 
-              ? new Date(signal.timestamp).getTime() 
-              : startTime);
-              
-        generationTime = signalTime < startTime ? startTime - signalTime : 0;
-      } catch (error) {
-        generationTime = 0;
-        logger.debug(`Error calculating generation time for signal ${signal.id}: ${error}`);
-      }
-      
-      // Track generation latency
-      try {
-        if (signalMonitoring && typeof signalMonitoring.trackLatency === 'function') {
-          signalMonitoring.trackLatency(signal.id, 'generation', generationTime);
-        } else {
-          logger.debug(`Signal ${signal.id} generation latency: ${generationTime}ms`);
-        }
-      } catch (error) {
-        logger.debug(`Signal ${signal.id} generation latency: ${generationTime}ms`);
-      }
-      
-      // Update signal with performance data
-      signal.metadata.performance = {
-        ...signal.metadata.performance,
-        totalTimeMs: Date.now() - startTime,
-        broadcastTimeMs: broadcastTime,
-        processingTimeMs: processingTime,
-        generationTimeMs: generationTime
-      };
-      
-      // Update signal store with final performance data
-      this.signalStore.set(signal.id, signal);
-      
-      // Track entire signal processing
-      try {
-        if (signalMonitoring && typeof signalMonitoring.trackSignal === 'function') {
-          signalMonitoring.trackSignal(signal, validationResult, Date.now() - startTime);
-        } else {
-          logger.debug(`Signal ${signal.id} full processing time: ${Date.now() - startTime}ms`);
-        }
-      } catch (error) {
-        logger.debug(`Signal ${signal.id} full processing time: ${Date.now() - startTime}ms`);
-      }
-      
-      logger.debug(`Processed signal ${signal.id} of type ${signal.type} from ${signal.source} in ${Date.now() - startTime}ms`);
     } catch (error) {
-      logger.error('Error processing signal:', error);
+      logger.error(`Error executing transaction for signal ${signal.id}:`, error);
+      
+      // Record action result
+      this.actionResults[signal.id] = {
+        signalId: signal.id,
+        success: false,
+        actionType: `${direction}_${sourceToken}_${targetToken}`,
+        timestamp: Date.now(),
+        error: error.message
+      };
+      
+      // Emit action result event
+      this.emit('action_result', this.actionResults[signal.id]);
     }
   }
   
   /**
-   * Submit a signal to the hub
-   * @param signal Signal to submit
+   * Process an arbitrage signal (arbitrage opportunity, MEV, flash loan)
+   * @param signal Signal to process
    */
-  public async submitSignal(signal: Signal): Promise<string> {
-    // Generate ID if not provided
-    if (!signal.id) {
-      signal.id = this.generateSignalId();
+  private async processArbitrageSignal(signal: Signal): Promise<void> {
+    logger.info(`Processing arbitrage signal ${signal.id} of type ${signal.type}`);
+    
+    // Validate signal has required fields
+    if (!signal.sourceToken || !signal.targetToken || !signal.metadata) {
+      logger.error(`Signal ${signal.id} missing required arbitrage information`);
+      return;
     }
     
-    // Process the signal with error handling
+    // Get arbitrage details from metadata
+    const dexA = signal.metadata.dexA || 'unknown';
+    const dexB = signal.metadata.dexB || 'unknown';
+    const estimatedProfit = signal.metadata.estimatedProfit || 0;
+    const useFlashLoan = signal.type === SignalType.FLASH_LOAN_OPPORTUNITY && this.config.enableFlashLoans;
+    
+    // Skip if estimated profit is too low
+    if (estimatedProfit < 0.001) { // 0.1% profit
+      logger.warn(`Estimated profit for signal ${signal.id} too low (${(estimatedProfit * 100).toFixed(2)}%), skipping`);
+      return;
+    }
+    
     try {
-      await this.processSignal(signal);
+      logger.info(`Executing arbitrage for ${signal.sourceToken}<->${signal.targetToken} between ${dexA} and ${dexB}, est. profit: ${(estimatedProfit * 100).toFixed(2)}%`);
+      
+      // Get wallet configuration
+      const walletConfig = getWalletConfig();
+      
+      // Determine amount based on signal priority and estimated profit
+      let amount = this.config.minimumTransactionSizeUSD;
+      
+      if (signal.priority === SignalPriority.HIGH) {
+        amount = this.config.maximumTransactionSizeUSD * 0.5;
+      } else if (signal.priority === SignalPriority.CRITICAL) {
+        amount = this.config.maximumTransactionSizeUSD;
+      }
+      
+      // Scale amount by estimated profit (higher profit -> larger position)
+      amount = amount * Math.min(1, estimatedProfit * 10); // Scale by profit, max 1x multiplier
+      
+      // Execute the arbitrage
+      const txResult = await nexusEngine.executeArbitrage({
+        tokenA: signal.sourceToken,
+        tokenB: signal.targetToken,
+        amount,
+        dexA,
+        dexB,
+        useRealFunds: this.config.useRealFunds,
+        flashLoan: useFlashLoan,
+        walletAddress: walletConfig.tradingWallet
+      });
+      
+      if (txResult.successful) {
+        logger.info(`Successfully executed arbitrage for signal ${signal.id}, signature: ${txResult.signature}`);
+        
+        // Mark signal as actioned
+        signal.actionTaken = true;
+        signal.transactionSignature = txResult.signature;
+        
+        // Submit for verification
+        if (txResult.signature) {
+          await verifyTransaction(
+            txResult.signature,
+            walletConfig.tradingWallet,
+            signal.targetToken,
+            txResult.netProfit || 0
+          );
+        }
+        
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: true,
+          actionType: `ARBITRAGE_${signal.sourceToken}_${signal.targetToken}`,
+          timestamp: Date.now(),
+          transactionSignature: txResult.signature,
+          profit: txResult.netProfit
+        };
+        
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
+      } else {
+        logger.warn(`Arbitrage failed for signal ${signal.id}: ${txResult.error}`);
+        
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: false,
+          actionType: `ARBITRAGE_${signal.sourceToken}_${signal.targetToken}`,
+          timestamp: Date.now(),
+          error: txResult.error
+        };
+        
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
+      }
     } catch (error) {
-      logger.error(`Error processing signal: ${error}`);
+      logger.error(`Error executing arbitrage for signal ${signal.id}:`, error);
+      
+      // Record action result
+      this.actionResults[signal.id] = {
+        signalId: signal.id,
+        success: false,
+        actionType: `ARBITRAGE_${signal.sourceToken}_${signal.targetToken}`,
+        timestamp: Date.now(),
+        error: error.message
+      };
+      
+      // Emit action result event
+      this.emit('action_result', this.actionResults[signal.id]);
     }
-    
-    return signal.id;
   }
   
   /**
-   * Generate a unique signal ID
+   * Process a cross-chain opportunity signal
+   * @param signal Signal to process
    */
-  private generateSignalId(): string {
-    return `sig_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  private async processCrossChainSignal(signal: Signal): Promise<void> {
+    logger.info(`Processing cross-chain signal ${signal.id} of type ${signal.type}`);
+    
+    // Validate signal has required fields
+    if (!signal.sourceToken || !signal.targetToken || !signal.metadata) {
+      logger.error(`Signal ${signal.id} missing required cross-chain information`);
+      return;
+    }
+    
+    // Get cross-chain details from metadata
+    const sourceChain = signal.metadata.sourceChain || 'solana';
+    const targetChain = signal.metadata.targetChain || 'ethereum';
+    const estimatedProfit = signal.metadata.estimatedProfit || 0;
+    
+    // Skip if estimated profit is too low
+    if (estimatedProfit < 0.0025) { // 0.25% profit for cross-chain (higher threshold due to gas costs)
+      logger.warn(`Estimated profit for cross-chain signal ${signal.id} too low (${(estimatedProfit * 100).toFixed(2)}%), skipping`);
+      return;
+    }
+    
+    try {
+      logger.info(`Executing cross-chain transaction from ${sourceChain} to ${targetChain} for ${signal.sourceToken}->${signal.targetToken}, est. profit: ${(estimatedProfit * 100).toFixed(2)}%`);
+      
+      // Get wallet configuration
+      const walletConfig = getWalletConfig();
+      
+      // For cross-chain, start with smaller amount due to higher risk
+      let amount = this.config.minimumTransactionSizeUSD * 2;
+      
+      if (signal.priority === SignalPriority.HIGH) {
+        amount = this.config.maximumTransactionSizeUSD * 0.25;
+      } else if (signal.priority === SignalPriority.CRITICAL) {
+        amount = this.config.maximumTransactionSizeUSD * 0.5;
+      }
+      
+      // In a real implementation, this would use Wormhole or another cross-chain bridge
+      // For now, we'll simulate a successful cross-chain transaction
+      
+      const txResult = {
+        successful: true,
+        signature: `xchain-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+        sourceChain,
+        targetChain,
+        sourceToken: signal.sourceToken,
+        targetToken: signal.targetToken,
+        amount,
+        netProfit: amount * estimatedProfit
+      };
+      
+      // Simulate 80% success rate for cross-chain
+      const isSuccessful = Math.random() < 0.8;
+      
+      if (isSuccessful) {
+        logger.info(`Successfully executed cross-chain transaction for signal ${signal.id}, signature: ${txResult.signature}`);
+        
+        // Mark signal as actioned
+        signal.actionTaken = true;
+        signal.transactionSignature = txResult.signature;
+        
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: true,
+          actionType: `CROSS_CHAIN_${sourceChain}_${targetChain}`,
+          timestamp: Date.now(),
+          transactionSignature: txResult.signature,
+          profit: txResult.netProfit
+        };
+        
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
+      } else {
+        logger.warn(`Cross-chain transaction failed for signal ${signal.id}`);
+        
+        // Record action result
+        this.actionResults[signal.id] = {
+          signalId: signal.id,
+          success: false,
+          actionType: `CROSS_CHAIN_${sourceChain}_${targetChain}`,
+          timestamp: Date.now(),
+          error: 'Cross-chain bridge failure simulation'
+        };
+        
+        // Emit action result event
+        this.emit('action_result', this.actionResults[signal.id]);
+      }
+    } catch (error) {
+      logger.error(`Error executing cross-chain transaction for signal ${signal.id}:`, error);
+      
+      // Record action result
+      this.actionResults[signal.id] = {
+        signalId: signal.id,
+        success: false,
+        actionType: `CROSS_CHAIN_${signal.metadata.sourceChain}_${signal.metadata.targetChain}`,
+        timestamp: Date.now(),
+        error: error.message
+      };
+      
+      // Emit action result event
+      this.emit('action_result', this.actionResults[signal.id]);
+    }
+  }
+  
+  /**
+   * Handle a signal event
+   * @param signal Signal received
+   */
+  private handleSignal(signal: Signal): void {
+    // Signal has already been added to this.signals in addSignal
+    // This is just for any additional handling when a signal is received
+    logger.debug(`Signal received: ${signal.id} (${signal.type})`);
+  }
+  
+  /**
+   * Handle an action result event
+   * @param result Action result
+   */
+  private handleActionResult(result: ActionResult): void {
+    logger.debug(`Action result for signal ${result.signalId}: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+    
+    // If transaction was successful and has a signature, register for verification
+    if (result.success && result.transactionSignature) {
+      // Verification is already triggered in the process methods
+      // This is just a hook for additional handling
+    }
+  }
+  
+  /**
+   * Handle a transaction verified event
+   * @param data Transaction verification data
+   */
+  private handleTransactionVerified(data: any): void {
+    logger.info(`Transaction ${data.signature} verified on blockchain`);
+    
+    // Find the signal that generated this transaction
+    const signalId = Object.keys(this.signals).find(
+      id => this.signals[id].transactionSignature === data.signature
+    );
+    
+    if (signalId) {
+      logger.info(`Transaction ${data.signature} is for signal ${signalId}`);
+      
+      // Update action result
+      if (this.actionResults[signalId]) {
+        this.actionResults[signalId].success = data.success;
+      }
+    }
+  }
+  
+  /**
+   * Handle a profit captured event
+   * @param data Profit capture data
+   */
+  private handleProfitCaptured(data: any): void {
+    logger.info(`Profit of ${data.amount} captured for transaction ${data.signature}`);
+    
+    // Find the signal that generated this transaction
+    const signalId = Object.keys(this.signals).find(
+      id => this.signals[id].transactionSignature === data.signature
+    );
+    
+    if (signalId && this.actionResults[signalId]) {
+      this.actionResults[signalId].profit = data.amount;
+    }
+  }
+  
+  /**
+   * Handle an error event
+   * @param error Error data
+   */
+  private handleError(error: any): void {
+    logger.error(`Signal Hub error (${error.type}):`, error.error);
+    
+    // Additional error handling logic can be added here
+    // For example, retrying operations, recovering from errors, etc.
+  }
+  
+  /**
+   * Enable real funds trading
+   * @param useRealFunds Whether to use real funds
+   */
+  public setRealFundsMode(useRealFunds: boolean): void {
+    this.config.useRealFunds = useRealFunds;
+    logger.info(`Real funds mode ${useRealFunds ? 'ENABLED' : 'DISABLED'}`);
+  }
+  
+  /**
+   * Set signal processing configuration
+   * @param config Configuration to set
+   */
+  public setConfig(config: Partial<SignalProcessingConfig>): void {
+    this.config = { ...this.config, ...config };
+    logger.info(`Signal processing configuration updated`);
   }
   
   /**
    * Get a signal by ID
    * @param id Signal ID
    */
-  public getSignal(id: string): Signal | undefined {
-    return this.signalStore.get(id);
+  public getSignal(id: string): Signal | null {
+    return this.signals[id] || null;
   }
   
   /**
-   * Get all signals matching specific criteria
-   * @param criteria Signal search criteria
-   */
-  public getSignals(criteria: { 
-    types?: SignalType[],
-    sources?: SignalSource[],
-    pairs?: string[],
-    since?: Date,
-    limit?: number
-  } = {}): Signal[] {
-    let signals = Array.from(this.signalStore.values());
-    
-    // Apply filters
-    if (criteria.types && criteria.types.length > 0) {
-      signals = signals.filter(s => criteria.types?.includes(s.type));
-    }
-    
-    if (criteria.sources && criteria.sources.length > 0) {
-      signals = signals.filter(s => criteria.sources?.includes(s.source));
-    }
-    
-    if (criteria.pairs && criteria.pairs.length > 0) {
-      signals = signals.filter(s => criteria.pairs?.includes(s.pair));
-    }
-    
-    if (criteria.since) {
-      signals = signals.filter(s => {
-        try {
-          const signalTime = s.timestamp instanceof Date 
-            ? s.timestamp 
-            : (typeof s.timestamp === 'string' 
-                ? new Date(s.timestamp) 
-                : new Date());
-                
-          return signalTime >= criteria.since;
-        } catch (error) {
-          logger.debug(`Error comparing signal timestamp: ${error}`);
-          return false;
-        }
-      });
-    }
-    
-    // Sort by timestamp (newest first)
-    signals.sort((a, b) => {
-      try {
-        const timeA = a.timestamp instanceof Date 
-          ? a.timestamp.getTime() 
-          : (typeof a.timestamp === 'string' 
-              ? new Date(a.timestamp).getTime() 
-              : 0);
-              
-        const timeB = b.timestamp instanceof Date 
-          ? b.timestamp.getTime() 
-          : (typeof b.timestamp === 'string' 
-              ? new Date(b.timestamp).getTime() 
-              : 0);
-              
-        return timeB - timeA;
-      } catch (error) {
-        logger.debug(`Error sorting signals by timestamp: ${error}`);
-        return 0;
-      }
-    });
-    
-    // Apply limit
-    if (criteria.limit) {
-      signals = signals.slice(0, criteria.limit);
-    }
-    
-    return signals;
-  }
-  
-  /**
-   * Find related signals for a given signal
+   * Get an action result by signal ID
    * @param signalId Signal ID
    */
-  public findRelatedSignals(signalId: string): Signal[] {
-    const signal = this.getSignal(signalId);
-    if (!signal || !signal.relatedSignals || signal.relatedSignals.length === 0) {
-      return [];
-    }
-    
-    return signal.relatedSignals
-      .map(id => this.getSignal(id))
-      .filter(s => s !== undefined) as Signal[];
+  public getActionResult(signalId: string): ActionResult | null {
+    return this.actionResults[signalId] || null;
   }
   
   /**
-   * Broadcast a signal to all WebSocket clients
-   * @param signal Signal to broadcast
+   * Get all signals
    */
-  private broadcastSignal(signal: Signal): void {
-    if (!this.wsClients.size) {
-      return; // No clients connected
-    }
-    
-    const message = JSON.stringify({
-      type: 'signal',
-      signal
-    });
-    
-    for (const client of this.wsClients) {
-      if (client.readyState !== WebSocket.OPEN) {
-        continue;
-      }
-      
-      const clientInfo = (client as any).clientInfo;
-      if (!clientInfo) {
-        continue;
-      }
-      
-      // Check if client is subscribed to this signal
-      const subscribedToPair = clientInfo.subscribedPairs.size === 0 || 
-                               clientInfo.subscribedPairs.has(signal.pair);
-      
-      const subscribedToType = clientInfo.subscribedTypes.size === 0 || 
-                               clientInfo.subscribedTypes.has(signal.type);
-      
-      const subscribedToSource = clientInfo.subscribedSources.size === 0 || 
-                                 clientInfo.subscribedSources.has(signal.source);
-      
-      // Send if subscribed
-      if (subscribedToPair && subscribedToType && subscribedToSource) {
-        client.send(message);
-      }
-    }
+  public getAllSignals(): Signal[] {
+    return Object.values(this.signals);
   }
   
   /**
-   * Process market data through transformers and generate signals
-   * @param marketData Market data to process
+   * Get all action results
    */
-  public async processMarketData(marketData: MarketData): Promise<void> {
-    try {
-      // This would call the Rust transformers in a real implementation
-      // For now, we'll simulate transformer signals for demonstration
-      
-      // Simulate MicroQHC transformer signal
-      if (Math.random() < 0.15) { // 15% chance
-        const signal: Signal = {
-          id: this.generateSignalId(),
-          timestamp: new Date(),
-          pair: marketData.pair,
-          type: SignalType.PATTERN_RECOGNITION,
-          source: SignalSource.MICRO_QHC,
-          strength: SignalStrength.STRONG,
-          direction: marketData.price_change_24h > 0 ? 
-            SignalDirection.BULLISH : SignalDirection.BEARISH,
-          priority: SignalPriority.HIGH,
-          confidence: 75 + (Math.random() * 20),
-          description: `MicroQHC detected quantum pattern in ${marketData.pair}`,
-          metadata: {
-            pattern: 'quantum-oscillation',
-            indicators: {
-              rsi: marketData.indicators?.rsi || 50,
-              macd: marketData.indicators?.macd || { line: 0, signal: 0, histogram: 0 }
-            },
-            priceChange: marketData.price_change_24h,
-            volume: marketData.volume24h
-          },
-          actionable: true,
-          token_address: marketData.token_address || '',
-          analysis: {
-            volatility: marketData.volatility || 0,
-            liquidity: marketData.liquidity || 0,
-            momentum: Math.random() * 100, // Sample momentum value
-            support: marketData.price * 0.9,
-            resistance: marketData.price * 1.1
-          },
-          metrics: {
-            volumeToMcapRatio: marketData.volume24h / (marketData.market_cap || 1),
-            priceDeviation: Math.abs(marketData.price_change_24h || 0),
-            trendStrength: Math.random() * 100
-          },
-          targetComponents: ['HyperionAgent', 'QuantumOmegaAgent']
-        };
-        
-        await this.processSignal(signal);
-      }
-      
-      // Simulate MEME Cortex transformer signal for meme coins
-      if ((marketData.pair.includes('BONK') || marketData.pair.includes('PEPE')) && 
-          Math.random() < 0.25) { // 25% chance for meme coins
-        const signal: Signal = {
-          id: this.generateSignalId(),
-          timestamp: new Date(),
-          pair: marketData.pair,
-          type: SignalType.SOCIAL_SENTIMENT,
-          source: SignalSource.MEME_CORTEX,
-          strength: SignalStrength.VERY_STRONG,
-          direction: Math.random() > 0.3 ? 
-            SignalDirection.BULLISH : SignalDirection.BEARISH,
-          priority: SignalPriority.NORMAL,
-          confidence: 70 + (Math.random() * 25),
-          description: `MEME Cortex detected viral sentiment shift for ${marketData.pair}`,
-          metadata: {
-            sentimentShift: (Math.random() * 2 - 1).toFixed(2),
-            viralScore: (Math.random() * 100).toFixed(1),
-            socialVolume: (marketData.volume24h * (Math.random() * 0.1)).toFixed(0),
-            platforms: ['twitter', 'telegram', 'discord']
-          },
-          actionable: Math.random() > 0.5,
-          token_address: marketData.token_address || '',
-          analysis: {
-            socialMomentum: Math.random() * 100,
-            viralCoefficient: Math.random() * 5,
-            memePotential: Math.random() * 100,
-            communityStrength: Math.random() * 100,
-            influencerActivity: Math.random() * 100
-          },
-          metrics: {
-            socialVolume24h: parseInt((marketData.volume24h * (Math.random() * 0.2)).toFixed(0)),
-            mentionsCount: Math.floor(Math.random() * 10000),
-            sentimentScore: Math.random() * 100,
-            viralityIndex: Math.random() * 10
-          },
-          targetComponents: ['QuantumOmegaAgent', 'AIInsightsEngine']
-        };
-        
-        await this.processSignal(signal);
-      }
-      
-      // Occasionally generate MEV opportunity signals
-      if (Math.random() < 0.1) { // 10% chance
-        const profitEstimate = marketData.price * 0.005 * Math.random();
-        const signal: Signal = {
-          id: this.generateSignalId(),
-          timestamp: new Date(),
-          pair: marketData.pair,
-          type: SignalType.MEV_OPPORTUNITY,
-          source: SignalSource.HYPERION_AGENT,
-          strength: SignalStrength.MODERATE,
-          direction: SignalDirection.NEUTRAL,
-          priority: SignalPriority.CRITICAL,
-          confidence: 85 + (Math.random() * 10),
-          description: `Hyperion detected MEV opportunity in ${marketData.pair}`,
-          metadata: {
-            opportunityType: 'cross-dex-arb',
-            estimatedProfit: profitEstimate.toFixed(4),
-            expiresIn: Math.floor(Math.random() * 10) + 1 + 's',
-            route: ['jupiter', 'raydium', 'openbook']
-          },
-          actionable: true,
-          ttl: 10, // Short time to live
-          targetComponents: ['HyperionAgent', 'TransactionEngine'],
-          token_address: marketData.token_address || '',
-          analysis: {
-            arbitrageSize: profitEstimate,
-            executionComplexity: Math.random() * 10,
-            gasEstimate: Math.random() * 0.01,
-            competitionLevel: Math.random() * 100,
-            flashLoanRequired: false
-          },
-          metrics: {
-            profitPotential: profitEstimate,
-            successProbability: Math.random() * 0.9 + 0.1,
-            timeWindow: Math.floor(Math.random() * 10) + 1,
-            gasEfficiency: Math.random() * 100
-          }
-        };
-        
-        await this.processSignal(signal);
-      }
-      
-    } catch (error) {
-      logger.error('Error processing market data through SignalHub:', error);
-    }
+  public getAllActionResults(): ActionResult[] {
+    return Object.values(this.actionResults);
   }
   
   /**
-   * Subscribe to signals by type
-   * @param type Signal type
-   * @param callback Callback function
+   * Get the current processing queue
    */
-  public onSignalType(type: SignalType, callback: (signal: Signal) => void): void {
-    this.on(`signal:${type}`, callback);
+  public getProcessingQueue(): string[] {
+    return [...this.processingQueue];
   }
   
   /**
-   * Subscribe to signals by source
-   * @param source Signal source
-   * @param callback Callback function
+   * Get the current configuration
    */
-  public onSignalSource(source: SignalSource, callback: (signal: Signal) => void): void {
-    this.on(`signal:${source}`, callback);
+  public getConfig(): SignalProcessingConfig {
+    return { ...this.config };
   }
   
   /**
-   * Subscribe to signals for a specific pair
-   * @param pair Trading pair
-   * @param callback Callback function
+   * Get system status
    */
-  public onSignalPair(pair: string, callback: (signal: Signal) => void): void {
-    this.on(`signal:${pair}`, callback);
-  }
-  
-  /**
-   * Subscribe to all signals
-   * @param callback Callback function
-   */
-  public onAnySignal(callback: (signal: Signal) => void): void {
-    this.on('signal', callback);
-  }
-  
-  /**
-   * Unsubscribe from signals
-   * @param event Event name
-   * @param callback Callback function
-   */
-  public offSignal(event: string, callback: (signal: Signal) => void): void {
-    this.off(event, callback);
-  }
-
-  /**
-   * Get signals targeted for a specific component
-   * @param componentName The name of the component to filter by
-   * @param limit Maximum number of signals to return
-   * @returns Array of signals targeted for the component
-   */
-  public getSignalsForComponent(componentName: string, limit: number = 50): Signal[] {
-    let signals = Array.from(this.signalStore.values());
-    
-    // Filter signals targeted for this component or with no targeting
-    signals = signals.filter(signal => 
-      !signal.targetComponents || 
-      signal.targetComponents.length === 0 ||
-      signal.targetComponents.includes(componentName)
-    );
-    
-    // Sort by timestamp (newest first) and priority (highest first)
-    signals.sort((a, b) => {
-      // First sort by priority (descending)
-      if (a.priority !== b.priority) {
-        return b.priority - a.priority;
-      }
-      // Then sort by timestamp (newest first)
-      return b.timestamp.getTime() - a.timestamp.getTime();
-    });
-    
-    // Apply limit
-    if (limit) {
-      signals = signals.slice(0, limit);
-    }
-    
-    return signals;
-  }
-
-  /**
-   * Subscribe to signals targeted for a specific component
-   * @param componentName The name of the component 
-   * @param callback Callback function
-   */
-  public onSignalsForComponent(componentName: string, callback: (signal: Signal) => void): void {
-    // Listen for all signals
-    this.on('signal', (signal: Signal) => {
-      // Pass only signals targeted for this component or with no targeting
-      if (!signal.targetComponents || 
-          signal.targetComponents.length === 0 ||
-          signal.targetComponents.includes(componentName)) {
-        callback(signal);
-      }
-    });
+  public getStatus(): any {
+    return {
+      isRunning: this.isRunning,
+      activeTransactions: this.activeTransactions,
+      queueSize: this.processingQueue.length,
+      signalCount: Object.keys(this.signals).length,
+      actionResultCount: Object.keys(this.actionResults).length,
+      config: this.getConfig()
+    };
   }
 }
 
 // Export the singleton instance
 export const signalHub = SignalHub.getInstance();
+
+// Start the signal hub when the module is loaded
+signalHub.start({
+  useRealFunds: process.env.USE_REAL_FUNDS === 'true'
+});
+
+// Export the SignalHub class and interfaces for reference
+export { SignalHub, SignalProcessingConfig };

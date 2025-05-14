@@ -6,7 +6,7 @@
  */
 
 import * as web3 from '@solana/web3.js';
-import { logger } from './logger';
+import * as logger from './logger';
 import { PublicKey } from '@solana/web3.js';
 import { EvmChain } from '@wormhole-foundation/sdk-evm';
 import { SolanaChain } from '@wormhole-foundation/sdk-solana';

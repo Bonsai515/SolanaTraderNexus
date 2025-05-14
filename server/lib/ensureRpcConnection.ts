@@ -6,7 +6,7 @@
  */
 
 import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
-import { logger } from '../logger';
+import * as logger from '../logger';
 
 // Validate URL formatting with enhanced error handling
 const validateRpcUrl = (url: string | undefined, defaultUrl: string = 'https://api.mainnet-beta.solana.com'): string => {
