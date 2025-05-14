@@ -8,7 +8,7 @@
 
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as fs from 'fs';
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { heliusApiIntegration } from './heliusIntegration';
 import { transactionVerifier } from './transactionVerifier';
 

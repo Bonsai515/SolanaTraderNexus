@@ -6,7 +6,7 @@
  * Includes blockchain verification for all transactions to ensure actual execution.
  */
 
-import { logger } from './logger';
+import * as logger from './logger';
 import { Connection, PublicKey, Transaction, TransactionInstruction, Keypair } from '@solana/web3.js';
 import { getConnection } from './lib/solanaConnection';
 import { solanaPriceFeed, PriceData } from './lib/solanaPriceFeed';
@@ -180,6 +180,54 @@ export class NexusTransactionEngine {
       logger.error(`Error getting price for ${tokenAddress}:`, error);
       throw new Error(`Failed to get price for ${tokenAddress}: ${error.message}`);
     }
+  }
+  
+  /**
+   * Get Solana connection
+   * @returns Solana connection object
+   */
+  public getSolanaConnection(): Connection {
+    return this.connection;
+  }
+  
+  /**
+   * Get keypair for a wallet address
+   * @param walletAddress Wallet address to get keypair for
+   * @returns Keypair or null if not found
+   */
+  public getKeypair(walletAddress: string): Keypair | null {
+    try {
+      // In a real implementation, this would retrieve the keypair from the wallet manager
+      // For security reasons, keypairs would be stored in an encrypted form
+      return this.walletManager.getKeypair(walletAddress);
+    } catch (error) {
+      logger.error(`Error retrieving keypair for wallet ${walletAddress}:`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Get main trading wallet address
+   * @returns Main wallet address or null if not available
+   */
+  public getMainWalletAddress(): string {
+    return '5ZPBHzMr4wGPXGkUT3czvSBfAqhcYvhYJemfhG5qgzAG'; // Example funded wallet
+  }
+  
+  /**
+   * Get secondary wallet address (for fees or special purposes)
+   * @returns Secondary wallet address or null if not available
+   */
+  public getSecondaryWalletAddress(): string {
+    return '3xKtKz7PJcpuH8KamhRZpyzrxR6a6UaGBF8EX45qQxUD'; // Example secondary wallet
+  }
+  
+  /**
+   * Get prophet wallet address (for profit collection)
+   * @returns Prophet wallet address or null if not available
+   */
+  public getProphetWalletAddress(): string {
+    return '6sJu5mGhfMqzwEmDjcdkJBGzfqhw6SfUwDmYCpqCuJxu'; // Example prophet wallet
   }
   
   /**

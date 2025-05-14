@@ -6,7 +6,7 @@
  * make trading decisions with purely on-chain verified data.
  */
 
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { ArbitrageOpportunity } from '../signalTypes';
 
 interface TokenMetrics {

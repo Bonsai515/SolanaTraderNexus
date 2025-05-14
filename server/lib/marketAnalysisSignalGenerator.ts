@@ -6,7 +6,7 @@
  * It serves as a bridge between market analysis and the trading system.
  */
 
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { EventEmitter } from 'events';
 import { perplexityAI } from '../perplexity-integration';
 import { localMarketAnalysis } from './localMarketAnalysis';
@@ -265,6 +265,9 @@ class MarketAnalysisSignalGenerator extends EventEmitter {
         priority: signalPriority,
         confidence,
         description: `Market analysis ${signalDirection.toLowerCase()} signal for ${token}`,
+        // Critical fields for signal processing - always set these
+        sourceToken: 'USDC',
+        targetToken: token,
         metadata: {
           analysis_source: source,
           price,

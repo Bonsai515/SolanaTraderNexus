@@ -6,7 +6,7 @@
  * price aggregation system with fallback capabilities.
  */
 
-import { logger } from '../logger';
+import * as logger from '../logger';
 import axios from 'axios';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getConnection } from './solanaConnection';

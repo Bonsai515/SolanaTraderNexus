@@ -5,7 +5,7 @@
  * to the trading system, enabling advanced pattern recognition and analysis.
  */
 
-import { logger } from './logger';
+import logger from './logger';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -138,7 +138,8 @@ export async function initializeTransformers(): Promise<boolean> {
       transformer.lastSyncTime = new Date();
       logger.info(`✅ Transformer ${transformer.name} initialized successfully`);
     } catch (error) {
-      logger.error(`❌ Failed to initialize transformer ${transformer.name}: ${error}`);
+      console.error(`❌ Failed to initialize transformer ${transformer.name}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`❌ Failed to initialize transformer ${transformer.name}: ${error instanceof Error ? error.message : String(error)}`);
       transformer.enabled = false;
     }
   }
@@ -731,5 +732,5 @@ export function getTransformerAPI(storage?: any) {
 
 // Initialize transformers when this module is loaded
 initializeTransformers().catch(error => {
-  logger.error(`Transformer initialization failed: ${error}`);
+  console.error(`Transformer initialization failed: ${error instanceof Error ? error.message : String(error)}`);
 });

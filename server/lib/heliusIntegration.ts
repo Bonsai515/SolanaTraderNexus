@@ -7,7 +7,7 @@
  */
 
 import axios from 'axios';
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { Connection, PublicKey, VersionedTransaction, Transaction } from '@solana/web3.js';
 
 // Interfaces for Helius API responses

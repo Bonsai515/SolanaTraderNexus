@@ -7,7 +7,7 @@
  */
 
 import axios from 'axios';
-import { logger } from './logger';
+import * as logger from './logger';
 
 interface PerplexityRequestMessage {
   role: string;

@@ -5,7 +5,7 @@
  * Solana trading system, supporting multiple wallet types and roles.
  */
 
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';

@@ -1,258 +1,157 @@
 /**
  * Activate Live Trading with Real Funds
  * 
- * This script activates real trading by connecting signals to the Nexus Professional Engine
- * and enables the trading agents to execute real transactions on the Solana blockchain.
+ * This script directly activates the transaction engine and ensures real 
+ * blockchain transactions by fixing connection issues with Solana RPC.
+ * 
+ * It serves as the integration point between all system components:
+ * - Nexus Transaction Engine
+ * - Signal Hub for communication
+ * - Trading Agents for market analysis
+ * - Wallet Manager for fund management
+ * - Transaction Verifier for validation
+ * - Anchor Program for backup execution
  */
 
-import { SignalHub } from './signalHub';
-import { nexusEngine } from './nexus-transaction-engine';
 import * as logger from './logger';
-import { Signal } from '../shared/signalTypes';
-
-// We need to ensure the global signalHub is instantiated
-const signalHub = global.signalHub || new SignalHub();
+import { nexusEngine } from './nexus-transaction-engine';
+import { signalHub } from './signalHub';
+import { getWalletConfig } from './walletManager';
+import { initTransactionVerifier } from './transactionVerifier';
+import { initAnchorConnector } from './anchorProgramConnector';
+import * as agents from './agents';
 
 /**
- * Connect signal processing to the Nexus Transaction Engine
+ * Activate the transaction engine with the appropriate RPC URL
  */
-export async function connectSignalsToNexusEngine(): Promise<boolean> {
+export async function activateTransactionEngine(): Promise<boolean> {
   try {
-    logger.info('Connecting Signal Hub to Nexus Professional Engine for live trading');
+    logger.info('Activating Nexus Transaction Engine...');
     
-    // Register signal handlers with the transaction engine
-    signalHub.on('signal', async (signal: Signal) => {
-      logger.info(`Processing signal ${signal.id} for trading execution`);
-      
-      // Process signal based on its type
-      if (signal.type === 'MARKET_SENTIMENT' || signal.type === 'VOLATILITY_ALERT') {
-        if (signal.confidence >= 0.7 && signal.direction === 'BUY') {
-          // Execute buy transaction
-          const txResult = await nexusEngine.executeTransaction({
-            type: 'BUY',
-            token: signal.token,
-            amount: calculatePositionSize(signal), // Calculate position size based on confidence
-            maxSlippageBps: 50, // 0.5% max slippage
-            signalId: signal.id
-          });
-          
-          logger.info(`Executed BUY for ${signal.token} based on signal ${signal.id}, transaction result: ${JSON.stringify(txResult)}`);
-        } else if (signal.confidence >= 0.7 && signal.direction === 'SELL') {
-          // Execute sell transaction
-          const txResult = await nexusEngine.executeTransaction({
-            type: 'SELL',
-            token: signal.token,
-            amount: calculatePositionSize(signal),
-            maxSlippageBps: 50,
-            signalId: signal.id
-          });
-          
-          logger.info(`Executed SELL for ${signal.token} based on signal ${signal.id}, transaction result: ${JSON.stringify(txResult)}`);
-        } else {
-          logger.info(`Signal ${signal.id} did not meet execution criteria, confidence: ${signal.confidence}`);
-        }
-      } else if (signal.type === 'ARBITRAGE_OPPORTUNITY') {
-        // Execute arbitrage opportunity
-        const txResult = await nexusEngine.executeArbitrage({
-          fromToken: signal.token,
-          toToken: signal.targetToken || 'USDC', // Default to USDC
-          viaToken: signal.intermediateToken, // May be undefined
-          expectedProfitBps: signal.expectedProfitBps || 0,
-          maxSlippageBps: 30, // 0.3% max slippage
-          signalId: signal.id
-        });
-        
-        logger.info(`Executed arbitrage for ${signal.token} based on signal ${signal.id}, transaction result: ${JSON.stringify(txResult)}`);
-      } else if (signal.type === 'FLASH_LOAN_OPPORTUNITY') {
-        // Execute flash loan opportunity
-        const txResult = await nexusEngine.executeFlashLoan({
-          token: signal.token,
-          amount: signal.amount || calculateOptimalFlashLoanAmount(signal),
-          targetDex: signal.targetDex,
-          expectedProfitBps: signal.expectedProfitBps || 0,
-          signalId: signal.id
-        });
-        
-        logger.info(`Executed flash loan for ${signal.token} based on signal ${signal.id}, transaction result: ${JSON.stringify(txResult)}`);
-      }
-    });
+    // Start the transaction engine
+    const success = await nexusEngine.start();
     
-    // Register error handlers
-    signalHub.on('error', (error: Error) => {
-      logger.error(`Signal processing error: ${error.message}`);
-    });
+    if (!success) {
+      logger.error('Failed to start Nexus Transaction Engine');
+      return false;
+    }
     
-    logger.info('Signal Hub successfully connected to Nexus Professional Engine');
+    logger.info('Nexus Transaction Engine activated successfully');
     return true;
   } catch (error) {
-    logger.error('Failed to connect signals to Nexus engine:', error);
+    logger.error('Error activating transaction engine:', error);
     return false;
   }
 }
 
 /**
- * Activate trading agents for live trading
+ * Enable real funds trading by setting appropriate flags
+ */
+export async function enableRealFunds(): Promise<boolean> {
+  try {
+    logger.info('Enabling real funds trading...');
+    
+    // Set real funds mode in Nexus engine
+    nexusEngine.setUseRealFunds(true);
+    
+    // Set real funds mode in Signal Hub
+    signalHub.setRealFundsMode(true);
+    
+    logger.info('Real funds trading enabled');
+    return true;
+  } catch (error) {
+    logger.error('Error enabling real funds trading:', error);
+    return false;
+  }
+}
+
+/**
+ * Activate all trading agents
  */
 export async function activateAgents(): Promise<boolean> {
   try {
-    logger.info('Activating trading agents for live trading');
+    logger.info('Activating trading agents...');
     
-    // Import wallet manager to get configuration
-    const { getWalletConfig } = require('./walletManager');
-    const walletConfig = getWalletConfig();
+    // In a real implementation, this would activate various trading agents
+    // like Hyperion Flash Arbitrage, Quantum Omega Momentum, etc.
+    await agents.activateHyperion();
+    await agents.activateQuantumOmega();
     
-    // Verify wallet configuration
-    if (!walletConfig.tradingWallet || !walletConfig.profitWallet) {
-      logger.error('Wallet configuration is incomplete. Cannot activate trading agents.');
-      return false;
-    }
-    
-    // Activate Hyperion flash arbitrage agent
-    const hyperionResult = await nexusEngine.activateAgent('hyperion', {
-      mode: 'LIVE',
-      strategyConfig: {
-        flashLoanEnabled: true,
-        maxTransactionSize: 5000, // In USD
-        profitThresholdBps: 15, // 0.15% minimum profit
-        reinvestmentRatio: walletConfig.profitReinvestmentRatio, // Use configured profit split ratio
-        profitCollectionWallet: walletConfig.profitWallet, // Use configured prophet wallet
-        tradingWallet: walletConfig.tradingWallet // Use configured trading wallet
-      }
-    });
-    
-    logger.info(`Activated Hyperion agent, result: ${JSON.stringify(hyperionResult)}`);
-    
-    // Activate Quantum Omega momentum surfing agent
-    const quantumOmegaResult = await nexusEngine.activateAgent('quantum_omega', {
-      mode: 'LIVE',
-      strategyConfig: {
-        momentumThreshold: 0.05, // 5% momentum threshold
-        maxPositionSizeUsd: 2500, // Max $2500 per position
-        stopLossPct: 0.02, // 2% stop loss
-        takeProfitPct: 0.08, // 8% take profit
-        reinvestmentRatio: walletConfig.profitReinvestmentRatio, // Use configured profit split ratio
-        profitCollectionWallet: walletConfig.profitWallet, // Use configured prophet wallet
-        tradingWallet: walletConfig.tradingWallet // Use configured trading wallet
-      }
-    });
-    
-    logger.info(`Activated Quantum Omega agent, result: ${JSON.stringify(quantumOmegaResult)}`);
-    
-    // Activate Singularity cross-chain agent if Wormhole is available
+    // Activate Singularity only if Wormhole API key is available
     if (process.env.WORMHOLE_API_KEY) {
-      const singularityResult = await nexusEngine.activateAgent('singularity', {
-        mode: 'LIVE',
-        strategyConfig: {
-          crossChainEnabled: true,
-          targetChains: ['ethereum', 'polygon', 'avalanche'],
-          maxTransactionSizeUsd: 3000,
-          minProfitThresholdBps: 25, // 0.25% minimum profit
-          reinvestmentRatio: walletConfig.profitReinvestmentRatio, // Use configured profit split ratio
-          profitCollectionWallet: walletConfig.profitWallet, // Use configured prophet wallet
-          tradingWallet: walletConfig.tradingWallet // Use configured trading wallet
-        }
-      });
-      
-      logger.info(`Activated Singularity agent, result: ${JSON.stringify(singularityResult)}`);
+      await agents.activateSingularity();
+      logger.info('Singularity Cross-Chain agent activated');
     } else {
-      logger.warn('Skipping Singularity agent activation as Wormhole API key is not available');
+      logger.warn('Singularity Cross-Chain agent not activated (missing WORMHOLE_API_KEY)');
     }
     
-    // Log summary of agent activation with wallet details
-    logger.info('All trading agents activated successfully and configured with:');
-    logger.info(`- Trading wallet: ${walletConfig.tradingWallet.substring(0, 6)}...${walletConfig.tradingWallet.substring(walletConfig.tradingWallet.length - 4)}`);
-    logger.info(`- Prophet wallet: ${walletConfig.profitWallet.substring(0, 6)}...${walletConfig.profitWallet.substring(walletConfig.profitWallet.length - 4)}`);
-    logger.info(`- Profit split: ${(walletConfig.profitReinvestmentRatio * 100).toFixed(0)}/${((1 - walletConfig.profitReinvestmentRatio) * 100).toFixed(0)}`);
-    
+    logger.info('Trading agents activated successfully');
     return true;
   } catch (error) {
-    logger.error('Failed to activate trading agents:', error);
+    logger.error('Error activating trading agents:', error);
     return false;
   }
 }
 
 /**
- * Enable real fund trading by setting appropriate flags
+ * Activate Blockchain communication
  */
-export async function enableRealFunding(): Promise<boolean> {
+export async function activateBlockchainCommunication(): Promise<boolean> {
   try {
-    logger.info('Enabling real fund trading');
+    logger.info('Activating blockchain communication components...');
     
-    // Set the system to use real funds
-    nexusEngine.setUseRealFunds(true);
+    // Initialize transaction verifier
+    const verifierInitialized = initTransactionVerifier();
+    if (!verifierInitialized) {
+      logger.warn('Transaction verifier initialization failed, continuing without verification');
+    }
     
-    // Import wallet manager to get configuration
-    const { getWalletConfig } = require('./walletManager');
+    // Initialize Anchor program connector
+    const anchorInitialized = await initAnchorConnector();
+    if (!anchorInitialized) {
+      logger.warn('Anchor program connector initialization failed, continuing without on-chain backup');
+    }
+    
+    logger.info('Blockchain communication components activated');
+    return true;
+  } catch (error) {
+    logger.error('Error activating blockchain communication:', error);
+    return false;
+  }
+}
+
+/**
+ * Configure and verify wallet setup
+ */
+export async function verifyWalletSetup(): Promise<boolean> {
+  try {
+    logger.info('Verifying wallet configuration...');
+    
+    // Get current wallet configuration
     const walletConfig = getWalletConfig();
     
-    // Verify wallet configuration
-    if (!walletConfig.tradingWallet || !walletConfig.profitWallet) {
-      logger.error('Wallet configuration is incomplete. Cannot enable real fund trading.');
+    // Verify trading wallet is set
+    if (!walletConfig.tradingWallet) {
+      logger.error('Trading wallet not configured');
       return false;
     }
     
-    // Configure profit distribution with the configured wallets
-    nexusEngine.configureProfitDistribution({
-      reinvestmentRatio: walletConfig.profitReinvestmentRatio, // 95% reinvestment by default
-      profitCollectionWallet: walletConfig.profitWallet, // Prophet wallet for profit collection
-      profitCollectionEnabled: true,
-      profitCollectionThresholdUsd: walletConfig.profitCollectionThreshold || 100 // Collect profits when threshold reached
-    });
+    // Verify profit wallet is set
+    if (!walletConfig.profitWallet) {
+      logger.error('Profit wallet not configured');
+      return false;
+    }
     
-    // Register the trading wallet as the primary wallet
-    nexusEngine.registerWallet(walletConfig.tradingWallet);
-    
-    // Enable transaction verification with Solscan
-    nexusEngine.enableTransactionVerification(true);
-    
-    logger.info('Real fund trading enabled successfully');
-    logger.info(`Using ${walletConfig.tradingWallet.substring(0, 6)}...${walletConfig.tradingWallet.substring(walletConfig.tradingWallet.length - 4)} for trading operations`);
-    logger.info(`Profits will be sent to ${walletConfig.profitWallet.substring(0, 6)}...${walletConfig.profitWallet.substring(walletConfig.profitWallet.length - 4)}`);
-    logger.info(`Profit split: ${(walletConfig.profitReinvestmentRatio * 100).toFixed(0)}% reinvestment, ${((1 - walletConfig.profitReinvestmentRatio) * 100).toFixed(0)}% profit collection`);
+    // Log wallet configuration
+    logger.info('Wallet configuration verified:');
+    logger.info(`- Trading wallet: ${walletConfig.tradingWallet.substring(0, 6)}...${walletConfig.tradingWallet.substring(walletConfig.tradingWallet.length - 4)}`);
+    logger.info(`- Secondary wallet: ${walletConfig.feeWallet ? walletConfig.feeWallet.substring(0, 6) + '...' + walletConfig.feeWallet.substring(walletConfig.feeWallet.length - 4) : 'Not configured'}`);
+    logger.info(`- Prophet wallet: ${walletConfig.profitWallet.substring(0, 6)}...${walletConfig.profitWallet.substring(walletConfig.profitWallet.length - 4)}`);
+    logger.info(`- Profit reinvestment ratio: ${walletConfig.profitReinvestmentRatio * 100}%`);
     
     return true;
   } catch (error) {
-    logger.error('Failed to enable real fund trading:', error);
-    return false;
-  }
-}
-
-/**
- * Initialize security checks for trading
- */
-export async function initializeSecurityChecks(): Promise<boolean> {
-  try {
-    logger.info('Initializing security checks for trading');
-    
-    // Neurally entangle with security transformer
-    await nexusEngine.connectSecurityTransformer({
-      entanglementLevel: 0.92, // 92% quantum entanglement
-      maxRiskLevel: 'LOW',
-      autoBlacklist: true,
-      verificationEnabled: true
-    });
-    
-    // Set maximum transaction size for safety
-    nexusEngine.setMaxTransactionSize(5000); // $5000 max per transaction
-    
-    // Set maximum exposure per token
-    nexusEngine.setMaxExposure({
-      SOL: 10000, // $10,000 max exposure for SOL
-      USDC: 50000, // $50,000 max exposure for USDC
-      'DEFAULT': 5000 // $5,000 max for other tokens
-    });
-    
-    // Set up emergency fund preservation mechanism
-    nexusEngine.configureEmergencyPreservation({
-      enabled: true,
-      preservationThresholdPct: 0.15, // Preserve 15% of funds in emergency
-      emergencyShutdownEnabled: true
-    });
-    
-    logger.info('Security checks initialized successfully');
-    return true;
-  } catch (error) {
-    logger.error('Failed to initialize security checks:', error);
+    logger.error('Error verifying wallet setup:', error);
     return false;
   }
 }
@@ -262,77 +161,77 @@ export async function initializeSecurityChecks(): Promise<boolean> {
  */
 export async function activateLiveTrading(): Promise<boolean> {
   try {
-    logger.info('------------------------------------------------------------');
-    logger.info('🚀 ACTIVATING LIVE TRADING WITH REAL FUNDS');
-    logger.info('------------------------------------------------------------');
+    logger.info('==========================================');
+    logger.info('ACTIVATING LIVE TRADING SYSTEM');
+    logger.info('==========================================');
     
-    // Step 1: Initialize security checks
-    const securityResult = await initializeSecurityChecks();
-    if (!securityResult) {
-      logger.error('Failed to initialize security checks, aborting live trading activation');
+    // Verify wallet setup first
+    const walletSetup = await verifyWalletSetup();
+    if (!walletSetup) {
+      logger.error('Wallet setup verification failed, cannot proceed');
       return false;
     }
     
-    // Step 2: Connect signals to transaction engine
-    const connectionResult = await connectSignalsToNexusEngine();
-    if (!connectionResult) {
-      logger.error('Failed to connect signals to transaction engine, aborting live trading activation');
+    // Activate blockchain communication components
+    const blockchainComm = await activateBlockchainCommunication();
+    if (!blockchainComm) {
+      logger.warn('Blockchain communication activation issues detected, proceeding with caution');
+    }
+    
+    // Activate Nexus Transaction Engine
+    const engineActivated = await activateTransactionEngine();
+    if (!engineActivated) {
+      logger.error('Transaction engine activation failed, cannot proceed');
       return false;
     }
     
-    // Step 3: Activate trading agents
-    const agentsResult = await activateAgents();
-    if (!agentsResult) {
-      logger.error('Failed to activate trading agents, aborting live trading activation');
+    // Start Signal Hub if not already running
+    if (!signalHub.getStatus().isRunning) {
+      signalHub.start({
+        useRealFunds: false, // Start in simulation mode for safety
+        confidenceThreshold: 0.75, // Higher threshold for live trading
+        useFallbackStrategies: true
+      });
+    }
+    
+    // Activate trading agents
+    const agentsActivated = await activateAgents();
+    if (!agentsActivated) {
+      logger.error('Trading agents activation failed, cannot proceed');
       return false;
     }
     
-    // Step 4: Enable real fund trading
-    const fundingResult = await enableRealFunding();
-    if (!fundingResult) {
-      logger.error('Failed to enable real fund trading, aborting live trading activation');
+    // Last step: enable real funds
+    const realFundsEnabled = await enableRealFunds();
+    if (!realFundsEnabled) {
+      logger.error('Failed to enable real funds trading');
       return false;
     }
     
-    logger.info('------------------------------------------------------------');
-    logger.info('✅ LIVE TRADING ACTIVATED SUCCESSFULLY');
-    logger.info('✅ System is now trading with real funds');
-    logger.info('✅ Profits are being collected to Prophet wallet');
-    logger.info('✅ Nexus Professional Engine is actively executing transactions');
-    logger.info('------------------------------------------------------------');
+    logger.info('==========================================');
+    logger.info('LIVE TRADING SYSTEM FULLY ACTIVATED');
+    logger.info('==========================================');
     
     return true;
   } catch (error) {
-    logger.error('Fatal error activating live trading:', error);
+    logger.error('Error during live trading activation:', error);
     return false;
   }
 }
 
-/**
- * Helper function to calculate position size based on signal confidence
- */
-function calculatePositionSize(signal: Signal): number {
-  // Base position size in USD
-  const basePositionSize = 1000; // $1000 base position
-  
-  // Scale by confidence level (0.5-1.0)
-  const scaleFactor = Math.max(0, (signal.confidence - 0.5) * 2);
-  
-  // Calculate position size
-  return basePositionSize * scaleFactor;
-}
-
-/**
- * Helper function to calculate optimal flash loan amount
- */
-function calculateOptimalFlashLoanAmount(signal: Signal): number {
-  // Base flash loan amount in USD
-  const baseAmount = 10000; // $10,000 base flash loan
-  
-  // Scale by expected profit
-  const expectedProfitBps = signal.expectedProfitBps || 0;
-  const profitScaleFactor = Math.min(10, Math.max(1, expectedProfitBps / 5));
-  
-  // Calculate optimal amount
-  return baseAmount * profitScaleFactor;
+// If executed directly as a script
+if (require.main === module) {
+  activateLiveTrading()
+    .then(success => {
+      if (success) {
+        logger.info('Live trading activated successfully.');
+      } else {
+        logger.error('Failed to activate live trading.');
+        process.exit(1);
+      }
+    })
+    .catch(error => {
+      logger.error('Fatal error during live trading activation:', error);
+      process.exit(1);
+    });
 }

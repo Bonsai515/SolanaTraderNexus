@@ -8,7 +8,7 @@
 
 import * as web3 from '@solana/web3.js';
 import { PublicKey } from '@solana/web3.js';
-import { logger } from './logger';
+import * as logger from './logger';
 import { priceFeedCache } from './priceFeedCache';
 import { nexusTransactionEngine } from './nexus-transaction-engine';
 

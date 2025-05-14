@@ -9,7 +9,7 @@
 import { transactionVerifier } from './aws-services';
 import { nexusEngine } from './nexus-transaction-engine';
 import { WalletManager } from './lib/walletManager';
-import { logger } from './logger';
+import * as logger from './logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import { localMarketAnalysis } from './lib/localMarketAnalysis';

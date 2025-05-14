@@ -8,7 +8,7 @@
 
 import AWS from 'aws-sdk';
 import axios from 'axios';
-import { logger } from './logger';
+import * as logger from './logger';
 import { WalletManager } from './lib/walletManager';
 import * as fs from 'fs';
 import * as path from 'path';

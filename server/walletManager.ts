@@ -21,10 +21,45 @@ export interface WalletConfig {
   profitCollectionThreshold: number; // In USD
 }
 
-// Default wallet configuration
+// Get wallet information directly from Nexus engine
+function getNexusMainWallet(): string | null {
+  try {
+    const mainWallet = nexusEngine.getMainWalletAddress();
+    logger.info(`Retrieved main trading wallet from Nexus engine: ${mainWallet.substring(0, 6)}...${mainWallet.substring(mainWallet.length - 4)}`);
+    return mainWallet;
+  } catch (error) {
+    logger.error('Failed to get main wallet address from Nexus engine:', error);
+    return null;
+  }
+}
+
+function getNexusSecondaryWallet(): string | null {
+  try {
+    const secondaryWallet = nexusEngine.getSecondaryWalletAddress();
+    logger.info(`Retrieved secondary wallet from Nexus engine: ${secondaryWallet.substring(0, 6)}...${secondaryWallet.substring(secondaryWallet.length - 4)}`);
+    return secondaryWallet;
+  } catch (error) {
+    logger.error('Failed to get secondary wallet address from Nexus engine:', error);
+    return null;
+  }
+}
+
+function getNexusProphetWallet(): string | null {
+  try {
+    const prophetWallet = nexusEngine.getProphetWalletAddress();
+    logger.info(`Retrieved prophet wallet from Nexus engine: ${prophetWallet.substring(0, 6)}...${prophetWallet.substring(prophetWallet.length - 4)}`);
+    return prophetWallet;
+  } catch (error) {
+    logger.error('Failed to get prophet wallet address from Nexus engine:', error);
+    return null;
+  }
+}
+
+// Default wallet configuration with Nexus engine integration
 const defaultWalletConfig: WalletConfig = {
-  tradingWallet: '', // Will be set by user
-  profitWallet: '', // Will be set by user
+  tradingWallet: getNexusMainWallet() || '', // Get from Nexus engine
+  feeWallet: getNexusSecondaryWallet() || '', // Optional secondary wallet for fee payments
+  profitWallet: getNexusProphetWallet() || '', // Prophet wallet for profit collection
   profitReinvestmentRatio: 0.95, // 95% profit reinvestment by default
   profitCollectionThreshold: 100 // $100 USD
 };

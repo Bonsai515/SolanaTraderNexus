@@ -8,7 +8,7 @@
 
 import axios from 'axios';
 import { PublicKey, Connection } from '@solana/web3.js';
-import { logger } from '../logger';
+import * as logger from '../logger';
 import { heliusApiIntegration } from './heliusIntegration';
 
 // Types for verification

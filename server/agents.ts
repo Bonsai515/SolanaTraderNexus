@@ -6,7 +6,7 @@
  */
 import express from 'express';
 import { spawn } from 'child_process';
-import { logger } from './logger';
+import * as logger from './logger';
 import WebSocket from 'ws';
 import { startSingularity } from './agents/singularity';
 

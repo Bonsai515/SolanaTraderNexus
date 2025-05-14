@@ -132,11 +132,21 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
   try {
     console.log('Initializing Hyperion Trading System with enhanced reliability...');
     
-    // Reset all transaction logs to zero
-    console.log('Resetting all transaction logs and data to zero...');
-    await resetTransactionLogs();
-    await awsServices.resetAllData();
-    console.log('✅ All transaction logs and data reset to zero');
+    try {
+      // Reset all transaction logs to zero
+      console.log('Resetting all transaction logs and data to zero...');
+      const logsResetSuccess = resetTransactionLogs();
+      if (logsResetSuccess) {
+        console.log('✅ Transaction logs reset to zero');
+      } else {
+        console.warn('⚠️ Failed to reset transaction logs');
+      }
+      
+      console.log('✅ Reset process completed');
+    } catch (resetError) {
+      console.warn('⚠️ Error during reset process:', resetError instanceof Error ? resetError.message : 'Unknown error');
+      // Continue anyway - don't let reset errors stop the system
+    }
     
     // Initialize Solana RPC connection with automatic fallback
     console.log('Connecting to Solana blockchain via high-reliability connection...');
@@ -167,11 +177,16 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Connect to Rust transformer binaries
     console.log('Connecting to Rust transformer binaries...');
-    const transformersConnected = await connectToRustTransformers();
-    if (transformersConnected) {
-      console.log('✅ Successfully connected to all Rust transformer binaries');
-    } else {
-      console.warn('⚠️ Rust transformer binaries not fully available, using direct API integration');
+    try {
+      const transformersConnected = await connectToRustTransformers();
+      if (transformersConnected) {
+        console.log('✅ Successfully connected to all Rust transformer binaries');
+      } else {
+        console.log('⚠️ Rust transformer binaries not fully available, using direct API integration');
+      }
+    } catch (transformerError) {
+      console.log('⚠️ Error connecting to Rust transformers, using direct API integration instead');
+      console.log(`Error details: ${transformerError instanceof Error ? transformerError.message : 'Unknown error'}`);
     }
     
     // Get Instant Nodes URLs from environment with validation for correct protocol

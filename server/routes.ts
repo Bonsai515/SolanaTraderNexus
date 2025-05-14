@@ -4,9 +4,10 @@ import { WebSocketServer } from 'ws';
 import { ArbitrageOpportunity } from './signalTypes';
 import { getAllDexes } from './dexInfo';
 import * as nexusEngine from './nexus-transaction-engine';
-import { logger } from './logger';
+import * as logger from './logger';
 import * as agents from './agents';
 import { AgentType } from './agents';
+import { ComponentStatus } from './systemMemory';
 import { perplexityAI } from './perplexity-integration';
 import { localMarketAnalysis } from './lib/localMarketAnalysis';
 import { marketAnalysisSignalGenerator } from './lib/marketAnalysisSignalGenerator';
@@ -1681,7 +1682,7 @@ export async function registerRoutes(app: express.Express) {
         res.json({
           success: true,
           message: 'Live trading activated successfully! Your system is now trading with real funds.',
-          status: 'ACTIVE',
+          status: ComponentStatus.ACTIVE,
           timestamp: new Date().toISOString(),
           wallets: {
             trading: `${walletConfig.tradingWallet.substring(0, 6)}...${walletConfig.tradingWallet.substring(walletConfig.tradingWallet.length - 4)}`,
