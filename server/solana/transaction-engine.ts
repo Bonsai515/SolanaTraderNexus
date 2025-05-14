@@ -19,7 +19,7 @@ import {
   VersionedTransaction,
   TransactionMessage
 } from '@solana/web3.js';
-import { logger } from '../logger';
+import logger from '../logger';
 import { execSync } from 'child_process';
 
 // System wallet address 
@@ -76,25 +76,25 @@ export interface TransactionResult {
 export class SolanaDirectEngine {
   // Primary RPC connection
   private connection: Connection | null = null;
-  
+
   // WebSocket connection for account subscriptions
   private wsConnection: Connection | null = null;
-  
+
   // Backup RPC connections
   private backupConnections: Connection[] = [];
-  
+
   // Registered wallets for monitoring
   private wallets: Set<string> = new Set();
-  
+
   // Initialization state
   private initialized: boolean = false;
-  
+
   // Connection stats
   private successfulTransactions: number = 0;
   private failedTransactions: number = 0;
   private lastConnectionTime: number = 0;
   private reconnectAttempts: number = 0;
-  
+
   /**
    * Initialize the direct connection to Solana
    */
@@ -103,20 +103,20 @@ export class SolanaDirectEngine {
       logger.info('Transaction engine already initialized');
       return true;
     }
-    
+
     try {
       // Get the best RPC URL based on environment variables
       const mainRpcUrl = this.getBestRpcUrl();
-      
+
       // Log the RPC connection details
       logger.info(`Initializing direct Solana connection using: ${mainRpcUrl}`);
-      
+
       // Create the primary connection
       this.connection = new Connection(mainRpcUrl, {
         commitment: COMMITMENT_LEVEL,
         confirmTransactionInitialTimeout: CONNECTION_TIMEOUT_MS
       });
-      
+
       // Setup WebSocket connection if available
       const wsUrl = this.getWebSocketUrl(mainRpcUrl);
       if (wsUrl) {
@@ -133,23 +133,23 @@ export class SolanaDirectEngine {
       } else {
         this.wsConnection = this.connection;
       }
-      
+
       // Setup backup connections
       this.setupBackupConnections();
-      
+
       // Register the system wallet
       this.registerWallet(SYSTEM_WALLET_ADDRESS);
-      
+
       // Verify the connection works
       this.connection.getSlot().then(slot => {
         logger.info(`Connection verified! Current Solana slot: ${slot}`);
       }).catch(error => {
         logger.error('Error verifying connection:', error);
       });
-      
+
       this.initialized = true;
       this.lastConnectionTime = Date.now();
-      
+
       logger.info('✅ Direct Solana connection successfully established');
       return true;
     } catch (error) {
@@ -157,7 +157,7 @@ export class SolanaDirectEngine {
       return false;
     }
   }
-  
+
   /**
    * Get the best available RPC URL based on environment variables
    */
@@ -166,16 +166,16 @@ export class SolanaDirectEngine {
     if (process.env.INSTANT_NODES_RPC_URL) {
       return process.env.INSTANT_NODES_RPC_URL;
     }
-    
+
     // Try to use Alchemy RPC with API key
     if (process.env.SOLANA_RPC_API_KEY) {
       return `https://solana-mainnet.g.alchemy.com/v2/${process.env.SOLANA_RPC_API_KEY}`;
     }
-    
+
     // Fallback to public RPC
     return 'https://api.mainnet-beta.solana.com';
   }
-  
+
   /**
    * Get WebSocket URL from RPC URL if possible
    */
@@ -185,45 +185,45 @@ export class SolanaDirectEngine {
       if (rpcUrl.startsWith('https://')) {
         return rpcUrl.replace('https://', 'wss://');
       }
-      
+
       // InstantNodes specific WebSocket URL
       if (process.env.INSTANT_NODES_RPC_URL && rpcUrl === process.env.INSTANT_NODES_RPC_URL) {
         return 'wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
       }
-      
+
       return null;
     } catch (error) {
       logger.error('Error creating WebSocket URL:', error);
       return null;
     }
   }
-  
+
   /**
    * Set up backup RPC connections
    */
   private setupBackupConnections(): void {
     const backupUrls: string[] = [];
-    
+
     // Add Alchemy if available and not already the main connection
     if (process.env.SOLANA_RPC_API_KEY && !this.connection.rpcEndpoint.includes('alchemy')) {
       backupUrls.push(`https://solana-mainnet.g.alchemy.com/v2/${process.env.SOLANA_RPC_API_KEY}`);
     }
-    
+
     // Add InstantNodes if available and not already the main connection
     if (process.env.INSTANT_NODES_RPC_URL && !this.connection.rpcEndpoint.includes('instantnodes')) {
       backupUrls.push(process.env.INSTANT_NODES_RPC_URL);
     }
-    
+
     // Add public RPC as last resort
     backupUrls.push('https://api.mainnet-beta.solana.com');
-    
+
     // Create backup connections
     this.backupConnections = backupUrls.map(url => {
       logger.info(`Adding backup Solana RPC connection: ${url}`);
       return new Connection(url, COMMITMENT_LEVEL);
     });
   }
-  
+
   /**
    * Register a wallet for monitoring
    */
@@ -231,10 +231,10 @@ export class SolanaDirectEngine {
     try {
       // Validate the wallet address
       const publicKey = new PublicKey(address);
-      
+
       // Add to registered wallets
       this.wallets.add(address);
-      
+
       // Set up subscription if WebSocket connection is available
       if (this.wsConnection) {
         this.wsConnection.onAccountChange(
@@ -246,7 +246,7 @@ export class SolanaDirectEngine {
           COMMITMENT_LEVEL
         );
       }
-      
+
       logger.info(`Wallet ${address} registered for direct blockchain monitoring`);
       return true;
     } catch (error) {
@@ -254,7 +254,7 @@ export class SolanaDirectEngine {
       return false;
     }
   }
-  
+
   /**
    * Execute a transaction directly on the Solana blockchain
    */
@@ -265,20 +265,20 @@ export class SolanaDirectEngine {
         error: 'Transaction engine not initialized'
       };
     }
-    
+
     try {
       const startTime = Date.now();
-      
+
       // Get the active connection
       const activeConnection = this.connection;
-      
+
       // Get the latest blockhash
       const { blockhash, lastValidBlockHeight } = await activeConnection.getLatestBlockhash(COMMITMENT_LEVEL);
-      
+
       // Add priority fee instruction if requested
       const priorityFee = PRIORITY_FEE_MULTIPLIERS[request.priority as TransactionPriority] || PRIORITY_FEE_MULTIPLIERS.MEDIUM;
       const computeUnits = request.computeUnits || 200_000; // Default compute units
-      
+
       const allInstructions = [
         // Set compute unit limit
         ComputeBudgetProgram.setComputeUnitLimit({
@@ -291,50 +291,50 @@ export class SolanaDirectEngine {
         // Add user instructions
         ...request.instructions
       ];
-      
+
       // Determine if we're using legacy or versioned transactions
       let signature: string;
-      
+
       if (request.useVersionedTx) {
         // Use versioned transaction (more efficient)
         logger.info(`Executing versioned transaction with priority: ${request.priority} (${priorityFee} microlamports)`);
-        
+
         // Get the fee payer
         const feePayer = request.feePayer?.publicKey || request.signers[0]?.publicKey;
-        
+
         if (!feePayer) {
           return {
             success: false,
             error: 'No fee payer provided for transaction'
           };
         }
-        
+
         // Create message
         const messageV0 = new TransactionMessage({
           payerKey: feePayer,
           recentBlockhash: blockhash,
           instructions: allInstructions
         }).compileToV0Message();
-        
+
         // Create transaction
         const versionedTx = new VersionedTransaction(messageV0);
-        
+
         // Sign transaction
         const allSigners = [
           ...(request.signers || []),
           ...(request.additionalSigners || []),
           ...(request.feePayer ? [request.feePayer] : [])
         ];
-        
+
         if (allSigners.length === 0) {
           return {
             success: false,
             error: 'No signers provided for transaction'
           };
         }
-        
+
         versionedTx.sign(allSigners.map(s => s));
-        
+
         // Send transaction
         signature = await activeConnection.sendTransaction(versionedTx, {
           skipPreflight: false,
@@ -344,35 +344,35 @@ export class SolanaDirectEngine {
       } else {
         // Use legacy transaction
         logger.info(`Executing legacy transaction with priority: ${request.priority} (${priorityFee} microlamports)`);
-        
+
         // Create transaction
         const transaction = new Transaction().add(...allInstructions);
-        
+
         // Set blockhash and fee payer
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = request.feePayer?.publicKey || request.signers[0]?.publicKey;
-        
+
         if (!transaction.feePayer) {
           return {
             success: false,
             error: 'No fee payer provided for transaction'
           };
         }
-        
+
         // Combine all signers
         const allSigners = [
           ...(request.signers || []),
           ...(request.additionalSigners || []),
           ...(request.feePayer ? [request.feePayer] : [])
         ];
-        
+
         if (allSigners.length === 0) {
           return {
             success: false,
             error: 'No signers provided for transaction'
           };
         }
-        
+
         // Sign and send transaction
         signature = await sendAndConfirmTransaction(
           activeConnection,
@@ -386,25 +386,25 @@ export class SolanaDirectEngine {
           }
         );
       }
-      
+
       // Get transaction details
       const txDetails = await activeConnection.getTransaction(signature, {
         commitment: COMMITMENT_LEVEL,
         maxSupportedTransactionVersion: 0
       });
-      
+
       const endTime = Date.now();
       const executionTime = endTime - startTime;
-      
+
       // Update stats
       this.successfulTransactions++;
-      
+
       // Log success
       logger.info(`✅ Transaction successfully executed on Solana blockchain!`);
       logger.info(`📝 Transaction signature: ${signature}`);
       logger.info(`⏱️ Execution time: ${executionTime}ms`);
       logger.info(`🔗 View on Solscan: https://solscan.io/tx/${signature}`);
-      
+
       // Return transaction results
       return {
         success: true,
@@ -412,35 +412,36 @@ export class SolanaDirectEngine {
         blockTime: txDetails?.blockTime,
         slot: txDetails?.slot,
         fee: txDetails?.meta?.fee,
-        confirmations: txDetails?.meta?.confirmations || 1
+        confirmations: txDetails?.meta?.confirmations ?? 1
       };
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error;
       // Update stats
       this.failedTransactions++;
-      
-      logger.error(`❌ Transaction execution failed:`, error);
-      
+
+      logger.error(`❌ Transaction execution failed:`, err);
+
       // Check if this is a connection issue
-      if (this.isConnectionError(error)) {
+      if (this.isConnectionError(err)) {
         if (await this.tryReconnect()) {
           logger.info('Reconnected successfully, retrying transaction...');
           return this.executeTransaction(request);
         }
       }
-      
+
       return {
         success: false,
-        error: error.message || 'Unknown error executing transaction'
+        error: err.message || 'Unknown error executing transaction'
       };
     }
   }
-  
+
   /**
    * Check if the error is related to connection issues
    */
   private isConnectionError(error: any): boolean {
     if (!error || !error.message) return false;
-    
+
     const connectionErrorKeywords = [
       'network error',
       'connection refused',
@@ -455,11 +456,11 @@ export class SolanaDirectEngine {
       '503',
       'server error'
     ];
-    
+
     const errorMsg = error.message.toLowerCase();
     return connectionErrorKeywords.some(keyword => errorMsg.includes(keyword));
   }
-  
+
   /**
    * Try to reconnect using backup connections
    */
@@ -468,34 +469,34 @@ export class SolanaDirectEngine {
       logger.error(`Failed to reconnect after ${MAX_RETRIES} attempts`);
       return false;
     }
-    
+
     this.reconnectAttempts++;
-    
+
     try {
       logger.info(`Attempting to reconnect (${this.reconnectAttempts}/${MAX_RETRIES})...`);
-      
+
       // Get a backup connection
       const backupIndex = this.reconnectAttempts % this.backupConnections.length;
       const backupConnection = this.backupConnections[backupIndex];
-      
+
       // Test the connection
       try {
         await backupConnection.getSlot();
-        
+
         // If successful, switch to this connection
         this.connection = backupConnection;
         this.lastConnectionTime = Date.now();
-        
+
         logger.info(`Reconnected successfully using backup connection ${backupIndex + 1}`);
         return true;
       } catch (testError) {
         logger.warn(`Backup connection ${backupIndex + 1} failed:`, testError);
-        
+
         // Try the next backup connection
         if (this.reconnectAttempts < MAX_RETRIES) {
           return this.tryReconnect();
         }
-        
+
         return false;
       }
     } catch (error) {
@@ -503,7 +504,7 @@ export class SolanaDirectEngine {
       return false;
     }
   }
-  
+
   /**
    * Get the current balance of a wallet
    */
@@ -511,11 +512,11 @@ export class SolanaDirectEngine {
     if (!this.initialized || !this.connection) {
       throw new Error('Transaction engine not initialized');
     }
-    
+
     try {
       const publicKey = new PublicKey(address);
       const balance = await this.connection.getBalance(publicKey, COMMITMENT_LEVEL);
-      
+
       // Convert lamports to SOL
       return balance / 1e9;
     } catch (error) {
@@ -523,7 +524,7 @@ export class SolanaDirectEngine {
       throw error;
     }
   }
-  
+
   /**
    * Get transaction statistics
    */

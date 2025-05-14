@@ -14,7 +14,7 @@ import {
   getActiveStrategies 
 } from './strategy-selector';
 import { strategyController } from './strategy-controller';
-import { logger } from './logger';
+import logger from "./logger"
 
 const strategyRouter = express.Router();
 
@@ -38,14 +38,14 @@ strategyRouter.get('/:id', (req, res) => {
   try {
     const { id } = req.params;
     const strategy = getStrategyById(id);
-    
+
     if (!strategy) {
       return res.status(404).json({
         status: 'error',
         message: `Strategy with ID ${id} not found`
       });
     }
-    
+
     res.json(strategy);
   } catch (error) {
     logger.error(`Error getting strategy ${req.params.id}:`, error);
@@ -79,14 +79,14 @@ strategyRouter.get('/top/list', (req, res) => {
     const successRateCount = req.query.successRateCount ? parseInt(req.query.successRateCount as string, 10) : 1;
     const minSuccessRate = req.query.minSuccessRate ? parseInt(req.query.minSuccessRate as string, 10) : 30;
     const minYield = req.query.minYield ? parseInt(req.query.minYield as string, 10) : 5;
-    
+
     const strategies = selectTopStrategies(
       yieldCount,
       successRateCount,
       minSuccessRate,
       minYield
     );
-    
+
     res.json(strategies);
   } catch (error) {
     logger.error('Error getting top strategies:', error);
@@ -102,17 +102,17 @@ strategyRouter.get('/top/list', (req, res) => {
 strategyRouter.post('/activate', (req, res) => {
   try {
     const { strategyIds } = req.body;
-    
+
     if (!Array.isArray(strategyIds) || strategyIds.length === 0) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing or invalid strategyIds parameter'
       });
     }
-    
+
     const activated = activateStrategies(strategyIds);
     strategyController.activateStrategies(strategyIds);
-    
+
     res.json({
       status: 'success',
       message: `Activated ${activated.length} strategies`,
@@ -132,17 +132,17 @@ strategyRouter.post('/activate', (req, res) => {
 strategyRouter.post('/deactivate', (req, res) => {
   try {
     const { strategyIds } = req.body;
-    
+
     if (!Array.isArray(strategyIds) || strategyIds.length === 0) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing or invalid strategyIds parameter'
       });
     }
-    
+
     const deactivated = deactivateStrategies(strategyIds);
     strategyController.deactivateStrategies(strategyIds);
-    
+
     res.json({
       status: 'success',
       message: `Deactivated ${deactivated.length} strategies`,
@@ -168,7 +168,7 @@ strategyRouter.post('/start', (req, res) => {
       minYield = 5,
       interval = 60000
     } = req.body;
-    
+
     // Initialize controller with top strategies
     strategyController.selectAndActivateTopStrategies(
       yieldCount,
@@ -176,12 +176,12 @@ strategyRouter.post('/start', (req, res) => {
       minSuccessRate,
       minYield
     );
-    
+
     // Start controller
     strategyController.start(interval);
-    
+
     const activeStrategies = strategyController.getActiveStrategies();
-    
+
     res.json({
       status: 'success',
       message: 'Strategy controller started with top strategies',
@@ -202,7 +202,7 @@ strategyRouter.post('/start', (req, res) => {
 strategyRouter.post('/stop', (req, res) => {
   try {
     strategyController.stop();
-    
+
     res.json({
       status: 'success',
       message: 'Strategy controller stopped',
@@ -223,7 +223,7 @@ strategyRouter.get('/status', (req, res) => {
   try {
     const status = strategyController.getStatus();
     const activeStrategies = strategyController.getActiveStrategies();
-    
+
     res.json({
       status: 'success',
       controllerStatus: status,
