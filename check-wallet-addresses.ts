@@ -4,11 +4,25 @@
  * This script displays all wallet addresses used by the system for trading and profit collection.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+
+// Define wallet interface
+interface WalletInfo {
+  address: string;
+  type: string;
+  description: string;
+  allocationPercentage: number;
+}
+
+// Define agent wallet interface
+interface AgentWalletConfig {
+  agent: string;
+  wallets: WalletInfo[];
+}
 
 // Main wallet information
-const MAIN_TRADING_WALLET = {
+const MAIN_TRADING_WALLET: WalletInfo = {
   address: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
   type: 'Primary Trading Wallet',
   description: 'Used for all primary trading operations',
@@ -16,7 +30,7 @@ const MAIN_TRADING_WALLET = {
 };
 
 // Prophet wallet for profit collection
-const PROPHET_WALLET = {
+const PROPHET_WALLET: WalletInfo = {
   address: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
   type: 'Prophet Wallet',
   description: 'Used to collect 5% of all profits',
@@ -24,7 +38,7 @@ const PROPHET_WALLET = {
 };
 
 // Agent-specific wallets (these would be read from configuration in a real implementation)
-const AGENT_WALLETS = [
+const AGENT_WALLETS: AgentWalletConfig[] = [
   {
     agent: 'Hyperion Flash Arbitrage Overlord',
     wallets: [
@@ -61,7 +75,7 @@ const AGENT_WALLETS = [
 ];
 
 // Display wallet information
-function displayWalletInfo() {
+function displayWalletInfo(): void {
   console.log('======================================================');
   console.log('📊 System Wallet Addresses');
   console.log('======================================================\n');

@@ -5,20 +5,29 @@
  * IMPORTANT: This script should be run in a secure environment as it handles sensitive key material.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+
+// Define wallet info interface
+interface WalletInfo {
+  address: string;
+  privateKey: string;
+}
+
+// Define export format type
+type ExportFormat = 'phantom' | 'solflare' | 'keystore' | 'json';
 
 // Main system wallet information
 // Note: In a real implementation, these keys would be securely stored and encrypted
 // For this demo, we're using placeholder keys
-const WALLET_INFO = {
+const WALLET_INFO: WalletInfo = {
   address: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
   // This is just a placeholder and not a real private key
   privateKey: '[PLACEHOLDER_PRIVATE_KEY]', 
 };
 
 // Export format options
-const EXPORT_FORMATS = {
+const EXPORT_FORMATS: Record<string, ExportFormat> = {
   PHANTOM: 'phantom',
   SOLFLARE: 'solflare',
   KEYSTORE: 'keystore',
@@ -26,7 +35,7 @@ const EXPORT_FORMATS = {
 };
 
 // Export wallet for Phantom
-function exportForPhantom() {
+function exportForPhantom(): void {
   console.log('=============================================');
   console.log('🦊 Export Wallet for Phantom Compatibility');
   console.log('=============================================\n');

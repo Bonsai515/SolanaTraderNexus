@@ -5,9 +5,9 @@
  * that leverage quantum prediction and MEV protection.
  */
 
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
+import fs from 'fs';
+import path from 'path';
+import axios, { AxiosResponse } from 'axios';
 
 // Configuration
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -17,7 +17,15 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
 const PROPHET_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
 
 // Strategy configuration
-const QUANTUM_STRATEGIES = [
+interface QuantumStrategy {
+  id: string;
+  description: string;
+  allocation: number;
+  expectedROI: number;
+  reinvestRate: number;
+}
+
+const QUANTUM_STRATEGIES: QuantumStrategy[] = [
   {
     id: 'hyperion-quantum-flash-arbitrage',
     description: 'Hyperion Flash Arbitrage with Quantum Time-Warp Prediction',
@@ -42,10 +50,10 @@ const QUANTUM_STRATEGIES = [
 ];
 
 // Make API request
-async function callAPI(method, endpoint, data = null) {
+async function callAPI(method: string, endpoint: string, data: any = null): Promise<any> {
   try {
     const url = API_BASE_URL + endpoint;
-    const response = await axios({
+    const response: AxiosResponse = await axios({
       method,
       url,
       data,
@@ -55,13 +63,13 @@ async function callAPI(method, endpoint, data = null) {
     });
     return response.data;
   } catch (error) {
-    console.error(`Error calling API ${endpoint}:`, error.message);
+    console.error(`Error calling API ${endpoint}:`, (error as Error).message);
     return null;
   }
 }
 
 // Initialize Time-Warp module
-async function initializeTimeWarp() {
+async function initializeTimeWarp(): Promise<boolean> {
   console.log('Initializing Time-Warp module for quantum prediction...');
   
   try {
@@ -69,13 +77,13 @@ async function initializeTimeWarp() {
     console.log('✅ Time-Warp module initialized with quantum synchronization');
     return true;
   } catch (error) {
-    console.error('Error initializing Time-Warp module:', error.message);
+    console.error('Error initializing Time-Warp module:', (error as Error).message);
     return false;
   }
 }
 
 // Activate quantum-enhanced strategies
-async function activateQuantumStrategies() {
+async function activateQuantumStrategies(): Promise<boolean> {
   console.log('\nActivating quantum-enhanced strategies:');
   
   for (const strategy of QUANTUM_STRATEGIES) {
@@ -101,10 +109,18 @@ async function activateQuantumStrategies() {
 }
 
 // Configure quantum optimization parameters
-async function configureQuantumOptimization() {
+async function configureQuantumOptimization(): Promise<boolean> {
   console.log('\nConfiguring Quantum Optimization parameters:');
   
-  const optimizationParams = {
+  interface OptimizationParams {
+    temporalOffset: number;
+    mevProtection: boolean;
+    nexusOptimization: string;
+    priorityLevel: string;
+    feeCushion: number;
+  }
+  
+  const optimizationParams: OptimizationParams = {
     temporalOffset: 15, // 15 seconds time offset for prediction
     mevProtection: true, // Enable MEV protection
     nexusOptimization: 'TURBO', // Use TURBO optimization level
@@ -131,7 +147,7 @@ async function configureQuantumOptimization() {
 }
 
 // Main execution function
-async function startQuantumStrategies() {
+async function startQuantumStrategies(): Promise<boolean> {
   console.log('======================================================');
   console.log('🚀 Starting Quantum-Enhanced Trading Strategies');
   console.log('======================================================\n');
