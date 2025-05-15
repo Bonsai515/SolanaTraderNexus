@@ -252,11 +252,12 @@ function initWebSocket() {
   store._handleConnectionChange(false, 'connecting');
   
   // Get the correct WebSocket URL
-  // For Replit environment, we need to use the relative URL
-  const baseUrl = window.location.origin;
-  const wsUrl = `${baseUrl}/ws`;
+  // For Replit environment, we need to use the relative URL with ws:// or wss:// protocol
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.host;
+  const wsUrl = `${protocol}//${host}/ws`;
   
-  console.log(`Connecting to WebSocket at ${wsUrl} (baseUrl: ${baseUrl})`);
+  console.log(`Connecting to WebSocket at ${wsUrl} (protocol: ${protocol}, host: ${host})`);
   
   try {
     // Create new WebSocket
