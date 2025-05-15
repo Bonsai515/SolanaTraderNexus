@@ -7,6 +7,7 @@ pub mod parallel;
 pub mod strategy;
 pub mod security;
 pub mod transformers;
+pub mod neural;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,6 +19,7 @@ pub use transaction::{Transaction, TransactionResult, TransactionEngine};
 pub use parallel::{init_parallel_processing, process_transactions_parallel, process_price_feeds_parallel};
 pub use security::{SecurityCheck, SecurityCheckResult, vectorized_security_checks};
 pub use transformers::parallel::{parallel_process, parallel_process_f32, parallel_process_prices, parallel_process_tokens, parallel_matrix_multiply};
+pub use neural::{QuantizedModel, ModelPrecision, DarkPredictor};
 pub use strategy::{
     StrategyType, 
     FlashLoanArbitrageStrategy, 
