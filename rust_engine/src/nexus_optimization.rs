@@ -338,7 +338,7 @@ pub trait NexusOptimizationExtension {
 }
 
 // Example implementation for TransactionEngine
-impl NexusOptimizationExtension for crate::transaction_engine::TransactionEngine {
+impl NexusOptimizationExtension for crate::transaction::TransactionEngine {
     fn set_optimization_manager(&mut self, manager: Arc<Mutex<NexusOptimizationManager>>) {
         // This would need to be implemented based on your TransactionEngine structure
         // self.optimization_manager = Some(manager);

@@ -11,13 +11,12 @@ use tokio::sync::Mutex;
 use log::info; // Only using info log level
 
 // Re-export important types 
-pub use transaction::{Transaction, TransactionResult};
+pub use transaction::{Transaction, TransactionResult, TransactionEngine};
 pub use parallel::{init_parallel_processing, process_transactions_parallel, process_price_feeds_parallel};
 pub use strategy::{
     StrategyType, 
     FlashLoanArbitrageStrategy, 
     MomentumSurfingStrategy,
-    TransactionEngine,
     MemeCortexIntegration
 };
 
@@ -27,7 +26,7 @@ pub fn init_engine() -> TransactionEngine {
     parallel::init_parallel_processing();
     
     // Return new transaction engine instance
-    TransactionEngine {}
+    TransactionEngine::new()
 }
 
 // Initialize the MemeCortex integration
@@ -36,7 +35,7 @@ pub fn init_memecortex() -> MemeCortexIntegration {
 }
 
 // Create strategies with optimal configuration
-pub fn create_strategy(strategy_type: StrategyType) -> Box<dyn Strategy> {
+pub fn create_strategy(strategy_type: StrategyType) -> Box<dyn crate::Strategy> {
     match strategy_type {
         StrategyType::FlashLoanArbitrage => {
             let nexus_engine = Arc::new(Mutex::new(init_engine()));
