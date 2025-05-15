@@ -494,7 +494,7 @@ export class ZeroCapitalFlashArbitrageStrategy {
                 targetDex: targetDex.name,
                 expectedProfitUSD: flashLoanToken === 'USDC' || flashLoanToken === 'USDT' 
                   ? netProfit 
-                  : netProfit * (baseUSDPrices[flashLoanToken] || 1),
+                  : netProfit * (this.baseUSDPrices[flashLoanToken] || 1),
                 expectedProfitPercentage: netProfitPercentage,
                 confidence: confidence,
                 executionPath: executionPath,
@@ -666,7 +666,7 @@ export class ZeroCapitalFlashArbitrageStrategy {
                   targetDex: dex.name, // Same DEX for triangular
                   expectedProfitUSD: baseToken === 'USDC' || baseToken === 'USDT' 
                     ? netProfit 
-                    : netProfit * (baseUSDPrices[baseToken] || 1),
+                    : netProfit * (this.baseUSDPrices[baseToken] || 1),
                   expectedProfitPercentage: netProfitPercentage,
                   confidence: confidence,
                   executionPath: executionPath,
