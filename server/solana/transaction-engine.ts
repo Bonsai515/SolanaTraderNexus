@@ -276,7 +276,7 @@ export class SolanaDirectEngine {
       const { blockhash, lastValidBlockHeight } = await activeConnection.getLatestBlockhash(COMMITMENT_LEVEL);
 
       // Add priority fee instruction if requested
-      const priorityFee = PRIORITY_FEE_MULTIPLIERS[request.priority as TransactionPriority] || PRIORITY_FEE_MULTIPLIERS.MEDIUM;
+      const priorityFee = PRIORITY_FEE_MULTIPLIERS[request.priority as TransactionPriority] || PRIORITY_FEE_MULTIPLIERS.medium;
       const computeUnits = request.computeUnits || 200_000; // Default compute units
 
       const allInstructions = [

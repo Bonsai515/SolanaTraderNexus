@@ -168,7 +168,7 @@ class SignalValidator {
       validate: (signal) => {
         const shouldHaveAnalysis = [
           SignalType.PATTERN_RECOGNITION,
-          SignalType.CROSS_CHAIN,
+          SignalType.CrossChain,
           SignalType.WHALE_MOVEMENT
         ].includes(signal.type);
         

@@ -16,7 +16,8 @@ import {
 import { strategyController } from './strategy-controller';
 import logger from "./logger"
 
-const strategyRouter = express.Router();
+import { Router } from 'express';
+const strategyRouter = Router();
 
 // Get all strategies
 strategyRouter.get('/', (req, res) => {
