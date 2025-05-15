@@ -30,7 +30,10 @@ const validateRpcUrl = (url?: string, defaultUrl: string = 'https://api.mainnet-
 // Set of backup RPC endpoints with validation and priority order
 const RPC_ENDPOINTS: Record<EndpointKey, string> = {
   // Primary connection - Instant Nodes premium endpoint (4M daily limit)
-  instantNodes: validateRpcUrl(process.env.INSTANT_NODES_RPC_URL, 'https://api.mainnet-beta.solana.com'),
+  instantNodes: process.env.INSTANT_NODES_RPC_URL ? 
+    // Try alternative format that many nodes providers use (API key as auth header instead of URL)
+    `https://rpc.helius.xyz/?api-key=${process.env.INSTANT_NODES_RPC_URL}` : 
+    'https://api.mainnet-beta.solana.com',
   // Secondary connection - Alchemy endpoint
   alchemy: validateRpcUrl(process.env.ALCHEMY_RPC_URL, 'https://api.mainnet-beta.solana.com'),
   // Tertiary connection - Helius (if API key available)
@@ -65,19 +68,24 @@ let solanaConnection: Connection | null = null;
 export async function initializeRpcConnection(): Promise<Connection> {
   logger.info('Initializing Solana RPC connection with auto-fallback...');
 
-  // We'll try each endpoint in sequence, starting with Helius which has been more reliable
-  // in our logs than Instant Nodes (which is hitting rate limits)
-  const endpointsToTry: EndpointKey[] = ['helius', 'instantNodes', 'alchemy', 'fallback1', 'fallback2', 'fallback3'];
+  // We'll try each endpoint in sequence, prioritizing Helius which has been consistently working
+  // Instant Nodes is showing authentication issues ("invalid api key")
+  const endpointsToTry: EndpointKey[] = ['helius', 'fallback1', 'fallback2', 'fallback3', 'instantNodes', 'alchemy'];
   
   for (const endpoint of endpointsToTry) {
     try {
       logger.info(`Attempting to connect to ${endpoint} RPC endpoint...`);
       
-      // Create connection with proper retry backoff
+      // Create connection with proper exponential backoff for rate limits
       solanaConnection = new Connection(RPC_ENDPOINTS[endpoint], {
         commitment: 'confirmed',
-        disableRetryOnRateLimit: true, // Changed to true to enable automatic retry
-        confirmTransactionInitialTimeout: 60000
+        disableRetryOnRateLimit: false, // Enable automatic retry with exponential backoff
+        confirmTransactionInitialTimeout: 60000,
+        httpHeaders: endpoint === 'helius' ? {
+          // Add headers to increase rate limit allowance and identify our service
+          'x-client-name': 'Hyperion-Trading-System',
+          'x-client-version': '1.0.0'
+        } : undefined
       });
 
       // Test the connection
