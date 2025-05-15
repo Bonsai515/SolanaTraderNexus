@@ -16,7 +16,7 @@
 
 import { EventEmitter } from 'events';
 import * as logger from './logger';
-import { nexusEngine } from './nexus-transaction-engine';
+import { nexusEngine, EnhancedTransactionEngine, getNexusEngine } from './nexus-transaction-engine';
 import { getWalletConfig } from './walletManager';
 // Import verifyTransaction function or use a stub if not available
 let verifyTransaction: (signature: string, walletAddress: string, token: string, amount: number) => Promise<boolean>;
@@ -450,53 +450,73 @@ class SignalHub extends EventEmitter {
       
       // Execute the transaction
       logger.info(`Executing swap with: source=${sourceToken}, target=${targetToken}, amount=${amount}`);
-      const txResult = await nexusEngine.executeSwap({
-        fromToken: sourceToken || 'USDC',
-        toToken: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
-        amount: amount,
-        slippageBps: 50, // 0.5% slippage
-        simulation: !this.config.useRealFunds, // Use simulation mode when not using real funds
-        walletAddress: walletConfig.tradingWallet
-      });
       
-      if (txResult.success) {
-        logger.info(`Successfully executed transaction for signal ${signal.id}, signature: ${txResult.signature}`);
+      try {
+        // Get the Nexus engine instance
+        const engine = getNexusEngine();
         
-        // Mark signal as actioned
-        signal.actionTaken = true;
-        signal.transactionSignature = txResult.signature;
-        
-        // Submit for verification if verification is available
-        if (txResult.signature && typeof verifyTransaction === 'function') {
-          try {
-            await verifyTransaction(
-              txResult.signature,
-              walletConfig.tradingWallet, 
-              targetToken,
-              0 // Actual balance verification would happen async
-            );
-            logger.info(`Verification submitted for transaction ${txResult.signature}`);
-          } catch (verifyError) {
-            logger.warn(`Could not verify transaction ${txResult.signature}: ${verifyError.message}`);
-            // Continue execution - verification failure shouldn't stop the process
+        // Execute the swap
+        const txResult = await engine.executeSwap({
+          fromToken: sourceToken || 'USDC',
+          toToken: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
+          amount: amount,
+          slippage: 0.5, // 0.5% slippage
+          walletAddress: walletConfig.tradingWallet
+        });
+      
+        if (txResult.success) {
+          logger.info(`Successfully executed transaction for signal ${signal.id}, signature: ${txResult.signature}`);
+          
+          // Mark signal as actioned
+          signal.actionTaken = true;
+          signal.transactionSignature = txResult.signature;
+          
+          // Submit for verification if verification is available
+          if (txResult.signature && typeof verifyTransaction === 'function') {
+            try {
+              await verifyTransaction(
+                txResult.signature,
+                walletConfig.tradingWallet, 
+                targetToken,
+                0 // Actual balance verification would happen async
+              );
+              logger.info(`Verification submitted for transaction ${txResult.signature}`);
+            } catch (verifyError) {
+              logger.warn(`Could not verify transaction ${txResult.signature}: ${verifyError.message}`);
+              // Continue execution - verification failure shouldn't stop the process
+            }
+          } else {
+            logger.info(`Transaction verification skipped for ${txResult.signature}`);
           }
+          
+          // Record action result
+          this.actionResults[signal.id] = {
+            signalId: signal.id,
+            success: true,
+            actionType: `${direction}_${sourceToken}_${targetToken}`,
+            timestamp: Date.now(),
+            transactionSignature: txResult.signature
+          };
+          
+          // Emit action result event
+          this.emit('action_result', this.actionResults[signal.id]);
         } else {
-          logger.info(`Transaction verification skipped for ${txResult.signature}`);
+          logger.warn(`Transaction failed for signal ${signal.id}: ${txResult.error}`);
+          
+          // Record action result
+          this.actionResults[signal.id] = {
+            signalId: signal.id,
+            success: false,
+            actionType: `${direction}_${sourceToken}_${targetToken}`,
+            timestamp: Date.now(),
+            error: txResult.error
+          };
+          
+          // Emit action result event
+          this.emit('action_result', this.actionResults[signal.id]);
         }
-        
-        // Record action result
-        this.actionResults[signal.id] = {
-          signalId: signal.id,
-          success: true,
-          actionType: `${direction}_${sourceToken}_${targetToken}`,
-          timestamp: Date.now(),
-          transactionSignature: txResult.signature
-        };
-        
-        // Emit action result event
-        this.emit('action_result', this.actionResults[signal.id]);
-      } else {
-        logger.warn(`Transaction failed for signal ${signal.id}: ${txResult.error}`);
+      } catch (error) {
+        logger.error(`Error executing transaction for signal ${signal.id}:`, error);
         
         // Record action result
         this.actionResults[signal.id] = {
@@ -504,25 +524,23 @@ class SignalHub extends EventEmitter {
           success: false,
           actionType: `${direction}_${sourceToken}_${targetToken}`,
           timestamp: Date.now(),
-          error: txResult.error
+          error: error.message
         };
         
         // Emit action result event
         this.emit('action_result', this.actionResults[signal.id]);
       }
     } catch (error) {
-      logger.error(`Error executing transaction for signal ${signal.id}:`, error);
+      logger.error(`Error in processing trading signal ${signal.id}:`, error);
       
-      // Record action result
       this.actionResults[signal.id] = {
         signalId: signal.id,
         success: false,
-        actionType: `${direction}_${sourceToken}_${targetToken}`,
+        actionType: `${direction}_ERROR`,
         timestamp: Date.now(),
         error: error.message
       };
       
-      // Emit action result event
       this.emit('action_result', this.actionResults[signal.id]);
     }
   }
