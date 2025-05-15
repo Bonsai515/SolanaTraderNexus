@@ -259,7 +259,7 @@ class TransactionConnector extends EventEmitter {
 // Export singleton instance with default configuration
 const defaultConfig: EngineConfig = {
   useRealFunds: process.env.USE_REAL_FUNDS === 'true',
-  rpcUrl: process.env.SOLANA_RPC_URL || 'https://solana-grpc-geyser.instantnodes.io:443',
+  rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
   websocketUrl: process.env.SOLANA_WEBSOCKET_URL,
   systemWalletAddress: process.env.SYSTEM_WALLET_ADDRESS || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
   wormholeGuardianRpc: process.env.WORMHOLE_GUARDIAN_RPC || 'https://guardian.stable.productions',
