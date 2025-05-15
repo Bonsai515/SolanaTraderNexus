@@ -2110,6 +2110,7 @@ dependencies = [
  "env_logger 0.10.2",
  "log",
  "rand 0.8.5",
+ "rayon",
  "serde",
  "serde_json",
  "solana-client",

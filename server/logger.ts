@@ -124,6 +124,20 @@ export function getLogLevel(): LogLevel {
   return currentLogLevel;
 }
 
+/**
+ * Get a logger with a specific context name
+ * @param context The context name for the logger
+ * @returns A logger object with the context
+ */
+export function getLogger(context: string) {
+  return {
+    debug: (message: string, ...args: any[]) => debug(`[${context}] ${message}`, ...args),
+    info: (message: string, ...args: any[]) => info(`[${context}] ${message}`, ...args),
+    warn: (message: string, ...args: any[]) => warn(`[${context}] ${message}`, ...args),
+    error: (message: string, ...args: any[]) => error(`[${context}] ${message}`, ...args)
+  };
+}
+
 // Export the logger object for compatibility with JavaScript's logger.js
 export const logger = {
   debug,
@@ -131,7 +145,8 @@ export const logger = {
   warn,
   error,
   setLogLevel,
-  getLogLevel
+  getLogLevel,
+  getLogger
 };
 
 // Export default logger for convenience

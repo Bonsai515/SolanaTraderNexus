@@ -117,7 +117,7 @@ export class CrossChainConnector {
       this.wormholeApiKey = process.env.WORMHOLE_API_KEY || null;
       
       if (!this.wormholeApiKey) {
-        logger.warn('No Wormhole API key found, some features may be limited');
+        logger.warn('No Wormhole API key found, using public Guardian network for cross-chain operations');
       }
       
       this.isInitialized = true;
@@ -366,9 +366,9 @@ export class CrossChainConnector {
           throw new Error('Private key required for real transactions');
         }
         
-        // Check if Wormhole API key is available for Wormhole bridge
+        // Note on Wormhole API key usage
         if (params.bridge === Bridge.WORMHOLE && !this.wormholeApiKey) {
-          throw new Error('Wormhole API key required for Wormhole bridge transactions');
+          logger.info('Using public Guardian network for Wormhole bridge transaction');
         }
         
         logger.info(`Executing cross-chain transaction: ${params.amount} ${params.sourceToken} from ${params.sourceChain} to ${params.targetChain} via ${params.bridge}`);

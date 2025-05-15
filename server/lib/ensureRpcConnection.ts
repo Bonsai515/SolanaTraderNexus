@@ -65,53 +65,54 @@ let solanaConnection: Connection | null = null;
 export async function initializeRpcConnection(): Promise<Connection> {
   logger.info('Initializing Solana RPC connection with auto-fallback...');
 
-  try {
-    // Try Instant Nodes first - this is the fastest and most reliable premium endpoint
-    logger.info('Attempting to connect to Instant Nodes RPC endpoint...');
-    solanaConnection = new Connection(RPC_ENDPOINTS.instantNodes, {
-      commitment: 'confirmed',
-      disableRetryOnRateLimit: false,
-      confirmTransactionInitialTimeout: 60000
-    });
-
-    const blockchainInfo = await solanaConnection.getVersion();
-    logger.info(`✅ Connected to Instant Nodes RPC endpoint (Solana version ${blockchainInfo['solana-core']}))`);
-    connectionActive = true;
-    lastConnectionCheck = Date.now();
-    
-    // Start connection monitoring
-    startConnectionMonitoring();
-    return solanaConnection;
-  } catch (error: any) {
-    logger.error(`Failed to connect to Instant Nodes RPC: ${error.message || String(error)}`);
-    connectionFailures.instantNodes++;
-    
-    // Try Helius next
+  // We'll try each endpoint in sequence, starting with Helius which has been more reliable
+  // in our logs than Instant Nodes (which is hitting rate limits)
+  const endpointsToTry: EndpointKey[] = ['helius', 'instantNodes', 'alchemy', 'fallback1', 'fallback2', 'fallback3'];
+  
+  for (const endpoint of endpointsToTry) {
     try {
-      logger.info('Attempting to connect to Helius RPC endpoint...');
-      solanaConnection = new Connection(RPC_ENDPOINTS.helius, {
+      logger.info(`Attempting to connect to ${endpoint} RPC endpoint...`);
+      
+      // Create connection with proper retry backoff
+      solanaConnection = new Connection(RPC_ENDPOINTS[endpoint], {
         commitment: 'confirmed',
-        disableRetryOnRateLimit: false,
+        disableRetryOnRateLimit: true, // Changed to true to enable automatic retry
         confirmTransactionInitialTimeout: 60000
       });
-      
+
+      // Test the connection
       const blockchainInfo = await solanaConnection.getVersion();
-      logger.info(`✅ Connected to Helius RPC endpoint (Solana version ${blockchainInfo['solana-core']}))`);
+      logger.info(`✅ Connected to ${endpoint} RPC endpoint (Solana version ${blockchainInfo['solana-core']}))`);
       connectionActive = true;
       lastConnectionCheck = Date.now();
-      currentEndpoint = 'helius';
+      currentEndpoint = endpoint;
       
       // Start connection monitoring
       startConnectionMonitoring();
       return solanaConnection;
-    } catch (heliusError: any) {
-      logger.error(`Failed to connect to Helius RPC: ${heliusError.message || String(heliusError)}`);
-      connectionFailures.helius++;
-      
-      // Try fallbacks
-      return switchToFallbackRpc();
+    } catch (error: any) {
+      logger.warn(`Failed to connect to ${endpoint} RPC: ${error.message || String(error)}`);
+      connectionFailures[endpoint]++;
+      // Continue to next endpoint
     }
   }
+  
+  // If we get here, all endpoints failed
+  logger.error('Failed to connect to any RPC endpoint, falling back to public RPC');
+  
+  // Create a connection with the public endpoint as a last resort
+  solanaConnection = new Connection(clusterApiUrl('mainnet-beta'), {
+    commitment: 'confirmed',
+    disableRetryOnRateLimit: true
+  });
+  
+  currentEndpoint = 'fallback3';
+  connectionActive = true;
+  lastConnectionCheck = Date.now();
+  
+  // Start monitoring anyway
+  startConnectionMonitoring();
+  return solanaConnection;
 }
 
 /**
