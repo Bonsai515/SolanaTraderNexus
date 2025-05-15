@@ -41,7 +41,7 @@ pub fn init_engine() -> TransactionEngine {
 
 // Initialize the MemeCortex integration
 pub fn init_memecortex() -> MemeCortexIntegration {
-    MemeCortexIntegration {}
+    MemeCortexIntegration::new()
 }
 
 // Create strategies with optimal configuration
