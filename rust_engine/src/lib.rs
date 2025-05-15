@@ -5,6 +5,8 @@ pub mod transaction;
 pub mod parallel;
 // Import strategy package directly from the module directory
 pub mod strategy;
+pub mod security;
+pub mod transformers;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +16,8 @@ use log::info; // Only using info log level
 // Re-export important types 
 pub use transaction::{Transaction, TransactionResult, TransactionEngine};
 pub use parallel::{init_parallel_processing, process_transactions_parallel, process_price_feeds_parallel};
+pub use security::{SecurityCheck, SecurityCheckResult, vectorized_security_checks};
+pub use transformers::parallel::{parallel_process, parallel_process_f32, parallel_process_prices, parallel_process_tokens, parallel_matrix_multiply};
 pub use strategy::{
     StrategyType, 
     FlashLoanArbitrageStrategy, 
