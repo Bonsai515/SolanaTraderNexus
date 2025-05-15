@@ -1589,6 +1589,8 @@ router.get('/api/price/:token', (req, res) => {
 });
 
 export async function registerRoutes(app: express.Express) {
+  // Use the router
+  app.use(router);
   // Add system status endpoint
   app.get('/status', (req, res) => {
     const status = {
