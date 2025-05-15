@@ -1,281 +1,344 @@
 /**
  * Anchor Program Connector
  * 
- * This module connects to the on-chain Anchor program that serves as a
- * backup execution system for transactions. This provides additional
- * execution security and ensures transactions can proceed even if the
- * primary execution method fails.
- * 
- * The module handles:
- * - Connection to the Anchor program
- * - Transaction execution through the program
- * - Verification that the program is properly synchronized
+ * Provides connectivity to Solana on-chain programs using Anchor framework
+ * with reliable connection management and verification.
  */
 
-import * as logger from './logger';
-import { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
-  TransactionInstruction,
-  Keypair,
-  sendAndConfirmTransaction
-} from '@solana/web3.js';
-import { getWalletConfig } from './walletManager';
-import { signalHub } from './signalHub';
+import { Connection, PublicKey, Keypair, Transaction, SystemProgram } from '@solana/web3.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import { logger } from './logger';
 
-// Anchor program constants
-const ANCHOR_PROGRAM_ID = process.env.ANCHOR_PROGRAM_ID || 'TRADExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
-
-// Connection and program state
-let initialized = false;
-let connected = false;
-let programConnection: Connection | null = null;
-let programState: any = {
-  lastSyncTimestamp: 0,
-  transactionCount: 0,
-  isActive: false,
-  version: 'unknown'
+// Program IDs for our deployed programs
+const PROGRAM_IDS = {
+  HYPERION_FLASH_LOAN: new PublicKey('HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa'),
+  QUANTUM_VAULT: new PublicKey('QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL'),
+  MEMECORTEX: new PublicKey('MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV'),
+  SINGULARITY_BRIDGE: new PublicKey('SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H'),
+  NEXUS_ENGINE: new PublicKey('NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx')
 };
 
+// Connection configuration
+interface ConnectionConfig {
+  url: string;
+  commitment: string;
+  confirmTransactionInitialTimeout: number;
+}
+
 /**
- * Initialize the Anchor program connector
- * @returns Success status
+ * Anchor Program Connection Manager
  */
-export async function initAnchorConnector(): Promise<boolean> {
-  if (initialized) {
-    logger.warn('Anchor program connector already initialized');
-    return connected;
+export class AnchorProgramConnector {
+  private connection: Connection | null = null;
+  private connectionConfig: ConnectionConfig;
+  private programIds: Record<string, PublicKey>;
+  private walletKeyPair: Keypair | null = null;
+  private connectionTimeoutIds: NodeJS.Timeout[] = [];
+  private lastConnectionCheck: number = 0;
+  private isConnectionHealthy: boolean = false;
+  
+  /**
+   * Constructor
+   * @param rpcUrl The RPC URL to connect to
+   */
+  constructor(rpcUrl: string) {
+    // Default connection configuration
+    this.connectionConfig = {
+      url: rpcUrl,
+      commitment: 'confirmed',
+      confirmTransactionInitialTimeout: 60000 // 60 seconds
+    };
+    
+    this.programIds = { ...PROGRAM_IDS };
+    
+    this.initializeConnection();
+    this.loadSystemWallet();
   }
   
-  try {
-    // Create connection to Solana network
-    const rpcUrl = process.env.SOLANA_RPC_URL || process.env.HELIUS_API_KEY 
-      ? `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}`
-      : 'https://api.devnet.solana.com';
+  /**
+   * Initialize Solana connection
+   */
+  private initializeConnection(): void {
+    try {
+      this.connection = new Connection(
+        this.connectionConfig.url,
+        {
+          commitment: this.connectionConfig.commitment as any,
+          confirmTransactionInitialTimeout: this.connectionConfig.confirmTransactionInitialTimeout
+        }
+      );
       
-    programConnection = new Connection(rpcUrl, 'confirmed');
+      logger.info(`[Anchor] Initialized connection to ${this.connectionConfig.url}`);
+      
+      // Schedule regular connection checks
+      this.scheduleConnectionChecks();
+    } catch (error) {
+      logger.error('[Anchor] Failed to initialize connection:', error);
+      throw new Error(`Failed to initialize Solana connection: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Load system wallet for transaction signing
+   */
+  private loadSystemWallet(): void {
+    try {
+      // In production, this would load from an environment variable or secure storage
+      // For development, we'll create a new keypair if one doesn't exist
+      const walletPath = path.join(__dirname, '..', 'wallet.json');
+      
+      let secretKey: Uint8Array;
+      
+      if (fs.existsSync(walletPath)) {
+        const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+        secretKey = new Uint8Array(walletData);
+      } else {
+        // For development only - not for production use
+        const newKeypair = Keypair.generate();
+        secretKey = newKeypair.secretKey;
+        fs.writeFileSync(walletPath, JSON.stringify(Array.from(secretKey)));
+        logger.info('[Anchor] Generated new wallet keypair for development');
+      }
+      
+      this.walletKeyPair = Keypair.fromSecretKey(secretKey);
+      logger.info(`[Anchor] Loaded wallet: ${this.walletKeyPair.publicKey.toString()}`);
+    } catch (error) {
+      logger.error('[Anchor] Failed to load wallet:', error);
+    }
+  }
+  
+  /**
+   * Schedule regular connection health checks
+   */
+  private scheduleConnectionChecks(): void {
+    // Clear any existing timeouts
+    this.connectionTimeoutIds.forEach(id => clearTimeout(id));
+    this.connectionTimeoutIds = [];
     
-    // Verify program exists
-    const programId = new PublicKey(ANCHOR_PROGRAM_ID);
-    const accountInfo = await programConnection.getAccountInfo(programId);
+    // Schedule an immediate check
+    const immediateCheck = setTimeout(() => this.checkConnectionHealth(), 1000);
+    this.connectionTimeoutIds.push(immediateCheck);
     
-    if (!accountInfo) {
-      logger.error(`Anchor program not found at address ${ANCHOR_PROGRAM_ID}`);
-      initialized = true;
-      connected = false;
+    // Schedule regular checks every 2 minutes
+    const regularCheck = setInterval(() => this.checkConnectionHealth(), 2 * 60 * 1000);
+    this.connectionTimeoutIds.push(regularCheck as unknown as NodeJS.Timeout);
+  }
+  
+  /**
+   * Check connection health
+   */
+  private async checkConnectionHealth(): Promise<boolean> {
+    if (!this.connection) {
+      logger.error('[Anchor] No connection to check');
+      this.isConnectionHealthy = false;
       return false;
     }
     
-    // Get program state
-    await updateProgramState();
-    
-    initialized = true;
-    connected = true;
-    logger.info(`Anchor program connector initialized successfully`);
-    logger.info(`- Program ID: ${ANCHOR_PROGRAM_ID}`);
-    logger.info(`- Version: ${programState.version}`);
-    logger.info(`- Active: ${programState.isActive ? 'YES' : 'NO'}`);
-    logger.info(`- Transactions: ${programState.transactionCount}`);
-    
-    return true;
-  } catch (error) {
-    logger.error('Failed to initialize Anchor program connector:', error);
-    initialized = true;
-    connected = false;
-    return false;
-  }
-}
-
-/**
- * Check if the Anchor program is connected
- * @returns Connection status
- */
-export function isProgramConnected(): boolean {
-  return connected;
-}
-
-/**
- * Get the Anchor program state
- * @returns Program state
- */
-export async function getProgramState(): Promise<any> {
-  if (!initialized) {
-    await initAnchorConnector();
-  }
-  
-  if (!connected) {
-    return { 
-      connected: false,
-      lastSyncTimestamp: 0,
-      error: 'Program not connected' 
-    };
-  }
-  
-  await updateProgramState();
-  return {
-    connected: true,
-    ...programState
-  };
-}
-
-/**
- * Update the program state from the blockchain
- */
-async function updateProgramState(): Promise<void> {
-  if (!programConnection) {
-    return;
-  }
-  
-  try {
-    // In a real implementation, this would fetch program state from the Anchor program
-    // For now, simulate fetching program state
-    programState = {
-      lastSyncTimestamp: Date.now(),
-      transactionCount: programState.transactionCount || Math.floor(Math.random() * 100),
-      isActive: true,
-      version: '1.0.0'
-    };
-  } catch (error) {
-    logger.error('Error updating program state:', error);
-  }
-}
-
-/**
- * Send a transaction through the Anchor program
- * @param txType Transaction type
- * @param params Transaction parameters
- * @param walletAddress Wallet address to use for the transaction
- */
-export async function sendTransactionThroughProgram(
-  txType: string,
-  params: any,
-  walletAddress?: string
-): Promise<any> {
-  if (!initialized) {
-    await initAnchorConnector();
-  }
-  
-  if (!connected || !programConnection) {
-    logger.error('Cannot send transaction: Anchor program not connected');
-    return { success: false, error: 'Program not connected' };
-  }
-  
-  try {
-    // Get wallet configuration
-    const walletConfig = getWalletConfig();
-    const wallet = walletAddress || walletConfig.tradingWallet;
-    
-    logger.info(`Sending ${txType} transaction through Anchor program for wallet ${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`);
-    
-    // Build transaction based on type
-    let transaction: Transaction | null = null;
-    
-    switch (txType) {
-      case 'swap':
-        transaction = buildSwapTransaction(params);
-        break;
-      case 'arbitrage':
-        transaction = buildArbitrageTransaction(params);
-        break;
-      case 'snipe':
-        transaction = buildSnipeTransaction(params);
-        break;
-      default:
-        logger.error(`Unsupported transaction type: ${txType}`);
-        return { success: false, error: 'Unsupported transaction type' };
+    try {
+      const currentTime = Date.now();
+      
+      // Only check if it's been at least 30 seconds since the last check
+      if (currentTime - this.lastConnectionCheck < 30000) {
+        return this.isConnectionHealthy;
+      }
+      
+      this.lastConnectionCheck = currentTime;
+      
+      // Get recent blockhash to check connection
+      const blockhash = await this.connection.getLatestBlockhash();
+      
+      if (blockhash && blockhash.blockhash) {
+        this.isConnectionHealthy = true;
+        logger.debug('[Anchor] Connection is healthy');
+      } else {
+        this.isConnectionHealthy = false;
+        logger.warn('[Anchor] Connection check failed: Invalid blockhash');
+        this.reconnect();
+      }
+    } catch (error) {
+      this.isConnectionHealthy = false;
+      logger.error('[Anchor] Connection check failed:', error);
+      this.reconnect();
     }
     
-    if (!transaction) {
-      return { success: false, error: 'Failed to build transaction' };
+    return this.isConnectionHealthy;
+  }
+  
+  /**
+   * Reconnect to Solana
+   */
+  private reconnect(): void {
+    logger.info('[Anchor] Attempting to reconnect...');
+    
+    try {
+      this.initializeConnection();
+    } catch (error) {
+      logger.error('[Anchor] Reconnection failed:', error);
+    }
+  }
+  
+  /**
+   * Get the Solana connection
+   */
+  public getConnection(): Connection | null {
+    return this.connection;
+  }
+  
+  /**
+   * Get wallet keypair
+   */
+  public getWalletKeypair(): Keypair | null {
+    return this.walletKeyPair;
+  }
+  
+  /**
+   * Get program pubkey by name
+   * @param programName The name of the program
+   */
+  public getProgramId(programName: string): PublicKey | null {
+    return this.programIds[programName] || null;
+  }
+  
+  /**
+   * Verify program is deployable and accessible
+   * @param programName The name of the program to verify
+   */
+  public async verifyProgramDeployment(programName: string): Promise<boolean> {
+    if (!this.connection) {
+      logger.error('[Anchor] No connection to verify program deployment');
+      return false;
     }
     
-    // In a real implementation, this would sign and send the transaction
-    // using a keypair retrieved from secure storage
-    // For now, simulate sending the transaction
-    const signature = `anchor-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const programId = this.getProgramId(programName);
     
-    // Update program state
-    programState.transactionCount++;
-    programState.lastSyncTimestamp = Date.now();
+    if (!programId) {
+      logger.error(`[Anchor] Unknown program: ${programName}`);
+      return false;
+    }
     
-    // Emit transaction event to signal hub
-    signalHub.emit('anchor_transaction', {
-      signature,
-      txType,
-      wallet,
-      timestamp: Date.now(),
-      params
-    });
+    try {
+      // Query program account info to verify it exists and is executable
+      const accountInfo = await this.connection.getAccountInfo(programId);
+      
+      if (!accountInfo) {
+        logger.error(`[Anchor] Program ${programName} not found on-chain`);
+        return false;
+      }
+      
+      if (!accountInfo.executable) {
+        logger.error(`[Anchor] Program ${programName} exists but is not executable`);
+        return false;
+      }
+      
+      logger.info(`[Anchor] Program ${programName} is deployed and executable`);
+      return true;
+    } catch (error) {
+      logger.error(`[Anchor] Failed to verify program ${programName}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * Verify all known programs
+   */
+  public async verifyAllPrograms(): Promise<Record<string, boolean>> {
+    const results: Record<string, boolean> = {};
     
-    logger.info(`Transaction sent through Anchor program, signature: ${signature}`);
+    for (const programName of Object.keys(this.programIds)) {
+      results[programName] = await this.verifyProgramDeployment(programName);
+    }
     
-    return {
-      success: true,
-      signature,
-      txType,
-      wallet
-    };
-  } catch (error) {
-    logger.error(`Error sending transaction through Anchor program:`, error);
-    return { success: false, error: error.message };
+    const deployedCount = Object.values(results).filter(Boolean).length;
+    logger.info(`[Anchor] Verified ${deployedCount}/${Object.keys(results).length} programs`);
+    
+    return results;
+  }
+  
+  /**
+   * Configure fallback RPC URLs
+   * @param fallbackUrls Array of fallback RPC URLs
+   */
+  public setFallbackRpcUrls(fallbackUrls: string[]): void {
+    // Store fallback URLs for reconnection logic
+    this.fallbackRpcUrls = fallbackUrls;
+    logger.info(`[Anchor] Configured ${fallbackUrls.length} fallback RPC URLs`);
+  }
+  
+  private fallbackRpcUrls: string[] = [];
+  private currentUrlIndex: number = 0;
+  
+  /**
+   * Try next fallback URL when primary fails
+   */
+  private useNextFallbackUrl(): boolean {
+    if (this.fallbackRpcUrls.length === 0) {
+      logger.error('[Anchor] No fallback URLs configured');
+      return false;
+    }
+    
+    this.currentUrlIndex = (this.currentUrlIndex + 1) % this.fallbackRpcUrls.length;
+    const nextUrl = this.fallbackRpcUrls[this.currentUrlIndex];
+    
+    logger.info(`[Anchor] Switching to fallback RPC URL: ${nextUrl}`);
+    this.connectionConfig.url = nextUrl;
+    
+    try {
+      this.initializeConnection();
+      return true;
+    } catch (error) {
+      logger.error('[Anchor] Failed to connect to fallback URL:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Send a test transaction to verify full functionality
+   */
+  public async sendTestTransaction(): Promise<string | null> {
+    if (!this.connection || !this.walletKeyPair) {
+      logger.error('[Anchor] Connection or wallet not initialized');
+      return null;
+    }
+    
+    try {
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: this.walletKeyPair.publicKey,
+          toPubkey: this.walletKeyPair.publicKey,
+          lamports: 100
+        })
+      );
+      
+      // Get recent blockhash
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.walletKeyPair.publicKey;
+      
+      // Sign transaction
+      transaction.sign(this.walletKeyPair);
+      
+      // Send transaction
+      const signature = await this.connection.sendRawTransaction(transaction.serialize());
+      
+      // Confirm transaction
+      const confirmation = await this.connection.confirmTransaction(signature);
+      
+      if (confirmation.value.err) {
+        logger.error(`[Anchor] Test transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        return null;
+      }
+      
+      logger.info(`[Anchor] Test transaction successful: ${signature}`);
+      return signature;
+    } catch (error) {
+      logger.error('[Anchor] Test transaction failed:', error);
+      return null;
+    }
   }
 }
 
-/**
- * Build a swap transaction
- * @param params Swap parameters
- */
-function buildSwapTransaction(params: any): Transaction | null {
-  try {
-    // In a real implementation, this would build a transaction
-    // with instructions to call the program's swap function
-    
-    // For now, return a mock transaction
-    return new Transaction();
-  } catch (error) {
-    logger.error('Error building swap transaction:', error);
-    return null;
-  }
-}
-
-/**
- * Build an arbitrage transaction
- * @param params Arbitrage parameters
- */
-function buildArbitrageTransaction(params: any): Transaction | null {
-  try {
-    // In a real implementation, this would build a transaction
-    // with instructions to call the program's arbitrage function
-    
-    // For now, return a mock transaction
-    return new Transaction();
-  } catch (error) {
-    logger.error('Error building arbitrage transaction:', error);
-    return null;
-  }
-}
-
-/**
- * Build a snipe transaction
- * @param params Snipe parameters
- */
-function buildSnipeTransaction(params: any): Transaction | null {
-  try {
-    // In a real implementation, this would build a transaction
-    // with instructions to call the program's snipe function
-    
-    // For now, return a mock transaction
-    return new Transaction();
-  } catch (error) {
-    logger.error('Error building snipe transaction:', error);
-    return null;
-  }
-}
-
-// Initialize the connector if in production environment
-if (process.env.NODE_ENV === 'production') {
-  initAnchorConnector().catch(err => {
-    logger.error('Failed to initialize Anchor connector during startup:', err);
-  });
+// Export a factory function to create the connector
+export function createAnchorProgramConnector(rpcUrl: string): AnchorProgramConnector {
+  return new AnchorProgramConnector(rpcUrl);
 }
