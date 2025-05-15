@@ -321,17 +321,7 @@ export class ZeroCapitalFlashArbitrageStrategy {
       const [tokenA, tokenB] = pair.split('/');
       
       // Base prices for common tokens in USD
-      const baseUSDPrices: {[key: string]: number} = {
-        'SOL': 150.25, 
-        'ETH': 3078.42,
-        'BTC': 62405.67,
-        'USDC': 1.0,
-        'USDT': 1.0,
-        'JUP': 1.28,
-        'BONK': 0.00001342,
-        'RAY': 0.76,
-        'ORCA': 0.92
-      };
+      const baseUSDPrices = this.baseUSDPrices;
       
       // DEX-specific variance (minor price differences between DEXes)
       const dexVariance: {[key: string]: number} = {
