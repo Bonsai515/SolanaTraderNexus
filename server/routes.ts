@@ -1715,7 +1715,7 @@ export async function registerRoutes(app: express.Express) {
     }
   });
 
-  router.get('/api/perplexity/arbitrage', async (req, res) => {
+  app.get('/api/perplexity/arbitrage', async (req, res) => {
     try {
       const opportunities = await perplexityAI.findArbitrageOpportunities();
       res.json({
