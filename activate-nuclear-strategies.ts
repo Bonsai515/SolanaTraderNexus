@@ -4,7 +4,13 @@
  * This script activates the highest-yield "nuclear" strategies designed 
  * to transform 1 SOL into 1000 SOL through aggressive trading techniques,
  * flash loans, and multi-DEX arbitrage with quantum timing optimization.
+ * 
+ * OPTIMIZED FOR MAXIMUM PERFORMANCE WITH ERROR CHECKING
  */
+
+// Import required modules
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Nuclear strategy configuration
 interface NuclearStrategy {
@@ -15,9 +21,47 @@ interface NuclearStrategy {
   allocation: number; // % of total funds
   risk: string;
   requires: string[];
+  active: boolean;
+  errorChecks: {
+    memoryRequirement: number; // MB
+    cpuRequirement: number;    // % utilization
+    timeframeMs: number;       // Transaction timeframe in ms
+    maxSlippageBps: number;    // Maximum slippage in basis points
+    fallbackOptions: string[]; // Fallback options if strategy fails
+  };
 }
 
-// Define nuclear strategies for maximum yield
+// System requirements check
+interface SystemRequirements {
+  minMemoryMB: number;
+  minCPUCores: number;
+  maxLatencyMs: number;
+  requiredAPIs: string[];
+  requiredTransformers: string[];
+}
+
+// System requirements for nuclear strategies
+const SYSTEM_REQUIREMENTS: SystemRequirements = {
+  minMemoryMB: 2048,
+  minCPUCores: 2,
+  maxLatencyMs: 100,
+  requiredAPIs: [
+    'solana-rpc',
+    'jupiter-v6',
+    'wormhole-v2',
+    'coingecko-pro',
+    'helius-dex'
+  ],
+  requiredTransformers: [
+    'MicroQHC',
+    'MEME Cortex',
+    'MemeCortexRemix',
+    'Security',
+    'CrossChain'
+  ]
+};
+
+// Define nuclear strategies for maximum yield with enhanced error checking
 const NUCLEAR_STRATEGIES: NuclearStrategy[] = [
   {
     id: 'quantum-nuclear-flash-arbitrage',
@@ -26,7 +70,15 @@ const NUCLEAR_STRATEGIES: NuclearStrategy[] = [
     dailyROI: 45, // 45% daily
     allocation: 30,
     risk: 'Very High',
-    requires: ['flash-loans', 'quantum-timing', 'multi-dex']
+    requires: ['flash-loans', 'quantum-timing', 'multi-dex'],
+    active: true,
+    errorChecks: {
+      memoryRequirement: 512,
+      cpuRequirement: 50,
+      timeframeMs: 500,
+      maxSlippageBps: 20,
+      fallbackOptions: ['raydium-direct-route', 'jupiter-aggregation', 'orca-whirlpools']
+    }
   },
   {
     id: 'singularity-black-hole',
@@ -35,7 +87,15 @@ const NUCLEAR_STRATEGIES: NuclearStrategy[] = [
     dailyROI: 55, // 55% daily
     allocation: 20,
     risk: 'Extreme',
-    requires: ['wormhole', 'cross-chain', 'time-warp']
+    requires: ['wormhole', 'cross-chain', 'time-warp'],
+    active: true,
+    errorChecks: {
+      memoryRequirement: 768,
+      cpuRequirement: 75,
+      timeframeMs: 2000,
+      maxSlippageBps: 50,
+      fallbackOptions: ['direct-bridge-v2', 'allbridge-route', 'portal-backup']
+    }
   },
   {
     id: 'memecortex-supernova',
@@ -44,7 +104,15 @@ const NUCLEAR_STRATEGIES: NuclearStrategy[] = [
     dailyROI: 75, // 75% daily
     allocation: 25,
     risk: 'Extreme',
-    requires: ['neural-prediction', 'mev-protection', 'pre-liquidity']
+    requires: ['neural-prediction', 'mev-protection', 'pre-liquidity'],
+    active: true,
+    errorChecks: {
+      memoryRequirement: 1024,
+      cpuRequirement: 90,
+      timeframeMs: 250,
+      maxSlippageBps: 100,
+      fallbackOptions: ['delayed-entry', 'partial-position', 'post-liquidity-entry']
+    }
   },
   {
     id: 'hyperion-money-loop',
@@ -53,7 +121,15 @@ const NUCLEAR_STRATEGIES: NuclearStrategy[] = [
     dailyROI: 38, // 38% daily
     allocation: 25,
     risk: 'Very High',
-    requires: ['flash-loans', 'lending-protocols', 'multi-dex']
+    requires: ['flash-loans', 'lending-protocols', 'multi-dex'],
+    active: true,
+    errorChecks: {
+      memoryRequirement: 384,
+      cpuRequirement: 60,
+      timeframeMs: 1000,
+      maxSlippageBps: 30,
+      fallbackOptions: ['solend-direct', 'mango-markets', 'drift-protocol']
+    }
   }
 ];
 
