@@ -1,238 +1,377 @@
 /**
- * Transaction Verification System with Fallbacks
+ * Transaction Verification System
  * 
- * Provides robust transaction verification with multiple methods and fallbacks.
- * Supports direct RPC verification and external service (Solscan) verification.
+ * This module provides robust transaction verification for the trading system,
+ * ensuring that all transactions are properly confirmed on the Solana blockchain.
  */
 
 import { Connection, PublicKey, TransactionSignature } from '@solana/web3.js';
-import * as logger from './logger';
 import axios from 'axios';
-import { verifyTransaction, verifyTransactions } from './lib/verification';
-import { initializeRpcConnection } from './lib/ensureRpcConnection';
+import { logger } from './logger';
 
-// Cache for transaction verification results
-const verificationCache = new Map<string, { verified: boolean, timestamp: number }>();
-const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+// Default number of confirmation blocks to wait for
+const DEFAULT_CONFIRMATIONS = 2;
 
-// Solscan API base URL (for external verification)
-const SOLSCAN_API_BASE = 'https://api.solscan.io';
+// Default timeout for confirmations in milliseconds
+const DEFAULT_CONFIRMATION_TIMEOUT = 60000; // 60 seconds
 
-// In-memory connection instance
-let connection: Connection | null = null;
+// Default timeout for API requests
+const DEFAULT_REQUEST_TIMEOUT = 30000; // 30 seconds
 
-/**
- * Initialize transaction verifier with Solana connection
- */
-export async function initializeTransactionVerifier(): Promise<void> {
-  try {
-    connection = await initializeRpcConnection();
-    logger.info('Transaction verifier initialized with connection');
-  } catch (error: any) {
-    logger.error(`Failed to initialize transaction verifier: ${error.message || String(error)}`);
-    throw error;
-  }
+// Maximum number of retry attempts for verification
+const MAX_RETRY_ATTEMPTS = 3;
+
+// Delay between retries in milliseconds
+const RETRY_DELAY = 2000; // 2 seconds
+
+// Interface for verification options
+interface VerificationOptions {
+  confirmations?: number;
+  confirmationTimeout?: number;
+  skipSimulations?: boolean;
+}
+
+// Interface for verification result
+interface VerificationResult {
+  success: boolean;
+  signature: string;
+  confirmations?: number;
+  error?: string;
+  slot?: number;
+  fee?: number;
+  blockTime?: number;
 }
 
 /**
- * Get the Solana connection, initializing if necessary
- * @returns Solana connection
+ * Transaction Verifier class
  */
-export async function getConnection(): Promise<Connection> {
-  if (!connection) {
-    connection = await initializeRpcConnection();
-  }
-  return connection;
-}
-
-/**
- * Verify a transaction via Solana RPC
- * @param signature Transaction signature
- * @returns Whether the transaction is verified
- */
-export async function verifyTransactionRPC(signature: string): Promise<boolean> {
-  try {
-    // Skip verification for simulated transactions
-    if (signature.startsWith('sim-')) {
-      return true;
-    }
-    
-    // Get connection
-    const conn = await getConnection();
-    
-    // Check status of transaction
-    const status = await conn.getSignatureStatus(signature, {
-      searchTransactionHistory: true
-    });
-    
-    const isVerified = status?.value?.confirmationStatus === 'confirmed' || 
-                       status?.value?.confirmationStatus === 'finalized';
-    
-    if (isVerified) {
-      logger.info(`Transaction ${signature.substring(0, 10)}... verified via RPC`);
-    } else {
-      logger.warn(`Transaction ${signature.substring(0, 10)}... not verified via RPC`);
-    }
-    
-    return isVerified;
-  } catch (error: any) {
-    logger.error(`RPC verification failed for ${signature.substring(0, 10)}...: ${error.message || String(error)}`);
-    return false;
-  }
-}
-
-/**
- * Verify a transaction via Solscan
- * @param signature Transaction signature
- * @returns Whether the transaction is verified
- */
-export async function verifyTransactionSolscan(signature: string): Promise<boolean> {
-  try {
-    // Skip verification for simulated transactions
-    if (signature.startsWith('sim-')) {
-      return true;
-    }
-    
-    // Check cache first
-    const cached = verificationCache.get(signature);
-    if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_MS) {
-      return cached.verified;
-    }
-    
-    // Query Solscan API
-    const response = await axios.get(`${SOLSCAN_API_BASE}/transaction`, {
-      params: { tx: signature },
-      timeout: 5000
-    });
-    
-    const isVerified = response.status === 200 && 
-                       response.data && 
-                       response.data.status === 'Success';
-    
-    // Cache result
-    verificationCache.set(signature, { verified: isVerified, timestamp: Date.now() });
-    
-    if (isVerified) {
-      logger.info(`Transaction ${signature.substring(0, 10)}... verified via Solscan`);
-    } else {
-      logger.warn(`Transaction ${signature.substring(0, 10)}... not verified via Solscan`);
-    }
-    
-    return isVerified;
-  } catch (error: any) {
-    logger.error(`Solscan verification failed for ${signature.substring(0, 10)}...: ${error.message || String(error)}`);
-    return false;
-  }
-}
-
-/**
- * Verify a transaction with fallback
- * @param signature Transaction signature
- * @returns Whether the transaction is verified
- */
-export async function verifyTransactionWithFallback(signature: string): Promise<boolean> {
-  // Skip verification for simulated transactions
-  if (signature.startsWith('sim-')) {
-    return true;
+export class TransactionVerifier {
+  private connection: Connection;
+  private solscanApiKey?: string;
+  private heliusApiKey?: string;
+  
+  /**
+   * Constructor
+   * @param connection Solana connection
+   * @param solscanApiKey Optional Solscan API key for advanced verification
+   * @param heliusApiKey Optional Helius API key for enhanced transaction information
+   */
+  constructor(
+    connection: Connection,
+    solscanApiKey?: string,
+    heliusApiKey?: string
+  ) {
+    this.connection = connection;
+    this.solscanApiKey = solscanApiKey;
+    this.heliusApiKey = heliusApiKey;
   }
   
-  // Try RPC verification first
-  try {
-    const rpcVerified = await verifyTransactionRPC(signature);
-    if (rpcVerified) {
-      return true;
-    }
-  } catch (error: any) {
-    logger.warn(`RPC verification failed, trying Solscan: ${error.message || String(error)}`);
+  /**
+   * Set Solana connection
+   * @param connection Solana connection
+   */
+  public setConnection(connection: Connection): void {
+    this.connection = connection;
   }
   
-  // Fallback to Solscan verification
-  try {
-    return await verifyTransactionSolscan(signature);
-  } catch (error: any) {
-    logger.error(`All verification methods failed for ${signature.substring(0, 10)}...`);
-    return false;
-  }
-}
-
-/**
- * Verify a transaction from the library module (facade)
- * @param signature Transaction signature
- * @returns Whether the transaction is verified
- */
-export async function verifyTransactionConfirmation(signature: string): Promise<boolean> {
-  if (!connection) {
-    throw new Error('Solana connection not initialized');
+  /**
+   * Set Solscan API key
+   * @param apiKey Solscan API key
+   */
+  public setSolscanApiKey(apiKey: string): void {
+    this.solscanApiKey = apiKey;
   }
   
-  return verifyTransaction(signature, connection);
-}
-
-/**
- * Verify a batch of transactions
- * @param signatures Transaction signatures
- * @returns Map of signatures to verification results
- */
-export async function verifyTransactionBatch(signatures: string[]): Promise<Map<string, boolean>> {
-  if (!connection) {
-    throw new Error('Solana connection not initialized');
+  /**
+   * Set Helius API key
+   * @param apiKey Helius API key
+   */
+  public setHeliusApiKey(apiKey: string): void {
+    this.heliusApiKey = apiKey;
   }
   
-  return verifyTransactions(signatures, connection);
-}
-
-/**
- * Get transaction details
- * @param signature Transaction signature
- * @returns Transaction details
- */
-export async function getTransactionDetails(signature: string): Promise<any> {
-  try {
-    // Skip for simulated transactions
-    if (signature.startsWith('sim-')) {
+  /**
+   * Verify transaction using RPC node
+   * @param signature Transaction signature
+   * @param options Verification options
+   */
+  public async verifyTransactionWithRpc(
+    signature: string,
+    options: VerificationOptions = {}
+  ): Promise<VerificationResult> {
+    const confirmations = options.confirmations || DEFAULT_CONFIRMATIONS;
+    const timeout = options.confirmationTimeout || DEFAULT_CONFIRMATION_TIMEOUT;
+    
+    try {
+      // Skip signature verification for simulation signatures
+      if (signature.startsWith('sim-')) {
+        logger.info(`[TransactionVerifier] Skipping verification for simulation signature: ${signature}`);
+        return {
+          success: true,
+          signature,
+          confirmations: 0
+        };
+      }
+      
+      // Wait for transaction confirmation
+      logger.info(`[TransactionVerifier] Waiting for ${confirmations} confirmations for signature: ${signature}`);
+      
+      const startTime = Date.now();
+      let confirmed = false;
+      let attempts = 0;
+      let lastError = null;
+      
+      while (!confirmed && Date.now() - startTime < timeout && attempts < MAX_RETRY_ATTEMPTS) {
+        try {
+          const status = await this.connection.confirmTransaction(
+            signature,
+            confirmations
+          );
+          
+          if (status.value.err) {
+            lastError = status.value.err;
+            logger.warn(`[TransactionVerifier] Transaction error: ${JSON.stringify(status.value.err)}`);
+            attempts++;
+            await this.delay(RETRY_DELAY);
+          } else {
+            confirmed = true;
+          }
+        } catch (error) {
+          lastError = error;
+          logger.warn(`[TransactionVerifier] Confirmation attempt ${attempts + 1} failed: ${error.message}`);
+          attempts++;
+          await this.delay(RETRY_DELAY);
+        }
+      }
+      
+      // If transaction still not confirmed, fail verification
+      if (!confirmed) {
+        logger.error(`[TransactionVerifier] Failed to confirm transaction: ${signature}`);
+        return {
+          success: false,
+          signature,
+          error: lastError ? lastError.toString() : 'Confirmation timed out'
+        };
+      }
+      
+      // Get transaction details
+      const details = await this.connection.getTransaction(signature, {
+        commitment: 'confirmed'
+      });
+      
+      if (!details) {
+        logger.warn(`[TransactionVerifier] Transaction confirmed but details not found: ${signature}`);
+        return {
+          success: true,
+          signature,
+          confirmations
+        };
+      }
+      
       return {
+        success: true,
         signature,
-        status: 'simulated',
-        timestamp: Date.now()
+        confirmations,
+        slot: details.slot,
+        fee: details.meta?.fee,
+        blockTime: details.blockTime || undefined
+      };
+    } catch (error) {
+      logger.error(`[TransactionVerifier] Error verifying transaction: ${error.message}`);
+      return {
+        success: false,
+        signature,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Verify transaction using Solscan API
+   * @param signature Transaction signature
+   */
+  public async verifyTransactionWithSolscan(signature: string): Promise<VerificationResult> {
+    try {
+      // Skip signature verification for simulation signatures
+      if (signature.startsWith('sim-')) {
+        logger.info(`[TransactionVerifier] Skipping Solscan verification for simulation signature: ${signature}`);
+        return {
+          success: true,
+          signature,
+          confirmations: 0
+        };
+      }
+      
+      const headers: Record<string, string> = {};
+      if (this.solscanApiKey) {
+        headers['x-api-key'] = this.solscanApiKey;
+      }
+      
+      const response = await axios.get(
+        `https://public-api.solscan.io/transaction/${signature}`,
+        {
+          headers,
+          timeout: DEFAULT_REQUEST_TIMEOUT
+        }
+      );
+      
+      if (response.status !== 200) {
+        logger.error(`[TransactionVerifier] Solscan API error: ${response.status} ${response.statusText}`);
+        return {
+          success: false,
+          signature,
+          error: `Solscan API error: ${response.status} ${response.statusText}`
+        };
+      }
+      
+      const data = response.data;
+      
+      if (data.status && data.status === 'Success') {
+        return {
+          success: true,
+          signature,
+          confirmations: DEFAULT_CONFIRMATIONS,
+          slot: data.slot,
+          fee: data.fee,
+          blockTime: data.blockTime
+        };
+      } else {
+        logger.warn(`[TransactionVerifier] Transaction failed according to Solscan: ${signature}`);
+        return {
+          success: false,
+          signature,
+          error: data.error || 'Transaction failed according to Solscan'
+        };
+      }
+    } catch (error) {
+      logger.error(`[TransactionVerifier] Error verifying transaction with Solscan: ${error.message}`);
+      return {
+        success: false,
+        signature,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Verify transaction using Helius API
+   * @param signature Transaction signature
+   */
+  public async verifyTransactionWithHelius(signature: string): Promise<VerificationResult> {
+    try {
+      // Skip signature verification for simulation signatures
+      if (signature.startsWith('sim-')) {
+        logger.info(`[TransactionVerifier] Skipping Helius verification for simulation signature: ${signature}`);
+        return {
+          success: true,
+          signature,
+          confirmations: 0
+        };
+      }
+      
+      if (!this.heliusApiKey) {
+        logger.warn('[TransactionVerifier] Helius API key not set, falling back to RPC verification');
+        return this.verifyTransactionWithRpc(signature);
+      }
+      
+      const response = await axios.get(
+        `https://api.helius.xyz/v0/transactions/${signature}?api-key=${this.heliusApiKey}`,
+        {
+          timeout: DEFAULT_REQUEST_TIMEOUT
+        }
+      );
+      
+      if (response.status !== 200) {
+        logger.error(`[TransactionVerifier] Helius API error: ${response.status} ${response.statusText}`);
+        return {
+          success: false,
+          signature,
+          error: `Helius API error: ${response.status} ${response.statusText}`
+        };
+      }
+      
+      const data = response.data;
+      
+      return {
+        success: true,
+        signature,
+        confirmations: DEFAULT_CONFIRMATIONS,
+        slot: data.slot,
+        fee: data.fee,
+        blockTime: data.blockTime
+      };
+    } catch (error) {
+      logger.error(`[TransactionVerifier] Error verifying transaction with Helius: ${error.message}`);
+      return {
+        success: false,
+        signature,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Verify transaction on the blockchain
+   * @param signature Transaction signature
+   * @param options Verification options
+   */
+  public async verifyTransaction(
+    signature: string,
+    options: VerificationOptions = {}
+  ): Promise<VerificationResult> {
+    // Skip verification for simulation signatures
+    if (signature.startsWith('sim-')) {
+      logger.info(`[TransactionVerifier] Transaction verification skipped for ${signature}`);
+      return {
+        success: true,
+        signature,
+        confirmations: 0
       };
     }
     
-    // Try Solscan first for richer details
     try {
-      const response = await axios.get(`${SOLSCAN_API_BASE}/transaction`, {
-        params: { tx: signature },
-        timeout: 5000
-      });
+      // Try with RPC first
+      const rpcResult = await this.verifyTransactionWithRpc(signature, options);
       
-      if (response.status === 200 && response.data) {
-        return response.data;
+      // If RPC verification fails, try Solscan if API key is available
+      if (!rpcResult.success && this.solscanApiKey) {
+        logger.warn(`[TransactionVerifier] RPC verification failed, trying Solscan for signature: ${signature}`);
+        const solscanResult = await this.verifyTransactionWithSolscan(signature);
+        
+        // If Solscan also fails, try Helius if API key is available
+        if (!solscanResult.success && this.heliusApiKey) {
+          logger.warn(`[TransactionVerifier] Solscan verification failed, trying Helius for signature: ${signature}`);
+          return await this.verifyTransactionWithHelius(signature);
+        }
+        
+        return solscanResult;
       }
-    } catch (error: any) {
-      logger.warn(`Solscan details lookup failed, falling back to RPC: ${error.message || String(error)}`);
+      
+      return rpcResult;
+    } catch (error) {
+      logger.error(`[TransactionVerifier] Error during verification process: ${error.message}`);
+      return {
+        success: false,
+        signature,
+        error: error.message
+      };
     }
-    
-    // Fallback to RPC
-    const conn = await getConnection();
-    const tx = await conn.getTransaction(signature);
-    
-    return tx;
-  } catch (error: any) {
-    logger.error(`Failed to get transaction details: ${error.message || String(error)}`);
-    throw error;
+  }
+  
+  /**
+   * Utility method to delay execution
+   * @param ms Milliseconds to delay
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
-// Initialize verifier when module is imported
-initializeTransactionVerifier().catch(err => {
-  logger.error(`Failed to initialize transaction verifier: ${err.message || String(err)}`);
-});
-
-export default {
-  verifyTransactionRPC,
-  verifyTransactionSolscan,
-  verifyTransactionWithFallback,
-  verifyTransactionConfirmation,
-  verifyTransactionBatch,
-  getTransactionDetails,
-  getConnection
-};
+// Export a factory function to create the verifier
+export function createTransactionVerifier(
+  connection: Connection,
+  solscanApiKey?: string,
+  heliusApiKey?: string
+): TransactionVerifier {
+  return new TransactionVerifier(connection, solscanApiKey, heliusApiKey);
+}
