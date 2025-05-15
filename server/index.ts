@@ -127,20 +127,14 @@ app.get('/api/executions', (req, res) => {
 // WebSocket support is handled in routes.ts
 
 // Initialize SignalHub as a global object for API access
-import { signalHub } from './signalHub';
-// Create global signalHub instance if it doesn't exist
-declare global {
-  // Using the same type as the imported signalHub
-  var signalHub: typeof signalHub;
-}
-
-if (!global.signalHub) {
-  global.signalHub = signalHub;
-  console.log('Initialized SignalHub for global access to trading signals');
-}
-
 // Import enhanced modules
-import { nexusEngine } from './nexus-transaction-engine';
+import { nexusEngine, initializeNexusEngine, ExecutionMode, TransactionPriority } from './nexus-transaction-engine';
+
+// Declare global types
+declare global {
+  // Using the same type for signalHub that will be imported later
+  var signalHub: any;
+}
 import { initializeRpcConnection, verifyWalletConnection } from './lib/ensureRpcConnection';
 import { profitCapture } from './lib/profitCapture';
 import { connectToRustTransformers } from './connect-transformer-rust';
@@ -219,40 +213,65 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const getValidatedUrl = (url, defaultUrl, protocol) => {
       if (!url) return defaultUrl;
       if (url.startsWith(protocol)) return url;
-      return `${protocol}${url.startsWith('//') ? '' : '//'}${url}`;
+      // Make sure we're handling protocol properly (with // after :)
+      return `${protocol}//` + (url.startsWith('//') ? url.substring(2) : url);
     };
     
-    const instantNodesRpcUrl = getValidatedUrl(
-      process.env.INSTANT_NODES_RPC_URL, 
-      'https://api.mainnet-beta.solana.com',
-      'https:'
-    );
+    // Use a valid RPC URL - hardcoded for reliability
+    const instantNodesRpcUrl = 'https://api.mainnet-beta.solana.com';
     
-    const instantNodesWsUrl = getValidatedUrl(
-      process.env.INSTANT_NODES_WS_URL,
-      'wss://api.mainnet-beta.solana.com',
-      'wss:'
-    );
+    // Use a valid WS URL - hardcoded for reliability
+    const instantNodesWsUrl = 'wss://api.mainnet-beta.solana.com';
     
-    const instantNodesGrpcUrl = getValidatedUrl(
-      process.env.INSTANT_NODES_GRPC_URL,
-      'https://solana-grpc-geyser.instantnodes.io:443',
-      'https:'
-    );
+    // Use a valid gRPC URL - hardcoded for reliability
+    const instantNodesGrpcUrl = 'https://solana-grpc-geyser.instantnodes.io:443';
     
     console.log('Initializing Nexus Professional Engine with validated RPC endpoints:');
     console.log(`HTTP: ${instantNodesRpcUrl}`);
     console.log(`WS: ${instantNodesWsUrl}`);
     console.log(`gRPC: ${instantNodesGrpcUrl}`);
     
-    // Transaction engine is initialized automatically via import
-    const success = true; // The nexusEngine is auto-initialized when imported
+    // Properly initialize the Nexus engine
+    const nexusConfig = {
+      useRealFunds: true,
+      rpcUrl: instantNodesRpcUrl,
+      websocketUrl: instantNodesWsUrl,
+      defaultExecutionMode: ExecutionMode.LIVE,
+      defaultPriority: TransactionPriority.MEDIUM,
+      defaultConfirmations: 2,
+      maxConcurrentTransactions: 5,
+      defaultTimeoutMs: 60000,
+      defaultMaxRetries: 3,
+      maxSlippageBps: 50,
+      backupRpcUrls: [process.env.ALCHEMY_RPC_URL, process.env.HELIUS_API_KEY ? `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}` : undefined].filter(Boolean) as string[],
+      solscanApiKey: process.env.SOLSCAN_API_KEY,
+      heliusApiKey: process.env.HELIUS_API_KEY,
+      mevProtection: true
+    };
+    
+    const engine = initializeNexusEngine(nexusConfig);
+    const success = engine ? true : false;
     
     if (success) {
       console.log('✅ Successfully initialized Nexus Professional Engine with enhanced RPC connection');
       
-      // Register system wallet with the engine (functionality now handled internally)
-      console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
+      // Register system wallet with the engine
+      if (engine.registerWallet(SYSTEM_WALLET)) {
+        console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
+      } else {
+        console.warn(`⚠️ Failed to register system wallet ${SYSTEM_WALLET} with Nexus engine`);
+      }
+      
+      // Now we can import and initialize the SignalHub
+      try {
+        const { signalHub } = require('./signalHub');
+        if (!global.signalHub) {
+          global.signalHub = signalHub;
+          console.log('✅ Initialized SignalHub for global access to trading signals');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing SignalHub:', error.message);
+      }
       
       // Initialize the transformers (Security, CrossChain, MemeCortex)
       try {
