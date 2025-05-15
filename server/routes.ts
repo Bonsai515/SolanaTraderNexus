@@ -25,9 +25,152 @@ import {
 } from '../shared/signalTypes';
 import * as fs from 'fs';
 import * as path from 'path';
+import { generateStaticDashboard, Signal as DashboardSignal } from './static-dashboard';
 
 const router = express.Router();
 let usingNexusEngine = true; // Always use the Nexus Professional Engine
+
+// Static Dashboard Route - No JavaScript Required
+router.get('/dashboard', (req, res) => {
+  try {
+    // Check if signalHub is initialized
+    if (!global.signalHub) {
+      return res.status(503).send(`
+        <html>
+          <head>
+            <title>Signal Hub Unavailable</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background-color: #0f172a;
+                color: #f8fafc;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                padding: 20px;
+              }
+              .error-container {
+                background: #1e293b;
+                border-radius: 8px;
+                padding: 30px;
+                max-width: 500px;
+                text-align: center;
+              }
+              h1 { color: #ef4444; }
+              p { line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="error-container">
+              <h1>Signal Hub Unavailable</h1>
+              <p>The trading signal hub is not currently available. Please try again later.</p>
+              <p>Status: Initializing System</p>
+              <p><a href="/dashboard" style="color: #38bdf8; text-decoration: none;">Refresh</a></p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Get signals from the hub (last 30)
+    const rawSignals = global.signalHub ? global.signalHub.getSignals(signal => {
+      // Filter to the most recent signals (up to 30)
+      return true;
+    }).slice(0, 30) : [];
+    
+    // Convert the signal hub signals to dashboard-compatible signals
+    const dashboardSignals: DashboardSignal[] = rawSignals.map(signal => {
+      // Extract source/target tokens from various signal fields
+      let sourceToken = signal.sourceToken || 'USDC';
+      let targetToken = signal.targetToken;
+      
+      // If not directly available, try to extract from pair
+      if (!targetToken && signal.pair) {
+        const pairParts = signal.pair.split('/');
+        if (pairParts.length === 2) {
+          targetToken = pairParts[0];
+          if (!sourceToken) sourceToken = pairParts[1];
+        }
+      }
+      
+      // Create a dashboard-compatible signal
+      return {
+        id: signal.id,
+        pair: signal.pair || `${targetToken}/${sourceToken}`,
+        type: signal.type,
+        strength: signal.strength || 'STRONG',
+        timestamp: typeof signal.timestamp === 'number' ? 
+          new Date(signal.timestamp).toISOString() : 
+          new Date().toISOString(),
+        source: signal.source,
+        confidence: signal.confidence,
+        sourceToken: sourceToken,
+        targetToken: targetToken || 'SOL',
+        amount: typeof signal.metadata?.amount === 'number' ? 
+          signal.metadata.amount : 
+          100,
+        status: signal.processed ? 
+          (signal.actionTaken ? 'EXECUTED' : 'FAILED') : 
+          'PENDING',
+        transactionSignature: signal.transactionSignature,
+        direction: signal.direction || 'NEUTRAL',
+        priority: signal.priority || 'MEDIUM',
+        description: signal.description || `Signal for ${targetToken}`,
+        actionable: signal.actionable !== undefined ? signal.actionable : true
+      };
+    });
+    
+    // Generate and return the dashboard HTML 
+    const dashboardHtml = generateStaticDashboard(dashboardSignals);
+    res.send(dashboardHtml);
+  } catch (error) {
+    logger.error('Error generating dashboard:', error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Dashboard Error</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background-color: #0f172a;
+              color: #f8fafc;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              padding: 20px;
+            }
+            .error-container {
+              background: #1e293b;
+              border-radius: 8px;
+              padding: 30px;
+              max-width: 500px;
+              text-align: center;
+            }
+            h1 { color: #ef4444; }
+            p { line-height: 1.6; }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1>Dashboard Error</h1>
+            <p>An error occurred while generating the dashboard.</p>
+            <p>Error: ${error.message || 'Unknown error'}</p>
+            <p><a href="/dashboard" style="color: #38bdf8; text-decoration: none;">Try Again</a></p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
+// Root route to redirect to dashboard
+router.get('/', (req, res) => {
+  res.redirect('/dashboard');
+});
 
 // Perplexity AI API Routes
 router.get('/api/perplexity/status', (req, res) => {

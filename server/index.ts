@@ -4,6 +4,8 @@ import { registerRoutes } from './routes';
 import { initializeTransformers } from './transformers';
 import { startAgentSystem } from './agents';
 import * as logger from './logger';
+import { memeCortexRemixAdvanced } from './transformers/MemeCortexAdvanced';
+import { quantumOmegaSniper } from './strategies/quantum-omega-sniper';
 
 const app = express();
 
@@ -273,11 +275,40 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
         console.error('❌ Error initializing SignalHub:', error.message);
       }
       
-      // Initialize the transformers (Security, CrossChain, MemeCortex)
+      // Initialize MemeCortexAdvanced transformer and Quantum Omega Sniper strategy
+
+// Initialize the transformers (Security, CrossChain, MemeCortex, MemeCortexAdvanced)
       try {
         const transformersInitialized = await initializeTransformers();
         if (transformersInitialized) {
           console.log('✅ Successfully initialized all transformers with neural-quantum entanglement');
+          
+          // Initialize MemeCortexAdvanced transformer with additional data sources
+          try {
+            console.log('Initializing MemeCortexAdvanced with additional data sources...');
+            // Reference is enough to activate it since constructor handles initialization
+            if (memeCortexRemixAdvanced) {
+              console.log('✅ Successfully initialized MemeCortexAdvanced with data sources:');
+              console.log('   - DexScreener, Pump.fun, Moonshot, GMGN.ai, Birdeye, Photon, Goose');
+            }
+          } catch (memeCortexError: any) {
+            console.error('❌ Error initializing MemeCortexAdvanced:', memeCortexError.message);
+          }
+          
+          // Initialize Quantum Omega Sniper strategy
+          try {
+            console.log('Initializing Quantum Omega Sniper strategy...');
+            // Activate the strategy
+            const sniperActivated = quantumOmegaSniper.activate();
+            if (sniperActivated) {
+              console.log('✅ Successfully activated Quantum Omega Sniper strategy');
+              console.log('   Connected to MemeCortexAdvanced for real-time trading signals');
+            } else {
+              console.warn('⚠️ Quantum Omega Sniper strategy was already active');
+            }
+          } catch (sniperError: any) {
+            console.error('❌ Error activating Quantum Omega Sniper strategy:', sniperError.message);
+          }
           
           // Initialize and activate the trading agents
           try {
