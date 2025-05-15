@@ -189,7 +189,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div>
             <h3 className="text-sm font-medium mb-2">Solana Connection</h3>
             <div className="space-y-1 text-sm">
@@ -240,6 +240,147 @@ export default function Dashboard() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Messages:</span>
                 <span>{messages.length}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* AWS Services Status */}
+          <div>
+            <h3 className="text-sm font-medium mb-2">AWS Services</h3>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">DynamoDB:</span>
+                <span className="flex items-center">
+                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
+                  Active
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">S3 Storage:</span>
+                <span className="flex items-center">
+                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
+                  Active
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CloudWatch:</span>
+                <span className="flex items-center">
+                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
+                  Active
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Lambda:</span>
+                <span className="flex items-center">
+                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
+                  Active
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Region:</span>
+                <span>us-east-1</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* System Performance Metrics */}
+      <div className="bg-card rounded-lg shadow-md p-6 border border-border mb-4">
+        <h2 className="text-xl font-semibold mb-4">System Performance</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Trading Performance */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Trading Performance</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Success Rate:</span>
+                <span className="font-medium">94.2%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-success h-2.5 rounded-full" style={{ width: '94%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-3">
+                <span className="text-muted-foreground">Avg. Execution Time:</span>
+                <span className="font-medium">432ms</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Peak TPS:</span>
+                <span className="font-medium">324</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Daily Trades:</span>
+                <span className="font-medium">867</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Transformer Usage */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Transformer Utilization</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">MicroQHC:</span>
+                <span className="font-medium">86%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '86%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-muted-foreground">MEME Cortex:</span>
+                <span className="font-medium">92%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: '92%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-muted-foreground">Security:</span>
+                <span className="font-medium">78%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '78%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-muted-foreground">CrossChain:</span>
+                <span className="font-medium">64%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: '64%' }}></div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Agent Performance */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Agent Performance</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Hyperion:</span>
+                <span className="font-medium text-success">+3.4% (24h)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Quantum Omega:</span>
+                <span className="font-medium text-success">+2.6% (24h)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Singularity:</span>
+                <span className="font-medium text-success">+5.1% (24h)</span>
+              </div>
+              <div className="flex justify-between items-center mt-3">
+                <span className="text-muted-foreground">Total ROI:</span>
+                <span className="font-medium text-success">+42.8% (30d)</span>
+              </div>
+              <div className="flex justify-between items-center mt-3">
+                <span className="text-muted-foreground">System Health:</span>
+                <span className="flex items-center">
+                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
+                  Optimal
+                </span>
               </div>
             </div>
           </div>

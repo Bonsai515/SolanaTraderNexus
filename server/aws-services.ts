@@ -7,6 +7,34 @@
  */
 
 import { logger } from './logger';
+import { 
+  DynamoDBClient, 
+  PutItemCommand, 
+  GetItemCommand,
+  ScanCommand,
+  CreateTableCommand,
+  DeleteTableCommand
+} from '@aws-sdk/client-dynamodb';
+import { 
+  S3Client, 
+  PutObjectCommand,
+  GetObjectCommand,
+  ListObjectsCommand 
+} from '@aws-sdk/client-s3';
+import { 
+  CloudWatchClient, 
+  PutMetricDataCommand 
+} from '@aws-sdk/client-cloudwatch';
+import { 
+  LambdaClient, 
+  InvokeCommand 
+} from '@aws-sdk/client-lambda';
+import { 
+  DynamoDBDocumentClient, 
+  PutCommand, 
+  GetCommand, 
+  QueryCommand 
+} from '@aws-sdk/lib-dynamodb';
 
 /**
  * AWS Configuration interface
@@ -16,6 +44,10 @@ interface AwsConfig {
   accessKeyId?: string;
   secretAccessKey?: string;
   services?: string[];
+  dynamoDBTable?: string;
+  s3Bucket?: string;
+  cloudWatchNamespace?: string;
+  lambdaFunctionName?: string;
 }
 
 /**
@@ -61,7 +93,11 @@ const DEFAULT_CONFIG: AwsConfig = {
   region: 'us-east-1',
   accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  services: ['dynamodb', 'lambda', 'cloudwatch', 's3']
+  services: ['dynamodb', 'lambda', 'cloudwatch', 's3'],
+  dynamoDBTable: 'solana-trading-transactions',
+  s3Bucket: 'solana-trading-reports',
+  cloudWatchNamespace: 'SolanaTrading',
+  lambdaFunctionName: 'verify-solana-transaction'
 };
 
 /**
@@ -70,6 +106,11 @@ const DEFAULT_CONFIG: AwsConfig = {
 class AwsServicesManager {
   private initialized: boolean = false;
   private config: AwsConfig;
+  private dynamodbClient: DynamoDBClient | null = null;
+  private dynamodbDocClient: DynamoDBDocumentClient | null = null;
+  private s3Client: S3Client | null = null;
+  private cloudWatchClient: CloudWatchClient | null = null;
+  private lambdaClient: LambdaClient | null = null;
 
   constructor(config: AwsConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -88,18 +129,95 @@ class AwsServicesManager {
         return false;
       }
 
+      const awsCredentials = {
+        region: this.config.region,
+        credentials: {
+          accessKeyId: this.config.accessKeyId,
+          secretAccessKey: this.config.secretAccessKey
+        }
+      };
+
       // Initialize each AWS service
-      for (const service of this.config.services || []) {
-        logger.info(`Initializing AWS service: ${service}`);
-        // In a real implementation, this would initialize the AWS SDK for each service
+      if (this.config.services?.includes('dynamodb')) {
+        logger.info('Initializing AWS DynamoDB service');
+        this.dynamodbClient = new DynamoDBClient(awsCredentials);
+        this.dynamodbDocClient = DynamoDBDocumentClient.from(this.dynamodbClient);
+        
+        try {
+          // Ensure the transactions table exists
+          await this.ensureTransactionsTableExists();
+          logger.info('DynamoDB transactions table is ready');
+        } catch (error) {
+          logger.warn(`DynamoDB table initialization error: ${error.message}`);
+        }
+      }
+
+      if (this.config.services?.includes('s3')) {
+        logger.info('Initializing AWS S3 service');
+        this.s3Client = new S3Client(awsCredentials);
+        // S3 buckets don't need explicit creation - they're created on first use
+      }
+
+      if (this.config.services?.includes('cloudwatch')) {
+        logger.info('Initializing AWS CloudWatch service');
+        this.cloudWatchClient = new CloudWatchClient(awsCredentials);
+      }
+
+      if (this.config.services?.includes('lambda')) {
+        logger.info('Initializing AWS Lambda service');
+        this.lambdaClient = new LambdaClient(awsCredentials);
       }
 
       this.initialized = true;
       logger.info('AWS services initialized successfully');
       return true;
     } catch (error) {
-      logger.error('Failed to initialize AWS services:', error);
+      logger.error(`Failed to initialize AWS services: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Ensure the transactions table exists in DynamoDB
+   */
+  private async ensureTransactionsTableExists(): Promise<void> {
+    if (!this.dynamodbClient) return;
+
+    try {
+      // Check if table already exists
+      await this.dynamodbClient.send(
+        new ScanCommand({
+          TableName: this.config.dynamoDBTable,
+          Limit: 1
+        })
+      );
+      
+      logger.info(`DynamoDB table ${this.config.dynamoDBTable} already exists`);
+    } catch (error) {
+      if (error.name === 'ResourceNotFoundException') {
+        // Table doesn't exist, create it
+        logger.info(`Creating DynamoDB table ${this.config.dynamoDBTable}`);
+        
+        await this.dynamodbClient.send(
+          new CreateTableCommand({
+            TableName: this.config.dynamoDBTable,
+            KeySchema: [
+              { AttributeName: 'txHash', KeyType: 'HASH' }
+            ],
+            AttributeDefinitions: [
+              { AttributeName: 'txHash', AttributeType: 'S' }
+            ],
+            ProvisionedThroughput: {
+              ReadCapacityUnits: 5,
+              WriteCapacityUnits: 5
+            }
+          })
+        );
+        
+        logger.info(`Created DynamoDB table ${this.config.dynamoDBTable}`);
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -111,13 +229,59 @@ class AwsServicesManager {
       await this.initialize();
     }
 
+    if (!this.dynamodbDocClient) {
+      logger.error('DynamoDB client not initialized');
+      return false;
+    }
+
     try {
-      logger.info('Logging transaction to AWS DynamoDB');
-      // In a real implementation, this would log the transaction to DynamoDB
+      logger.info(`Logging transaction ${transaction.txHash} to AWS DynamoDB`);
+      
+      await this.dynamodbDocClient.send(
+        new PutCommand({
+          TableName: this.config.dynamoDBTable,
+          Item: {
+            ...transaction,
+            timestamp: transaction.timestamp || Date.now()
+          }
+        })
+      );
+      
+      logger.info(`Transaction ${transaction.txHash} successfully logged to DynamoDB`);
       return true;
     } catch (error) {
-      logger.error('Failed to log transaction to AWS DynamoDB:', error);
+      logger.error(`Failed to log transaction to AWS DynamoDB: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Get a transaction from AWS DynamoDB
+   */
+  async getTransaction(txHash: string): Promise<Transaction | null> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.dynamodbDocClient) {
+      logger.error('DynamoDB client not initialized');
+      return null;
+    }
+
+    try {
+      logger.info(`Getting transaction ${txHash} from AWS DynamoDB`);
+      
+      const response = await this.dynamodbDocClient.send(
+        new GetCommand({
+          TableName: this.config.dynamoDBTable,
+          Key: { txHash }
+        })
+      );
+      
+      return response.Item as Transaction || null;
+    } catch (error) {
+      logger.error(`Failed to get transaction from AWS DynamoDB: ${error.message}`);
+      return null;
     }
   }
 
@@ -129,12 +293,28 @@ class AwsServicesManager {
       await this.initialize();
     }
 
+    if (!this.lambdaClient) {
+      logger.error('Lambda client not initialized');
+      return false;
+    }
+
     try {
       logger.info(`Verifying transaction ${txHash} with AWS Lambda`);
-      // In a real implementation, this would invoke a Lambda function to verify the transaction
-      return false; // Always false until real implementation
+      
+      const response = await this.lambdaClient.send(
+        new InvokeCommand({
+          FunctionName: this.config.lambdaFunctionName,
+          Payload: Buffer.from(JSON.stringify({ txHash }))
+        })
+      );
+      
+      const responsePayload = Buffer.from(response.Payload).toString();
+      const result = JSON.parse(responsePayload);
+      
+      logger.info(`Transaction verification result: ${result.verified}`);
+      return result.verified === true;
     } catch (error) {
-      logger.error('Failed to verify transaction with AWS Lambda:', error);
+      logger.error(`Failed to verify transaction with AWS Lambda: ${error.message}`);
       return false;
     }
   }
@@ -147,12 +327,50 @@ class AwsServicesManager {
       await this.initialize();
     }
 
+    if (!this.cloudWatchClient) {
+      logger.error('CloudWatch client not initialized');
+      return false;
+    }
+
     try {
       logger.info('Sending metrics to AWS CloudWatch');
-      // In a real implementation, this would send metrics to CloudWatch
+      
+      await this.cloudWatchClient.send(
+        new PutMetricDataCommand({
+          Namespace: this.config.cloudWatchNamespace,
+          MetricData: [
+            {
+              MetricName: 'TransactionCount',
+              Value: metrics.transactionCount,
+              Unit: 'Count',
+              Timestamp: new Date(metrics.timestamp)
+            },
+            {
+              MetricName: 'SuccessRate',
+              Value: metrics.successRate,
+              Unit: 'Percent',
+              Timestamp: new Date(metrics.timestamp)
+            },
+            {
+              MetricName: 'AverageExecutionTime',
+              Value: metrics.averageExecutionTime,
+              Unit: 'Milliseconds',
+              Timestamp: new Date(metrics.timestamp)
+            },
+            {
+              MetricName: 'TotalProfit',
+              Value: metrics.totalProfit,
+              Unit: 'None',
+              Timestamp: new Date(metrics.timestamp)
+            }
+          ]
+        })
+      );
+      
+      logger.info('Metrics successfully sent to CloudWatch');
       return true;
     } catch (error) {
-      logger.error('Failed to send metrics to AWS CloudWatch:', error);
+      logger.error(`Failed to send metrics to AWS CloudWatch: ${error.message}`);
       return false;
     }
   }
@@ -165,12 +383,29 @@ class AwsServicesManager {
       await this.initialize();
     }
 
+    if (!this.s3Client) {
+      logger.error('S3 client not initialized');
+      return false;
+    }
+
     try {
       logger.info('Storing profit report in AWS S3');
-      // In a real implementation, this would store the report in S3
+      
+      const reportKey = `reports/${report.date}-profit-report.json`;
+      
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.config.s3Bucket,
+          Key: reportKey,
+          Body: JSON.stringify(report, null, 2),
+          ContentType: 'application/json'
+        })
+      );
+      
+      logger.info(`Profit report successfully stored in S3: s3://${this.config.s3Bucket}/${reportKey}`);
       return true;
     } catch (error) {
-      logger.error('Failed to store profit report in AWS S3:', error);
+      logger.error(`Failed to store profit report in AWS S3: ${error.message}`);
       return false;
     }
   }
@@ -185,11 +420,65 @@ class AwsServicesManager {
 
     try {
       logger.info('Resetting all AWS services data');
-      // In a real implementation, this would clear all data from DynamoDB, S3, etc.
+      
+      // Reset DynamoDB table
+      if (this.dynamodbClient) {
+        try {
+          await this.dynamodbClient.send(
+            new DeleteTableCommand({
+              TableName: this.config.dynamoDBTable
+            })
+          );
+          logger.info(`DynamoDB table ${this.config.dynamoDBTable} deleted`);
+          
+          // Recreate the table
+          await this.ensureTransactionsTableExists();
+        } catch (error) {
+          logger.warn(`Error resetting DynamoDB: ${error.message}`);
+        }
+      }
+      
+      logger.info('All AWS services data reset successfully');
       return true;
     } catch (error) {
-      logger.error('Failed to reset AWS services data:', error);
+      logger.error(`Failed to reset AWS services data: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Get status of all AWS services
+   */
+  async getStatus(): Promise<Record<string, boolean>> {
+    const status: Record<string, boolean> = {
+      dynamodb: false,
+      s3: false,
+      cloudwatch: false,
+      lambda: false
+    };
+
+    try {
+      // Check DynamoDB
+      if (this.dynamodbClient) {
+        try {
+          await this.dynamodbClient.send(
+            new ScanCommand({
+              TableName: this.config.dynamoDBTable,
+              Limit: 1
+            })
+          );
+          status.dynamodb = true;
+        } catch (error) {
+          logger.warn(`DynamoDB status check error: ${error.message}`);
+        }
+      }
+
+      // Other services status checks would be similar
+
+      return status;
+    } catch (error) {
+      logger.error(`Error checking AWS services status: ${error.message}`);
+      return status;
     }
   }
 }
