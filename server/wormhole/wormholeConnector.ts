@@ -183,8 +183,16 @@ async function trackEVMTransaction(chainId: number, txHash: string): Promise<any
  */
 export async function initializeWormholeConnector(): Promise<boolean> {
   try {
-    logger.info('Initializing Wormhole connector with Guardian RPC network');
-    return await checkWormholeConnection();
+    // Check if API key is available
+    if (process.env.WORMHOLE_API_KEY) {
+      logger.info('Initializing Wormhole connector with API key');
+      // Use API key for better rate limits and reliability
+      baseUrl = 'https://api.wormholescan.io';
+      return true;
+    } else {
+      logger.info('Initializing Wormhole connector with Guardian RPC network (fallback mode)');
+      return await checkWormholeConnection();
+    }
   } catch (error) {
     logger.error(`Failed to initialize Wormhole connector: ${error}`);
     return false;

@@ -47,19 +47,34 @@ export class TransactionVerifier {
    * @param rpcUrl Solana RPC URL
    */
   constructor(rpcUrl?: string) {
-    // Try to use Helius connection if available
-    if (heliusApiIntegration.isInitialized()) {
-      this.solanaConnection = heliusApiIntegration.getConnection();
+    try {
+      // Try to use Helius connection if available
+      if (heliusApiIntegration.isInitialized()) {
+        this.solanaConnection = heliusApiIntegration.getConnection();
+        this.initialized = true;
+        logger.info('Transaction verifier initialized with Helius connection');
+      } else if (rpcUrl && (rpcUrl.startsWith('http://') || rpcUrl.startsWith('https://'))) {
+        this.solanaConnection = new Connection(rpcUrl, 'confirmed');
+        this.initialized = true;
+        logger.info('Transaction verifier initialized with provided RPC connection');
+      } else if (process.env.ALCHEMY_RPC_URL && 
+                (process.env.ALCHEMY_RPC_URL.startsWith('http://') || 
+                 process.env.ALCHEMY_RPC_URL.startsWith('https://'))) {
+        this.solanaConnection = new Connection(process.env.ALCHEMY_RPC_URL, 'confirmed');
+        this.initialized = true;
+        logger.info('Transaction verifier initialized with Alchemy RPC connection');
+      } else {
+        // Fallback to public RPC
+        this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        this.initialized = true;
+        logger.info('Transaction verifier initialized with public Solana RPC');
+      }
+    } catch (error) {
+      logger.error('Error in transaction verifier initialization:', error);
+      // Safe fallback to public RPC
+      this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
       this.initialized = true;
-      logger.info('Transaction verifier initialized with Helius connection');
-    } else if (rpcUrl) {
-      this.solanaConnection = new Connection(rpcUrl, 'confirmed');
-      this.initialized = true;
-      logger.info('Transaction verifier initialized with provided RPC connection');
-    } else {
-      this.solanaConnection = null;
-      this.initialized = false;
-      logger.warn('No valid RPC connection for transaction verifier');
+      logger.info('Transaction verifier initialized with public Solana RPC (fallback after error)');
     }
 
     // Get Solscan API key from environment if available

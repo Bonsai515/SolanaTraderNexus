@@ -51,7 +51,7 @@ export class ProfitCapture {
    * @param systemWalletAddress System wallet address for profit collection
    */
   constructor(systemWalletAddress?: string) {
-    this.systemWalletAddress = systemWalletAddress || process.env.SYSTEM_WALLET_ADDRESS || '';
+    this.systemWalletAddress = systemWalletAddress || process.env.SYSTEM_WALLET_ADDRESS || 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     this.loadProfitData();
   }
 
