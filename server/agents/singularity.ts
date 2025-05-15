@@ -8,10 +8,10 @@
  */
 
 import * as web3 from '@solana/web3.js';
-import * as logger from '../logger';
+import logger from '../logger';
 import * as nexusEngine from '../nexus-transaction-engine';
 import { priceFeedCache } from '../priceFeedCache';
-import { securityTransformer } from '../security-connector';
+import securityConnector from '../security-connector';
 import { crossChainTransformer } from '../crosschain-connector';
 
 // Types for cross-chain operations
@@ -307,11 +307,20 @@ class SingularityAgent {
       for (const opp of crossChainOpps) {
         // Check token security
         if (opp.sourceToken) {
-          const security = await securityTransformer.checkTokenSecurity(opp.sourceToken);
-          
-          if (!security.isSecure) {
-            logger.debug(`Skipping cross-chain opportunity with unsafe token: ${opp.sourceToken}`);
-            continue;
+          // Use security connector directly if transformer is not available
+          let isSecure = true;
+          try {
+            // Use the security connector directly
+          const securityResult = await securityConnector.performSecurityCheck(opp.sourceToken);
+          isSecure = securityResult.success && securityResult.threatLevel === 'none';
+            
+            if (!isSecure) {
+              logger.debug(`Skipping cross-chain opportunity with unsafe token: ${opp.sourceToken}`);
+              continue;
+            }
+          } catch (error) {
+            logger.warn(`Token security check failed for ${opp.sourceToken}: ${error.message}`);
+            // Continue with opportunity but mark it as higher risk
           }
         }
         
