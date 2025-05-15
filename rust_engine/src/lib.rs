@@ -3,6 +3,7 @@
 
 pub mod transaction;
 pub mod parallel;
+// Import strategy package directly from the module directory
 pub mod strategy;
 
 use std::collections::HashMap;
@@ -17,7 +18,9 @@ pub use strategy::{
     StrategyType, 
     FlashLoanArbitrageStrategy, 
     MomentumSurfingStrategy,
-    MemeCortexIntegration
+    MemeCortexIntegration,
+    ArbitrageOpportunity,
+    SentimentOpportunity
 };
 
 // Initialize the transaction engine

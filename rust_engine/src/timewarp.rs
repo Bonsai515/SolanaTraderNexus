@@ -6,7 +6,54 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
 use log::{debug, info, warn, error};
-use time_warp::{TimeWarp, Config};
+
+// Define our own TimeWarp and Config structures since we don't have an external crate
+pub struct Config {
+    pub acceleration_factor: f64,
+    pub freeze_enabled: bool,
+    pub simulation_mode: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            acceleration_factor: 1.0,
+            freeze_enabled: false,
+            simulation_mode: true,
+        }
+    }
+}
+
+pub struct TimeWarp {
+    config: Config,
+    frozen_time: Option<SystemTime>,
+    speed_factor: f64,
+}
+
+impl TimeWarp {
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            frozen_time: None,
+            speed_factor: 1.0,
+        }
+    }
+    
+    pub fn set(&self, time: SystemTime) {
+        // In a real implementation, this would set a frozen time
+        // For now, this is a stub
+    }
+    
+    pub fn set_speed(&self, factor: f64) {
+        // In a real implementation, this would set the time acceleration factor
+        // For now, this is a stub
+    }
+    
+    pub fn reset(&self) {
+        // In a real implementation, this would reset to normal time flow
+        // For now, this is a stub
+    }
+}
 
 use crate::strategy::{
     FlashLoanArbitrageStrategy, 

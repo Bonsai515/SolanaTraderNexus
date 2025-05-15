@@ -3,6 +3,7 @@ import path from 'path';
 import { registerRoutes } from './routes';
 import { initializeTransformers } from './transformers';
 import { startAgentSystem } from './agents';
+import * as logger from './logger';
 
 const app = express();
 
@@ -292,12 +293,26 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const appServer = await registerRoutes(app);
     
     // Listen on port 5000 for production deployment
-    const port = process.env.PORT || 5000;
+    const port = parseInt(process.env.PORT || '5000');
     appServer.listen(port, () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
+      logger.info(`✅ Server running on port ${port}`);
+      logger.info(`✅ WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error registering API routes:', error.message);
+    logger.error('Error registering API routes:', error);
+    
+    // Try to start server with basic routes in case the regular registration failed
+    try {
+      const backupServer = app.listen(parseInt(process.env.PORT || '5000'), () => {
+        console.log('🚨 Started minimal backup server due to registration error');
+        logger.info('🚨 Started minimal backup server due to registration error');
+      });
+    } catch (backupError: any) {
+      console.error('❌ Failed to start backup server:', backupError.message);
+      logger.error('Failed to start backup server:', backupError);
+    }
   }
 })();
