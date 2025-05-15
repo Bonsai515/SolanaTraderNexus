@@ -7,7 +7,7 @@
  */
 
 import axios from 'axios';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionSignature } from '@solana/web3.js';
 import * as logger from '../logger';
 import { VersionedTransactionResponse } from '@solana/web3.js';
 
@@ -159,4 +159,23 @@ export async function verifyTransactionMultiMethod(
     logger.error(`Error during multi-method verification: ${error.message}`);
     return false;
   }
+}
+
+export async function verifyTransaction(signature: string, connection: Connection): Promise<boolean> {
+  try {
+    const status = await connection.getSignatureStatus(signature);
+    return status?.value?.confirmationStatus === 'confirmed' || 
+           status?.value?.confirmationStatus === 'finalized';
+  } catch (error) {
+    console.error('Transaction verification failed:', error);
+    return false;
+  }
+}
+
+export async function verifyTransactions(signatures: string[], connection: Connection): Promise<Map<string, boolean>> {
+  const results = new Map<string, boolean>();
+  await Promise.all(signatures.map(async (sig) => {
+    results.set(sig, await verifyTransaction(sig, connection));
+  }));
+  return results;
 }

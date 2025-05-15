@@ -1,4 +1,7 @@
 /**
+ * The code fixes a TypeScript type error by casting `signal` to `any` when accessing `targetComponents`.
+ */
+/**
  * Signal Validator - Real-time Signal Quality and Integrity Assurance
  * 
  * This module validates signals before they are processed by the system
@@ -91,7 +94,7 @@ class SignalValidator {
       errorMessage: (signal) => `Confidence score out of range: ${signal.confidence}`,
       severity: 'error'
     });
-    
+
     // Token address validation for asset-specific signals
     this.rules.push({
       name: 'token-address-required',
@@ -106,13 +109,13 @@ class SignalValidator {
           SignalType.ARBITRAGE,
           SignalType.SNIPE
         ].includes(signal.type);
-        
+
         return !requiresToken || !!signal.token_address;
       },
       errorMessage: (signal) => `Token address required for signal type: ${signal.type}`,
       severity: 'error'
     });
-    
+
     // Critical priority validation
     this.rules.push({
       name: 'critical-priority-validation',
@@ -122,17 +125,17 @@ class SignalValidator {
       errorMessage: () => 'Critical priority signals must have confidence of at least 85%',
       severity: 'error'
     });
-    
+
     // Component targeting validation for actionable signals
     this.rules.push({
       name: 'actionable-targeting',
       validate: (signal) => {
-        return !signal.actionable || (signal.targetComponents && signal.targetComponents.length > 0) ? true : false;
+        return !signal.actionable || ((signal as any).targetComponents && (signal as any).targetComponents.length > 0) ? true : false;
       },
       errorMessage: () => 'Actionable signals must specify target components',
       severity: 'error'
     });
-    
+
     // Metrics validation for arbitrage and MEV signals
     this.rules.push({
       name: 'profit-metrics-required',
@@ -142,7 +145,7 @@ class SignalValidator {
           SignalType.ARBITRAGE,
           SignalType.FLASH_LOAN
         ].includes(signal.type);
-        
+
         return (!requiresMetrics || 
                (signal.metrics && 
                 signal.metrics.profitPotential !== undefined && 
@@ -151,7 +154,7 @@ class SignalValidator {
       errorMessage: (signal) => `Profit metrics required for signal type: ${signal.type}`,
       severity: 'error'
     });
-    
+
     // Warning for low confidence but high priority signals
     this.rules.push({
       name: 'low-confidence-high-priority',
@@ -161,7 +164,7 @@ class SignalValidator {
       errorMessage: () => 'High priority signal with confidence below 70%',
       severity: 'warning'
     });
-    
+
     // Warning for missing analysis on certain signal types
     this.rules.push({
       name: 'analysis-recommended',
@@ -171,13 +174,13 @@ class SignalValidator {
           SignalType.CrossChain,
           SignalType.WHALE_MOVEMENT
         ].includes(signal.type);
-        
+
         return (!shouldHaveAnalysis || (signal.analysis && Object.keys(signal.analysis).length > 0)) ? true : false;
       },
       errorMessage: (signal) => `Analysis data recommended for signal type: ${signal.type}`,
       severity: 'warning'
     });
-    
+
     // Zero-Knowledge Proof verification for AI-generated signals
     this.rules.push({
       name: 'zk-proof-verification',
@@ -189,11 +192,11 @@ class SignalValidator {
           'MemeCortex',
           'QuantumNeuralNet'
         ].includes(signal.source);
-        
+
         if (!requiresZkProof) {
           return true; // Skip validation for signals from other sources
         }
-        
+
         try {
           // Generate model weights for the signal source
           // In a real implementation, these would be retrieved from a secure storage
@@ -205,16 +208,16 @@ class SignalValidator {
               confidenceFactors: signal.confidence
             }
           );
-          
+
           // Verify the signal with ZK proof
           const isValid = zkProofVerification.verifySignal(signal, modelWeights);
-          
+
           if (isValid) {
             logger.info(`ZK proof verification passed for signal ${signal.id} from ${signal.source}`);
           } else {
             logger.warn(`ZK proof verification failed for signal ${signal.id} from ${signal.source}`);
           }
-          
+
           return isValid;
         } catch (error) {
           logger.error(`Error during ZK proof verification for signal ${signal.id}: ${error.message}`);
@@ -242,19 +245,19 @@ class SignalValidator {
     // Check each rule
     for (const rule of this.rules) {
       const isValid = rule.validate(signal);
-      
+
       if (!isValid) {
         result.errors.push({
           rule: rule.name,
           message: rule.errorMessage(signal),
           severity: rule.severity
         });
-        
+
         // Only set valid to false for errors, not warnings
         if (rule.severity === 'error') {
           result.valid = false;
         }
-        
+
         // Track errors by rule
         this.validationStats.errorsByRule[rule.name] = (this.validationStats.errorsByRule[rule.name] || 0) + 1;
       }
@@ -262,13 +265,13 @@ class SignalValidator {
 
     // Update stats
     this.validationStats.totalValidated++;
-    
+
     if (!result.valid) {
       this.validationStats.invalidSignals++;
       logger.warn(`Invalid signal detected [${signal.id}]: ${result.errors.filter(e => e.severity === 'error').map(e => e.message).join(', ')}`);
     } else {
       this.validationStats.validSignals++;
-      
+
       if (result.errors.length > 0) {
         this.validationStats.warningSignals++;
         logger.info(`Signal with warnings [${signal.id}]: ${result.errors.map(e => e.message).join(', ')}`);

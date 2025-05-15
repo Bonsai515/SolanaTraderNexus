@@ -35,7 +35,7 @@ strategyRouter.get('/', (req, res) => {
 });
 
 // Get a strategy by ID
-strategyRouter.get('/:id', (req, res) => {
+strategyRouter.get('/:id', async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
     const strategy = getStrategyById(id);
