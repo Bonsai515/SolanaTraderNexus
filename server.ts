@@ -5,10 +5,10 @@
  * for deployment on cloud platforms.
  */
 
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { registerRoutes } = require('./server/routes');
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { registerRoutes } from './server/routes';
 
 // Create Express app
 const app = express();

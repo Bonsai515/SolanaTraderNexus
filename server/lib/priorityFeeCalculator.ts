@@ -1,6 +1,6 @@
 /**
  * Advanced Priority Fee Calculator
- * 
+ *
  * Optimizes transaction priority fees based on:
  * - Expected profit from the transaction
  * - Current network congestion
@@ -8,319 +8,369 @@
  * - Historical success rates
  */
 
-import { Connection, PublicKey } from '@solana/web3.js';
+import { ComputeBudgetProgram, Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { logger } from '../logger';
 import { getSolanaConnection } from './ensureRpcConnection';
+import axios from 'axios';
 
-// Window to analyze for fee calculation
-const FEE_WINDOW_SLOTS = 150;
-
-// Fee model parameters
-interface FeeModelParameters {
-  baseFeeMicroLamports: number;  // Base fee in micro-lamports
-  maxFeeMicroLamports: number;   // Maximum fee in micro-lamports
-  profitMultiplier: number;      // Multiplier based on expected profit
-  congestionMultiplier: number;  // Multiplier based on network congestion
-  urgencyMultiplier: number;     // Multiplier for urgent transactions
-  minSuccessRate: number;        // Minimum target success rate (0-1)
+// Types for priority fee calculation
+export interface HistoricalFeeData {
+  timestamp: number;
+  priorityFee: number;
+  success: boolean;
+  congestionLevel: number;
+  profit: number;
 }
 
-// Default parameters
-const DEFAULT_PARAMS: FeeModelParameters = {
-  baseFeeMicroLamports: 1_000_000,  // 1,000,000 micro-lamports = 0.001 SOL
-  maxFeeMicroLamports: 1_000_000_000, // 1 SOL max
-  profitMultiplier: 0.05,          // 5% of profit
-  congestionMultiplier: 2.5,       // Up to 2.5x during high congestion
-  urgencyMultiplier: 3.0,          // Up to 3x for urgent transactions
-  minSuccessRate: 0.95             // Target 95% success rate
+export interface CalculationParams {
+  baseFeeMultiplier: number;
+  congestionMultiplier: number;
+  profitBasedScaling: boolean;
+  maxMicroLamports: number;
+  minMicroLamports: number;
+  defaultMicroLamports: number;
+  adaptiveAdjustment: boolean;
+  congestionCheckInterval: number;
+}
+
+export interface BlockhashInfo {
+  blockhash: string;
+  lastValidBlockHeight: number;
+  timestamp: number;
+}
+
+// Default calculation parameters
+const DEFAULT_PARAMS: CalculationParams = {
+  baseFeeMultiplier: 1.2,
+  congestionMultiplier: 1.5,
+  profitBasedScaling: true,
+  maxMicroLamports: 1_000_000, // 1M micro-lamports = 0.001 SOL per CU
+  minMicroLamports: 1_000,     // 1K micro-lamports = 0.000001 SOL per CU
+  defaultMicroLamports: 5_000, // Default value when data is insufficient
+  adaptiveAdjustment: true,
+  congestionCheckInterval: 60_000 // 1 minute
 };
 
-// Historical fee data for learning
-interface HistoricalFeeData {
-  timestamp: number;
-  feeMicroLamports: number;
-  successful: boolean;
-  expectedProfit: number;
-  actualProfit: number;
-  congestionLevel: number;
-}
-
-/**
- * Priority Fee Calculator with machine learning optimization
- */
 export class PriorityFeeCalculator {
-  private connection: Connection;
-  private params: FeeModelParameters;
   private historicalData: HistoricalFeeData[] = [];
-  private recentBlockhashInfo: any = null;
+  private recentBlockhashInfo: BlockhashInfo | null = null;
   private lastCongestionCheck: number = 0;
-  private currentCongestionLevel: number = 0;
+  private currentCongestionLevel: number = 0; 
+  private connection: Connection;
+  private params: CalculationParams;
 
-  constructor(params: Partial<FeeModelParameters> = {}) {
+  constructor(params: Partial<CalculationParams> = {}) {
     this.connection = getSolanaConnection();
     this.params = { ...DEFAULT_PARAMS, ...params };
   }
+  
+  /**
+   * Update calculator parameters
+   * @param params Partial parameters to update
+   */
+  public updateParams(params: Partial<CalculationParams>): void {
+    this.params = { ...this.params, ...params };
+  }
 
   /**
-   * Calculate optimal priority fee based on expected profit
-   * @param expectedProfitUsd Expected profit in USD
-   * @param urgent Whether this is an urgent transaction
-   * @returns Priority fee in micro-lamports
+   * Calculate optimal priority fee based on current conditions
+   * @param expectedProfit Expected profit from transaction in SOL
+   * @returns Optimal priority fee in micro-lamports
    */
-  public async calculatePriorityFee(
-    expectedProfitUsd: number,
-    urgent: boolean = false
-  ): Promise<number> {
+  public async calculateOptimalFee(expectedProfit?: number): Promise<number> {
     try {
-      // Update congestion data if needed
-      await this.updateCongestionLevel();
+      // Check congestion if needed
+      await this.updateCongestionIfNeeded();
       
-      // Get SOL price for conversion
-      const solPriceUsd = await this.getSolPrice();
+      // Get baseline fee
+      let baseFee = this.getBaselineFee();
       
-      // Expected profit in lamports
-      const expectedProfitLamports = (expectedProfitUsd / solPriceUsd) * 1_000_000_000;
+      // Adjust for congestion
+      let congestionAdjustedFee = this.adjustForCongestion(baseFee);
       
-      // Base calculation
-      let priorityFeeMicroLamports = this.params.baseFeeMicroLamports;
-      
-      // Add profit-based component
-      priorityFeeMicroLamports += Math.floor(
-        expectedProfitLamports * 1000 * this.params.profitMultiplier
-      );
-      
-      // Apply congestion multiplier
-      priorityFeeMicroLamports = Math.floor(
-        priorityFeeMicroLamports * (1 + (this.currentCongestionLevel * this.params.congestionMultiplier))
-      );
-      
-      // Apply urgency multiplier if needed
-      if (urgent) {
-        priorityFeeMicroLamports = Math.floor(
-          priorityFeeMicroLamports * this.params.urgencyMultiplier
-        );
+      // Adjust for profitability if provided
+      let finalFee = expectedProfit !== undefined ? 
+        this.adjustForProfit(congestionAdjustedFee, expectedProfit) : 
+        congestionAdjustedFee;
+        
+      // Apply adaptive adjustment based on historical success rates
+      if (this.params.adaptiveAdjustment && this.historicalData.length > 5) {
+        finalFee = this.applyAdaptiveAdjustment(finalFee);
       }
       
-      // Apply machine learning adjustment based on historical data
-      priorityFeeMicroLamports = this.applyMachineLearningAdjustment(
-        priorityFeeMicroLamports,
-        expectedProfitUsd,
-        urgent
-      );
-      
-      // Ensure fee is within limits
-      priorityFeeMicroLamports = Math.min(
-        priorityFeeMicroLamports,
-        this.params.maxFeeMicroLamports
-      );
-      
-      // Convert to lamports for logging
-      const priorityFeeLamports = priorityFeeMicroLamports / 1000;
-      logger.debug(`Calculated priority fee: ${priorityFeeLamports} lamports (${priorityFeeLamports / 1_000_000_000} SOL)`);
-      
-      return priorityFeeMicroLamports;
+      // Ensure within bounds
+      return this.clampFeeWithinBounds(finalFee);
     } catch (error) {
-      logger.error(`Error calculating priority fee: ${error}`);
-      return this.params.baseFeeMicroLamports;
+      logger.error('Error calculating optimal priority fee:', error);
+      return this.params.defaultMicroLamports; // Fallback to default
     }
   }
 
   /**
-   * Record transaction outcome for learning
+   * Add transaction data to historical records for future optimization
+   * @param priorityFee The fee that was used
+   * @param success Whether the transaction succeeded
+   * @param profit The profit made (if applicable)
    */
-  public recordTransactionOutcome(
-    feeMicroLamports: number,
-    successful: boolean,
-    expectedProfit: number,
-    actualProfit: number
-  ): void {
+  public recordTransactionData(priorityFee: number, success: boolean, profit?: number): void {
     this.historicalData.push({
       timestamp: Date.now(),
-      feeMicroLamports,
-      successful,
-      expectedProfit,
-      actualProfit,
-      congestionLevel: this.currentCongestionLevel
+      priorityFee,
+      success,
+      congestionLevel: this.currentCongestionLevel,
+      profit: profit || 0
     });
     
-    // Keep history limited to last 1000 transactions
-    if (this.historicalData.length > 1000) {
+    // Keep only last 100 records
+    if (this.historicalData.length > 100) {
       this.historicalData.shift();
     }
+  }
+
+  /**
+   * Update the latest blockhash information
+   */
+  public async updateBlockhashInfo(): Promise<void> {
+    try {
+      const blockhashInfo = await this.connection.getLatestBlockhash();
+      this.recentBlockhashInfo = {
+        blockhash: blockhashInfo.blockhash,
+        lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      logger.error('Error updating blockhash info:', error);
+    }
+  }
+
+  /**
+   * Get latest blockhash info, fetching if necessary
+   */
+  public async getBlockhashInfo(): Promise<BlockhashInfo | null> {
+    // If no blockhash or it's more than 60 seconds old, update it
+    if (!this.recentBlockhashInfo || 
+        Date.now() - this.recentBlockhashInfo.timestamp > 60000) {
+      await this.updateBlockhashInfo();
+    }
+    return this.recentBlockhashInfo;
+  }
+
+  /**
+   * Apply priority fee to transaction
+   * @param transaction Transaction to apply fee to
+   * @param priorityFee Priority fee in micro-lamports
+   * @param computeUnits Optional compute units (default 200,000)
+   */
+  public applyPriorityFee(
+    transaction: Transaction, 
+    priorityFee: number, 
+    computeUnits: number = 200_000
+  ): void {
+    // Add compute budget instruction
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: priorityFee
+      })
+    );
     
-    // Trigger model optimization
-    this.optimizeModel();
+    // Also set compute unit limit if not default
+    if (computeUnits !== 200_000) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: computeUnits
+        })
+      );
+    }
   }
 
   /**
    * Update network congestion level
    */
-  private async updateCongestionLevel(): Promise<void> {
-    // Only check every 10 seconds
-    if (Date.now() - this.lastCongestionCheck < 10000) {
-      return;
+  private async updateCongestionIfNeeded(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastCongestionCheck > this.params.congestionCheckInterval) {
+      await this.updateCongestionLevel();
+      this.lastCongestionCheck = now;
     }
-    
+  }
+
+  /**
+   * Update the current congestion level
+   */
+  private async updateCongestionLevel(): Promise<void> {
     try {
-      // Get recent performance samples
-      const perfSamples = await this.connection.getRecentPerformanceSamples(FEE_WINDOW_SLOTS);
+      // Multiple methods to estimate congestion for reliability
       
-      if (!perfSamples || perfSamples.length === 0) {
-        logger.warn('No performance samples available for congestion calculation');
+      // Method 1: Check recent performance
+      const perfSamples = await this.connection.getRecentPerformanceSamples(5);
+      if (perfSamples && perfSamples.length > 0) {
+        // Calculate average transactions per slot
+        const avgTps = perfSamples.reduce((sum, sample) => 
+          sum + sample.numTransactions / sample.samplePeriodSecs, 0) / perfSamples.length;
+        
+        // Check against known TPS limits
+        // Solana mainnet can handle ~2000-4000 TPS theoretically
+        // Higher TPS indicates higher congestion
+        if (avgTps > 2500) {
+          this.currentCongestionLevel = 0.9; // High congestion
+        } else if (avgTps > 1500) {
+          this.currentCongestionLevel = 0.7; // Medium-high congestion
+        } else if (avgTps > 500) {
+          this.currentCongestionLevel = 0.4; // Medium congestion
+        } else {
+          this.currentCongestionLevel = 0.2; // Low congestion
+        }
         return;
       }
       
-      // Calculate average transactions per slot
-      const totalTxCount = perfSamples.reduce((sum, sample) => sum + sample.numTransactions, 0);
-      const totalSlots = perfSamples.reduce((sum, sample) => sum + sample.samplePeriodSecs, 0);
-      const avgTxPerSlot = totalSlots > 0 ? totalTxCount / totalSlots : 0;
+      // Method 2: Use Helius API if available
+      if (process.env.HELIUS_API_KEY) {
+        try {
+          const response = await axios.get(`https://api.helius.xyz/v0/network-status?api-key=${process.env.HELIUS_API_KEY}`);
+          if (response.data && response.data.congestionLevel) {
+            // Map Helius congestion levels to our scale
+            const heliusLevel = response.data.congestionLevel.toLowerCase();
+            if (heliusLevel === 'high') {
+              this.currentCongestionLevel = 0.9;
+            } else if (heliusLevel === 'medium') {
+              this.currentCongestionLevel = 0.5;
+            } else {
+              this.currentCongestionLevel = 0.2;
+            }
+            return;
+          }
+        } catch (error) {
+          logger.warn('Failed to get congestion data from Helius:', error);
+          // Continue to fallback methods
+        }
+      }
       
-      // Network congestion is normalized between 0 and 1
-      // Assuming 2000 tx/sec is high congestion
-      this.currentCongestionLevel = Math.min(avgTxPerSlot / 2000, 1);
+      // Method 3: Use recent blockhash information as fallback
+      const blockhashInfo = await this.getBlockhashInfo();
       
-      this.lastCongestionCheck = Date.now();
-      logger.debug(`Current network congestion level: ${this.currentCongestionLevel.toFixed(2)}`);
+      // Default to moderate congestion
+      this.currentCongestionLevel = 0.5;
     } catch (error) {
-      logger.error(`Error updating congestion level: ${error}`);
+      logger.error('Error updating congestion level:', error);
+      // Default to moderate congestion on error
+      this.currentCongestionLevel = 0.5;
     }
   }
 
   /**
-   * Get current SOL price in USD
+   * Get baseline fee from historical data or default
    */
-  private async getSolPrice(): Promise<number> {
-    // In a real implementation, this would call an oracle or price feed
-    // For now, using a placeholder price
-    return 145.75; // Current SOL price in USD
-  }
-
-  /**
-   * Apply machine learning adjustment based on historical data
-   */
-  private applyMachineLearningAdjustment(
-    baseFee: number,
-    expectedProfit: number,
-    urgent: boolean
-  ): number {
-    if (this.historicalData.length < 10) {
-      return baseFee; // Not enough data yet
+  private getBaselineFee(): number {
+    if (this.historicalData.length === 0) {
+      return this.params.defaultMicroLamports;
     }
     
-    // Get recent similar transactions
-    const similarTransactions = this.getSimilarTransactions(expectedProfit, urgent);
+    // Get successful transactions in the last hour
+    const lastHour = Date.now() - 3600000;
+    const recentSuccessful = this.historicalData.filter(
+      data => data.success && data.timestamp > lastHour
+    );
     
-    if (similarTransactions.length < 5) {
-      return baseFee; // Not enough similar transactions
-    }
-    
-    // Calculate success rate at different fee levels
-    const feeGroups = this.groupByFeeLevel(similarTransactions);
-    
-    // Find minimum fee level that meets target success rate
-    let optimalFee = baseFee;
-    let highestSuccessRate = 0;
-    
-    for (const [feeLevelStr, transactions] of Object.entries(feeGroups)) {
-      const feeLevel = parseInt(feeLevelStr);
-      const successCount = transactions.filter(tx => tx.successful).length;
-      const successRate = successCount / transactions.length;
+    if (recentSuccessful.length > 5) {
+      // Use median of recent successful fees
+      const sortedFees = recentSuccessful
+        .map(data => data.priorityFee)
+        .sort((a, b) => a - b);
       
-      if (successRate >= this.params.minSuccessRate && successRate > highestSuccessRate) {
-        optimalFee = feeLevel;
-        highestSuccessRate = successRate;
-      }
+      const medianFee = sortedFees[Math.floor(sortedFees.length / 2)];
+      return medianFee * this.params.baseFeeMultiplier;
     }
     
-    // If we couldn't find a fee level with target success rate, use base fee
-    return optimalFee !== baseFee ? optimalFee : baseFee;
+    return this.params.defaultMicroLamports;
   }
 
   /**
-   * Get similar historical transactions
+   * Adjust fee based on network congestion
    */
-  private getSimilarTransactions(
-    expectedProfit: number,
-    urgent: boolean
-  ): HistoricalFeeData[] {
-    // Get transactions from similar market conditions
-    return this.historicalData.filter(tx => {
-      // Within 20% of profit range and similar congestion conditions
-      const profitSimilar = Math.abs(tx.expectedProfit - expectedProfit) / expectedProfit < 0.2;
-      const congestionSimilar = Math.abs(tx.congestionLevel - this.currentCongestionLevel) < 0.2;
-      
-      return profitSimilar && congestionSimilar;
-    });
+  private adjustForCongestion(baseFee: number): number {
+    // Exponential scaling based on congestion level
+    const congestionFactor = Math.pow(
+      this.params.congestionMultiplier, 
+      this.currentCongestionLevel * 10
+    );
+    
+    return baseFee * congestionFactor;
   }
 
   /**
-   * Group transactions by fee level
+   * Adjust fee based on expected profit
    */
-  private groupByFeeLevel(transactions: HistoricalFeeData[]): Record<number, HistoricalFeeData[]> {
-    const groups: Record<number, HistoricalFeeData[]> = {};
-    
-    // Group by fee level (rounded to nearest 100,000 micro-lamports)
-    for (const tx of transactions) {
-      const feeLevel = Math.round(tx.feeMicroLamports / 100000) * 100000;
-      
-      if (!groups[feeLevel]) {
-        groups[feeLevel] = [];
-      }
-      
-      groups[feeLevel].push(tx);
+  private adjustForProfit(fee: number, expectedProfit: number): number {
+    if (!this.params.profitBasedScaling || expectedProfit <= 0) {
+      return fee;
     }
     
-    return groups;
+    // Convert profit to lamports (1 SOL = 1e9 lamports)
+    const profitLamports = expectedProfit * 1e9;
+    
+    // Scale fee to be proportional to profit, but no more than 1% of expected profit
+    const maxFeeFromProfit = profitLamports * 0.01 / 200000; // Per compute unit
+    
+    // Use either the congestion-based fee or profit-based cap, whichever is lower
+    return Math.min(fee, maxFeeFromProfit);
   }
 
   /**
-   * Optimize model parameters based on historical data
+   * Apply adaptive adjustment based on success rates
    */
-  private optimizeModel(): void {
-    if (this.historicalData.length < 100) {
-      return; // Not enough data yet
+  private applyAdaptiveAdjustment(fee: number): number {
+    // Get recent transactions
+    const recentTransactions = this.historicalData.slice(-20);
+    
+    if (recentTransactions.length < 5) {
+      return fee;
     }
     
-    // Calculate success rates for different parameter settings
-    // This is a simplified implementation that would be more sophisticated in production
+    // Calculate success rate
+    const successRate = recentTransactions.filter(tx => tx.success).length / 
+                       recentTransactions.length;
     
-    // Analyze profit multiplier effectiveness
-    const profitCorrelation = this.calculateProfitMultiplierCorrelation();
-    
-    if (profitCorrelation > 0.7) {
-      // Strong correlation, increase multiplier
-      this.params.profitMultiplier *= 1.05;
-    } else if (profitCorrelation < 0.3) {
-      // Weak correlation, decrease multiplier
-      this.params.profitMultiplier *= 0.95;
+    if (successRate < 0.7) {
+      // Low success rate, increase fee
+      const adjustmentFactor = 1 + ((0.7 - successRate) * 2);
+      return fee * adjustmentFactor;
+    } else if (successRate > 0.95 && this.historicalData.length > 30) {
+      // Very high success rate, can slightly decrease fee to optimize
+      return fee * 0.95;
     }
     
-    // Keep parameters within reasonable bounds
-    this.params.profitMultiplier = Math.min(Math.max(this.params.profitMultiplier, 0.01), 0.2);
-    
-    logger.debug(`Optimized fee model parameters: profitMultiplier=${this.params.profitMultiplier.toFixed(3)}`);
+    return fee;
   }
 
   /**
-   * Calculate correlation between profit multiplier and success rate
+   * Ensure fee is within allowed bounds
    */
-  private calculateProfitMultiplierCorrelation(): number {
-    // This would be a more complex calculation in production
-    // Simplified implementation for demonstration
-    
-    const recentTransactions = this.historicalData.slice(-100);
-    const successfulCount = recentTransactions.filter(tx => tx.successful).length;
-    
-    return successfulCount / recentTransactions.length;
+  private clampFeeWithinBounds(fee: number): number {
+    return Math.min(
+      Math.max(fee, this.params.minMicroLamports),
+      this.params.maxMicroLamports
+    );
   }
 }
 
-// Create singleton instance
-const priorityFeeCalculator = new PriorityFeeCalculator();
+// Singleton instance
+let priorityFeeCalculatorInstance: PriorityFeeCalculator | null = null;
 
 /**
- * Get the priority fee calculator instance
+ * Get priority fee calculator instance
  */
-export function getPriorityFeeCalculator(): PriorityFeeCalculator {
-  return priorityFeeCalculator;
+export function getPriorityFeeCalculator(params?: Partial<CalculationParams>): PriorityFeeCalculator {
+  if (!priorityFeeCalculatorInstance) {
+    priorityFeeCalculatorInstance = new PriorityFeeCalculator(params);
+  } else if (params) {
+    // Update params if provided
+    priorityFeeCalculatorInstance.updateParams(params);
+  }
+  
+  return priorityFeeCalculatorInstance;
 }
+
+// Add missing updateParams method to the class
+PriorityFeeCalculator.prototype.updateParams = function(params: Partial<CalculationParams>): void {
+  this.params = { ...this.params, ...params };
+};

@@ -1,100 +1,76 @@
 /**
  * DEX Information Module
- * 
+ *
  * Provides information about supported DEXes on Solana
  */
 
 export enum DexType {
-  Jupiter = 'jupiter',
-  Openbook = 'openbook',
-  Raydium = 'raydium',
-  Orca = 'orca',
-  Meteora = 'meteora',
-  PumpFun = 'pump.fun',
-  GMGN = 'gmgn',
-  DexScreener = 'dexscreener',
-  Moonshot = 'moonshot',
-  Birdeye = 'birdeye',
+  Jupiter = "jupiter",
+  Openbook = "openbook",
+  Raydium = "raydium",
+  Orca = "orca",
+  Meteora = "meteora",
+  PumpFun = "pump.fun",
+  GMGN = "gmgn",
+  DexScreener = "dexscreener",
+  Moonshot = "moonshot",
+  Birdeye = "birdeye",
   // New DEXs
-  Drift = 'drift',
-  Cykura = 'cykura',
-  Symmetry = 'symmetry',
-  GooseFX = 'goosefx',
-  Saros = 'saros',
-  Lifinity = 'lifinity',
-  Atrix = 'atrix',
-  Crema = 'crema',
-  Step = 'step'  
+  Drift = "drift",
+  Cykura = "cykura",
+  Symmetry = "symmetry",
+  GooseFX = "goosefx",
+  Saros = "saros",
+  Lifinity = "lifinity",
+  Atrix = "atrix",
+  Crema = "crema",
+  Step = "step",
 }
 
 export enum DexCategory {
-  AMM = 'amm',
-  OrderBook = 'orderbook',
-  Aggregator = 'aggregator',
-  Analytics = 'analytics',
-  Launchpad = 'launchpad',
-  Perps = 'perpetuals',
-  Options = 'options',
-  CLMMs = 'concentrated-liquidity',
-  Staking = 'staking',
-  Synthetics = 'synthetics',
-  Margin = 'margin',
-  Lending = 'lending'
+  AMM = "amm",
+  OrderBook = "orderbook",
+  Aggregator = "aggregator",
+  Analytics = "analytics",
+  Launchpad = "launchpad",
+  Perps = "perpetuals",
+  Options = "options",
+  CLMMs = "concentrated-liquidity",
+  Staking = "staking",
+  Synthetics = "synthetics",
+  Margin = "margin",
+  Lending = "lending",
 }
 
 export enum LendingProtocolType {
-  MarginFi = 'marginfi',
-  Kamino = 'kamino',
-  Mercurial = 'mercurial',
-  Jet = 'jet',
-  Bolt = 'bolt'
+  MarginFi = "marginfi",
+  Kamino = "kamino",
+  Mercurial = "mercurial",
+  Jet = "jet",
+  Bolt = "bolt",
 }
 
+/**
+ * Interface for DEX information
+ */
 export interface DexInfo {
   id: string;
   name: string;
   url: string;
   active: boolean;
+  category: DexCategory;
   features: string[];
   fees: {
     maker: number;
     taker: number;
   };
-}
-
-// Pool pair information
-export interface PoolInfo {
-  id: string;                  // Unique identifier
-  address: string;             // On-chain address
-  dexId: string;               // DEX identifier
-  baseToken: string;           // Base token address/identifier
-  quoteToken: string;          // Quote token address/identifier
-  baseTokenSymbol: string;     // Base token symbol
-  quoteTokenSymbol: string;    // Quote token symbol
-  category: DexCategory;       // Pool category
-  tvl?: number;                // Total Value Locked in USD
-  volume24h?: number;          // 24h trading volume
-  apr?: number;                // Annual Percentage Rate if applicable
-  fee?: number;                // Fee percentage
-  feeTier?: string;            // Fee tier identifier
-  tickSpacing?: number;        // Tick spacing for CLMM pools
-  lastUpdate?: number;         // Last update timestamp
-  price?: number;              // Current price of baseToken in quoteToken
-  depth?: number;              // Market depth
-  priority?: number;           // Priority for arbitrage (internal scoring)
-}
-
-// Enhanced DEX info with pools
-export interface EnhancedDexInfo extends DexInfo {
-  category: DexCategory;
-  pools?: PoolInfo[];
-  programId?: string;  // Contract address for the DEX protocol
-  apiEndpoint?: string;  // API endpoint for direct integration
-  rateLimit?: number;  // API rate limit in requests per second
+  apiEndpoint?: string;
+  rateLimit?: number;
+  programId?: string;
 }
 
 // List of supported DEXes
-const dexes: EnhancedDexInfo[] = [
+const dexes: DexInfo[] = [
   {
     id: 'jupiter',
     name: 'Jupiter',
@@ -107,7 +83,7 @@ const dexes: EnhancedDexInfo[] = [
       taker: 0.0003
     },
     apiEndpoint: 'https://quote-api.jup.ag/v6',
-    rateLimit: 1  // 1 request per second as per your specification
+    rateLimit: 1 // 1 request per second as per your specification
   },
   {
     id: 'openbook',

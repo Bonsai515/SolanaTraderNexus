@@ -1,71 +1,71 @@
 {
   "SOL": {
     "symbol": "SOL",
-    "priceUsd": 175.8,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 174.84,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -2.59050402401832
+    "change24h": -3.5562577123589296
   },
   "BONK": {
     "symbol": "BONK",
-    "priceUsd": 0.00002207,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 0.0000221,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -7.784995332785963
+    "change24h": -8.384847659375728
   },
   "JUP": {
     "symbol": "JUP",
-    "priceUsd": 0.00067444,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 0.00075598,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -3.667218504118698
+    "change24h": 8.143782612969355
   },
   "USDC": {
     "symbol": "USDC",
-    "priceUsd": 0.999948,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 0.999903,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -0.005169763578622058
+    "change24h": -0.010218834638292196
   },
   "USDT": {
     "symbol": "USDT",
     "priceUsd": 1,
-    "lastUpdated": 1747277046140,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": 0.017945254490515063
+    "change24h": 0.018171100940578673
   },
   "ETH": {
     "symbol": "ETH",
-    "priceUsd": 2588.22,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 2587.21,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -2.3713167966090776
+    "change24h": -2.7399627576892613
   },
   "WIF": {
     "symbol": "WIF",
     "priceUsd": 0.645,
-    "lastUpdated": 1747265203988,
+    "lastUpdated": 1747279493681,
     "source": "Jupiter"
   },
   "MEME": {
     "symbol": "MEME",
     "priceUsd": 0.00640246,
-    "lastUpdated": 1747277046140,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
     "change24h": null
   },
   "GUAC": {
     "symbol": "GUAC",
-    "priceUsd": 2.8705e-8,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 2.8673e-8,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": 21.225062035696187
+    "change24h": 20.31767646111349
   },
   "BTC": {
     "symbol": "BTC",
-    "priceUsd": 103042,
-    "lastUpdated": 1747277046140,
+    "priceUsd": 102895,
+    "lastUpdated": 1747284435948,
     "source": "CoinGecko",
-    "change24h": -0.6187637135103922
+    "change24h": -0.7668120989877708
   }
 }

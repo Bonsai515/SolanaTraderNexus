@@ -1,29 +1,19 @@
 /**
  * Helius API Integration for Solana Blockchain
- * 
+ *
  * This module provides direct integration with Helius API for enhanced
  * Solana blockchain functionality including NFT data, token data,
  * and transaction history with DAS API support.
  */
 
 import axios from 'axios';
-import * as logger from '../logger';
-import { Connection, PublicKey, VersionedTransaction, Transaction } from '@solana/web3.js';
+import { logger } from '../logger';
+import { Connection, PublicKey, Transaction, Keypair, SendOptions, Commitment } from '@solana/web3.js';
+import { getSolanaConnection } from './ensureRpcConnection';
 
-// Interfaces for Helius API responses
-export interface TokenData {
-  mint: string;
-  name: string;
-  symbol: string;
-  imageUri: string;
-  metadata: any;
-  tokenAmount: {
-    amount: string;
-    decimals: number;
-    uiAmount: number;
-  };
-}
-
+/**
+ * Token balance interface
+ */
 export interface TokenBalance {
   mint: string;
   address: string;
@@ -35,76 +25,67 @@ export interface TokenBalance {
   usdValue?: number;
 }
 
-export interface EnrichedTransaction {
-  signature: string;
-  type: string;
-  timestamp: number;
-  fee: number;
-  status: 'success' | 'failed';
-  instructions: any[];
-  tokenTransfers: any[];
-  nativeTransfers: any[];
+/**
+ * Transaction status interface
+ */
+export interface TransactionStatus {
+  status: 'confirmed' | 'finalized' | 'processing' | 'processed' | 'failed' | 'not_found' | 'error';
+  confirmations: number;
 }
 
+/**
+ * Transaction execution options
+ */
+export interface TransactionExecutionOptions {
+  skipPreflight?: boolean;
+  preflightCommitment?: Commitment;
+  maxRetries?: number;
+  useOptimalFees?: boolean;
+  feeMultiplier?: number;
+}
+
+/**
+ * Helius API Integration Class
+ */
 export class HeliusApiIntegration {
-  private apiKey: string | undefined;
   private baseUrl: string = 'https://api.helius.xyz/v0';
   private connection: Connection | null = null;
   private initialized: boolean = false;
+  private apiKey: string | null;
 
   constructor() {
-    this.apiKey = process.env.HELIUS_API_KEY;
-    
-    if (!this.apiKey) {
-      logger.warn('Helius API key not found in environment variables');
-    } else {
-      // Initialize Solana connection with Helius endpoint
-      this.connection = new Connection(
-        `https://mainnet.helius-rpc.com/?api-key=${this.apiKey}`,
-        'confirmed'
-      );
-      this.initialized = true;
-      logger.info('Helius API integration initialized');
-    }
+    this.apiKey = process.env.HELIUS_API_KEY || null;
   }
-  
+
   /**
    * Initialize the Helius API integration
    * @param apiKey Optional API key, uses environment variable if not provided
    * @returns Boolean indicating if initialization was successful
    */
   public async initialize(apiKey?: string): Promise<boolean> {
-    if (this.initialized) {
-      return true;
-    }
-    
-    if (apiKey) {
-      this.apiKey = apiKey;
-    } else if (!this.apiKey && process.env.HELIUS_API_KEY) {
-      this.apiKey = process.env.HELIUS_API_KEY;
-    }
-    
-    if (!this.apiKey) {
-      logger.warn('Helius API key not found, cannot initialize');
-      return false;
-    }
-    
     try {
-      // Initialize Solana connection with Helius endpoint
-      this.connection = new Connection(
-        `https://mainnet.helius-rpc.com/?api-key=${this.apiKey}`,
-        'confirmed'
-      );
-      
-      // Test connection with a simple call
-      const version = await this.connection.getVersion();
-      logger.info(`Connected to Solana cluster version: ${version['solana-core']}`);
-      
+      // Set API key if provided, otherwise use environment variable
+      if (apiKey) {
+        this.apiKey = apiKey;
+      }
+
+      if (!this.apiKey) {
+        logger.warn("Helius API integration initialized without API key, some features will be limited");
+      }
+
+      // Initialize Solana connection
+      this.connection = getSolanaConnection();
+
+      // Test the API connection
+      if (this.apiKey) {
+        await this.getEnhancedAccountInfo("11111111111111111111111111111111");
+      }
+
       this.initialized = true;
-      logger.info('Helius API integration initialized successfully');
+      logger.info("Helius API integration initialized successfully");
       return true;
-    } catch (error: any) {
-      logger.error('Failed to initialize Helius API integration:', error.message);
+    } catch (error) {
+      logger.error("Failed to initialize Helius API integration:", error);
       this.initialized = false;
       return false;
     }
@@ -114,7 +95,7 @@ export class HeliusApiIntegration {
    * Check if the integration is initialized
    */
   public isInitialized(): boolean {
-    return this.initialized && !!this.apiKey;
+    return this.initialized;
   }
 
   /**
@@ -128,20 +109,17 @@ export class HeliusApiIntegration {
    * Get enhanced account information with token holdings
    */
   public async getEnhancedAccountInfo(address: string): Promise<any> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for enhanced account info');
+    }
+
     try {
-      if (!this.apiKey) {
-        throw new Error('Helius API key not configured');
-      }
-
-      const response = await axios.get(`${this.baseUrl}/addresses/${address}/balances`, {
-        params: {
-          'api-key': this.apiKey
-        }
-      });
-
+      const response = await axios.get(
+        `${this.baseUrl}/addresses/${address}/balances?api-key=${this.apiKey}`
+      );
       return response.data;
-    } catch (error: any) {
-      logger.error('Failed to get enhanced account info from Helius:', error.message);
+    } catch (error) {
+      logger.error(`Error getting enhanced account info for ${address}:`, error);
       throw error;
     }
   }
@@ -151,33 +129,51 @@ export class HeliusApiIntegration {
    */
   public async getTokenBalances(address: string): Promise<TokenBalance[]> {
     try {
-      if (!this.apiKey) {
-        throw new Error('Helius API key not configured');
-      }
+      if (this.apiKey) {
+        // Use Helius API for comprehensive token data including prices
+        const response = await axios.get(
+          `${this.baseUrl}/addresses/${address}/balances?api-key=${this.apiKey}`
+        );
 
-      const response = await axios.get(`${this.baseUrl}/addresses/${address}/balances`, {
-        params: {
-          'api-key': this.apiKey
+        if (response.data && response.data.tokens) {
+          return response.data.tokens.map((token: any) => ({
+            mint: token.mint,
+            address: token.address,
+            symbol: token.symbol || 'UNKNOWN',
+            name: token.name || 'Unknown Token',
+            amount: token.amount,
+            decimals: token.decimals,
+            uiAmount: token.amount / Math.pow(10, token.decimals),
+            usdValue: token.price ? token.amount * token.price / Math.pow(10, token.decimals) : undefined
+          }));
         }
-      });
+        return [];
+      } else {
+        // Fallback to regular connection for token accounts
+        const pubkey = new PublicKey(address);
+        if (!this.connection) throw new Error('Connection not initialized');
+        
+        const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
+          pubkey,
+          { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
+        );
 
-      // Process token balances
-      if (response.data && response.data.tokens) {
-        return response.data.tokens.map((token: any) => ({
-          mint: token.mint,
-          address: address,
-          symbol: token.symbol || 'UNKNOWN',
-          name: token.name || 'Unknown Token',
-          amount: token.amount,
-          decimals: token.decimals,
-          uiAmount: token.uiAmount || (token.amount / Math.pow(10, token.decimals)),
-          usdValue: token.price ? token.uiAmount * token.price : undefined
-        }));
+        return tokenAccounts.value.map(account => {
+          const data = account.account.data.parsed.info;
+          return {
+            mint: data.mint,
+            address: account.pubkey.toString(),
+            symbol: '', // Not available without additional API calls
+            name: '',   // Not available without additional API calls
+            amount: parseInt(data.tokenAmount.amount),
+            decimals: data.tokenAmount.decimals,
+            uiAmount: parseFloat(data.tokenAmount.uiAmount),
+            usdValue: undefined
+          };
+        });
       }
-
-      return [];
-    } catch (error: any) {
-      logger.error('Failed to get token balances from Helius:', error.message);
+    } catch (error) {
+      logger.error(`Error getting token balances for ${address}:`, error);
       return [];
     }
   }
@@ -185,28 +181,21 @@ export class HeliusApiIntegration {
   /**
    * Get enriched transaction history for an account
    */
-  public async getEnrichedTransactions(address: string, limit: number = 10): Promise<EnrichedTransaction[]> {
-    try {
-      if (!this.apiKey) {
-        throw new Error('Helius API key not configured');
-      }
+  public async getEnrichedTransactions(address: string, limit: number = 10): Promise<any[]> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for enriched transactions');
+    }
 
-      const response = await axios.post(`${this.baseUrl}/addresses/${address}/transactions`, 
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/addresses/${address}/transactions?api-key=${this.apiKey}`,
         {
-          options: {
-            limit: limit
-          }
-        },
-        {
-          params: {
-            'api-key': this.apiKey
-          }
+          limit
         }
       );
-
-      return response.data || [];
-    } catch (error: any) {
-      logger.error('Failed to get enriched transactions from Helius:', error.message);
+      return response.data;
+    } catch (error) {
+      logger.error(`Error getting enriched transactions for ${address}:`, error);
       return [];
     }
   }
@@ -214,26 +203,18 @@ export class HeliusApiIntegration {
   /**
    * Get token metadata for a mint address
    */
-  public async getTokenMetadata(mintAddress: string): Promise<TokenData | null> {
+  public async getTokenMetadata(mintAddress: string): Promise<any | null> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for token metadata');
+    }
+
     try {
-      if (!this.apiKey) {
-        throw new Error('Helius API key not configured');
-      }
-
-      const response = await axios.get(`${this.baseUrl}/tokens`, {
-        params: {
-          'api-key': this.apiKey,
-          'mint': mintAddress
-        }
-      });
-
-      if (response.data && response.data.length > 0) {
-        return response.data[0];
-      }
-
-      return null;
-    } catch (error: any) {
-      logger.error('Failed to get token metadata from Helius:', error.message);
+      const response = await axios.get(
+        `${this.baseUrl}/tokens/${mintAddress}?api-key=${this.apiKey}`
+      );
+      return response.data;
+    } catch (error) {
+      logger.error(`Error getting token metadata for ${mintAddress}:`, error);
       return null;
     }
   }
@@ -241,12 +222,28 @@ export class HeliusApiIntegration {
   /**
    * Check transaction status using Helius enhanced API
    */
-  public async checkTransactionStatus(signature: string): Promise<{ status: string, confirmations: number }> {
+  public async checkTransactionStatus(signature: string): Promise<TransactionStatus> {
     try {
-      if (!this.connection) {
-        throw new Error('Helius connection not initialized');
+      if (this.apiKey) {
+        // Use Helius API for enhanced status information
+        const response = await axios.get(
+          `${this.baseUrl}/transactions/${signature}?api-key=${this.apiKey}`
+        );
+
+        if (response.data) {
+          if (response.data.confirmationStatus === 'finalized') {
+            return { status: 'finalized', confirmations: 32 }; // Max confirmations when finalized
+          } else if (response.data.confirmationStatus === 'confirmed') {
+            return { status: 'confirmed', confirmations: response.data.confirmations || 1 };
+          } else if (response.data.confirmationStatus === 'processed') {
+            return { status: 'processed', confirmations: 0 };
+          }
+        }
       }
 
+      // Fallback to regular connection
+      if (!this.connection) throw new Error('Connection not initialized');
+      
       const status = await this.connection.getSignatureStatus(signature, {
         searchTransactionHistory: true
       });
@@ -255,20 +252,20 @@ export class HeliusApiIntegration {
         return { status: 'not_found', confirmations: 0 };
       }
 
-      const confirmations = status.value.confirmations || 0;
-      let statusText = 'processing';
-
       if (status.value.err) {
-        statusText = 'failed';
-      } else if (confirmations >= 32) {
-        statusText = 'finalized';
-      } else if (confirmations > 0) {
-        statusText = 'confirmed';
+        return { status: 'failed', confirmations: 0 };
       }
 
-      return { status: statusText, confirmations };
-    } catch (error: any) {
-      logger.error('Failed to check transaction status with Helius:', error.message);
+      if (status.value.confirmationStatus === 'finalized') {
+        return { status: 'finalized', confirmations: 32 };
+      }
+
+      return {
+        status: status.value.confirmationStatus || 'processing',
+        confirmations: status.value.confirmations || 0
+      };
+    } catch (error) {
+      logger.error(`Error checking transaction status for ${signature}:`, error);
       return { status: 'error', confirmations: 0 };
     }
   }
@@ -277,98 +274,233 @@ export class HeliusApiIntegration {
    * Execute a transaction with priority fee optimization
    */
   public async executeTransaction(
-    transaction: Transaction | VersionedTransaction,
-    signers: any[],
-    confirmLevel: 'processed' | 'confirmed' | 'finalized' = 'confirmed'
-  ): Promise<{ signature: string, success: boolean }> {
+    transaction: Transaction, 
+    signer: Keypair | Keypair[],
+    options?: TransactionExecutionOptions
+  ): Promise<string> {
+    if (!this.connection) throw new Error('Connection not initialized');
+
     try {
-      if (!this.connection) {
-        throw new Error('Helius connection not initialized');
-      }
+      const signers = Array.isArray(signer) ? signer : [signer];
+      
+      // Get latest blockhash
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = signers[0].publicKey;
 
-      // Calculate optimal priority fee based on recent transactions
-      const priorityFee = await this.calculateOptimalPriorityFee();
-      logger.info(`Using optimal priority fee: ${priorityFee} microLamports`);
+      // Sign transaction
+      transaction.sign(...signers);
 
-      // Add priority fee to transaction if not a versioned transaction
-      if (transaction instanceof Transaction) {
-        transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
-        
-        // Set priority fee if needed and supported
-        if (priorityFee > 0) {
-          // Here we would add priority fee if implementing prioritized transactions
-        }
-      }
+      // Determine send options
+      const sendOptions: SendOptions = {
+        skipPreflight: options?.skipPreflight || false,
+        preflightCommitment: (options?.preflightCommitment as Commitment) || 'confirmed',
+        maxRetries: options?.maxRetries || 3
+      };
 
       // Send transaction
-      let signature;
-      if (transaction instanceof Transaction) {
-        signature = await this.connection.sendTransaction(transaction, signers);
-      } else {
-        signature = await this.connection.sendTransaction(transaction);
-      }
+      const signature = await this.connection.sendRawTransaction(
+        transaction.serialize(), 
+        sendOptions
+      );
 
-      // Wait for confirmation
-      const confirmation = await this.connection.confirmTransaction({
-        signature,
-        blockhash: (await this.connection.getLatestBlockhash()).blockhash,
-        lastValidBlockHeight: (await this.connection.getLatestBlockhash()).lastValidBlockHeight
-      }, confirmLevel);
+      // Confirm transaction
+      await this.connection.confirmTransaction({
+        blockhash,
+        lastValidBlockHeight,
+        signature
+      });
 
-      return {
-        signature,
-        success: !confirmation.value.err
-      };
-    } catch (error: any) {
-      logger.error('Failed to execute transaction with Helius:', error.message);
-      return {
-        signature: '',
-        success: false
-      };
+      return signature;
+    } catch (error) {
+      logger.error('Error executing transaction:', error);
+      throw error;
     }
   }
 
   /**
-   * Calculate optimal priority fee based on recent transactions
+   * Calculate optimal priority fee based on network congestion
    */
   private async calculateOptimalPriorityFee(): Promise<number> {
     try {
-      if (!this.connection) {
-        return 0;
+      // Use Helius API for network status if available
+      if (this.apiKey) {
+        const response = await axios.get(
+          `${this.baseUrl}/network-status?api-key=${this.apiKey}`
+        );
+        
+        if (response.data && response.data.priorityFee) {
+          return response.data.priorityFee;
+        }
       }
 
-      // Get recent transactions
-      const recentBlockhash = await this.connection.getLatestBlockhash();
-      const block = await this.connection.getBlock(recentBlockhash.lastValidBlockHeight, {
-        maxSupportedTransactionVersion: 0
-      });
-
-      if (!block || !block.transactions || block.transactions.length === 0) {
-        return 10000; // Default 10,000 microLamports if no data
+      // Fallback priority fee calculation
+      if (!this.connection) throw new Error('Connection not initialized');
+      
+      const perfSamples = await this.connection.getRecentPerformanceSamples(5);
+      if (perfSamples && perfSamples.length > 0) {
+        // Calculate average TPS
+        const avgTps = perfSamples.reduce((sum, sample) => 
+          sum + sample.numTransactions / sample.samplePeriodSecs, 0) / perfSamples.length;
+        
+        // Scale fee based on TPS
+        if (avgTps > 2500) return 1000000; // High congestion: 0.001 SOL per CU
+        if (avgTps > 1500) return 500000;  // Medium-high: 0.0005 SOL per CU
+        if (avgTps > 500) return 100000;   // Medium: 0.0001 SOL per CU
+        return 10000;                      // Low: 0.00001 SOL per CU
       }
+      
+      return 50000; // Default priority fee
+    } catch (error) {
+      logger.error('Error calculating optimal priority fee:', error);
+      return 50000; // Default priority fee on error
+    }
+  }
 
-      // Sample fee data from transactions
-      const fees = block.transactions
-        .filter(tx => tx.meta && tx.meta.fee)
-        .map(tx => tx.meta!.fee);
+  /**
+   * Get name service domains for an address
+   */
+  public async getDomainsForAddress(address: string): Promise<string[]> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for name service lookups');
+    }
 
-      if (fees.length === 0) {
-        return 10000;
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/addresses/${address}/domains?api-key=${this.apiKey}`
+      );
+      
+      if (response.data && Array.isArray(response.data)) {
+        return response.data.map((domain: any) => domain.name);
       }
+      return [];
+    } catch (error) {
+      logger.error(`Error getting domains for address ${address}:`, error);
+      return [];
+    }
+  }
 
-      // Calculate percentiles
-      fees.sort((a, b) => a - b);
-      const medianFee = fees[Math.floor(fees.length / 2)];
-      const p75Fee = fees[Math.floor(fees.length * 0.75)];
+  /**
+   * Resolve a domain to an address
+   */
+  public async resolveDomainToAddress(domain: string): Promise<string | null> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for name service lookups');
+    }
 
-      // Use the 75th percentile for faster confirmation
-      return Math.max(5000, p75Fee);
-    } catch (error: any) {
-      logger.warn('Failed to calculate optimal priority fee:', error.message);
-      return 10000; // Default value
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/domains/${domain}/address?api-key=${this.apiKey}`
+      );
+      
+      if (response.data && response.data.address) {
+        return response.data.address;
+      }
+      return null;
+    } catch (error) {
+      logger.error(`Error resolving domain ${domain}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get detailed information about an NFT
+   */
+  public async getNftDetails(mintAddress: string): Promise<any | null> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for NFT details');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/nfts/${mintAddress}?api-key=${this.apiKey}`
+      );
+      return response.data;
+    } catch (error) {
+      logger.error(`Error getting NFT details for ${mintAddress}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get compressed NFTs for an account using DAS
+   */
+  public async getCompressedNfts(address: string): Promise<any[]> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for compressed NFT lookups');
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/addresses/${address}/compressed-nfts?api-key=${this.apiKey}`,
+        {}
+      );
+      
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
+    } catch (error) {
+      logger.error(`Error getting compressed NFTs for ${address}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get NFT events for a collection
+   */
+  public async getNftEventsForCollection(firstCreator: string): Promise<any[]> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for NFT events');
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/nft-events?api-key=${this.apiKey}`,
+        {
+          query: {
+            firstVerifiedCreators: [firstCreator]
+          },
+          options: {
+            limit: 100
+          }
+        }
+      );
+      
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
+    } catch (error) {
+      logger.error(`Error getting NFT events for collection ${firstCreator}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get Mint List for a collection
+   */
+  public async getCollectionMints(firstCreator: string): Promise<string[]> {
+    if (!this.apiKey) {
+      throw new Error('Helius API key is required for collection mints');
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/addresses/${firstCreator}/mints?api-key=${this.apiKey}`,
+        {}
+      );
+      
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
+    } catch (error) {
+      logger.error(`Error getting collection mints for ${firstCreator}:`, error);
+      return [];
     }
   }
 }
 
-// Create singleton instance
+// Export singleton instance
 export const heliusApiIntegration = new HeliusApiIntegration();

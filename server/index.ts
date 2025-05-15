@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { registerRoutes } from './routes';
+import { initializeTransformers } from './transformers';
+import { startAgentSystem } from './agents';
 
 const app = express();
 
@@ -96,22 +98,23 @@ app.get('/api/agents', (req, res) => {
   res.json(agents);
 });
 
+import { v4 as uuidv4 } from 'uuid';
+
 app.get('/api/executions', (req, res) => {
-  const { v4: uuidv4 } = require('uuid');
-  const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
 
   // Return sample executions
   const executions = Array.from({ length: limit }, (_, i) => ({
     id: uuidv4(),
     agentId: i % 2 === 0 ? 'hyperion-1' : 'quantum-omega-1',
     success: Math.random() > 0.2,
-    profit: (Math.random() * 2 - 0.5).toFixed(4) * 1,
+    profit: parseFloat((Math.random() * 2 - 0.5).toFixed(4)),
     timestamp: new Date(Date.now() - i * 3600000).toISOString(),
     strategy: i % 2 === 0 ? 'flash_arb_v2' : 'mev_sniper_v1',
     metrics: {
       executionTime: Math.round(Math.random() * 500),
       gasUsed: Math.round(Math.random() * 200000),
-      slippage: (Math.random() * 0.01).toFixed(4) * 1
+      slippage: parseFloat((Math.random() * 0.01).toFixed(4))
     },
     signature: `5${uuidv4().replace(/-/g, '')}`,
     error: Math.random() > 0.8 ? 'Execution reverted: insufficient liquidity' : undefined
@@ -123,8 +126,13 @@ app.get('/api/executions', (req, res) => {
 // WebSocket support is handled in routes.ts
 
 // Initialize SignalHub as a global object for API access
-const { signalHub } = require('./signalHub');
+import { signalHub } from './signalHub';
 // Create global signalHub instance if it doesn't exist
+declare global {
+  // Using the same type as the imported signalHub
+  var signalHub: typeof signalHub;
+}
+
 if (!global.signalHub) {
   global.signalHub = signalHub;
   console.log('Initialized SignalHub for global access to trading signals');
@@ -137,7 +145,7 @@ import { profitCapture } from './lib/profitCapture';
 import { connectToRustTransformers } from './connect-transformer-rust';
 import { verifySolscanTransaction, verifyWalletBalance } from './lib/verification';
 import { resetTransactionLogs } from './lib/transactionLogs';
-const { awsServices } = require('./aws-services');
+import { awsServices } from './aws-services';
 
 // System wallet for all trading operations
 const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
@@ -186,8 +194,10 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Initialize profit capture system
     console.log('Initializing profit capture mechanism...');
-    profitCapture.loadProfitData();
-    profitCapture.startAutomaticCapture(30); // Capture profits every 30 minutes
+    // profitCapture.initialize() loads profit data internally
+    await profitCapture.initialize(solanaConnection.rpcEndpoint);
+    profitCapture.setCaptureInterval(30); // Capture profits every 30 minutes
+    profitCapture.startAutomaticCapture();
     console.log('✅ Profit capture system activated with automatic collection');
     
     // Connect to Rust transformer binaries
@@ -244,14 +254,12 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
       
       // Initialize the transformers (Security, CrossChain, MemeCortex)
-      const { initializeTransformers } = require('./transformers');
       try {
         const transformersInitialized = await initializeTransformers();
         if (transformersInitialized) {
           console.log('✅ Successfully initialized all transformers with neural-quantum entanglement');
           
           // Initialize and activate the trading agents
-          const { startAgentSystem } = require('./agents');
           try {
             const agentSuccess = await startAgentSystem();
             if (agentSuccess) {
@@ -261,13 +269,13 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
             } else {
               console.error('❌ Failed to initialize AI trading agents');
             }
-          } catch (agentError) {
+          } catch (agentError: any) {
             console.error('❌ Error initializing AI trading agents:', agentError.message);
           }
         } else {
           console.error('❌ Failed to initialize transformers');
         }
-      } catch (transformerError) {
+      } catch (transformerError: any) {
         console.error('❌ Error initializing transformers:', transformerError.message);
       }
     } else {
@@ -285,7 +293,7 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Listen on port 5000 for production deployment
     const port = process.env.PORT || 5000;
-    appServer.listen(port, '0.0.0.0', () => {
+    appServer.listen(port, () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
     });
