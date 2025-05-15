@@ -2,6 +2,22 @@
 
 use std::collections::HashMap;
 
+// Transaction Engine - main engine for processing transactions
+pub struct TransactionEngine {
+    // Engine fields would go here
+}
+
+impl TransactionEngine {
+    // Engine implementation
+    pub fn new() -> Self {
+        TransactionEngine {}
+    }
+    
+    pub fn execute_transaction(&self, transaction: &Transaction) -> Result<TransactionResult, String> {
+        transaction.execute()
+    }
+}
+
 pub struct Transaction {
     from_token: String,
     to_token: String,
