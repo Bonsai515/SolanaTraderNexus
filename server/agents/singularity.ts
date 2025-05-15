@@ -9,7 +9,7 @@
 
 import * as web3 from '@solana/web3.js';
 import logger from '../logger';
-import * as nexusEngine from '../nexus-transaction-engine';
+import { getNexusEngine, EnhancedTransactionEngine } from '../nexus-transaction-engine';
 import { priceFeedCache } from '../priceFeedCache';
 import securityConnector from '../security-connector';
 import { crossChainTransformer } from '../crosschain-connector';
@@ -134,11 +134,16 @@ class SingularityAgent {
       this.profitWallet = profitWallet;
       
       // Register wallets with the Nexus engine
-      nexusEngine.registerWallet(sourceWallet);
-      if (targetWallet !== sourceWallet) {
-        nexusEngine.registerWallet(targetWallet);
+      try {
+        const engine = getNexusEngine();
+        engine.registerWallet(sourceWallet);
+        if (targetWallet !== sourceWallet) {
+          engine.registerWallet(targetWallet);
+        }
+        engine.registerWallet(profitWallet);
+      } catch (err) {
+        logger.warn(`Failed to register wallets: ${err.message}. Will continue without wallet registration.`);
       }
-      nexusEngine.registerWallet(profitWallet);
       
       // Start opportunity scanning
       this.startOpportunityScan();
@@ -435,7 +440,8 @@ class SingularityAgent {
   private async executeCrossChainTransaction(tx: CrossChainTransaction): Promise<void> {
     try {
       // Phase 1: Execute source chain transaction
-      const sourceResult = await nexusEngine.executeSwap({
+      const engine = getNexusEngine();
+      const sourceResult = await engine.executeSwap({
         fromToken: 'USDC', // Start with USDC
         toToken: tx.sourceToken,
         amount: tx.sourceAmount,
@@ -466,7 +472,7 @@ class SingularityAgent {
       // Phase 3: Execute target chain transaction
       const targetWallet = this.targetWallet || this.sourceWallet;
       
-      const targetResult = await nexusEngine.executeSwap({
+      const targetResult = await engine.executeSwap({
         fromToken: tx.targetToken,
         toToken: 'USDC', // End with USDC
         amount: sourceResult.outputAmount || 0,
