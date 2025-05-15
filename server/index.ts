@@ -7,13 +7,27 @@ const app = express();
 // Middleware for parsing JSON bodies
 app.use(express.json());
 
+// Explicitly set CORS headers to ensure all clients can access
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+});
+
 // Serve static files (CSS, JS, images)
 app.use(express.static(path.join(__dirname, '..')));
 
-// Serve our standalone HTML file at the root
+// Handle all routes that should be served by the React app
 app.get('/', (req, res) => {
   console.log('Serving index.html from root path');
   res.sendFile(path.join(__dirname, '../index.html'));
+});
+
+// Add specific route for health check with CORS headers
+app.get('/health', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.json({ status: 'ok', message: 'Solana Trading Platform is running', timestamp: new Date().toISOString() });
 });
 
 // Special endpoints for testing

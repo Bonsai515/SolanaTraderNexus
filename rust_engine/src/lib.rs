@@ -8,7 +8,7 @@ pub mod strategy;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use log::{debug, info, warn, error};
+use log::info; // Only using info log level
 
 // Re-export important types 
 pub use transaction::{Transaction, TransactionResult};

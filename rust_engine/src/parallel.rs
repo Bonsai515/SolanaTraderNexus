@@ -2,12 +2,13 @@
 // Utilizes Rayon and Tokio for high-performance parallel execution
 
 use rayon::prelude::*;
+use rayon::iter::IntoParallelRefIterator; // Added to fix compilation error
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinSet;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::time::Duration;
-use log::{debug, info, warn, error};
+use log::{debug, info, error}; // Removed unused 'warn'
 
 use crate::transaction::Transaction;
 
