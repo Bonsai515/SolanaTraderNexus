@@ -92,15 +92,43 @@ export class EnhancedTransactionEngine {
     this.config = config;
     this.useRealFunds = config.useRealFunds;
     
-    // Initialize connection
-    this.connection = new Connection(config.rpcUrl, {
-      commitment: 'confirmed',
-      confirmTransactionInitialTimeout: config.defaultTimeoutMs
-    });
+    // Ensure rpcUrl has proper http prefix
+    let validatedRpcUrl = config.rpcUrl;
+    if (!validatedRpcUrl.startsWith('http')) {
+      validatedRpcUrl = 'https://api.mainnet-beta.solana.com';
+      logger.warn(`[NexusEngine] Invalid RPC URL format, using default: ${validatedRpcUrl}`);
+    }
+    
+    // Initialize connection with validated URL
+    try {
+      this.connection = new Connection(validatedRpcUrl, {
+        commitment: 'confirmed',
+        confirmTransactionInitialTimeout: config.defaultTimeoutMs
+      });
+      logger.info(`[NexusEngine] Connection initialized with ${validatedRpcUrl}`);
+    } catch (error) {
+      logger.error(`[NexusEngine] Error initializing connection: ${error.message}`);
+      // Fallback to default RPC URL
+      this.connection = new Connection('https://api.mainnet-beta.solana.com', {
+        commitment: 'confirmed',
+        confirmTransactionInitialTimeout: config.defaultTimeoutMs
+      });
+      logger.info(`[NexusEngine] Using fallback RPC URL: https://api.mainnet-beta.solana.com`);
+    }
     
     // Initialize websocket connection if URL provided
     if (config.websocketUrl) {
-      this.wsConnection = new Connection(config.websocketUrl, 'confirmed');
+      try {
+        let validatedWsUrl = config.websocketUrl;
+        if (!validatedWsUrl.startsWith('ws')) {
+          validatedWsUrl = 'wss://api.mainnet-beta.solana.com';
+          logger.warn(`[NexusEngine] Invalid WebSocket URL format, using default: ${validatedWsUrl}`);
+        }
+        this.wsConnection = new Connection(validatedWsUrl, 'confirmed');
+        logger.info(`[NexusEngine] WebSocket connection initialized with ${validatedWsUrl}`);
+      } catch (error) {
+        logger.error(`[NexusEngine] Error initializing WebSocket connection: ${error.message}`);
+      }
     }
     
     // Initialize transaction verifier
@@ -474,25 +502,62 @@ export class EnhancedTransactionEngine {
   }
 }
 
-// Create default engine instance
-export let nexusEngine: EnhancedTransactionEngine | undefined;
+// Make nexusEngine globally accessible
+declare global {
+  var nexusEngine: EnhancedTransactionEngine | undefined;
+}
+
+// Initialize global nexusEngine if it doesn't exist
+if (global.nexusEngine === undefined) {
+  global.nexusEngine = undefined;
+}
 
 /**
  * Initialize transaction engine
  * @param config Engine configuration
  */
 export function initializeNexusEngine(config: NexusEngineConfig): EnhancedTransactionEngine {
-  nexusEngine = new EnhancedTransactionEngine(config);
-  return nexusEngine;
+  const engine = new EnhancedTransactionEngine(config);
+  // Store in both module scope and global scope for maximum compatibility
+  nexusEngine = engine;
+  global.nexusEngine = engine;
+  return engine;
 }
 
 /**
- * Get transaction engine instance
+ * Get transaction engine instance with auto-initialization
  */
 export function getNexusEngine(): EnhancedTransactionEngine {
-  if (!nexusEngine) {
-    throw new Error('Nexus engine not initialized');
+  // Check both module scope and global scope
+  if (!nexusEngine && !global.nexusEngine) {
+    // Auto-initialize with safe defaults if not already initialized
+    try {
+      console.log('[NexusEngine] Engine not initialized, creating with default configuration');
+      const defaultConfig: NexusEngineConfig = {
+        useRealFunds: false, // Default to simulation mode for safety
+        rpcUrl: 'https://api.mainnet-beta.solana.com',
+        websocketUrl: 'wss://api.mainnet-beta.solana.com',
+        defaultExecutionMode: ExecutionMode.SIMULATION,
+        defaultPriority: TransactionPriority.MEDIUM,
+        defaultConfirmations: 1,
+        maxConcurrentTransactions: 5,
+        defaultTimeoutMs: 60000,
+        defaultMaxRetries: 3,
+        maxSlippageBps: 500 // 5% max slippage
+      };
+      
+      const engine = new EnhancedTransactionEngine(defaultConfig);
+      nexusEngine = engine;
+      global.nexusEngine = engine;
+      console.log('[NexusEngine] Auto-initialized with default configuration');
+    } catch (error) {
+      console.error(`[NexusEngine] Failed to auto-initialize: ${error.message}`);
+      throw new Error('Nexus engine not initialized and auto-initialization failed');
+    }
   }
   
-  return nexusEngine;
+  return nexusEngine || global.nexusEngine;
 }
+
+// For compatibility with existing imports - define a variable with the correct type
+export let nexusEngine: EnhancedTransactionEngine | undefined = undefined;
