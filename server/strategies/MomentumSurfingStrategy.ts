@@ -1,656 +1,667 @@
 /**
- * Quantum Momentum Surfing Strategy
+ * Momentum Surfing Strategy
  * 
- * A high-ROI strategy that analyzes token momentum patterns and executes
- * trades at the optimal entry and exit points using quantum-enhanced pattern
- * recognition algorithms.
+ * Advanced implementation of the Quantum Momentum Surfing strategy,
+ * specializing in riding memecoin price waves with AI signal-based timing.
  */
 
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
 import { Mutex } from 'async-mutex';
-import logger from '../logger';
+import { memeCortexEnhanced, SignalDirection, SignalType } from '../transformers/MemeCortexEnhanced';
 
-// Interface for momentum signal
+// Momentum signal source
+enum SignalSource {
+  MEME_CORTEX = 'MEME_CORTEX',
+  PERPLEXITY_AI = 'PERPLEXITY_AI',
+  SENTIMENT_ANALYSIS = 'SENTIMENT_ANALYSIS',
+  SOCIAL_VOLUME = 'SOCIAL_VOLUME',
+  PRICE_ACTION = 'PRICE_ACTION',
+  COMBINED = 'COMBINED'
+}
+
+// Momentum strength
+enum MomentumStrength {
+  VERY_WEAK = 'VERY_WEAK',
+  WEAK = 'WEAK',
+  MODERATE = 'MODERATE',
+  STRONG = 'STRONG',
+  VERY_STRONG = 'VERY_STRONG'
+}
+
+// Market phase
+enum MarketPhase {
+  ACCUMULATION = 'ACCUMULATION',
+  MARKUP = 'MARKUP',
+  DISTRIBUTION = 'DISTRIBUTION',
+  MARKDOWN = 'MARKDOWN',
+  CONSOLIDATION = 'CONSOLIDATION'
+}
+
+// Momentum signal
 interface MomentumSignal {
-  token: string;
-  direction: 'BUY' | 'SELL' | 'HOLD';
-  confidence: number; // 0-1 scale
-  timestamp: number;
-  strength: number; // 0-100 scale
-  timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
-  expectedPriceMovement: number; // Percentage
-  entryPrice?: number;
-  targetPrice?: number;
-  stopLossPrice?: number;
-  source: 'quantum' | 'neural' | 'technical' | 'sentiment';
-}
-
-// Price data structure
-interface PriceData {
-  token: string;
-  price: number;
-  timestamp: number;
-  volume24h: number;
-  priceChange1h: number;
-  priceChange24h: number;
-  relativeVolume: number; // Current volume relative to average
-}
-
-// Trade position interface
-interface TradePosition {
   id: string;
   token: string;
-  entryPrice: number;
-  quantity: number;
-  entryTimestamp: number;
-  direction: 'LONG' | 'SHORT';
-  targetPrice: number;
-  stopLossPrice: number;
-  currentProfit: number;
-  currentProfitPercentage: number;
-  status: 'OPEN' | 'CLOSED';
-  closePrice?: number;
-  closeTimestamp?: number;
-  realizedProfit?: number;
-  realizedProfitPercentage?: number;
+  timestamp: number;
+  direction: SignalDirection;
+  strength: MomentumStrength;
+  source: SignalSource;
+  confidence: number;
+  timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+  volumeChange24h: number;
+  priceChange1h: number;
+  priceChange24h: number;
+  socialVolume24h: number;
+  phase: MarketPhase;
+  metadata?: Record<string, any>;
 }
 
-// Momentum indicator configuration
-interface MomentumIndicatorConfig {
-  rsiPeriod: number;
-  rsiOverbought: number;
-  rsiOversold: number;
-  macdFastPeriod: number;
-  macdSlowPeriod: number;
-  macdSignalPeriod: number;
-  atrPeriod: number;
-  atrMultiplier: number;
-  volumeThreshold: number;
+// Trade setup
+interface TradeSetup {
+  id: string;
+  token: string;
+  direction: 'BUY' | 'SELL';
+  entryPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  size: number;
+  riskRewardRatio: number;
+  confidence: number;
+  timestamp: number;
+  expirationTimestamp: number;
+  signals: MomentumSignal[];
+}
+
+// Trade execution
+interface TradeExecution {
+  id: string;
+  setupId: string;
+  token: string;
+  direction: 'BUY' | 'SELL';
+  entryPrice: number;
+  entryTimestamp: number;
+  size: number;
+  status: 'OPEN' | 'CLOSED' | 'STOPPED_OUT' | 'TARGET_REACHED' | 'EXPIRED';
+  exitPrice?: number;
+  exitTimestamp?: number;
+  profit?: number;
+  profitPercentage?: number;
+  signature?: string;
+}
+
+// Strategy configuration
+interface MomentumStrategyConfig {
+  enabled: boolean;
+  maxPositions: number;
+  maxPositionSizeUsd: number;
+  minConfidence: number;
+  preferredTimeframes: string[];
+  minRiskRewardRatio: number;
+  maxDrawdownPercentage: number;
+  takeProfitLevels: number[];
+  stopLossPaddingPercentage: number;
+  useTrailingStops: boolean;
+  trailingStopActivationPercentage: number;
+  trailingStopDistancePercentage: number;
+  signalWeights: Record<SignalSource, number>;
+  autoAdjustPositionSize: boolean;
+  blacklistedTokens: string[];
+  whitelistedTokens: string[];
+  preferMemeCoins: boolean;
 }
 
 /**
- * Implementation of the Quantum Momentum Surfing Strategy
+ * Momentum Surfing Strategy class
  */
-export class MomentumSurfingStrategy {
-  private isRunning: boolean = false;
-  private priceFeed: Record<string, PriceData> = {};
-  private activePositions: TradePosition[] = [];
-  private historicalPositions: TradePosition[] = [];
-  private mutex = new Mutex();
-  private watchedTokens: string[] = ['SOL', 'ETH', 'BTC', 'BONK', 'JUP', 'MEME', 'WIF', 'GUAC'];
-  private config: MomentumIndicatorConfig = {
-    rsiPeriod: 14,
-    rsiOverbought: 70,
-    rsiOversold: 30,
-    macdFastPeriod: 12,
-    macdSlowPeriod: 26,
-    macdSignalPeriod: 9,
-    atrPeriod: 14,
-    atrMultiplier: 2.5,
-    volumeThreshold: 1.5
-  };
-  private historicalData: Record<string, Array<PriceData>> = {};
+export class MomentumSurfingStrategy extends EventEmitter {
+  private config: MomentumStrategyConfig;
+  private memeCortex: typeof memeCortexEnhanced;
+  private active: boolean = false;
+  private executionMutex: Mutex;
+  private signals: Map<string, MomentumSignal[]> = new Map();
+  private tradeSetups: TradeSetup[] = [];
+  private activeTradeExecutions: TradeExecution[] = [];
+  private historicalTradeExecutions: TradeExecution[] = [];
+  private lastSignalProcessingTime: number = 0;
+  private totalProfitUsd: number = 0;
+  private successfulTrades: number = 0;
+  private totalTrades: number = 0;
   
   /**
-   * Constructor initializes the strategy
+   * Constructor
+   * @param memeCortex The MEME Cortex integration
    */
-  constructor() {
-    // Initialize historical data containers for each watched token
-    this.watchedTokens.forEach(token => {
-      this.historicalData[token] = [];
-    });
+  constructor(memeCortex: typeof memeCortexEnhanced) {
+    super();
+    this.memeCortex = memeCortex;
+    this.executionMutex = new Mutex();
     
-    logger.info(`Initialized Quantum Momentum Surfing Strategy with ${this.watchedTokens.length} watched tokens`);
+    // Default configuration
+    this.config = {
+      enabled: true,
+      maxPositions: 5,
+      maxPositionSizeUsd: 1000, // $1,000 maximum position size
+      minConfidence: 0.7, // 70% minimum confidence
+      preferredTimeframes: ['5m', '15m', '1h'],
+      minRiskRewardRatio: 2.0, // Minimum 2:1 reward-to-risk ratio
+      maxDrawdownPercentage: 15, // 15% maximum drawdown
+      takeProfitLevels: [0.25, 0.5, 0.25], // Take profit at 25%, 50%, and 100% of position
+      stopLossPaddingPercentage: 2.5, // Add 2.5% padding to stop loss for volatility
+      useTrailingStops: true,
+      trailingStopActivationPercentage: 10, // Activate trailing stop after 10% profit
+      trailingStopDistancePercentage: 5, // Trail by 5% of current price
+      signalWeights: {
+        [SignalSource.MEME_CORTEX]: 0.35,
+        [SignalSource.PERPLEXITY_AI]: 0.25,
+        [SignalSource.SENTIMENT_ANALYSIS]: 0.15,
+        [SignalSource.SOCIAL_VOLUME]: 0.15,
+        [SignalSource.PRICE_ACTION]: 0.1,
+        [SignalSource.COMBINED]: 0.5
+      },
+      autoAdjustPositionSize: true,
+      blacklistedTokens: [],
+      whitelistedTokens: ['SOL', 'BONK', 'WIF', 'MEME', 'POPCAT', 'GUAC', 'JUP'],
+      preferMemeCoins: true
+    };
+    
+    logger.info('[MomentumStrategy] Initialized with default configuration');
+    
+    // Listen for MEME Cortex signals
+    this.setupSignalListeners();
   }
   
   /**
-   * Start the momentum surfing strategy
+   * Setup signal listeners
    */
-  public async start(): Promise<void> {
-    if (this.isRunning) {
-      logger.warn('Momentum Surfing Strategy is already running');
+  private setupSignalListeners(): void {
+    if (this.memeCortex) {
+      this.memeCortex.on('signal', (signal) => {
+        this.processExternalSignal(signal);
+      });
+      
+      logger.info('[MomentumStrategy] Connected to MEME Cortex signal source');
+    } else {
+      logger.warn('[MomentumStrategy] MEME Cortex not available, signals will be limited');
+    }
+  }
+  
+  /**
+   * Process external trading signal from MEME Cortex
+   * @param signal Trading signal from MEME Cortex
+   */
+  private processExternalSignal(signal: any): void {
+    try {
+      if (!this.active || !this.config.enabled) {
+        return;
+      }
+      
+      // Convert to our internal momentum signal format
+      const momentumSignal: MomentumSignal = {
+        id: signal.id,
+        token: signal.targetToken,
+        timestamp: signal.timestamp,
+        direction: signal.direction,
+        strength: this.convertSignalToStrength(signal.direction, signal.confidence),
+        source: SignalSource.MEME_CORTEX,
+        confidence: signal.confidence / 100, // Convert from percentage to decimal
+        timeframe: this.determineTimeframeFromSignal(signal),
+        volumeChange24h: signal.metadata?.volumeChange24h || 0,
+        priceChange1h: signal.metadata?.priceChange1h || 0,
+        priceChange24h: signal.metadata?.priceChange24h || 0,
+        socialVolume24h: signal.metadata?.socialVolume24h || 0,
+        phase: this.determineMarketPhase(signal),
+        metadata: signal.metadata
+      };
+      
+      // Store the signal
+      this.addSignalToStorage(momentumSignal);
+      
+      // Try to generate a trade setup
+      this.generateTradeSetups(momentumSignal.token);
+      
+      // Update last signal processing time
+      this.lastSignalProcessingTime = Date.now();
+      
+      logger.debug(`[MomentumStrategy] Processed signal for ${momentumSignal.token} with direction ${momentumSignal.direction} and strength ${momentumSignal.strength}`);
+    } catch (error) {
+      logger.error(`[MomentumStrategy] Error processing external signal: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Convert signal direction and confidence to momentum strength
+   * @param direction Signal direction
+   * @param confidence Signal confidence (0-100)
+   */
+  private convertSignalToStrength(direction: SignalDirection, confidence: number): MomentumStrength {
+    // Adjust strength based on confidence
+    const confidenceLevel = confidence / 100; // Convert to decimal
+    
+    if (direction === SignalDirection.BULLISH || direction === SignalDirection.BEARISH) {
+      if (confidenceLevel > 0.9) {
+        return MomentumStrength.VERY_STRONG;
+      } else if (confidenceLevel > 0.7) {
+        return MomentumStrength.STRONG;
+      } else {
+        return MomentumStrength.MODERATE;
+      }
+    } else if (direction === SignalDirection.SLIGHTLY_BULLISH || direction === SignalDirection.SLIGHTLY_BEARISH) {
+      if (confidenceLevel > 0.9) {
+        return MomentumStrength.MODERATE;
+      } else if (confidenceLevel > 0.7) {
+        return MomentumStrength.WEAK;
+      } else {
+        return MomentumStrength.VERY_WEAK;
+      }
+    } else {
+      return MomentumStrength.VERY_WEAK;
+    }
+  }
+  
+  /**
+   * Determine timeframe from signal
+   * @param signal Trading signal
+   */
+  private determineTimeframeFromSignal(signal: any): '1m' | '5m' | '15m' | '1h' | '4h' | '1d' {
+    // Default to 1h if not specified
+    const defaultTimeframe = '1h';
+    
+    if (!signal.metadata || !signal.metadata.timeframe) {
+      return defaultTimeframe;
+    }
+    
+    const timeframe = signal.metadata.timeframe;
+    
+    if (typeof timeframe === 'string') {
+      if (['1m', '5m', '15m', '1h', '4h', '1d'].includes(timeframe)) {
+        return timeframe as any;
+      }
+    }
+    
+    return defaultTimeframe;
+  }
+  
+  /**
+   * Determine market phase from signal
+   * @param signal Trading signal
+   */
+  private determineMarketPhase(signal: any): MarketPhase {
+    if (!signal.metadata) {
+      return MarketPhase.CONSOLIDATION;
+    }
+    
+    // Use market phase if explicitly provided in metadata
+    if (signal.metadata.marketPhase) {
+      return signal.metadata.marketPhase;
+    }
+    
+    // Try to infer from available data
+    const priceChange24h = signal.metadata.priceChange24h || 0;
+    const volumeChange24h = signal.metadata.volumeChange24h || 0;
+    
+    if (priceChange24h > 10 && volumeChange24h > 20) {
+      return MarketPhase.MARKUP;
+    } else if (priceChange24h < -10 && volumeChange24h > 20) {
+      return MarketPhase.MARKDOWN;
+    } else if (Math.abs(priceChange24h) < 5 && volumeChange24h > 30) {
+      return MarketPhase.ACCUMULATION;
+    } else if (Math.abs(priceChange24h) < 5 && volumeChange24h < 0) {
+      return MarketPhase.CONSOLIDATION;
+    } else if (priceChange24h > 5 && volumeChange24h < 0) {
+      return MarketPhase.DISTRIBUTION;
+    }
+    
+    return MarketPhase.CONSOLIDATION;
+  }
+  
+  /**
+   * Add signal to storage
+   * @param signal Momentum signal
+   */
+  private addSignalToStorage(signal: MomentumSignal): void {
+    if (!this.signals.has(signal.token)) {
+      this.signals.set(signal.token, []);
+    }
+    
+    const signals = this.signals.get(signal.token)!;
+    signals.push(signal);
+    
+    // Sort by timestamp (newest first)
+    signals.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Prune old signals (keep only last 24 hours)
+    const cutoffTime = Date.now() - 24 * 60 * 60 * 1000;
+    const prunedSignals = signals.filter(s => s.timestamp >= cutoffTime);
+    
+    this.signals.set(signal.token, prunedSignals);
+  }
+  
+  /**
+   * Generate trade setups for a token
+   * @param token Token symbol
+   */
+  private generateTradeSetups(token: string): void {
+    if (!this.signals.has(token)) {
       return;
     }
     
-    this.isRunning = true;
-    logger.info('Starting Quantum Momentum Surfing Strategy');
+    // Get recent signals for this token
+    const signals = this.signals.get(token)!;
     
-    // Begin the analysis loop
-    this.runAnalysisLoop();
-  }
-  
-  /**
-   * Stop the momentum surfing strategy
-   */
-  public stop(): void {
-    this.isRunning = false;
-    logger.info('Stopped Quantum Momentum Surfing Strategy');
-  }
-  
-  /**
-   * Update price data for a token
-   * @param token Token symbol
-   * @param priceData Latest price data
-   */
-  public updatePriceData(token: string, priceData: PriceData): void {
-    this.priceFeed[token] = priceData;
+    // Need at least 3 signals to generate a setup
+    if (signals.length < 3) {
+      logger.debug(`[MomentumStrategy] Not enough signals for ${token} (${signals.length})`);
+      return;
+    }
     
-    // Also append to historical data
-    if (this.historicalData[token]) {
-      this.historicalData[token].push(priceData);
+    // If this token is blacklisted, skip
+    if (this.config.blacklistedTokens.includes(token)) {
+      logger.debug(`[MomentumStrategy] Token ${token} is blacklisted, skipping`);
+      return;
+    }
+    
+    // If we have a whitelist and this token is not on it, skip
+    if (this.config.whitelistedTokens.length > 0 && !this.config.whitelistedTokens.includes(token)) {
+      logger.debug(`[MomentumStrategy] Token ${token} is not whitelisted, skipping`);
+      return;
+    }
+    
+    // Calculate average signal direction and confidence
+    let bullishCount = 0;
+    let bearishCount = 0;
+    let totalConfidence = 0;
+    
+    // We'll only use signals from the last 2 hours
+    const recentSignals = signals.filter(s => s.timestamp >= Date.now() - 2 * 60 * 60 * 1000);
+    
+    for (const signal of recentSignals) {
+      if (signal.direction === SignalDirection.BULLISH || signal.direction === SignalDirection.SLIGHTLY_BULLISH) {
+        bullishCount++;
+      } else if (signal.direction === SignalDirection.BEARISH || signal.direction === SignalDirection.SLIGHTLY_BEARISH) {
+        bearishCount++;
+      }
       
-      // Keep only last 1000 data points for each token
-      if (this.historicalData[token].length > 1000) {
-        this.historicalData[token] = this.historicalData[token].slice(-1000);
-      }
+      totalConfidence += signal.confidence;
     }
-  }
-  
-  /**
-   * Add tokens to watch
-   * @param tokens Token symbols to add
-   */
-  public addWatchedTokens(tokens: string[]): void {
-    tokens.forEach(token => {
-      if (!this.watchedTokens.includes(token)) {
-        this.watchedTokens.push(token);
-        this.historicalData[token] = [];
-      }
-    });
     
-    logger.info(`Added ${tokens.length} tokens to Momentum Surfing Strategy watchlist`);
-  }
-  
-  /**
-   * Configure momentum indicators
-   * @param config Momentum indicator configuration
-   */
-  public configureIndicators(config: Partial<MomentumIndicatorConfig>): void {
-    this.config = { ...this.config, ...config };
-    logger.info('Updated Momentum Surfing Strategy configuration');
-  }
-  
-  /**
-   * Get all active positions
-   */
-  public getActivePositions(): TradePosition[] {
-    return [...this.activePositions];
-  }
-  
-  /**
-   * Get all historical positions
-   */
-  public getHistoricalPositions(): TradePosition[] {
-    return [...this.historicalPositions];
-  }
-  
-  /**
-   * Get strategy performance metrics
-   */
-  public getPerformanceMetrics(): {
-    totalTrades: number;
-    winningTrades: number;
-    losingTrades: number;
-    winRate: number;
-    averageProfit: number;
-    totalProfit: number;
-    maxDrawdown: number;
-    sharpeRatio: number;
-  } {
-    const closedPositions = this.historicalPositions;
-    const winningTrades = closedPositions.filter(p => (p.realizedProfitPercentage || 0) > 0);
-    const losingTrades = closedPositions.filter(p => (p.realizedProfitPercentage || 0) <= 0);
+    const averageConfidence = totalConfidence / recentSignals.length;
     
-    const totalProfit = closedPositions.reduce((sum, p) => sum + (p.realizedProfit || 0), 0);
-    const profitPercentages = closedPositions.map(p => p.realizedProfitPercentage || 0);
-    
-    // Calculate Sharpe ratio (simplified)
-    const returns = profitPercentages.length > 0 ? profitPercentages : [0];
-    const averageReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-    const stdDev = Math.sqrt(
-      returns.reduce((sum, r) => sum + Math.pow(r - averageReturn, 2), 0) / returns.length
-    ) || 1; // Avoid division by zero
-    
-    // Find max drawdown
-    let maxDrawdown = 0;
-    let peak = 0;
-    let cumulativeReturns = 0;
-    
-    returns.forEach(ret => {
-      cumulativeReturns += ret;
-      peak = Math.max(peak, cumulativeReturns);
-      maxDrawdown = Math.max(maxDrawdown, peak - cumulativeReturns);
-    });
-    
-    return {
-      totalTrades: closedPositions.length,
-      winningTrades: winningTrades.length,
-      losingTrades: losingTrades.length,
-      winRate: closedPositions.length > 0 
-        ? (winningTrades.length / closedPositions.length) * 100 
-        : 0,
-      averageProfit: closedPositions.length > 0 
-        ? totalProfit / closedPositions.length 
-        : 0,
-      totalProfit,
-      maxDrawdown,
-      sharpeRatio: averageReturn / (stdDev || 1) // Avoid division by zero
-    };
-  }
-  
-  /**
-   * Main analysis loop
-   */
-  private async runAnalysisLoop(): Promise<void> {
-    while (this.isRunning) {
-      await this.mutex.acquire();
-      try {
-        // Generate momentum signals for each watched token
-        const signals: MomentumSignal[] = [];
-        
-        for (const token of this.watchedTokens) {
-          // Skip tokens with insufficient data
-          if (!this.priceFeed[token] || !this.historicalData[token] || this.historicalData[token].length < 30) {
-            continue;
-          }
-          
-          // Generate signals using different methods
-          const technicalSignal = this.generateTechnicalMomentumSignal(token);
-          const neuralSignal = this.generateNeuralMomentumSignal(token);
-          const quantumSignal = this.generateQuantumMomentumSignal(token);
-          const sentimentSignal = this.generateSentimentMomentumSignal(token);
-          
-          // Add valid signals to collection
-          if (technicalSignal) signals.push(technicalSignal);
-          if (neuralSignal) signals.push(neuralSignal);
-          if (quantumSignal) signals.push(quantumSignal);
-          if (sentimentSignal) signals.push(sentimentSignal);
-        }
-        
-        // Process the signals to make trading decisions
-        await this.processSignals(signals);
-        
-        // Update and manage existing positions
-        this.updateActivePositions();
-        
-      } catch (error) {
-        logger.error(`Error in Momentum Surfing Strategy analysis: ${error.message}`);
-      } finally {
-        this.mutex.release();
-        
-        // Wait before next analysis cycle
-        await new Promise(resolve => setTimeout(resolve, 60000)); // Run every minute
-      }
+    // If confidence is below threshold, skip
+    if (averageConfidence < this.config.minConfidence) {
+      logger.debug(`[MomentumStrategy] Confidence too low for ${token}: ${averageConfidence.toFixed(2)} < ${this.config.minConfidence}`);
+      return;
     }
-  }
-  
-  /**
-   * Process momentum signals to make trading decisions
-   * @param signals Array of momentum signals
-   */
-  private async processSignals(signals: MomentumSignal[]): Promise<void> {
-    // Filter out low-confidence signals
-    const highConfidenceSignals = signals.filter(signal => signal.confidence > 0.7);
     
-    // Sort by confidence * strength for prioritization
-    highConfidenceSignals.sort((a, b) => 
-      (b.confidence * b.strength) - (a.confidence * a.strength)
+    // Determine trade direction
+    let tradeDirection: 'BUY' | 'SELL' | null = null;
+    
+    if (bullishCount > bearishCount * 2) {
+      tradeDirection = 'BUY';
+    } else if (bearishCount > bullishCount * 2) {
+      tradeDirection = 'SELL';
+    }
+    
+    // If no clear direction, skip
+    if (!tradeDirection) {
+      logger.debug(`[MomentumStrategy] No clear direction for ${token}: ${bullishCount} bullish vs ${bearishCount} bearish`);
+      return;
+    }
+    
+    // Check if we already have an active setup for this token and direction
+    const existingSetup = this.tradeSetups.find(s => 
+      s.token === token && 
+      s.direction === tradeDirection &&
+      s.expirationTimestamp > Date.now()
     );
     
-    if (highConfidenceSignals.length > 0) {
-      logger.info(`Processing ${highConfidenceSignals.length} high-confidence momentum signals`);
-      
-      // Process each signal
-      for (const signal of highConfidenceSignals) {
-        // Check if we already have a position for this token
-        const existingPosition = this.activePositions.find(p => p.token === signal.token);
-        
-        if (signal.direction === 'BUY' && !existingPosition) {
-          // Open a new long position
-          await this.openPosition(signal);
-        } 
-        else if (signal.direction === 'SELL' && existingPosition) {
-          // Close existing position
-          await this.closePosition(existingPosition.id, 'SIGNAL');
-        }
-      }
+    if (existingSetup) {
+      logger.debug(`[MomentumStrategy] Already have a ${tradeDirection} setup for ${token}`);
+      return;
     }
-  }
-  
-  /**
-   * Open a new trading position based on a signal
-   * @param signal The momentum signal
-   */
-  private async openPosition(signal: MomentumSignal): Promise<void> {
-    const currentPrice = this.priceFeed[signal.token]?.price;
-    if (!currentPrice) return;
     
-    // Calculate position size (simplified example)
-    const positionSize = 100; // Fixed position size for simulation
+    // Check if we already have an active trade for this token and direction
+    const existingTrade = this.activeTradeExecutions.find(t => 
+      t.token === token && 
+      t.direction === tradeDirection &&
+      t.status === 'OPEN'
+    );
     
-    // Calculate target and stop loss
-    const targetPrice = signal.targetPrice || currentPrice * (1 + (signal.expectedPriceMovement / 100));
-    const stopLossPrice = signal.stopLossPrice || currentPrice * (1 - (signal.expectedPriceMovement / 4 / 100));
+    if (existingTrade) {
+      logger.debug(`[MomentumStrategy] Already have an active ${tradeDirection} trade for ${token}`);
+      return;
+    }
     
-    // Create new position
-    const position: TradePosition = {
-      id: `pos_${Date.now()}_${signal.token}`,
-      token: signal.token,
-      entryPrice: currentPrice,
-      quantity: positionSize / currentPrice,
-      entryTimestamp: Date.now(),
-      direction: 'LONG',
+    // Simulate price data (in a real implementation, we would get this from the market)
+    const currentPrice = 1.0; // Placeholder value
+    
+    // Calculate entry, target, and stop loss prices
+    let entryPrice = currentPrice;
+    let targetPrice, stopLossPrice;
+    
+    if (tradeDirection === 'BUY') {
+      targetPrice = entryPrice * (1 + 0.15); // Target 15% profit
+      stopLossPrice = entryPrice * (1 - 0.05); // Stop loss at 5% loss
+    } else {
+      targetPrice = entryPrice * (1 - 0.15); // Target 15% profit
+      stopLossPrice = entryPrice * (1 + 0.05); // Stop loss at 5% loss
+    }
+    
+    // Calculate position size
+    const riskAmount = this.calculatePositionSize(token, averageConfidence);
+    
+    // Calculate risk-reward ratio
+    const riskPercentage = Math.abs((stopLossPrice - entryPrice) / entryPrice);
+    const rewardPercentage = Math.abs((targetPrice - entryPrice) / entryPrice);
+    const riskRewardRatio = rewardPercentage / riskPercentage;
+    
+    // If risk-reward ratio is below threshold, skip
+    if (riskRewardRatio < this.config.minRiskRewardRatio) {
+      logger.debug(`[MomentumStrategy] Risk-reward ratio too low for ${token}: ${riskRewardRatio.toFixed(2)} < ${this.config.minRiskRewardRatio}`);
+      return;
+    }
+    
+    // Create trade setup
+    const setup: TradeSetup = {
+      id: `setup_${Date.now()}_${token}_${tradeDirection}`,
+      token,
+      direction: tradeDirection,
+      entryPrice,
       targetPrice,
       stopLossPrice,
-      currentProfit: 0,
-      currentProfitPercentage: 0,
-      status: 'OPEN'
+      size: riskAmount,
+      riskRewardRatio,
+      confidence: averageConfidence,
+      timestamp: Date.now(),
+      expirationTimestamp: Date.now() + 1 * 60 * 60 * 1000, // Expire in 1 hour
+      signals: recentSignals
     };
     
-    // Add to active positions
-    this.activePositions.push(position);
+    // Add to setups
+    this.tradeSetups.push(setup);
     
-    logger.info(`Opened ${signal.token} position: entry=${currentPrice}, target=${targetPrice}, stop=${stopLossPrice}, confidence=${signal.confidence.toFixed(2)}`);
+    logger.info(`[MomentumStrategy] Generated ${tradeDirection} setup for ${token} with confidence ${averageConfidence.toFixed(2)} and risk-reward ratio ${riskRewardRatio.toFixed(2)}`);
+    
+    // Emit event
+    this.emit('setupGenerated', setup);
+    
+    // Automatically execute the trade if criteria are met
+    this.executeTrade(setup);
   }
   
   /**
-   * Close an existing position
-   * @param positionId ID of the position to close
-   * @param reason Reason for closing ('TARGET', 'STOP', 'SIGNAL', 'MANUAL')
+   * Calculate position size for a trade
+   * @param token Token symbol
+   * @param confidence Signal confidence
    */
-  private async closePosition(positionId: string, reason: 'TARGET' | 'STOP' | 'SIGNAL' | 'MANUAL'): Promise<void> {
-    const positionIndex = this.activePositions.findIndex(p => p.id === positionId);
-    if (positionIndex === -1) return;
+  private calculatePositionSize(token: string, confidence: number): number {
+    // Base position size
+    let positionSize = this.config.maxPositionSizeUsd;
     
-    const position = this.activePositions[positionIndex];
-    const token = position.token;
-    const currentPrice = this.priceFeed[token]?.price;
+    // If auto-adjust is enabled, scale by confidence
+    if (this.config.autoAdjustPositionSize) {
+      positionSize = positionSize * Math.min(1, confidence * 1.2);
+    }
     
-    if (!currentPrice) return;
-    
-    // Calculate final profit
-    const realizedProfit = (currentPrice - position.entryPrice) * position.quantity;
-    const realizedProfitPercentage = ((currentPrice / position.entryPrice) - 1) * 100;
-    
-    // Update position with closing details
-    const closedPosition: TradePosition = {
-      ...position,
-      status: 'CLOSED',
-      closePrice: currentPrice,
-      closeTimestamp: Date.now(),
-      realizedProfit,
-      realizedProfitPercentage
-    };
-    
-    // Remove from active and add to historical
-    this.activePositions.splice(positionIndex, 1);
-    this.historicalPositions.push(closedPosition);
-    
-    logger.info(`Closed ${token} position (${reason}): entry=${position.entryPrice}, exit=${currentPrice}, profit=${realizedProfit.toFixed(2)} (${realizedProfitPercentage.toFixed(2)}%)`);
+    // Make sure position size is not zero
+    return Math.max(10, positionSize);
   }
   
   /**
-   * Update active positions
+   * Execute a trade from a setup
+   * @param setup Trade setup
    */
-  private updateActivePositions(): void {
-    for (const position of this.activePositions) {
-      const currentPrice = this.priceFeed[position.token]?.price;
-      if (!currentPrice) continue;
+  private async executeTrade(setup: TradeSetup): Promise<void> {
+    if (!this.active || !this.config.enabled) {
+      logger.debug(`[MomentumStrategy] Strategy not active, skipping trade execution`);
+      return;
+    }
+    
+    // Check if we've reached the maximum number of positions
+    if (this.activeTradeExecutions.length >= this.config.maxPositions) {
+      logger.debug(`[MomentumStrategy] Maximum positions reached (${this.config.maxPositions}), skipping trade execution`);
+      return;
+    }
+    
+    // Acquire execution lock
+    const release = await this.executionMutex.acquire();
+    
+    try {
+      logger.info(`[MomentumStrategy] Executing ${setup.direction} trade for ${setup.token} with size $${setup.size.toFixed(2)}`);
       
-      // Update current profit calculations
-      position.currentProfit = (currentPrice - position.entryPrice) * position.quantity;
-      position.currentProfitPercentage = ((currentPrice / position.entryPrice) - 1) * 100;
+      // In a real implementation, this would use the transaction engine to execute the trade
       
-      // Check for target hit
-      if (currentPrice >= position.targetPrice) {
-        this.closePosition(position.id, 'TARGET');
-      } 
-      // Check for stop loss hit
-      else if (currentPrice <= position.stopLossPrice) {
-        this.closePosition(position.id, 'STOP');
-      }
+      // For now, we'll simulate it
+      const execution: TradeExecution = {
+        id: `trade_${Date.now()}_${setup.token}_${setup.direction}`,
+        setupId: setup.id,
+        token: setup.token,
+        direction: setup.direction,
+        entryPrice: setup.entryPrice,
+        entryTimestamp: Date.now(),
+        size: setup.size,
+        status: 'OPEN',
+        signature: `sim-${Date.now()}-${Math.floor(Math.random() * 1000000)}`
+      };
+      
+      // Add to active executions
+      this.activeTradeExecutions.push(execution);
+      
+      // Update metrics
+      this.totalTrades++;
+      
+      logger.info(`[MomentumStrategy] Executed ${setup.direction} trade for ${setup.token} with size $${setup.size.toFixed(2)}`);
+      
+      // Emit event
+      this.emit('tradeExecuted', execution);
+      
+      // Schedule trade management (stop loss, take profit, etc.)
+      this.scheduleTradeManagement(execution);
+    } finally {
+      // Release execution lock
+      release();
     }
   }
   
   /**
-   * Generate momentum signal using technical analysis
-   * @param token Token symbol
-   * @returns Momentum signal or null
+   * Schedule trade management (simulated)
+   * @param execution Trade execution
    */
-  private generateTechnicalMomentumSignal(token: string): MomentumSignal | null {
-    const data = this.historicalData[token];
-    if (data.length < 30) return null;
+  private scheduleTradeManagement(execution: TradeExecution): void {
+    // In a real implementation, this would set up monitoring for stop loss, take profit, etc.
     
-    // Calculate RSI (simplified)
-    const prices = data.slice(-this.config.rsiPeriod).map(d => d.price);
-    const gains = [];
-    const losses = [];
-    
-    for (let i = 1; i < prices.length; i++) {
-      const change = prices[i] - prices[i-1];
-      gains.push(change > 0 ? change : 0);
-      losses.push(change < 0 ? Math.abs(change) : 0);
+    // For now, we'll just log it
+    logger.info(`[MomentumStrategy] Scheduled management for ${execution.direction} trade of ${execution.token}`);
+  }
+  
+  /**
+   * Update strategy configuration
+   * @param config New configuration
+   */
+  public updateConfig(config: Partial<MomentumStrategyConfig>): void {
+    this.config = { ...this.config, ...config };
+    logger.info('[MomentumStrategy] Configuration updated');
+  }
+  
+  /**
+   * Activate the strategy
+   */
+  public activate(): boolean {
+    if (this.active) {
+      logger.warn('[MomentumStrategy] Strategy already active');
+      return true;
     }
     
-    const avgGain = gains.reduce((sum, val) => sum + val, 0) / gains.length || 0;
-    const avgLoss = losses.reduce((sum, val) => sum + val, 0) / losses.length || 1; // Avoid division by zero
-    
-    const rs = avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-    
-    // Determine direction based on RSI
-    let direction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-    let confidence = 0.5;
-    
-    if (rsi < this.config.rsiOversold) {
-      direction = 'BUY';
-      confidence = 0.6 + (this.config.rsiOversold - rsi) / (this.config.rsiOversold * 2);
-    } else if (rsi > this.config.rsiOverbought) {
-      direction = 'SELL';
-      confidence = 0.6 + (rsi - this.config.rsiOverbought) / ((100 - this.config.rsiOverbought) * 2);
+    if (!this.memeCortex) {
+      logger.warn('[MomentumStrategy] MEME Cortex not available, activation may have limited functionality');
     }
     
-    // Only return signal if not HOLD
-    if (direction === 'HOLD') return null;
+    this.active = true;
+    logger.info('[MomentumStrategy] Strategy activated');
+    return true;
+  }
+  
+  /**
+   * Deactivate the strategy
+   */
+  public deactivate(): boolean {
+    if (!this.active) {
+      logger.warn('[MomentumStrategy] Strategy already inactive');
+      return true;
+    }
     
-    const currentPrice = data[data.length - 1].price;
-    const expectedMovement = direction === 'BUY' ? 1.5 : -1.5; // Default 1.5% expected movement
+    this.active = false;
+    logger.info('[MomentumStrategy] Strategy deactivated');
+    return true;
+  }
+  
+  /**
+   * Check if the strategy is active
+   */
+  public isActive(): boolean {
+    return this.active;
+  }
+  
+  /**
+   * Get strategy metrics
+   */
+  public getMetrics(): {
+    totalTrades: number;
+    successfulTrades: number;
+    winRate: number;
+    totalProfitUsd: number;
+    activePositions: number;
+    active: boolean;
+  } {
+    const winRate = this.totalTrades > 0 ? this.successfulTrades / this.totalTrades : 0;
     
     return {
-      token,
-      direction,
-      confidence: Math.min(0.95, confidence),
-      timestamp: Date.now(),
-      strength: Math.abs(50 - rsi), // 0-50 scale based on distance from neutral
-      timeframe: '1h',
-      expectedPriceMovement: expectedMovement,
-      entryPrice: currentPrice,
-      targetPrice: currentPrice * (1 + (expectedMovement / 100)),
-      stopLossPrice: currentPrice * (1 - (expectedMovement / 4 / 100)),
-      source: 'technical'
+      totalTrades: this.totalTrades,
+      successfulTrades: this.successfulTrades,
+      winRate,
+      totalProfitUsd: this.totalProfitUsd,
+      activePositions: this.activeTradeExecutions.length,
+      active: this.active
     };
   }
   
   /**
-   * Generate momentum signal using neural network analysis
-   * @param token Token symbol
-   * @returns Momentum signal or null
+   * Get active trade executions
    */
-  private generateNeuralMomentumSignal(token: string): MomentumSignal | null {
-    // This would involve a neural network in a real implementation
-    // Using simplified logic for simulation
-    
-    const data = this.historicalData[token];
-    if (data.length < 30) return null;
-    
-    // Calculate price momentum (rate of change)
-    const prices = data.slice(-10).map(d => d.price);
-    const volumes = data.slice(-10).map(d => d.volume24h);
-    
-    const priceROC = (prices[prices.length - 1] / prices[0] - 1) * 100;
-    const volumeROC = (volumes[volumes.length - 1] / volumes[0] - 1) * 100;
-    
-    // Simulate neural network output
-    let direction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-    let confidence = 0.5;
-    let expectedMovement = 2.0; // Default 2% expected movement
-    
-    // Combined price and volume analysis (simplified neural logic)
-    if (priceROC > 3 && volumeROC > 20) {
-      // Strong uptrend with increasing volume
-      direction = 'BUY';
-      confidence = 0.7 + (Math.min(priceROC, 10) / 30);
-      expectedMovement = 2.5 + priceROC / 4;
-    } else if (priceROC < -3 && volumeROC > 20) {
-      // Strong downtrend with increasing volume
-      direction = 'SELL';
-      confidence = 0.7 + (Math.min(Math.abs(priceROC), 10) / 30);
-      expectedMovement = -(2.5 + Math.abs(priceROC) / 4);
-    } else if (priceROC > 5 && volumeROC < -10) {
-      // Price rising but volume decreasing (potential reversal)
-      direction = 'SELL';
-      confidence = 0.6 + (Math.min(priceROC, 15) / 40);
-      expectedMovement = -2.0;
-    } else if (priceROC < -5 && volumeROC < -10) {
-      // Price falling but volume decreasing (potential reversal)
-      direction = 'BUY';
-      confidence = 0.6 + (Math.min(Math.abs(priceROC), 15) / 40);
-      expectedMovement = 2.0;
-    }
-    
-    // Only return signal if not HOLD and confidence is high enough
-    if (direction === 'HOLD' || confidence < 0.65) return null;
-    
-    const currentPrice = data[data.length - 1].price;
-    
-    return {
-      token,
-      direction,
-      confidence: Math.min(0.90, confidence),
-      timestamp: Date.now(),
-      strength: Math.min(100, Math.abs(priceROC) * 5 + Math.abs(volumeROC) * 2),
-      timeframe: '4h',
-      expectedPriceMovement: expectedMovement,
-      entryPrice: currentPrice,
-      targetPrice: currentPrice * (1 + (expectedMovement / 100)),
-      stopLossPrice: currentPrice * (1 - (Math.abs(expectedMovement) / 4 / 100)),
-      source: 'neural'
-    };
+  public getActiveTradeExecutions(): TradeExecution[] {
+    return [...this.activeTradeExecutions];
   }
   
   /**
-   * Generate momentum signal using quantum pattern recognition
-   * @param token Token symbol
-   * @returns Momentum signal or null
+   * Get historical trade executions
    */
-  private generateQuantumMomentumSignal(token: string): MomentumSignal | null {
-    // This would involve quantum pattern algorithms in a real implementation
-    // Using simplified logic for simulation
-    
-    const data = this.historicalData[token];
-    if (data.length < 60) return null; // Need more data for quantum patterns
-    
-    // Get recent price data
-    const recentPrices = data.slice(-60).map(d => d.price);
-    const volumes = data.slice(-20).map(d => d.volume24h);
-    
-    // Detect fractal patterns (simplified)
-    // In a real quantum system, this would use quantum Fourier transforms
-    // to find repeating patterns across different timeframes
-    
-    // Randomly detect a pattern for simulation
-    const hasPattern = Math.random() < 0.15; // 15% chance to detect pattern
-    
-    if (!hasPattern) return null;
-    
-    // Pattern analysis
-    const patternStrength = 50 + Math.random() * 30; // 50-80 strength
-    const recentTrend = recentPrices[recentPrices.length - 1] > recentPrices[recentPrices.length - 10] ? 'up' : 'down';
-    const volumeTrend = volumes[volumes.length - 1] > volumes[volumes.length - 5] ? 'up' : 'down';
-    
-    // Define expected direction
-    let direction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-    let expectedMovement = 0;
-    let confidence = 0.7 + Math.random() * 0.25; // 0.7-0.95 confidence
-    
-    if (recentTrend === 'up' && volumeTrend === 'up') {
-      direction = 'BUY';
-      expectedMovement = 3 + Math.random() * 2; // 3-5%
-    } else if (recentTrend === 'down' && volumeTrend === 'up') {
-      direction = 'BUY'; // Potential reversal
-      expectedMovement = 2 + Math.random() * 2; // 2-4%
-      confidence -= 0.1; // Lower confidence on reversal
-    } else if (recentTrend === 'up' && volumeTrend === 'down') {
-      direction = 'SELL'; // Potential reversal
-      expectedMovement = -(2 + Math.random() * 2); // 2-4%
-      confidence -= 0.1; // Lower confidence on reversal
-    } else {
-      direction = 'SELL';
-      expectedMovement = -(3 + Math.random() * 2); // 3-5%
-    }
-    
-    const currentPrice = data[data.length - 1].price;
-    
-    return {
-      token,
-      direction,
-      confidence,
-      timestamp: Date.now(),
-      strength: patternStrength,
-      timeframe: '1d',
-      expectedPriceMovement: expectedMovement,
-      entryPrice: currentPrice,
-      targetPrice: currentPrice * (1 + (expectedMovement / 100)),
-      stopLossPrice: currentPrice * (1 - (Math.abs(expectedMovement) / 4 / 100)),
-      source: 'quantum'
-    };
+  public getHistoricalTradeExecutions(): TradeExecution[] {
+    return [...this.historicalTradeExecutions];
   }
   
   /**
-   * Generate momentum signal using sentiment analysis
-   * @param token Token symbol
-   * @returns Momentum signal or null
+   * Get current trade setups
    */
-  private generateSentimentMomentumSignal(token: string): MomentumSignal | null {
-    // This would involve sentiment analysis in a real implementation
-    // Using simplified logic for simulation
-    
-    // Randomly generate sentiment signal (low frequency)
-    if (Math.random() > 0.1) return null; // Only 10% chance to generate signal
-    
-    const currentPrice = this.priceFeed[token]?.price;
-    if (!currentPrice) return null;
-    
-    // Random sentiment bias
-    const sentimentBias = Math.random() * 2 - 1; // -1 to 1
-    
-    let direction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-    let confidence = 0.5 + Math.abs(sentimentBias) * 0.3; // 0.5-0.8 confidence
-    
-    if (sentimentBias > 0.3) {
-      direction = 'BUY';
-    } else if (sentimentBias < -0.3) {
-      direction = 'SELL';
-    } else {
-      return null; // Neutral sentiment, no signal
-    }
-    
-    const expectedMovement = sentimentBias * 3; // -3% to 3%
-    
-    return {
-      token,
-      direction,
-      confidence,
-      timestamp: Date.now(),
-      strength: Math.abs(sentimentBias) * 70, // 0-70 strength
-      timeframe: '1d',
-      expectedPriceMovement: expectedMovement,
-      entryPrice: currentPrice,
-      targetPrice: currentPrice * (1 + (expectedMovement / 100)),
-      stopLossPrice: currentPrice * (1 - (Math.abs(expectedMovement) / 4 / 100)),
-      source: 'sentiment'
-    };
+  public getCurrentTradeSetups(): TradeSetup[] {
+    return this.tradeSetups.filter(s => s.expirationTimestamp > Date.now());
   }
 }
-
-// Export a singleton instance
-export default MomentumSurfingStrategy;

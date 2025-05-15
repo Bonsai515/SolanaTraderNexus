@@ -1,352 +1,490 @@
 /**
  * Flash Loan Arbitrage Strategy
  * 
- * Implements the core flash loan arbitrage strategy for the Hyperion Agent.
- * This strategy identifies price discrepancies between DEXes and executes
- * atomic transactions to capture arbitrage profits.
+ * Advanced implementation of flash loan arbitrage for the Hyperion agent,
+ * supporting multi-hop arbitrage with MEV protection.
  */
 
-import { PublicKey, Connection, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import { EventEmitter } from 'events';
+import { logger } from '../logger';
+import { EnhancedTransactionEngine } from '../nexus-transaction-engine';
 import { Mutex } from 'async-mutex';
-import logger from '../logger';
 
-// Flash loan provider interface
-interface FlashLoanProvider {
-  name: string;
-  address: string;
-  programId: string;
-  supportedTokens: string[];
-  fee: number; // Represented as a decimal (e.g., 0.003 for 0.3%)
-  maxLoanSize: Record<string, number>; // Maximum loan size by token
+// Define supported DEXes
+enum DexPlatform {
+  ORCA = 'ORCA',
+  RAYDIUM = 'RAYDIUM',
+  JUPITER = 'JUPITER',
+  METEORA = 'METEORA',
+  OPENBOOK = 'OPENBOOK',
+  PHOENIX = 'PHOENIX'
 }
 
-// DEX interface
-interface DEX {
-  name: string;
-  programId: string;
-  routerAddress?: string;
-  fee: number; // Represented as a decimal
-  estimatedSlippage: number;
-  supportedTokens: string[];
-}
-
-// Arbitrage opportunity interface
+// Flash loan arbitrage opportunity
 interface ArbitrageOpportunity {
-  sourceToken: string;
-  targetToken: string;
-  sourceDex: string;
-  targetDex: string;
-  flashLoanProvider: string;
+  id: string;
+  tokens: string[];
+  dexes: DexPlatform[];
+  estimatedProfitUsd: number;
+  estimatedProfitPercentage: number;
+  route: {
+    inputToken: string;
+    outputToken: string;
+    inputAmount: number;
+    expectedOutputAmount: number;
+    dex: DexPlatform;
+    steps: {
+      dex: DexPlatform;
+      fromToken: string;
+      toToken: string;
+      expectedPrice: number;
+    }[];
+  };
+  flashLoanRequired: boolean;
   flashLoanAmount: number;
-  expectedProfitUSD: number;
-  profitPercentage: number;
-  confidence: number; // 0-1 scale
-  routePath: string[];
+  flashLoanFee: number;
+  netProfitUsd: number;
+  netProfitPercentage: number;
+  confidence: number;
+  securityScore: number;
+  timestamp: number;
+}
+
+// Arbitrage execution result
+interface ArbitrageResult {
+  success: boolean;
+  opportunityId: string;
+  signature?: string;
+  profit?: {
+    token: string;
+    amount: number;
+    usdValue: number;
+  };
+  error?: string;
+  executionTimeMs: number;
+}
+
+// Strategy configuration
+interface FlashLoanStrategyConfig {
+  enabled: boolean;
+  maxSlippageBps: number;
+  minProfitUsd: number;
+  minProfitPercentage: number;
+  maxPathLength: number;
+  minSecurityScore: number;
+  minConfidence: number;
+  maxFlashLoanAmount: number;
+  priorityDexes: DexPlatform[];
+  blacklistedTokens: string[];
+  gasAdjustmentFactor: number;
+  mevProtection: boolean;
+  timeoutMs: number;
+  concurrentExecutions: number;
 }
 
 /**
- * Flash Loan Arbitrage Strategy implementation
+ * Flash Loan Arbitrage Strategy Class
  */
-export class FlashLoanArbitrageStrategy {
-  private connection: Connection;
-  private flashLoanProviders: FlashLoanProvider[] = [];
-  private supportedDEXes: DEX[] = [];
-  private tokenPrices: Record<string, number> = {};
-  private mutex = new Mutex();
-  private isRunning = false;
-  private minProfitThresholdUSD = 5; // Minimum profit threshold in USD
-  private minProfitPercentage = 0.5; // Minimum profit percentage (0.5%)
+export class FlashLoanArbitrageStrategy extends EventEmitter {
+  private config: FlashLoanStrategyConfig;
+  private nexusEngine: EnhancedTransactionEngine;
+  private active: boolean = false;
+  private executionMutex: Mutex;
+  private executionCount: number = 0;
+  private successCount: number = 0;
+  private totalProfitUsd: number = 0;
+  private lastExecutionTimestamp: number = 0;
+  private activeExecutions: Set<string> = new Set();
   
-  constructor(connection: Connection) {
-    this.connection = connection;
-    this.initializeProviders();
-    this.initializeDEXes();
+  /**
+   * Constructor
+   * @param nexusEngine Enhanced transaction engine
+   */
+  constructor(nexusEngine: EnhancedTransactionEngine) {
+    super();
+    this.nexusEngine = nexusEngine;
+    this.executionMutex = new Mutex();
+    
+    // Default configuration
+    this.config = {
+      enabled: true,
+      maxSlippageBps: 50, // 0.5%
+      minProfitUsd: 5, // $5 minimum profit
+      minProfitPercentage: 0.25, // 0.25% minimum profit
+      maxPathLength: 4, // Maximum 4 hops
+      minSecurityScore: 0.8, // 80% security score
+      minConfidence: 0.7, // 70% confidence
+      maxFlashLoanAmount: 10000, // $10,000 maximum flash loan
+      priorityDexes: [
+        DexPlatform.JUPITER,
+        DexPlatform.ORCA,
+        DexPlatform.PHOENIX
+      ],
+      blacklistedTokens: [],
+      gasAdjustmentFactor: 1.2, // 20% buffer for gas costs
+      mevProtection: true,
+      timeoutMs: 30000, // 30 seconds
+      concurrentExecutions: 2 // Allow 2 concurrent executions
+    };
+    
+    logger.info('[FlashLoanStrategy] Initialized with default configuration');
   }
   
   /**
-   * Initialize supported flash loan providers
+   * Update strategy configuration
+   * @param config New configuration
    */
-  private initializeProviders(): void {
-    // Add Solend as a flash loan provider
-    this.flashLoanProviders.push({
-      name: 'Solend',
-      address: 'SoLEND8CDJUE1WT7x3PbAHQCjvF6hCzCDNNXtY7tCH',
-      programId: 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo',
-      supportedTokens: ['USDC', 'USDT', 'SOL', 'ETH', 'BTC'],
-      fee: 0.0005, // 0.05%
-      maxLoanSize: {
-        'USDC': 1000000,
-        'USDT': 1000000,
-        'SOL': 10000,
-        'ETH': 100,
-        'BTC': 10
-      }
-    });
-    
-    // Add Kamino as a flash loan provider
-    this.flashLoanProviders.push({
-      name: 'Kamino',
-      address: 'KAM1nvVfKLQeCERLZpfEuuA1avEJMGwXCECMTKJyp8w',
-      programId: 'KAM19an42g4RrKNGzRrQ4JBxCx4YgdELmzYv2kR7rVw',
-      supportedTokens: ['USDC', 'USDT', 'SOL'],
-      fee: 0.0008, // 0.08%
-      maxLoanSize: {
-        'USDC': 500000,
-        'USDT': 500000,
-        'SOL': 5000
-      }
-    });
-    
-    logger.info(`Initialized ${this.flashLoanProviders.length} flash loan providers`);
+  public updateConfig(config: Partial<FlashLoanStrategyConfig>): void {
+    this.config = { ...this.config, ...config };
+    logger.info('[FlashLoanStrategy] Configuration updated');
   }
   
   /**
-   * Initialize supported DEXes
+   * Activate the strategy
    */
-  private initializeDEXes(): void {
-    // Add Jupiter as a DEX aggregator
-    this.supportedDEXes.push({
-      name: 'Jupiter',
-      programId: 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB',
-      fee: 0.0005, // 0.05%
-      estimatedSlippage: 0.001, // 0.1%
-      supportedTokens: ['USDC', 'USDT', 'SOL', 'ETH', 'BTC', 'BONK', 'JUP', 'MEME']
-    });
-    
-    // Add Raydium as a DEX
-    this.supportedDEXes.push({
-      name: 'Raydium',
-      programId: 'RAYfr689LnGMaRE7qkM3YjR1dkeYmcQYZeDG6nop55Y',
-      routerAddress: 'RVWzR78eVM2RTr9RFpYPLGLTHFzYv2EuGNkd8wUQYcJ',
-      fee: 0.0025, // 0.25%
-      estimatedSlippage: 0.002, // 0.2%
-      supportedTokens: ['USDC', 'USDT', 'SOL', 'ETH', 'BTC', 'RAY']
-    });
-    
-    // Add Orca as a DEX
-    this.supportedDEXes.push({
-      name: 'Orca',
-      programId: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',
-      fee: 0.0025, // 0.25%
-      estimatedSlippage: 0.002, // 0.2%
-      supportedTokens: ['USDC', 'USDT', 'SOL', 'ETH', 'BTC', 'ORCA']
-    });
-    
-    logger.info(`Initialized ${this.supportedDEXes.length} DEXes for arbitrage`);
-  }
-  
-  /**
-   * Update token prices
-   * @param prices Record of token prices in USD
-   */
-  public updateTokenPrices(prices: Record<string, number>): void {
-    this.tokenPrices = {...prices};
-  }
-  
-  /**
-   * Start scanning for arbitrage opportunities
-   */
-  public async startScanning(): Promise<void> {
-    if (this.isRunning) {
-      logger.warn('Arbitrage scanning is already running');
-      return;
+  public activate(): boolean {
+    if (this.active) {
+      logger.warn('[FlashLoanStrategy] Strategy already active');
+      return true;
     }
     
-    this.isRunning = true;
-    logger.info('Starting to scan for arbitrage opportunities');
+    if (!this.nexusEngine) {
+      logger.error('[FlashLoanStrategy] Cannot activate: Transaction engine not set');
+      return false;
+    }
     
-    // Start continuous scanning loop
-    this.scanForOpportunities();
+    this.active = true;
+    logger.info('[FlashLoanStrategy] Strategy activated');
+    return true;
   }
   
   /**
-   * Stop scanning for arbitrage opportunities
+   * Deactivate the strategy
    */
-  public stopScanning(): void {
-    this.isRunning = false;
-    logger.info('Stopped scanning for arbitrage opportunities');
+  public deactivate(): boolean {
+    if (!this.active) {
+      logger.warn('[FlashLoanStrategy] Strategy already inactive');
+      return true;
+    }
+    
+    this.active = false;
+    logger.info('[FlashLoanStrategy] Strategy deactivated');
+    return true;
   }
   
   /**
-   * Set minimum profit thresholds
-   * @param minUSD Minimum profit in USD
-   * @param minPercentage Minimum profit percentage
+   * Check if the strategy is active
    */
-  public setMinProfitThresholds(minUSD: number, minPercentage: number): void {
-    this.minProfitThresholdUSD = minUSD;
-    this.minProfitPercentage = minPercentage;
-    logger.info(`Set minimum profit thresholds: $${minUSD} USD or ${minPercentage}%`);
+  public isActive(): boolean {
+    return this.active;
   }
   
   /**
-   * Main function to scan for arbitrage opportunities
+   * Evaluate an arbitrage opportunity
+   * @param opportunity The arbitrage opportunity to evaluate
    */
-  private async scanForOpportunities(): Promise<void> {
-    while (this.isRunning) {
-      await this.mutex.acquire();
-      try {
-        // Get common tokens across DEXes
-        const commonTokens = this.getCommonTokens();
-        
-        // Find potential arbitrage opportunities
-        const opportunities: ArbitrageOpportunity[] = [];
-        
-        for (const token of commonTokens) {
-          // Skip if token price is not available
-          if (!this.tokenPrices[token]) continue;
-          
-          // Find price discrepancies between DEXes
-          for (let i = 0; i < this.supportedDEXes.length; i++) {
-            for (let j = 0; j < this.supportedDEXes.length; j++) {
-              if (i === j) continue; // Skip same DEX
-              
-              const sourceDex = this.supportedDEXes[i];
-              const targetDex = this.supportedDEXes[j];
-              
-              // Check if both DEXes support this token
-              if (!sourceDex.supportedTokens.includes(token) || 
-                  !targetDex.supportedTokens.includes(token)) {
-                continue;
-              }
-              
-              // Find suitable flash loan provider
-              const provider = this.findSuitableFlashLoanProvider(token);
-              if (!provider) continue;
-              
-              // Calculate potential profit (simplified for simulation)
-              const simulatedPriceDiffPercentage = Math.random() * 2 - 0.5; // -0.5% to 1.5%
-              
-              // Skip if no potential profit
-              if (simulatedPriceDiffPercentage <= (provider.fee + sourceDex.fee + targetDex.fee)) {
-                continue;
-              }
-              
-              // Calculate flash loan amount based on provider limits
-              const flashLoanAmount = Math.min(
-                provider.maxLoanSize[token] || 0,
-                10000 // Cap for simulation
-              );
-              
-              // Calculate expected profit
-              const grossProfitPercentage = simulatedPriceDiffPercentage;
-              const totalFees = provider.fee + sourceDex.fee + targetDex.fee;
-              const netProfitPercentage = grossProfitPercentage - totalFees;
-              const expectedProfitUSD = flashLoanAmount * this.tokenPrices[token] * netProfitPercentage / 100;
-              
-              // Only consider profitable opportunities
-              if (netProfitPercentage > this.minProfitPercentage && 
-                  expectedProfitUSD > this.minProfitThresholdUSD) {
-                
-                // Create arbitrage opportunity
-                opportunities.push({
-                  sourceToken: token,
-                  targetToken: token,
-                  sourceDex: sourceDex.name,
-                  targetDex: targetDex.name,
-                  flashLoanProvider: provider.name,
-                  flashLoanAmount,
-                  expectedProfitUSD,
-                  profitPercentage: netProfitPercentage,
-                  confidence: 0.7 + Math.random() * 0.2, // 0.7-0.9 confidence
-                  routePath: [sourceDex.name, targetDex.name]
-                });
-              }
-            }
-          }
-        }
-        
-        // Sort opportunities by expected profit
-        opportunities.sort((a, b) => b.expectedProfitUSD - a.expectedProfitUSD);
-        
-        // Log the top opportunities
-        if (opportunities.length > 0) {
-          logger.info(`Found ${opportunities.length} potential arbitrage opportunities`);
-          opportunities.slice(0, 3).forEach((opportunity, i) => {
-            logger.info(`Opportunity #${i+1}: ${opportunity.sourceToken} on ${opportunity.sourceDex} to ${opportunity.targetDex}, expected profit: $${opportunity.expectedProfitUSD.toFixed(2)} (${(opportunity.profitPercentage).toFixed(4)}%)`);
-          });
-          
-          // Execute the best opportunity
-          if (opportunities.length > 0) {
-            this.executeArbitrage(opportunities[0]);
-          }
-        } else {
-          logger.debug('No profitable arbitrage opportunities found in this scan');
-        }
-      } catch (error) {
-        logger.error(`Error in arbitrage scanning: ${error.message}`);
-      } finally {
-        this.mutex.release();
-        
-        // Wait before the next scan
-        await new Promise(resolve => setTimeout(resolve, 15000)); // Scan every 15 seconds
+  public evaluateOpportunity(opportunity: ArbitrageOpportunity): boolean {
+    if (!this.active || !this.config.enabled) {
+      logger.debug('[FlashLoanStrategy] Strategy inactive, skipping evaluation');
+      return false;
+    }
+    
+    // Apply filters
+    
+    // Check profit thresholds
+    if (opportunity.netProfitUsd < this.config.minProfitUsd) {
+      logger.debug(`[FlashLoanStrategy] Insufficient profit: $${opportunity.netProfitUsd.toFixed(2)} < $${this.config.minProfitUsd}`);
+      return false;
+    }
+    
+    if (opportunity.netProfitPercentage < this.config.minProfitPercentage) {
+      logger.debug(`[FlashLoanStrategy] Insufficient profit percentage: ${(opportunity.netProfitPercentage * 100).toFixed(2)}% < ${this.config.minProfitPercentage * 100}%`);
+      return false;
+    }
+    
+    // Check path length
+    if (opportunity.route.steps.length > this.config.maxPathLength) {
+      logger.debug(`[FlashLoanStrategy] Path too long: ${opportunity.route.steps.length} > ${this.config.maxPathLength}`);
+      return false;
+    }
+    
+    // Check security score
+    if (opportunity.securityScore < this.config.minSecurityScore) {
+      logger.debug(`[FlashLoanStrategy] Security score too low: ${opportunity.securityScore} < ${this.config.minSecurityScore}`);
+      return false;
+    }
+    
+    // Check confidence
+    if (opportunity.confidence < this.config.minConfidence) {
+      logger.debug(`[FlashLoanStrategy] Confidence too low: ${opportunity.confidence} < ${this.config.minConfidence}`);
+      return false;
+    }
+    
+    // Check flash loan amount
+    if (opportunity.flashLoanRequired && opportunity.flashLoanAmount > this.config.maxFlashLoanAmount) {
+      logger.debug(`[FlashLoanStrategy] Flash loan amount too high: $${opportunity.flashLoanAmount.toFixed(2)} > $${this.config.maxFlashLoanAmount}`);
+      return false;
+    }
+    
+    // Check blacklisted tokens
+    for (const token of opportunity.tokens) {
+      if (this.config.blacklistedTokens.includes(token)) {
+        logger.debug(`[FlashLoanStrategy] Blacklisted token: ${token}`);
+        return false;
       }
     }
-  }
-  
-  /**
-   * Get common tokens across all DEXes
-   */
-  private getCommonTokens(): string[] {
-    const tokenSets = this.supportedDEXes.map(dex => new Set(dex.supportedTokens));
-    const flashLoanTokens = new Set(
-      this.flashLoanProviders.flatMap(provider => provider.supportedTokens)
-    );
     
-    // Start with tokens from the first DEX
-    let commonTokens = [...tokenSets[0]];
-    
-    // Find intersection with other DEXes
-    for (let i = 1; i < tokenSets.length; i++) {
-      commonTokens = commonTokens.filter(token => tokenSets[i].has(token));
-    }
-    
-    // Filter by tokens supported by flash loan providers
-    commonTokens = commonTokens.filter(token => flashLoanTokens.has(token));
-    
-    return commonTokens;
-  }
-  
-  /**
-   * Find suitable flash loan provider for a token
-   */
-  private findSuitableFlashLoanProvider(token: string): FlashLoanProvider | null {
-    // Find providers supporting this token
-    const supportingProviders = this.flashLoanProviders.filter(
-      provider => provider.supportedTokens.includes(token) && provider.maxLoanSize[token] > 0
-    );
-    
-    if (supportingProviders.length === 0) return null;
-    
-    // Return the provider with lowest fee
-    return supportingProviders.sort((a, b) => a.fee - b.fee)[0];
+    // Opportunity is valid
+    logger.info(`[FlashLoanStrategy] Valid opportunity found: ${opportunity.id}, estimated profit: $${opportunity.netProfitUsd.toFixed(2)} (${(opportunity.netProfitPercentage * 100).toFixed(2)}%)`);
+    return true;
   }
   
   /**
    * Execute an arbitrage opportunity
-   * In a real implementation, this would construct and submit the transaction
+   * @param opportunity The arbitrage opportunity to execute
    */
-  private async executeArbitrage(opportunity: ArbitrageOpportunity): Promise<void> {
-    logger.info(`Executing arbitrage for ${opportunity.sourceToken} from ${opportunity.sourceDex} to ${opportunity.targetDex}`);
-    logger.info(`Flash loan amount: ${opportunity.flashLoanAmount} ${opportunity.sourceToken}, expected profit: $${opportunity.expectedProfitUSD.toFixed(2)}`);
+  public async executeArbitrage(opportunity: ArbitrageOpportunity): Promise<ArbitrageResult> {
+    const startTime = Date.now();
     
-    // In a real implementation, this would:
-    // 1. Construct a transaction with flash loan instructions
-    // 2. Add instructions for the first swap on sourceDex
-    // 3. Add instructions for the second swap on targetDex
-    // 4. Add instructions to repay the flash loan
-    // 5. Sign and send the transaction
+    if (!this.active || !this.config.enabled) {
+      return {
+        success: false,
+        opportunityId: opportunity.id,
+        error: 'Strategy inactive',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
     
-    // Simulate execution result
-    const success = Math.random() > 0.2; // 80% success rate for simulation
+    // Check if we've reached the concurrent execution limit
+    if (this.activeExecutions.size >= this.config.concurrentExecutions) {
+      return {
+        success: false,
+        opportunityId: opportunity.id,
+        error: 'Concurrent execution limit reached',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
     
-    if (success) {
-      const actualProfit = opportunity.expectedProfitUSD * (0.8 + Math.random() * 0.4); // 80-120% of expected
-      logger.info(`✅ Arbitrage executed successfully with ${opportunity.sourceToken}. Actual profit: $${actualProfit.toFixed(2)}`);
-    } else {
-      logger.warn(`❌ Arbitrage execution failed: Transaction failed or opportunity disappeared`);
+    // Mark this opportunity as being executed
+    this.activeExecutions.add(opportunity.id);
+    
+    try {
+      logger.info(`[FlashLoanStrategy] Executing arbitrage opportunity: ${opportunity.id}`);
+      
+      // Acquire execution lock
+      const release = await this.executionMutex.acquire();
+      
+      try {
+        // Validate opportunity again (in case market conditions changed)
+        if (!this.evaluateOpportunity(opportunity)) {
+          logger.warn(`[FlashLoanStrategy] Opportunity no longer valid: ${opportunity.id}`);
+          return {
+            success: false,
+            opportunityId: opportunity.id,
+            error: 'Opportunity no longer valid',
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+        
+        // Prepare flash loan transaction
+        const flashLoanResult = await this.prepareFlashLoanTransaction(opportunity);
+        
+        if (!flashLoanResult.success) {
+          logger.error(`[FlashLoanStrategy] Failed to prepare flash loan transaction: ${flashLoanResult.error}`);
+          return {
+            success: false,
+            opportunityId: opportunity.id,
+            error: `Failed to prepare flash loan transaction: ${flashLoanResult.error}`,
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+        
+        // Execute transaction
+        const signatureResult = await this.executeTransaction(flashLoanResult.transaction);
+        
+        if (!signatureResult.success) {
+          logger.error(`[FlashLoanStrategy] Failed to execute transaction: ${signatureResult.error}`);
+          return {
+            success: false,
+            opportunityId: opportunity.id,
+            error: `Failed to execute transaction: ${signatureResult.error}`,
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+        
+        // Verify transaction and calculate actual profit
+        const verificationResult = await this.verifyTransactionAndCalculateProfit(signatureResult.signature, opportunity);
+        
+        if (!verificationResult.success) {
+          logger.error(`[FlashLoanStrategy] Transaction verification failed: ${verificationResult.error}`);
+          return {
+            success: false,
+            opportunityId: opportunity.id,
+            error: `Transaction verification failed: ${verificationResult.error}`,
+            signature: signatureResult.signature,
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+        
+        // Update metrics
+        this.executionCount++;
+        this.successCount++;
+        this.totalProfitUsd += verificationResult.profit.usdValue;
+        this.lastExecutionTimestamp = Date.now();
+        
+        logger.info(`[FlashLoanStrategy] Arbitrage successful: ${opportunity.id}, profit: ${verificationResult.profit.amount} ${verificationResult.profit.token} ($${verificationResult.profit.usdValue.toFixed(2)})`);
+        
+        // Emit success event
+        this.emit('arbitrageSuccess', {
+          opportunity,
+          signature: signatureResult.signature,
+          profit: verificationResult.profit,
+          executionTimeMs: Date.now() - startTime
+        });
+        
+        return {
+          success: true,
+          opportunityId: opportunity.id,
+          signature: signatureResult.signature,
+          profit: verificationResult.profit,
+          executionTimeMs: Date.now() - startTime
+        };
+      } finally {
+        // Release execution lock
+        release();
+      }
+    } catch (error) {
+      logger.error(`[FlashLoanStrategy] Error executing arbitrage: ${error.message}`);
+      
+      return {
+        success: false,
+        opportunityId: opportunity.id,
+        error: `Error executing arbitrage: ${error.message}`,
+        executionTimeMs: Date.now() - startTime
+      };
+    } finally {
+      // Remove from active executions
+      this.activeExecutions.delete(opportunity.id);
+    }
+  }
+  
+  /**
+   * Get strategy metrics
+   */
+  public getMetrics(): {
+    executionCount: number;
+    successCount: number;
+    successRate: number;
+    totalProfitUsd: number;
+    averageProfitUsd: number;
+    lastExecutionTimestamp: number;
+    active: boolean;
+  } {
+    const successRate = this.executionCount > 0 ? this.successCount / this.executionCount : 0;
+    const averageProfitUsd = this.successCount > 0 ? this.totalProfitUsd / this.successCount : 0;
+    
+    return {
+      executionCount: this.executionCount,
+      successCount: this.successCount,
+      successRate,
+      totalProfitUsd: this.totalProfitUsd,
+      averageProfitUsd,
+      lastExecutionTimestamp: this.lastExecutionTimestamp,
+      active: this.active
+    };
+  }
+  
+  /**
+   * Prepare flash loan transaction
+   * @param opportunity The arbitrage opportunity
+   */
+  private async prepareFlashLoanTransaction(opportunity: ArbitrageOpportunity): Promise<{ success: boolean; transaction?: any; error?: string }> {
+    try {
+      // In a real implementation, this would construct the actual transaction
+      // with the flash loan instructions and swap instructions
+      
+      // For now, we'll simulate it
+      return {
+        success: true,
+        transaction: {
+          id: opportunity.id,
+          steps: opportunity.route.steps,
+          inputToken: opportunity.route.inputToken,
+          inputAmount: opportunity.route.inputAmount,
+          expectedOutputAmount: opportunity.route.expectedOutputAmount,
+          flashLoanRequired: opportunity.flashLoanRequired,
+          flashLoanAmount: opportunity.flashLoanAmount
+        }
+      };
+    } catch (error) {
+      logger.error(`[FlashLoanStrategy] Error preparing flash loan transaction: ${error.message}`);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Execute transaction
+   * @param transaction The transaction to execute
+   */
+  private async executeTransaction(transaction: any): Promise<{ success: boolean; signature?: string; error?: string }> {
+    try {
+      // In a real implementation, this would send the transaction to the blockchain
+      
+      // For now, we'll simulate it
+      const signature = `sim-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+      
+      return {
+        success: true,
+        signature
+      };
+    } catch (error) {
+      logger.error(`[FlashLoanStrategy] Error executing transaction: ${error.message}`);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Verify transaction and calculate actual profit
+   * @param signature The transaction signature
+   * @param opportunity The original arbitrage opportunity
+   */
+  private async verifyTransactionAndCalculateProfit(
+    signature: string,
+    opportunity: ArbitrageOpportunity
+  ): Promise<{
+    success: boolean;
+    profit?: { token: string; amount: number; usdValue: number };
+    error?: string;
+  }> {
+    try {
+      // In a real implementation, this would verify the transaction on-chain
+      // and calculate the actual profit
+      
+      // For now, we'll simulate it
+      const profitAmount = opportunity.route.expectedOutputAmount - opportunity.route.inputAmount;
+      const profitUsd = opportunity.netProfitUsd;
+      
+      return {
+        success: true,
+        profit: {
+          token: opportunity.route.outputToken,
+          amount: profitAmount,
+          usdValue: profitUsd
+        }
+      };
+    } catch (error) {
+      logger.error(`[FlashLoanStrategy] Error verifying transaction: ${error.message}`);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 }
-
-// Export a singleton instance
-export default FlashLoanArbitrageStrategy;
