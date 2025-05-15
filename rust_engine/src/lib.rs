@@ -8,6 +8,7 @@ pub mod strategy;
 pub mod security;
 pub mod transformers;
 pub mod neural;
+pub mod quantum;
 
 use std::collections::HashMap;
 use std::sync::Arc;
