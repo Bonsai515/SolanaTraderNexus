@@ -309,7 +309,7 @@ class SingularityAgent {
         if (opp.sourceToken) {
           const security = await securityTransformer.checkTokenSecurity(opp.sourceToken);
           
-          if (!security.isSafe) {
+          if (!security.isSecure) {
             logger.debug(`Skipping cross-chain opportunity with unsafe token: ${opp.sourceToken}`);
             continue;
           }

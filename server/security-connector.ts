@@ -312,8 +312,95 @@ export class SecurityConnector {
   public async refreshEntanglement(): Promise<void> {
     await this.activateNeuralEntanglement();
   }
+
+  /**
+   * Check token security
+   * @param tokenAddress Token address to check
+   * @returns Security score from 0-100 (higher is more secure)
+   */
+  public async checkTokenSecurity(tokenAddress: string): Promise<{
+    score: number;
+    isSecure: boolean;
+    issues: string[];
+    details: {
+      honeyPotRisk: number;
+      rugPullRisk: number;
+      contractAudit: boolean;
+      tradingVolume: number;
+      holderConcentration: number;
+    }
+  }> {
+    try {
+      // Allow time for initialization if needed
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
+      // Log the security check
+      logger.info(`Performing security check for token: ${tokenAddress}`);
+
+      // Check token specific security issues
+      const issues: string[] = [];
+      let score = 85; // Start with a baseline score
+      
+      // Simulated security analysis - in production this would connect to
+      // on-chain analytics and risk scoring services
+      const honeyPotRisk = Math.floor(Math.random() * 20); // 0-20 risk score
+      const rugPullRisk = Math.floor(Math.random() * 30); // 0-30 risk score
+      const contractAudit = Math.random() > 0.3; // 70% chance of being audited
+      const tradingVolume = 10000 + Math.floor(Math.random() * 1000000); // Random volume
+      const holderConcentration = 10 + Math.floor(Math.random() * 60); // % held by top 10 wallets
+      
+      // Adjust score based on risk factors
+      score -= honeyPotRisk * 0.5;
+      score -= rugPullRisk * 0.3;
+      if (!contractAudit) score -= 15;
+      if (tradingVolume < 50000) score -= 10;
+      if (holderConcentration > 60) score -= 20;
+      
+      // Ensure score is within bounds
+      score = Math.max(0, Math.min(100, score));
+      
+      // Add relevant issues
+      if (honeyPotRisk > 10) issues.push("High honeypot risk detected");
+      if (rugPullRisk > 15) issues.push("Elevated rugpull risk detected");
+      if (!contractAudit) issues.push("No contract audit found");
+      if (tradingVolume < 50000) issues.push("Low trading volume");
+      if (holderConcentration > 60) issues.push("High holder concentration");
+      
+      return {
+        score: Math.round(score),
+        isSecure: score >= 70,
+        issues,
+        details: {
+          honeyPotRisk,
+          rugPullRisk,
+          contractAudit,
+          tradingVolume,
+          holderConcentration
+        }
+      };
+    } catch (error: any) {
+      logger.error(`Error checking token security: ${error.message}`);
+      
+      // Return default values in case of error
+      return {
+        score: 50,
+        isSecure: false,
+        issues: ["Security service error", error.message],
+        details: {
+          honeyPotRisk: 50,
+          rugPullRisk: 50,
+          contractAudit: false,
+          tradingVolume: 0,
+          holderConcentration: 100
+        }
+      };
+    }
+  }
 }
 
 // Export singleton instance
 export const securityConnector = new SecurityConnector();
+export const securityTransformer = securityConnector; // Alias for transformer interface
 export default securityConnector;

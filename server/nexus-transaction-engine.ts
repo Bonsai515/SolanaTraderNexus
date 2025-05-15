@@ -100,17 +100,21 @@ export class NexusTransactionEngine {
   private processingQueue: boolean = false;
   
   /**
-   * Constructor
+   * Constructor - auto-initializes the engine when created
    */
   constructor() {
-    this.initializeEngine();
+    this.initializeEngine().catch(error => {
+      console.error("Failed to auto-initialize NexusTransactionEngine:", error.message);
+    });
   }
   
   /**
    * Initialize the transaction engine
    */
-  private async initializeEngine(): Promise<void> {
+  public async initializeEngine(): Promise<void> {
     try {
+      logger.info("Initializing Nexus Transaction Engine...");
+      
       // Initialize Solana connection
       this.connection = await initializeRpcConnection();
       
@@ -128,10 +132,9 @@ export class NexusTransactionEngine {
         fs.writeFileSync(TRANSACTION_LOG_PATH, '[]');
       }
       
-      // Set initialization flag
+      // Set the initialization flag
       this.isInitialized = true;
-      
-      logger.info('Nexus Transaction Engine initialized successfully');
+      logger.info("✅ Nexus Transaction Engine initialized successfully");
     } catch (error: any) {
       logger.error(`Failed to initialize Nexus Transaction Engine: ${error.message || String(error)}`);
       throw error;
@@ -518,6 +521,32 @@ export class NexusTransactionEngine {
 
 // Export singleton instance
 export const nexusEngine = new NexusTransactionEngine();
+
+// Add direct function exports for star import compatibility (import * as nexusEngine)
+export function registerWallet(walletAddress: string): boolean {
+  return nexusEngine.registerWallet(walletAddress);
+}
+
+export function executeSwap(params: SwapParams): Promise<TransactionResult> {
+  return nexusEngine.executeSwap(params);
+}
+
+export function executeArbitrage(params: ArbitrageParams): Promise<TransactionResult> {
+  return nexusEngine.executeArbitrage(params);
+}
+
+export function setSimulationMode(isSimulation: boolean): void {
+  return nexusEngine.setSimulationMode(isSimulation);
+}
+
+export function getAvailableDEXes(): DEX[] {
+  return nexusEngine.getAvailableDEXes();
+}
+
+// Make sure engine is initialized when module is imported
+nexusEngine.initializeEngine().catch(err => {
+  logger.error(`Failed to initialize Nexus Engine on module import: ${err}`);
+});
 
 // Initialize engine when module is imported
 export default nexusEngine;
