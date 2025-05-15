@@ -83,6 +83,8 @@ export class EnhancedTransactionEngine {
   private lastHealthCheck: number = 0;
   private blockSubscriptionId?: number;
   private registeredWallets: Set<string> = new Set();
+  private secondaryWalletAddress: string = "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb";
+  private prophetWalletAddress: string = "D5WThJECFrnWZKA76HGHpsYvKJdnCGbwKq5sjpCnfuMS";
   
   /**
    * Constructor
