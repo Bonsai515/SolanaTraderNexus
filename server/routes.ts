@@ -1498,6 +1498,96 @@ router.post('/agents/deactivate-all', async (req, res) => {
   }
 });
 
+// Route to get all supported DEXs
+router.get('/api/dexes', (req, res) => {
+  try {
+    const dexes = getAllDexes();
+    res.json({
+      success: true,
+      count: dexes.length,
+      dexes
+    });
+  } catch (error) {
+    logger.error('Error fetching DEXs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch DEXs'
+    });
+  }
+});
+
+// Route to get all price feed data
+router.get('/api/prices', (req, res) => {
+  try {
+    if (!global.priceFeed) {
+      return res.status(503).json({
+        success: false,
+        error: 'Price feed not initialized'
+      });
+    }
+    
+    const prices = Array.from(global.priceFeed.getAllPrices().entries()).map(([symbol, data]) => ({
+      symbol,
+      price: data.priceUsd,
+      lastUpdated: data.lastUpdated,
+      source: data.source,
+      change24h: data.change24h
+    }));
+    
+    res.json({
+      success: true,
+      count: prices.length,
+      prices,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching prices:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch prices'
+    });
+  }
+});
+
+// Route to get price for a specific token
+router.get('/api/price/:token', (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    
+    if (!global.priceFeed) {
+      return res.status(503).json({
+        success: false,
+        error: 'Price feed not initialized'
+      });
+    }
+    
+    const price = global.priceFeed.getTokenPrice(token);
+    
+    if (!price) {
+      return res.status(404).json({
+        success: false,
+        error: `Price not found for token ${token}`
+      });
+    }
+    
+    res.json({
+      success: true,
+      token,
+      price: price.priceUsd,
+      lastUpdated: price.lastUpdated,
+      source: price.source,
+      change24h: price.change24h,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error fetching price for ${req.params.token}:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch price'
+    });
+  }
+});
+
 export async function registerRoutes(app: express.Express) {
   // Add system status endpoint
   app.get('/status', (req, res) => {

@@ -716,6 +716,15 @@ export class PriceFeedCache {
   }
   
   /**
+   * Get price for a specific token
+   * @param symbol Token symbol
+   * @returns TokenPrice object or undefined if not found
+   */
+  public getTokenPrice(symbol: string): TokenPrice | undefined {
+    return this.prices.get(symbol.toUpperCase());
+  }
+  
+  /**
    * Force update prices
    */
   public async forceUpdate(): Promise<void> {
