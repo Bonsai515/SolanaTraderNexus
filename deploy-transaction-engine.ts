@@ -6,10 +6,10 @@
  * and activates it for live trading with real funds.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { exec, spawn } = require('child_process');
-const { promisify } = require('util');
+import * as fs from 'fs';
+import * as path from 'path';
+import { exec, spawn, ChildProcess } from 'child_process';
+import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
@@ -26,16 +26,20 @@ if (!fs.existsSync('./logs')) {
   fs.mkdirSync('./logs', { recursive: true });
 }
 
-// Logger function
-function log(message) {
+/**
+ * Logger function
+ * @param message The message to log
+ */
+function log(message: string): void {
   console.log(message);
   fs.appendFileSync('./logs/transaction-engine-deploy.log', `${new Date().toISOString()} - ${message}\n`);
 }
 
 /**
  * Build the Rust transaction engine
+ * @returns Promise<boolean> indicating build success
  */
-async function buildRustEngine() {
+async function buildRustEngine(): Promise<boolean> {
   log(`${BLUE}Building Rust transaction engine...${RESET}`);
   
   try {
@@ -64,16 +68,39 @@ async function buildRustEngine() {
       log(`${RED}❌ Failed to build Rust transaction engine - binary not found${RESET}`);
       return false;
     }
-  } catch (error) {
+  } catch (error: any) {
     log(`${RED}❌ Error building Rust transaction engine: ${error?.message || 'Unknown error'}${RESET}`);
     return false;
   }
 }
 
 /**
- * Configure environment for the transaction engine
+ * Engine configuration interface
  */
-async function configureEnvironment() {
+interface EngineConfig {
+  useRealFunds: boolean;
+  rpcUrl: string;
+  websocketUrl: string;
+  systemWalletAddress: string;
+  wormholeGuardianRpc: string;
+}
+
+/**
+ * Agent configuration interface
+ */
+interface AgentConfig {
+  useRealFunds: boolean;
+  profitWallet: string;
+  hyperion: { active: boolean };
+  quantumOmega: { active: boolean };
+  singularity: { active: boolean };
+}
+
+/**
+ * Configure environment for the transaction engine
+ * @returns Promise<boolean> indicating config success
+ */
+async function configureEnvironment(): Promise<boolean> {
   log(`${BLUE}Configuring environment for transaction engine...${RESET}`);
   
   try {
@@ -96,7 +123,7 @@ async function configureEnvironment() {
     const systemWalletAddress = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Create engine config file
-    const engineConfig = {
+    const engineConfig: EngineConfig = {
       useRealFunds: true,
       rpcUrl,
       websocketUrl,
@@ -108,7 +135,7 @@ async function configureEnvironment() {
     fs.writeFileSync(engineConfigPath, JSON.stringify(engineConfig, null, 2));
     
     // Create agent config file
-    const agentConfig = {
+    const agentConfig: AgentConfig = {
       useRealFunds: true,
       profitWallet: systemWalletAddress,
       hyperion: { active: true },
@@ -136,7 +163,7 @@ async function configureEnvironment() {
     log(`${GREEN}  - Using Real Funds: TRUE${RESET}`);
     
     return true;
-  } catch (error) {
+  } catch (error: any) {
     log(`${RED}❌ Error configuring environment: ${error?.message || 'Unknown error'}${RESET}`);
     return false;
   }
@@ -144,8 +171,9 @@ async function configureEnvironment() {
 
 /**
  * Activate the transaction engine for live trading
+ * @returns Promise<boolean> indicating activation success
  */
-async function activateTransactionEngine() {
+async function activateTransactionEngine(): Promise<boolean> {
   log(`${BLUE}Activating transaction engine for live trading...${RESET}`);
   
   try {
@@ -155,7 +183,7 @@ async function activateTransactionEngine() {
     if (fs.existsSync(rustEnginePath)) {
       // Get environment variables from .env.trading
       const envContent = fs.readFileSync('.env.trading', 'utf8');
-      const env = {};
+      const env: Record<string, string> = {};
       
       envContent.split('\n').forEach(line => {
         const [key, value] = line.split('=');
@@ -202,22 +230,31 @@ async function activateTransactionEngine() {
       
       return true;
     }
-  } catch (error) {
+  } catch (error: any) {
     log(`${RED}❌ Error activating transaction engine: ${error?.message || 'Unknown error'}${RESET}`);
     return false;
   }
 }
 
 /**
- * Enable real fund trading
+ * Interface for agents module
  */
-async function enableRealFundTrading() {
+interface AgentsModule {
+  setUseRealFunds?: (useReal: boolean) => Promise<void>;
+  activateAgent?: (agentId: string) => Promise<void>;
+}
+
+/**
+ * Enable real fund trading
+ * @returns Promise<boolean> indicating success
+ */
+async function enableRealFundTrading(): Promise<boolean> {
   log(`${BLUE}Enabling trading with REAL FUNDS...${RESET}`);
   
   try {
     // Try to dynamically import the agents module
     try {
-      const agentsModule = require('./server/agents');
+      const agentsModule: AgentsModule = await import('./server/agents');
       
       if (typeof agentsModule.setUseRealFunds === 'function') {
         await agentsModule.setUseRealFunds(true);
@@ -226,7 +263,7 @@ async function enableRealFundTrading() {
         log(`${YELLOW}⚠️ setUseRealFunds function not found in agents module${RESET}`);
         // This is handled by our configuration files already
       }
-    } catch (importError) {
+    } catch (importError: any) {
       log(`${YELLOW}⚠️ Could not import agents module: ${importError?.message || 'Unknown error'}${RESET}`);
       // This is handled by our configuration files already
     }
@@ -236,7 +273,7 @@ async function enableRealFundTrading() {
     
     log(`${GREEN}✅ Real fund trading enabled${RESET}`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     log(`${RED}❌ Error enabling real fund trading: ${error?.message || 'Unknown error'}${RESET}`);
     return false;
   }
@@ -244,14 +281,15 @@ async function enableRealFundTrading() {
 
 /**
  * Activate all trading agents
+ * @returns Promise<boolean> indicating success
  */
-async function activateAllAgents() {
+async function activateAllAgents(): Promise<boolean> {
   log(`${BLUE}Activating all trading agents...${RESET}`);
   
   try {
     // Try to dynamically import the agents module
     try {
-      const agentsModule = require('./server/agents');
+      const agentsModule: AgentsModule = await import('./server/agents');
       
       // We know the server has activateAgent function but not activateAllAgents
       if (typeof agentsModule.activateAgent === 'function') {
@@ -275,14 +313,14 @@ async function activateAllAgents() {
         fs.writeFileSync(path.join(triggerDir, 'activate_agents'), new Date().toISOString());
         log(`${GREEN}✅ Created activation trigger file${RESET}`);
       }
-    } catch (importError) {
+    } catch (importError: any) {
       log(`${YELLOW}⚠️ Could not import agents module: ${importError?.message || 'Unknown error'}${RESET}`);
       // This is handled by our server auto-activation
     }
     
     log(`${GREEN}✅ Trading agents activation process complete${RESET}`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     log(`${RED}❌ Error activating trading agents: ${error?.message || 'Unknown error'}${RESET}`);
     return false;
   }
@@ -290,8 +328,9 @@ async function activateAllAgents() {
 
 /**
  * Deploy the transaction engine for live trading
+ * @returns Promise<boolean> indicating deployment success
  */
-async function deployTransactionEngine() {
+async function deployTransactionEngine(): Promise<boolean> {
   log(`${MAGENTA}🚀 DEPLOYING SOLANA TRANSACTION ENGINE FOR LIVE TRADING${RESET}`);
   log(`${MAGENTA}===================================================${RESET}`);
   
@@ -333,10 +372,13 @@ async function deployTransactionEngine() {
   return true;
 }
 
+// Type safe isMainModule function for TypeScript
+const isMainModule = () => require.main === module;
+
 // Run if this file is executed directly
-if (require.main === module) {
+if (isMainModule()) {
   deployTransactionEngine()
-    .then(success => {
+    .then((success: boolean) => {
       if (success) {
         log(`${GREEN}✅ Deployment completed successfully!${RESET}`);
         process.exit(0);
@@ -345,8 +387,18 @@ if (require.main === module) {
         process.exit(1);
       }
     })
-    .catch(error => {
+    .catch((error: Error) => {
       log(`${RED}❌ Deployment error: ${error?.message || 'Unknown error'}${RESET}`);
       process.exit(1);
     });
 }
+
+// Export functions for use in other modules
+export {
+  buildRustEngine,
+  configureEnvironment,
+  activateTransactionEngine,
+  enableRealFundTrading,
+  activateAllAgents,
+  deployTransactionEngine
+};

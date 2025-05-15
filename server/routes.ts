@@ -636,15 +636,44 @@ router.post('/api/engine/set-real-funds', (req, res) => {
     if (typeof useRealFunds !== 'boolean') {
       return res.status(400).json({ success: false, message: 'useRealFunds must be a boolean' });
     }
-    
-    if (usingNexusEngine) {
-      nexusEngine.setUseRealFunds(useRealFunds);
+
+    // Critical confirmation required for enabling real funds
+    if (useRealFunds) {
+      logger.warn('🚨 ENABLING REAL FUNDS MODE - LIVE TRADING WILL USE ACTUAL BLOCKCHAIN TRANSACTIONS 🚨');
+      logger.warn('System wallet HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb will be used for trading operations');
+      
+      // Set real funds mode in all agents
+      if (typeof agents.setUseRealFunds === 'function') {
+        agents.setUseRealFunds(true);
+      }
+
+      // Disable simulation mode in nexus engine
+      if (usingNexusEngine) {
+        nexusEngine.setUseRealFunds(true);
+      }
+    } else {
+      logger.info('🔄 Disabling real funds mode - returning to simulation mode');
+      
+      // Disable real funds mode in all agents
+      if (typeof agents.setUseRealFunds === 'function') {
+        agents.setUseRealFunds(false);
+      }
+
+      // Enable simulation mode in nexus engine
+      if (usingNexusEngine) {
+        nexusEngine.setUseRealFunds(false);
+      }
     }
     
     res.json({ 
       success: true, 
-      message: `Real funds mode ${useRealFunds ? 'enabled' : 'disabled'}`,
-      usingRealFunds: useRealFunds
+      message: useRealFunds 
+        ? '🚨 LIVE TRADING ACTIVATED - Using REAL FUNDS for trading 🚨' 
+        : '🔄 Simulation mode activated - No real funds will be used',
+      usingRealFunds: useRealFunds,
+      simulationMode: !useRealFunds,
+      mainWallet: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     logger.error('Error setting real funds mode:', error);

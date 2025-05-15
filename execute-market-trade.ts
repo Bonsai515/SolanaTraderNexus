@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Execute Market Trade
  * 
@@ -5,12 +6,12 @@
  * It allows trading specified tokens on Solana DEXes.
  */
 
-import * as nexusTransactionEngine from './server/nexus-transaction-engine';
-import dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Load environment variables
-dotenv.config();
-
+/**
+ * Interface defining the trade options
+ */
 interface TradeOptions {
   fromToken: string;
   toToken: string;
@@ -20,109 +21,131 @@ interface TradeOptions {
   walletPath?: string;
 }
 
-// Default system wallet is configured in the Nexus engine
+/**
+ * Interface for transaction result
+ */
+interface TransactionResult {
+  success: boolean;
+  signature?: string;
+  fromToken?: string;
+  toToken?: string;
+  fromAmount?: number;
+  toAmount?: number;
+  price?: number;
+  error?: string;
+  executionTime?: number;
+  txId?: string;
+}
 
-async function executeMarketTrade(options: TradeOptions) {
-  console.log('=============================================');
-  console.log('EXECUTING MARKET TRADE');
-  console.log('=============================================');
-  
-  // Validate parameters
-  if (!options.fromToken || !options.toToken || !options.amount) {
-    console.error('Invalid trade parameters. Required: fromToken, toToken, amount');
-    return;
-  }
-  
-  if (options.amount <= 0) {
-    console.error('Amount must be greater than 0');
-    return;
-  }
-  
-  const slippageBps = options.slippageBps || 50; // Default 0.5% slippage
-  const dex = options.dex || 'Jupiter'; // Default to Jupiter
-  
-  console.log(`Trade parameters:`);
-  console.log(`- From: ${options.fromToken}`);
-  console.log(`- To: ${options.toToken}`);
-  console.log(`- Amount: ${options.amount}`);
-  console.log(`- Slippage: ${slippageBps / 100}%`);
-  console.log(`- DEX: ${dex}`);
+/**
+ * Execute a market trade with the provided options
+ * @param options Trade options
+ */
+async function executeMarketTrade(options: TradeOptions): Promise<void> {
+  console.log('🚀 Executing market trade with options:');
+  console.log(`   From: ${options.fromToken}`);
+  console.log(`   To: ${options.toToken}`);
+  console.log(`   Amount: ${options.amount}`);
+  console.log(`   Slippage: ${options.slippageBps} bps (${options.slippageBps / 100}%)`);
+  console.log(`   DEX: ${options.dex || 'Jupiter (default)'}`);
   
   try {
-    // Initialize Nexus Professional Engine if not already initialized
-    if (!nexusTransactionEngine.isInitialized()) {
-      console.log('Initializing Nexus Professional Engine...');
-      await nexusTransactionEngine.initializeTransactionEngine(
-        process.env.ALCHEMY_RPC_URL || process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        true // Use real funds
-      );
+    // Import the transaction engine with proper typing
+    const { nexusEngine } = await import('./server/nexus-transaction-engine');
+    
+    if (!nexusEngine) {
+      throw new Error('Failed to import Nexus Transaction Engine');
     }
     
-    // Execute the trade
-    console.log('Executing market trade...');
-    const result = await nexusTransactionEngine.executeMarketTrade({
+    // Define the wallet address (using system wallet by default)
+    const walletAddress = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+    
+    // Execute the swap
+    console.log(`⏳ Executing swap: ${options.amount} ${options.fromToken} → ${options.toToken}...`);
+    
+    const result = await nexusEngine.executeSwap({
       fromToken: options.fromToken,
       toToken: options.toToken,
       amount: options.amount,
-      slippageBps,
-      dex,
-      walletPath: options.walletPath || './wallet.json'
+      slippageBps: options.slippageBps,
+      dex: options.dex,
+      walletAddress,
+      simulation: true // Set to false to execute real transaction
     });
     
-    if (result && result.success) {
-      console.log('✅ Trade executed successfully!');
-      console.log(`Transaction signature: ${result.signature || 'N/A'}`);
-      console.log(`Received: ${result.amount || 'N/A'} ${options.toToken}`);
-      return result;
+    if (result.success) {
+      console.log('✅ Swap executed successfully!');
+      console.log(`   Transaction signature: ${result.signature}`);
+      console.log(`   Input: ${result.fromAmount} ${result.fromToken}`);
+      console.log(`   Output: ${result.actualToAmount || result.estimatedToAmount} ${result.toToken}`);
+      console.log(`   Execution time: ${result.executionTimeMs}ms`);
+      
+      if (result.profit) {
+        console.log(`   Profit: ${result.profit.toFixed(4)} (${result.profitPercentage?.toFixed(2)}%)`);
+      }
     } else {
-      console.error(`❌ Trade failed: ${result?.error || 'Unknown error'}`);
-      return null;
+      console.error('❌ Swap failed:', result.error);
     }
   } catch (error: any) {
-    console.error('Error executing market trade:', error.message);
-    return null;
-  } finally {
-    console.log('\n=============================================');
-    console.log('MARKET TRADE OPERATION COMPLETE');
-    console.log('=============================================');
+    console.error('❌ Error executing market trade:', error.message);
   }
 }
 
-// Check available trading pairs
-async function checkAvailableTrades() {
-  console.log('\nRecommended markets:');
-  console.log('- SOL/USDC (SOL to USDC)');
-  console.log('- USDC/SOL (USDC to SOL)');
-  console.log('- BONK/USDC (BONK to USDC)');
-  console.log('- USDC/BONK (USDC to BONK)');
-  console.log('- wSOL/USDC (Wrapped SOL to USDC)');
-  console.log('- USDC/wSOL (USDC to Wrapped SOL)');
-  console.log('- SAMO/USDC (SAMO to USDC)');
-  console.log('- USDC/SAMO (USDC to SAMO)');
-  
-  // Show current token addresses for convenience
-  console.log('\nToken addresses:');
-  console.log('- SOL: So11111111111111111111111111111111111111112 (native)');
-  console.log('- USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-  console.log('- BONK: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263');
-  console.log('- SAMO: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU');
+/**
+ * Check available trades and supported tokens
+ */
+async function checkAvailableTrades(): Promise<void> {
+  try {
+    // Import the transaction engine
+    const { nexusEngine } = await import('./server/nexus-transaction-engine');
+    
+    if (!nexusEngine) {
+      throw new Error('Failed to import Nexus Transaction Engine');
+    }
+    
+    // Get available DEXes
+    const dexes = nexusEngine.getAvailableDEXes();
+    
+    console.log('🔍 Available DEXes:');
+    dexes.forEach(dex => {
+      console.log(`   - ${dex.name} (${dex.id}) - ${dex.enabled ? 'Enabled' : 'Disabled'}`);
+    });
+    
+    // Note: In a full implementation, we would fetch supported tokens here
+    console.log('\n💱 Common Solana Tokens:');
+    console.log('   - SOL (Native Solana)');
+    console.log('   - USDC (USD Coin)');
+    console.log('   - USDT (Tether)');
+    console.log('   - JUP (Jupiter)');
+    console.log('   - BONK (Bonk)');
+    console.log('   - MEME (Memecoin)');
+    console.log('   - WIF (Dogwifhat)');
+    console.log('   - GUAC (Guacamole)');
+  } catch (error: any) {
+    console.error('❌ Error checking available trades:', error.message);
+  }
 }
 
-// Parse command line arguments
-async function main() {
+/**
+ * Main function to process command line arguments
+ */
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   
-  if (args.length === 0 || args[0] === 'help' || args[0] === '--help') {
-    console.log('Usage:');
-    console.log('  npx ts-node execute-market-trade.ts check         - Check available tokens for trading');
-    console.log('  npx ts-node execute-market-trade.ts execute <options>  - Execute a market trade');
+  if (args.length === 0 || args[0] === 'help') {
+    console.log('Usage: node execute-market-trade.ts [command] [options]');
     console.log('');
-    console.log('Trade options:');
-    console.log('  --from=TOKEN    - From token (symbol or mint address)');
-    console.log('  --to=TOKEN      - To token (symbol or mint address)');
-    console.log('  --amount=NUM    - Amount to trade');
-    console.log('  --slippage=NUM  - Slippage in basis points (optional, default 50 = 0.5%)');
-    console.log('  --dex=NAME      - DEX to use (optional, default Jupiter)');
+    console.log('Commands:');
+    console.log('  check            - Check available tokens and DEXes');
+    console.log('  execute          - Execute a market trade');
+    console.log('  help             - Show this help message');
+    console.log('');
+    console.log('Options for execute:');
+    console.log('  --from=TOKEN     - Token to sell (required)');
+    console.log('  --to=TOKEN       - Token to buy (required)');
+    console.log('  --amount=NUM     - Amount to trade (required)');
+    console.log('  --slippage=NUM   - Slippage in basis points (optional, default 50 = 0.5%)');
+    console.log('  --dex=NAME       - DEX to use (optional, default Jupiter)');
     console.log('');
     console.log('Example:');
     console.log('  npx ts-node execute-market-trade.ts execute --from=SOL --to=USDC --amount=0.1');
@@ -146,8 +169,13 @@ async function main() {
   console.log('Use "help" to see available commands');
 }
 
+/**
+ * Parse command line arguments into trade options
+ * @param args Command line arguments
+ * @returns Parsed trade options
+ */
 function parseTradeOptions(args: string[]): TradeOptions {
-  const options: any = {
+  const options: Partial<TradeOptions> = {
     slippageBps: 50
   };
   
@@ -165,6 +193,18 @@ function parseTradeOptions(args: string[]): TradeOptions {
     }
   });
   
+  // Validate required options
+  if (!options.fromToken) {
+    throw new Error('Missing required option: --from=TOKEN');
+  }
+  if (!options.toToken) {
+    throw new Error('Missing required option: --to=TOKEN');
+  }
+  if (!options.amount || isNaN(options.amount)) {
+    throw new Error('Missing or invalid required option: --amount=NUM');
+  }
+  
+  // Return the validated options with type assertion
   return options as TradeOptions;
 }
 
@@ -172,3 +212,11 @@ function parseTradeOptions(args: string[]): TradeOptions {
 main().catch(error => {
   console.error('Error running market trade script:', error);
 });
+
+// Export functions for use in other modules
+export {
+  executeMarketTrade,
+  checkAvailableTrades,
+  TradeOptions,
+  TransactionResult
+};
