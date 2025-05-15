@@ -3,11 +3,15 @@
  * 
  * This module validates signals before they are processed by the system
  * to ensure data quality, completeness, and prevent invalid trading actions.
+ * 
+ * Now enhanced with Zero-Knowledge Proof verification to validate signal
+ * integrity without revealing model weights or parameters.
  */
 
 import { SignalPriority, SignalType, BaseSignal } from '../shared/signalTypes';
 import { Signal } from './signalHub';
 import { logger } from './logger';
+import { zkProofVerification, ZkProofScheme } from './lib/zkProofVerification';
 
 // Signal validation rules
 interface ValidationRule {
@@ -172,6 +176,53 @@ class SignalValidator {
       },
       errorMessage: (signal) => `Analysis data recommended for signal type: ${signal.type}`,
       severity: 'warning'
+    });
+    
+    // Zero-Knowledge Proof verification for AI-generated signals
+    this.rules.push({
+      name: 'zk-proof-verification',
+      validate: (signal) => {
+        // Only validate AI-generated signals that should have ZK proofs
+        const requiresZkProof = [
+          'PerplexityAI',
+          'DeepSeekAI',
+          'MemeCortex',
+          'QuantumNeuralNet'
+        ].includes(signal.source);
+        
+        if (!requiresZkProof) {
+          return true; // Skip validation for signals from other sources
+        }
+        
+        try {
+          // Generate model weights for the signal source
+          // In a real implementation, these would be retrieved from a secure storage
+          const modelWeights = zkProofVerification.generateModelWeights(
+            signal.source,
+            { 
+              timestamp: signal.timestamp,
+              sourceId: signal.source,
+              confidenceFactors: signal.confidence
+            }
+          );
+          
+          // Verify the signal with ZK proof
+          const isValid = zkProofVerification.verifySignal(signal, modelWeights);
+          
+          if (isValid) {
+            logger.info(`ZK proof verification passed for signal ${signal.id} from ${signal.source}`);
+          } else {
+            logger.warn(`ZK proof verification failed for signal ${signal.id} from ${signal.source}`);
+          }
+          
+          return isValid;
+        } catch (error) {
+          logger.error(`Error during ZK proof verification for signal ${signal.id}: ${error.message}`);
+          return false;
+        }
+      },
+      errorMessage: (signal) => `AI signal verification failed: ZK proof invalid for ${signal.source}`,
+      severity: 'error'
     });
   }
 
