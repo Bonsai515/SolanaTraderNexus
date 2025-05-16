@@ -20,9 +20,9 @@ export async function initializeRpcConnection(): Promise<Connection> {
   
   try {
     // Initialize RPC connections through the manager
-    await rpcConnectionManager.getRpcConnection();
+    const connection = rpcConnectionManager.getManagedConnection();
     logger.info('Successfully connected to Solana RPC node with intelligent rate limiting.');
-    return await rpcConnectionManager.getRpcConnection();
+    return connection;
   } catch (error) {
     logger.error('Failed to initialize any Solana RPC connection:', error);
     throw error;
@@ -34,7 +34,7 @@ export async function initializeRpcConnection(): Promise<Connection> {
  */
 export function getSolanaConnection(): Connection {
   try {
-    return rpcConnectionManager.getRpcConnection();
+    return rpcConnectionManager.getManagedConnection();
   } catch (error) {
     logger.error('Error getting Solana connection:', error);
     throw error;

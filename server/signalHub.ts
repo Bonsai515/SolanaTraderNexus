@@ -20,15 +20,153 @@ export enum SignalType {
   EXIT = 'exit',
   REBALANCE = 'rebalance',
   FLASH_OPPORTUNITY = 'flash_opportunity',
-  CROSS_CHAIN = 'cross_chain'
+  CROSS_CHAIN = 'cross_chain',
+  MARKET_SENTIMENT = 'market_sentiment',  // Added for market analysis
+  ARBITRAGE_OPPORTUNITY = 'arbitrage_opportunity', // Added for arbitrage
+  VOLATILITY_ALERT = 'volatility_alert'   // Added for volatility alerts
 }
 
 export enum SignalStrength {
   LOW = 'low',        // 0-30%
   MEDIUM = 'medium',  // 31-70%
   HIGH = 'high',      // 71-90%
-  EXTREME = 'extreme' // 91-100%
+  EXTREME = 'extreme', // 91-100%
+  WEAK = 'weak',      // Added for market signals
+  STRONG = 'strong'   // Added for market signals
 }
+
+// Add these enums for market analysis signals
+export enum SignalDirection {
+  BULLISH = 'bullish',
+  BEARISH = 'bearish',
+  NEUTRAL = 'neutral',
+  SLIGHTLY_BULLISH = 'slightly_bullish',
+  SLIGHTLY_BEARISH = 'slightly_bearish'
+}
+
+export enum SignalPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum SignalSource {
+  TRANSFORMER = 'transformer',
+  AGENT = 'agent',
+  ENGINE = 'engine',
+  PERPLEXITY_AI = 'perplexity_ai',
+  LOCAL_ANALYSIS = 'local_analysis'
+}
+
+// Define the transformer signal interface
+export interface TransformerSignal {
+  id: string;
+  timestamp: number;
+  transformer: string;
+  type: SignalType;
+  confidence: number;
+  strength: SignalStrength;
+  timeframe: SignalTimeframe;
+  action: 'buy' | 'sell' | 'swap' | 'borrow' | 'flash_loan';
+  sourceToken: string;
+  targetToken: string;
+  sourceAmount?: number;
+  targetAmount?: number;
+  entryPriceUsd?: number;
+  targetPriceUsd?: number;
+  stopLossUsd?: number;
+  dex?: string;
+  flashLoan?: boolean;
+  crossChain?: boolean;
+  leverage?: number;
+  description?: string;
+  metadata?: any;
+}
+
+// Create a singleton signal hub class
+class SignalHub {
+  private signals: Map<string, TransformerSignal> = new Map();
+  private eventEmitter: EventEmitter = new EventEmitter();
+  
+  constructor() {
+    this.eventEmitter.setMaxListeners(50);
+  }
+  
+  /**
+   * Submit a new signal
+   * @param signal The signal to submit
+   * @returns The signal ID
+   */
+  public async submitSignal(signal: any): Promise<string> {
+    try {
+      // Generate ID if not provided
+      const signalId = signal.id || `signal_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      
+      // Ensure ID is assigned to signal
+      signal.id = signalId;
+      
+      // Store signal
+      this.signals.set(signalId, signal);
+      
+      // Log signal submission
+      logger.info(`[SignalHub] Signal submitted: ${signalId} (${signal.type}) - ${signal.sourceToken} → ${signal.targetToken}`);
+      
+      // Emit signal events
+      this.eventEmitter.emit('signal', signal);
+      this.eventEmitter.emit(`signal:${signal.type}`, signal);
+      
+      return signalId;
+    } catch (error) {
+      logger.error(`[SignalHub] Error submitting signal: ${error}`);
+      return '';
+    }
+  }
+  
+  /**
+   * Get a signal by ID
+   * @param id The signal ID
+   * @returns The signal if found, undefined otherwise
+   */
+  public getSignal(id: string): TransformerSignal | undefined {
+    return this.signals.get(id);
+  }
+  
+  /**
+   * Get recent signals
+   * @param limit Maximum number of signals to return
+   * @returns Array of recent signals
+   */
+  public getRecentSignals(limit: number = 10): TransformerSignal[] {
+    return Array.from(this.signals.values())
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+  }
+  
+  /**
+   * Listen for new signals
+   * @param callback Callback function to handle new signals
+   * @returns Function to remove the listener
+   */
+  public onSignal(callback: (signal: TransformerSignal) => void): () => void {
+    this.eventEmitter.on('signal', callback);
+    return () => this.eventEmitter.off('signal', callback);
+  }
+  
+  /**
+   * Listen for signals of a specific type
+   * @param type Signal type to listen for
+   * @param callback Callback function to handle signals
+   * @returns Function to remove the listener
+   */
+  public onSignalType(type: SignalType, callback: (signal: TransformerSignal) => void): () => void {
+    this.eventEmitter.on(`signal:${type}`, callback);
+    return () => this.eventEmitter.off(`signal:${type}`, callback);
+  }
+}
+
+// Export singleton instance
+export const signalHub = new SignalHub();
 
 export enum SignalTimeframe {
   IMMEDIATE = 'immediate',  // Execute immediately

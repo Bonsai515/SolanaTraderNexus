@@ -232,6 +232,7 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     // Initialize profit collection system
     console.log('Initializing profit collection system...');
     try {
+      const { initializeProfitCollection } = require('./profit-collection');
       initializeProfitCollection(solanaConnection, SYSTEM_WALLET);
       console.log('✅ Profit collection system initialized successfully');
       console.log('   Profit capture interval: 4 minutes, reinvestment rate: 95%');
@@ -241,6 +242,7 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     // Initialize Jito bundle support
     console.log('Initializing Jito bundle support for MEV protection...');
     try {
+      const { initializeJitoBundles } = require('./jito-bundles');
       const jitoInitialized = initializeJitoBundles(solanaConnection);
       if (jitoInitialized) {
         console.log('✅ Jito bundle support initialized successfully');
@@ -274,8 +276,14 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     }
     // Initialize price feed cache
     console.log('Initializing price feed cache...');
-    await waitForPriceFeedInit();
-    console.log('✅ Price feed cache initialized with data for multiple tokens');
+    try {
+      const { initializePriceFeed, waitForPriceFeedInit } = require('./price-feed');
+      await initializePriceFeed(solanaConnection);
+      await waitForPriceFeedInit();
+      console.log('✅ Price feed cache initialized with data for multiple tokens');
+    } catch (error) {
+      console.error('❌ Error during price feed initialization:', error);
+    }
     
     // Initialize on-chain arbitrage router program
     console.log('Initializing on-chain arbitrage router program...');
@@ -370,14 +378,17 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       mevProtection: true
     };
     
-    const engine = initializeNexusEngine(nexusConfig);
-    const success = engine ? true : false;
+    const success = await initializeNexusEngine(nexusConfig);
     
     if (success) {
       console.log('✅ Successfully initialized Nexus Professional Engine with enhanced RPC connection');
       
       // Register system wallet with the engine
-      if (engine.registerWallet(SYSTEM_WALLET)) {
+      if (nexusEngine.registerWallet({
+        walletAddress: SYSTEM_WALLET,
+        walletType: 'trading',
+        label: 'System Trading Wallet'
+      })) {
         console.log(`✅ System wallet ${SYSTEM_WALLET} registered for trading operations`);
       } else {
         console.warn(`⚠️ Failed to register system wallet ${SYSTEM_WALLET} with Nexus engine`);

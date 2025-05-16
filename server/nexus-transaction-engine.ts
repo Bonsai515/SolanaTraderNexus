@@ -5,6 +5,22 @@
  * using the optimized RPC connection management to prevent rate limits.
  */
 
+// Execution mode enum for the engine
+export enum ExecutionMode {
+  LIVE = 'live',
+  SIMULATION = 'simulation',
+  VALIDATION = 'validation',
+  DEBUG = 'debug'
+}
+
+// Transaction priority enum
+export enum TransactionPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  URGENT = 'urgent'
+}
+
 import {
   Connection,
   Keypair,
@@ -101,6 +117,30 @@ export class NexusEngine {
   }
   
   /**
+   * Execute a trade based on signal
+   */
+  async executeTrade(params: {
+    sourceToken: string;
+    targetToken: string;
+    amount: number;
+    slippageBps: number;
+    strategy: string;
+    signalId: string;
+    stopLoss?: number;
+    takeProfit?: number;
+  }): Promise<{ success: boolean; signature?: string; error?: string }> {
+    logger.info(`[NexusEngine] Executing trade: ${params.sourceToken} -> ${params.targetToken}, amount: ${params.amount}, strategy: ${params.strategy}`);
+    
+    // For now, this is just a wrapper around executeSwap
+    return executeSwap({
+      source: params.sourceToken,
+      target: params.targetToken,
+      amount: params.amount,
+      slippageBps: params.slippageBps
+    });
+  }
+  
+  /**
    * Execute a Solana transaction
    */
   async executeSolanaTransaction(
@@ -109,6 +149,37 @@ export class NexusEngine {
     options: TransactionOptions = {}
   ): Promise<{ success: boolean; signature?: string; error?: string }> {
     return executeSolanaTransaction(transaction, signers, options);
+  }
+  
+  /**
+   * Register a wallet with the engine
+   */
+  registerWallet(params: {
+    walletAddress: string;
+    walletType: 'trading' | 'profit' | 'liquidity' | 'holding';
+    label?: string;
+  }): boolean {
+    try {
+      const { walletAddress, walletType, label } = params;
+      
+      logger.info(`[NexusEngine] Registering ${walletType} wallet: ${walletAddress}${label ? ` (${label})` : ''}`);
+      
+      // Validate wallet address
+      try {
+        new PublicKey(walletAddress);
+      } catch (error) {
+        logger.error(`[NexusEngine] Invalid wallet address: ${walletAddress}`);
+        return false;
+      }
+      
+      // In a real implementation, this would store the wallet in the engine's registry
+      // For now, just log the registration
+      
+      return true;
+    } catch (error) {
+      logger.error(`[NexusEngine] Error registering wallet: ${error}`);
+      return false;
+    }
   }
   
   /**
@@ -127,6 +198,63 @@ export class NexusEngine {
 }
 
 /**
+ * Initialize Nexus Engine with the provided configuration
+ */
+export async function initializeNexusEngine(options: {
+  mode?: ExecutionMode;
+  priority?: TransactionPriority;
+  walletAddress?: string;
+  rpcUrl?: string;
+} = {}): Promise<boolean> {
+  if (!options.mode) {
+    options.mode = ExecutionMode.LIVE;
+  }
+  if (!options.priority) {
+    options.priority = TransactionPriority.MEDIUM;
+  }
+  
+  try {
+    logger.info(`[NexusEngine] Initializing Nexus Transaction Engine in ${options.mode} mode with ${options.priority} priority`);
+    
+    if (options.walletAddress) {
+      config.mainWalletAddress = options.walletAddress;
+    }
+    
+    // Get RPC connection
+    connection = getManagedConnection();
+    
+    // Create public key from wallet address
+    mainWalletPublicKey = new PublicKey(config.mainWalletAddress);
+    
+    // Load wallet keypair (in production this would use secure storage)
+    if (config.walletKeyPath) {
+      try {
+        const keyData = fs.readFileSync(config.walletKeyPath, 'utf8');
+        const decoded = bs58.decode(keyData);
+        walletKeypair = Keypair.fromSecretKey(decoded);
+        logger.info(`[NexusEngine] Loaded wallet keypair from ${config.walletKeyPath}`);
+      } catch (error) {
+        logger.error(`[NexusEngine] Error loading wallet keypair: ${error}`);
+      }
+    }
+    
+    // Create singleton instance if needed
+    if (!engineInstance) {
+      engineInstance = new NexusEngine();
+    }
+    
+    // Update state
+    initialized = true;
+    
+    logger.info(`[NexusEngine] Nexus Transaction Engine initialized successfully with wallet ${config.mainWalletAddress}`);
+    return true;
+  } catch (error) {
+    logger.error(`[NexusEngine] Initialization error: ${error}`);
+    return false;
+  }
+}
+
+/**
  * Get the singleton engine instance
  */
 export function getNexusEngine(): NexusEngine {
@@ -135,6 +263,9 @@ export function getNexusEngine(): NexusEngine {
   }
   return engineInstance;
 }
+
+// Export the engine instance for direct access
+export const nexusEngine = engineInstance || new NexusEngine();
 
 /**
  * Initialize the transaction engine

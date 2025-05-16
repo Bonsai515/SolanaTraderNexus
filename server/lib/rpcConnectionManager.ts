@@ -104,13 +104,15 @@ function startHealthCheck() {
       
       try {
         const startTime = Date.now();
-        const result = await connection.getHealth();
+        // Simple health check - just request the latest block height
+        const result = await connection.getBlockHeight();
         const endTime = Date.now();
         const latency = endTime - startTime;
+        const isHealthy = result > 0;
         
         const health = endpointHealth.get(url);
         if (health) {
-          health.healthy = result === 'ok';
+          health.healthy = isHealthy ? true : false;
           health.latency = latency;
           health.lastChecked = Date.now();
           health.failCount = 0;
@@ -271,6 +273,34 @@ export async function executeWithRpcLoadBalancing<T>(
  */
 export function getEndpointHealthStatus(): EndpointHealth[] {
   return Array.from(endpointHealth.values());
+}
+
+/**
+ * Get balance of a public key using the managed connection
+ */
+export async function getBalance(publicKey: PublicKey): Promise<number> {
+  const connection = getManagedConnection();
+  return executeWithRpcLoadBalancing(async (conn) => {
+    return await conn.getBalance(publicKey);
+  });
+}
+
+/**
+ * Get account info from on-chain program
+ */
+export async function getAccountInfo(publicKey: PublicKey, commitment?: string): Promise<any> {
+  return executeWithRpcLoadBalancing(async (connection) => {
+    return await connection.getAccountInfo(publicKey, commitment);
+  });
+}
+
+/**
+ * Get program accounts for on-chain program data
+ */
+export async function getProgramAccounts(programId: PublicKey, filters?: any): Promise<any[]> {
+  return executeWithRpcLoadBalancing(async (connection) => {
+    return await connection.getProgramAccounts(programId, filters);
+  });
 }
 
 // Initialize on import
