@@ -1,7 +1,7 @@
 {
   "useRealFunds": true,
-  "rpcUrl": "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
-  "websocketUrl": "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "rpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "websocketUrl": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
   "systemWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
   "backupRpcUrls": [
     "https://api.mainnet-beta.solana.com",
@@ -24,14 +24,15 @@
   "mevProtection": false,
   "rateLimitSettings": {
     "enabled": true,
-    "maxRequestsPerSecond": 4,
-    "maxConcurrentRequests": 2,
-    "cooldownBetweenRequestsMs": 250,
+    "maxRequestsPerSecond": 5,
+    "maxConcurrentRequests": 3,
+    "cooldownBetweenRequestsMs": 200,
     "retryStrategy": {
       "initialBackoffMs": 500,
       "maxBackoffMs": 8000,
       "maxRetries": 5,
       "backoffMultiplier": 2
     }
-  }
+  },
+  "forceLiveMode": true
 }
