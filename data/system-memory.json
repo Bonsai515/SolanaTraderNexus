@@ -25,7 +25,8 @@
     "testMode": false,
     "simulateTransactions": false,
     "liveMode": true,
-    "forceRealTransactions": true
+    "forceRealTransactions": true,
+    "autonomousTrading": true
   },
   "config": {
     "transactionEngine": {
@@ -107,7 +108,27 @@
       "mainWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
       "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
       "useRealWallet": true
+    },
+    "onChainPrograms": {
+      "enabled": true,
+      "programIds": {
+        "hyperion": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+        "quantumMEV": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+        "memeCortex": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+        "flashArb": "FlsH1zBxXz3ib9uqgHNtV6uqzGMcnTgoAutozBXH8Zff",
+        "priceOracle": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+      }
+    },
+    "autonomousTrading": {
+      "enabled": true,
+      "requireOnChainValidation": true,
+      "profitThreshold": 0.5,
+      "riskManagement": {
+        "stopLoss": true,
+        "stopLossThreshold": 5,
+        "maxDaily": 200
+      }
     }
   },
-  "lastUpdated": "2025-05-16T10:38:21.327Z"
+  "lastUpdated": "2025-05-16T15:58:09.386Z"
 }

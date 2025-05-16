@@ -1,0 +1,194 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-05-16T15:58:09.371Z",
+  "programs": {
+    "hyperion": {
+      "id": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+      "name": "Hyperion Flash Arbitrage",
+      "description": "On-chain program for flash loan arbitrage execution",
+      "active": true,
+      "instructions": {
+        "executeFlashArbitrage": {
+          "accounts": [
+            "flashArbitrage",
+            "vaultAccount",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "amountIn",
+              "type": "u64"
+            },
+            {
+              "name": "minAmountOut",
+              "type": "u64"
+            },
+            {
+              "name": "routes",
+              "type": "bytes"
+            }
+          ]
+        },
+        "executeMultiHopTrade": {
+          "accounts": [
+            "flashArbitrage",
+            "vaultAccount",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "amountIn",
+              "type": "u64"
+            },
+            {
+              "name": "minAmountOut",
+              "type": "u64"
+            },
+            {
+              "name": "hops",
+              "type": "u8"
+            },
+            {
+              "name": "routes",
+              "type": "bytes"
+            }
+          ]
+        }
+      }
+    },
+    "quantumMEV": {
+      "id": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+      "name": "Quantum MEV Extractor",
+      "description": "On-chain program for MEV extraction and protection",
+      "active": true,
+      "instructions": {
+        "extractMEV": {
+          "accounts": [
+            "mevExtractor",
+            "bundler",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "searchParams",
+              "type": "bytes"
+            },
+            {
+              "name": "maxSlippage",
+              "type": "u64"
+            }
+          ]
+        },
+        "bundleTransactions": {
+          "accounts": [
+            "bundler",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "transactions",
+              "type": "bytes"
+            },
+            {
+              "name": "priorityFee",
+              "type": "u64"
+            }
+          ]
+        }
+      }
+    },
+    "memeCortex": {
+      "id": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+      "name": "MemeCortex Analyzer",
+      "description": "On-chain program for meme token analysis and sniping",
+      "active": true,
+      "instructions": {
+        "analyzeMemeToken": {
+          "accounts": [
+            "memeAnalyzer",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "tokenMint",
+              "type": "publicKey"
+            },
+            {
+              "name": "timeWindow",
+              "type": "u64"
+            }
+          ]
+        },
+        "executeMemeSnipe": {
+          "accounts": [
+            "sniper",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "tokenMint",
+              "type": "publicKey"
+            },
+            {
+              "name": "amountIn",
+              "type": "u64"
+            },
+            {
+              "name": "minAmountOut",
+              "type": "u64"
+            },
+            {
+              "name": "maxSlippage",
+              "type": "u16"
+            }
+          ]
+        }
+      }
+    },
+    "flashArb": {
+      "id": "FlsH1zBxXz3ib9uqgHNtV6uqzGMcnTgoAutozBXH8Zff",
+      "name": "Flash Arbitrage Executor",
+      "description": "On-chain program for executing flash arbitrage",
+      "active": true,
+      "instructions": {
+        "executeFlashLoan": {
+          "accounts": [
+            "flashLoan",
+            "tokenProgram",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "amount",
+              "type": "u64"
+            },
+            {
+              "name": "route",
+              "type": "bytes"
+            }
+          ]
+        }
+      }
+    },
+    "priceOracle": {
+      "id": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT",
+      "name": "Price Oracle",
+      "description": "On-chain price oracle for accurate pricing",
+      "active": true,
+      "instructions": {
+        "getPrice": {
+          "accounts": [
+            "oracle",
+            "user"
+          ],
+          "args": [
+            {
+              "name": "tokenMint",
+              "type": "publicKey"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
