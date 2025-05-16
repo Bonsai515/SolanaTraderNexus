@@ -43,7 +43,11 @@
       "verifyTransactions": true,
       "rpcProvider": "INSTANT_NODES",
       "maxSlippageBps": 100,
-      "priorityFee": "MEDIUM"
+      "priorityFee": "MEDIUM",
+      "mainWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "secondaryWalletAddress": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "prophetWalletAddress": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "tradingWalletAddress": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm"
     }
   },
   "useRealFunds": true,
