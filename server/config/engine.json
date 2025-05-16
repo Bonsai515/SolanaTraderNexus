@@ -1,7 +1,53 @@
 {
+  "name": "Nexus Professional Engine",
+  "version": "2.5.0",
   "useRealFunds": true,
-  "rpcUrl": "https://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
-  "websocketUrl": "wss://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
-  "systemWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-  "wormholeGuardianRpc": "https://guardian.stable.productions"
+  "maxConcurrentTransactions": 8,
+  "priorityFeeLevels": {
+    "LOW": 10000,
+    "MEDIUM": 100000,
+    "HIGH": 500000,
+    "VERY_HIGH": 1000000,
+    "MAXIMUM": 5000000
+  },
+  "defaultPriorityFee": "HIGH",
+  "rpcConfig": {
+    "mainRpc": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "backupRpc": [
+      "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "https://api.mainnet-beta.solana.com"
+    ],
+    "rateLimit": {
+      "requestsPerMinute": 225,
+      "maxRetries": 5,
+      "retryDelay": 1000
+    }
+  },
+  "flashLoanConfig": {
+    "enabled": true,
+    "providers": [
+      "Solend",
+      "Mango",
+      "Kamino"
+    ],
+    "maxLoanAmount": 100000,
+    "safetyFactor": 0.98
+  },
+  "mevProtection": {
+    "enabled": true,
+    "bundles": true,
+    "privateTxs": true
+  },
+  "onChainPrograms": {
+    "hyperion": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+    "quantumMEV": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+    "memeCortex": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+    "flashArb": "FlsH1zBxXz3ib9uqgHNtV6uqzGMcnTgoAutozBXH8Zff",
+    "priceOracle": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+  },
+  "wallets": {
+    "main": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "prophet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  }
 }
