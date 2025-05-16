@@ -222,7 +222,9 @@ export async function startAgentSystem(): Promise<boolean> {
             name: agent.name,
             active: true,
             wallets: {
-              system: SYSTEM_WALLET_ADDRESS
+              trading: SYSTEM_WALLET_ADDRESS,
+              profit: SYSTEM_WALLET_ADDRESS,
+              auxiliary: SYSTEM_WALLET_ADDRESS
             }
           });
           logger.info(`${agent.name} is now actively running cross-chain strategies and market prediction`);

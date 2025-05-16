@@ -811,3 +811,57 @@ export async function initMemecoinPriceDistributor(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Validate trade signal parameters before execution
+ * This ensures all required parameters are present to avoid undefined values
+ * 
+ * @param sourceToken Source token symbol
+ * @param destinationToken Destination token symbol
+ * @param amount Trade amount
+ * @returns Validated parameters object or null if invalid
+ */
+export function validateTradeParameters(
+  sourceToken: string,
+  destinationToken: string | undefined,
+  amount: number
+): { sourceToken: string, destinationToken: string, amount: number } | null {
+  try {
+    // Check source token
+    if (!sourceToken) {
+      console.error('[TradeValidator] Missing source token');
+      return null;
+    }
+    
+    // Check destination token
+    if (!destinationToken) {
+      // If destination is undefined, try to find a high-profit memecoin
+      console.warn(`[TradeValidator] Missing destination token, attempting to find profitable alternative`);
+      
+      const topMemecoins = memecoinPriceDistributor.getTopProfitable(5);
+      if (topMemecoins.length > 0) {
+        destinationToken = topMemecoins[0].symbol;
+        console.info(`[TradeValidator] Selected ${destinationToken} as replacement destination token`);
+      } else {
+        console.error('[TradeValidator] No alternative destination token found');
+        return null;
+      }
+    }
+    
+    // Check amount
+    if (!amount || amount <= 0) {
+      console.error('[TradeValidator] Invalid trade amount');
+      return null;
+    }
+    
+    // Return validated parameters
+    return {
+      sourceToken,
+      destinationToken,
+      amount
+    };
+  } catch (error) {
+    console.error('[TradeValidator] Error validating trade parameters:', error);
+    return null;
+  }
+}

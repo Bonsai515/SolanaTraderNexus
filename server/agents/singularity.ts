@@ -136,11 +136,24 @@ class SingularityAgent {
       // Register wallets with the Nexus engine
       try {
         const engine = getNexusEngine();
-        engine.registerWallet(sourceWallet);
+        engine.registerWallet({
+          address: sourceWallet,
+          type: 'trading'
+        });
+        
         if (targetWallet !== sourceWallet) {
-          engine.registerWallet(targetWallet);
+          engine.registerWallet({
+            address: targetWallet,
+            type: 'auxiliary'
+          });
         }
-        engine.registerWallet(profitWallet);
+        
+        engine.registerWallet({
+          address: profitWallet,
+          type: 'profit'
+        });
+        
+        logger.info(`Registered wallets with Nexus Engine: trading=${sourceWallet}, profit=${profitWallet}`);
       } catch (err) {
         logger.warn(`Failed to register wallets: ${err.message}. Will continue without wallet registration.`);
       }
@@ -602,17 +615,19 @@ export async function startSingularity(config: {
   name: string;
   active: boolean;
   wallets: {
-    system: string;
+    trading: string;
     profit?: string;
+    auxiliary?: string;
   }
 }): Promise<boolean> {
   try {
     logger.info(`Starting Singularity agent ${config.id}: ${config.name}`);
-    const systemWallet = config.wallets.system;
-    const profitWallet = config.wallets.profit || systemWallet;
+    const tradingWallet = config.wallets.trading;
+    const profitWallet = config.wallets.profit || tradingWallet;
+    const auxiliaryWallet = config.wallets.auxiliary || tradingWallet;
     
-    // Use the same wallet for source and target since we're using Wormhole bridge
-    return singularityAgent.activate(systemWallet, systemWallet, profitWallet);
+    // Use the provided wallets for the agent
+    return singularityAgent.activate(tradingWallet, auxiliaryWallet, profitWallet);
   } catch (error) {
     logger.error(`Failed to start Singularity agent ${config.id}:`, error);
     return false;

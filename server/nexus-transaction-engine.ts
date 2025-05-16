@@ -36,6 +36,7 @@ import { getManagedConnection, executeWithRpcLoadBalancing } from './lib/rpcConn
 import * as bs58 from 'bs58';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EventEmitter } from 'events';
 
 // Configuration paths
 const CONFIG_DIR = './server/config';
@@ -75,6 +76,24 @@ interface Strategy {
   config: any;
 }
 
+// Trade execution params for neural network integration
+interface TradeExecutionParams {
+  signalId: string;
+  source: string;
+  target: string;
+  amount: number;
+  slippageBps: number;
+  strategy: string;
+  walletOverride: string;
+  executionMode: ExecutionMode;
+  timestamp: number;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  agentId: string;
+}
+
+// Global event bus for neural communication
+const nexusEventBus = new EventEmitter();
+
 // State
 let initialized = false;
 let connection: Connection;
@@ -102,6 +121,50 @@ export class NexusEngine {
     if (!initialized) {
       logger.warn('[NexusEngine] Engine instance created but not initialized');
     }
+    
+    // Set up event listeners for neural network integration
+    this.setupEventListeners();
+  }
+  
+  /**
+   * Set up event listeners for various neural communication channels
+   */
+  private setupEventListeners(): void {
+    // Listen for direct execution requests from the neural communication hub
+    nexusEventBus.on('engine:direct:execution', async (params: TradeExecutionParams) => {
+      logger.info(`[NexusEngine] Received direct execution request for signal ${params.signalId} from agent ${params.agentId}`);
+      
+      try {
+        // Convert and execute the trade
+        const result = await this.executeSwap({
+          source: params.source,
+          target: params.target,
+          amount: params.amount,
+          slippageBps: params.slippageBps
+        });
+        
+        // Report back the execution result
+        nexusEventBus.emit('engine:execution:result', {
+          signalId: params.signalId,
+          success: result.success,
+          signature: result.signature,
+          error: result.error,
+          timestamp: Date.now()
+        });
+        
+        logger.info(`[NexusEngine] Executed trade for signal ${params.signalId}: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+      } catch (error) {
+        logger.error(`[NexusEngine] Error executing trade for signal ${params.signalId}: ${error}`);
+        
+        // Report execution failure
+        nexusEventBus.emit('engine:execution:result', {
+          signalId: params.signalId,
+          success: false,
+          error: error.message || String(error),
+          timestamp: Date.now()
+        });
+      }
+    });
   }
   
   /**
@@ -494,16 +557,40 @@ export function registerWallet(address: string, type: string): boolean {
  */
 export async function executeSwap(params: {
   source: string;
-  target: string;
+  target: string | undefined;
   amount: number;
   slippageBps?: number;
 }): Promise<{ success: boolean; signature?: string; error?: string }> {
   if (!initialized) {
     return { success: false, error: 'Transaction engine not initialized' };
   }
+
+  // Validate trade parameters using the validation function from memecoin price distributor
+  const { validateTradeParameters } = require('./transformers/memecoin-price-distributor');
+  
+  // Validate parameters
+  const validatedParams = validateTradeParameters(
+    params.source,
+    params.target,
+    params.amount
+  );
+  
+  // If validation fails, return error result
+  if (!validatedParams) {
+    logger.error(`[NexusEngine] Trade validation failed for ${params.source} -> ${params.target}, amount: ${params.amount}`);
+    return {
+      success: false,
+      error: "Invalid trade parameters",
+    };
+  }
+  
+  // Use validated parameters
+  const source = validatedParams.sourceToken;
+  const target = validatedParams.destinationToken;
+  const amount = validatedParams.amount;
   
   if (!config.useRealFunds) {
-    logger.info(`[NexusEngine] Simulating swap: ${params.amount} ${params.source} → ${params.target}`);
+    logger.info(`[NexusEngine] Simulating swap: ${amount} ${source} → ${target}`);
     return { 
       success: true, 
       signature: `simulated-${Date.now()}-${Math.floor(Math.random() * 1000000)}` 
@@ -513,7 +600,7 @@ export async function executeSwap(params: {
   try {
     const slippageBps = params.slippageBps || 100; // Default 1% slippage
     
-    logger.info(`[NexusEngine] Executing LIVE swap: ${params.amount} ${params.source} → ${params.target} (slippage: ${slippageBps/100}%)`);
+    logger.info(`[NexusEngine] Executing LIVE swap: ${amount} ${source} → ${target} (slippage: ${slippageBps/100}%)`);
     logger.info(`[NexusEngine] Executing REAL BLOCKCHAIN transaction`);
     
     // Get a fresh blockhash
