@@ -343,8 +343,8 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const appServer = await registerRoutes(app);
     
     // Listen on port 5000 for production deployment
-    const port = parseInt(process.env.PORT || '5000');
-    appServer.listen(port, () => {
+    const port = parseInt(process.env.PORT || '5001');
+    appServer.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
       logger.info(`✅ Server running on port ${port}`);
