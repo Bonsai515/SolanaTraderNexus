@@ -1,0 +1,98 @@
+{
+  "version": "2.0.0",
+  "rpcEndpoints": {
+    "primary": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "backups": [
+      "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "https://api.mainnet-beta.solana.com"
+    ]
+  },
+  "websocketEndpoints": {
+    "primary": "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+    "backups": [
+      "wss://api.mainnet-beta.solana.com"
+    ]
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "requestsPerMinute": {
+      "getBalance": 120,
+      "getAccountInfo": 100,
+      "getRecentBlockhash": 60,
+      "getSignaturesForAddress": 40,
+      "sendTransaction": 30,
+      "default": 80
+    },
+    "adaptiveThrottling": {
+      "enabled": true,
+      "successRateThreshold": 0.9,
+      "backoffFactor": 1.5,
+      "maxBackoffMs": 10000,
+      "recoveryFactor": 0.9
+    },
+    "circuitBreaker": {
+      "enabled": true,
+      "failureThreshold": 5,
+      "resetTimeoutMs": 30000
+    },
+    "endpointRotation": {
+      "enabled": true,
+      "rotationStrategy": "FAILURE_COUNT",
+      "maxFailuresPerEndpoint": 3,
+      "cooldownPeriodMs": 60000,
+      "pingEndpointsMs": 300000
+    },
+    "batchRequests": {
+      "enabled": true,
+      "maxBatchSize": 10,
+      "delayMs": 100
+    }
+  },
+  "priorityFeeLevels": {
+    "LOW": 10000,
+    "MEDIUM": 100000,
+    "HIGH": 500000,
+    "VERY_HIGH": 1000000,
+    "MAXIMUM": 5000000
+  },
+  "adaptivePriorityFees": {
+    "enabled": true,
+    "networkCongestionLevels": {
+      "LOW": {
+        "threshold": 50,
+        "fee": "LOW"
+      },
+      "MEDIUM": {
+        "threshold": 200,
+        "fee": "MEDIUM"
+      },
+      "HIGH": {
+        "threshold": 500,
+        "fee": "HIGH"
+      },
+      "VERY_HIGH": {
+        "threshold": 1000,
+        "fee": "VERY_HIGH"
+      },
+      "EXTREME": {
+        "threshold": 2000,
+        "fee": "MAXIMUM"
+      }
+    },
+    "updateIntervalMs": 60000
+  },
+  "retryStrategy": {
+    "enabled": true,
+    "initialDelayMs": 500,
+    "maxDelayMs": 8000,
+    "maxRetries": 8,
+    "exponentialBackoff": true,
+    "jitter": true
+  },
+  "concurrency": {
+    "maxConcurrentRequests": 20,
+    "queueSize": 100,
+    "timeoutMs": 15000
+  }
+}

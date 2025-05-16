@@ -79,9 +79,9 @@
       },
       "autonomous": {
         "enabled": true,
-        "requireOnChainValidation": true,
-        "confidenceThreshold": 0.8,
-        "profitThreshold": 0.5
+        "requiredConfidence": 0.85,
+        "realtimeAnalysis": true,
+        "updateWalletBalance": true
       },
       "riskManagement": {
         "stopLoss": true,
@@ -89,7 +89,8 @@
         "maxDrawdown": 10,
         "maxPositionSize": 100,
         "positionSizing": "DYNAMIC"
-      }
+      },
+      "executeOnChain": true
     }
   },
   {
@@ -166,9 +167,9 @@
       },
       "autonomous": {
         "enabled": true,
-        "requireOnChainValidation": true,
-        "confidenceThreshold": 0.8,
-        "profitThreshold": 0.5
+        "requiredConfidence": 0.85,
+        "realtimeAnalysis": true,
+        "updateWalletBalance": true
       },
       "riskManagement": {
         "stopLoss": true,
@@ -176,7 +177,8 @@
         "maxDrawdown": 10,
         "maxPositionSize": 100,
         "positionSizing": "DYNAMIC"
-      }
+      },
+      "executeOnChain": true
     }
   },
   {
@@ -261,9 +263,9 @@
       },
       "autonomous": {
         "enabled": true,
-        "requireOnChainValidation": true,
-        "confidenceThreshold": 0.8,
-        "profitThreshold": 0.5
+        "requiredConfidence": 0.85,
+        "realtimeAnalysis": true,
+        "updateWalletBalance": true
       },
       "riskManagement": {
         "stopLoss": true,
@@ -271,7 +273,8 @@
         "maxDrawdown": 10,
         "maxPositionSize": 100,
         "positionSizing": "DYNAMIC"
-      }
+      },
+      "executeOnChain": true
     }
   }
 ]

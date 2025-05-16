@@ -1,35 +1,92 @@
 {
+  "version": "2.0.0",
   "enabled": true,
-  "maxDailyTransactions": 100,
-  "maxDailyVolume": 500,
-  "maxTransactionAmount": 100,
+  "riskManagement": {
+    "maxDailyVolume": 1000,
+    "maxTransactionSize": 100,
+    "maxDailyTransactions": 100,
+    "maxExposurePerToken": 200,
+    "portfolioDiversification": true,
+    "maxAllocationPerToken": 0.2
+  },
   "stopLoss": {
     "enabled": true,
-    "threshold": 5,
-    "cooldownMinutes": 60
+    "globalStopLoss": 10,
+    "individualStopLoss": 5,
+    "timeframeHours": 24,
+    "cooldownAfterTrigger": 3600
   },
-  "profitTaking": {
+  "takeProfit": {
     "enabled": true,
-    "threshold": 10,
-    "percentage": 50
+    "threshold": 5,
+    "partialTakeProfit": true,
+    "partialPercentage": 0.5
   },
-  "riskLevels": {
-    "low": {
-      "maxAmount": 25,
-      "slippage": 0.5
-    },
-    "medium": {
-      "maxAmount": 50,
-      "slippage": 1
-    },
-    "high": {
-      "maxAmount": 100,
-      "slippage": 2
-    }
+  "marketConditionControls": {
+    "enabled": true,
+    "volatilityThreshold": 5,
+    "reduceSizeOnVolatility": true,
+    "volatilityReductionFactor": 0.5,
+    "pauseTradingOnExtreme": true,
+    "extremeVolatilityThreshold": 15
+  },
+  "circuitBreakers": {
+    "enabled": true,
+    "failedTransactionsLimit": 3,
+    "drawdownThreshold": 8,
+    "pauseDurationMinutes": 60,
+    "requireManualReset": false
   },
   "tokenSafety": {
-    "requireLiquidity": true,
+    "requireWhitelist": true,
+    "whitelistedTokens": [
+      "SOL",
+      "BTC",
+      "ETH",
+      "BONK",
+      "WIF",
+      "MEME",
+      "JUP",
+      "RAY",
+      "USDC",
+      "USDT"
+    ],
     "minLiquidityUsd": 50000,
-    "excludeNonVerified": true
+    "minVolume24h": 20000,
+    "maxSlippage": 1,
+    "rejectRugPullIndicators": true,
+    "analysisBeforeTrading": true
+  },
+  "transactionVerification": {
+    "enabled": true,
+    "verifyBeforeSubmitting": true,
+    "verifyAfterSubmission": true,
+    "requiredConfirmations": 2,
+    "maxConfirmationWaitTimeMs": 60000,
+    "checkBlockchainExplorer": true,
+    "useSolscan": true
+  },
+  "autonomousFailsafe": {
+    "enabled": true,
+    "haltOnUnexpectedBehavior": true,
+    "maxDrawdownBeforeHalt": 15,
+    "unusualActivityDetection": true,
+    "unusualActivityThreshold": 3,
+    "dailyProfitLimit": 100,
+    "emergencyContactOnHalt": false
+  },
+  "walletProtection": {
+    "minSolBalance": 0.05,
+    "reserveFunds": true,
+    "reservePercentage": 0.1,
+    "preventEmptyWallet": true,
+    "validateTargetAddress": true
+  },
+  "audit": {
+    "logAllTransactions": true,
+    "detailedTradeHistory": true,
+    "saveRejectedTrades": true,
+    "saveSafetyEvents": true,
+    "notifyOnSafetyTrigger": true
   }
 }
