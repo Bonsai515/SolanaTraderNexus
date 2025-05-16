@@ -107,7 +107,7 @@ class SignalValidator {
           SignalType.MEV_OPPORTUNITY,
           SignalType.FLASH_LOAN,
           SignalType.ARBITRAGE,
-          SignalType.SNIPE
+          SignalType.MEV_OPPORTUNITY
         ].includes(signal.type);
 
         return !requiresToken || !!signal.token_address;
@@ -171,7 +171,7 @@ class SignalValidator {
       validate: (signal) => {
         const shouldHaveAnalysis = [
           SignalType.PATTERN_RECOGNITION,
-          SignalType.CrossChain,
+          SignalType.CROSS_CHAIN_OPPORTUNITY,
           SignalType.WHALE_MOVEMENT
         ].includes(signal.type);
 
