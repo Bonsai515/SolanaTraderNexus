@@ -7,7 +7,7 @@
  */
 
 import * as logger from './logger';
-import { nexusEngine } from './nexus-transaction-engine';
+import { getNexusEngine } from './nexus-transaction-engine';
 import { PublicKey } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -277,6 +277,30 @@ export async function getAllWalletBalances(): Promise<any> {
     logger.error('Error retrieving wallet balances:', error);
     throw new Error('Failed to retrieve wallet balances');
   }
+}
+
+/**
+ * Get the main trading wallet address
+ * @returns The trading wallet address
+ */
+export function getTradingWalletAddress(): string {
+  return currentWalletConfig.tradingWallet;
+}
+
+/**
+ * Get the profit wallet address
+ * @returns The profit wallet address
+ */
+export function getProfitWalletAddress(): string {
+  return currentWalletConfig.profitWallet;
+}
+
+/**
+ * Get the fee wallet address if available
+ * @returns The fee wallet address or null
+ */
+export function getFeeWalletAddress(): string | null {
+  return currentWalletConfig.feeWallet || null;
 }
 
 // Initialize by trying to load existing configuration
