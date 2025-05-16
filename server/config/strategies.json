@@ -59,7 +59,10 @@
       },
       "useRealFunds": true,
       "simulationMode": false,
-      "updateWalletBalance": true
+      "updateWalletBalance": true,
+      "dryRun": false,
+      "forceRealTransactions": true,
+      "skipSimulation": true
     }
   },
   {
@@ -115,7 +118,10 @@
       },
       "useRealFunds": true,
       "simulationMode": false,
-      "updateWalletBalance": true
+      "updateWalletBalance": true,
+      "dryRun": false,
+      "forceRealTransactions": true,
+      "skipSimulation": true
     }
   },
   {
@@ -180,7 +186,10 @@
       },
       "useRealFunds": true,
       "simulationMode": false,
-      "updateWalletBalance": true
+      "updateWalletBalance": true,
+      "dryRun": false,
+      "forceRealTransactions": true,
+      "skipSimulation": true
     }
   }
 ]
