@@ -1,782 +1,482 @@
 /**
- * Neural On-Chain Program Connector
+ * Neural On-Chain Connector
  * 
- * Creates a neural-like connection between the Nexus Pro Engine and on-chain Solana programs
- * for real-time information exchange and opportunity detection.
+ * This module establishes neural connections between on-chain Solana programs
+ * and the transformer system, allowing real-time data flow for more informed
+ * trading decisions.
  */
 
-import { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
-  TransactionInstruction, 
-  Keypair,
-  SystemProgram,
-  Commitment,
-  LAMPORTS_PER_SOL
-} from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
 import * as logger from './logger';
-import { getManagedConnection } from './lib/rpcConnectionManager';
-import { getNexusEngine } from './nexus-transaction-engine';
-import { quantumOmegaSniper } from './ai/quantum-omega-sniper';
-import { memecoinTracker } from './ai/memecoin-strategy-tracker';
-import { TradeType } from './ai/memecoin-types';
-import { getActiveArbitrageOpportunities } from './solana/arb-router-integration';
-import EventEmitter from 'events';
+import * as rpcConnectionManager from './lib/rpcConnectionManager';
+import { submitTransformerSignal } from './signalHub';
 
-// Program IDs for different protocols
-const RAYDIUM_DEX_PROGRAM_ID = new PublicKey('675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8');
-const JUPITER_V3_PROGRAM_ID = new PublicKey('JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB');
-const ORCA_V2_PROGRAM_ID = new PublicKey('9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP');
-const SERUM_DEX_V3_PROGRAM_ID = new PublicKey('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin');
+// Program IDs to monitor
+const PROGRAM_IDS = {
+  // Serum DEX v3 program
+  SERUM_DEX_V3: '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin',
+  // Oracle program IDs
+  PYTH_ORACLE: 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH',
+  // Raydium program
+  RAYDIUM_LIQUIDITY: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+  // Other important programs
+  JUPITER_AGGREGATOR: 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB',
+  // Custom programs
+  HYPERION_FLASH: 'hFL7t5iAUiTroyWt385mGNbWGYim5Fj2jfXJ9D4AWN7', // Example - replace with your real program ID
+  QUANTUM_OMEGA: 'QMOMgKpTFgiXV8hnShfdcYRsEXRJhDxfRgm6PbCaLKvi', // Example - replace with your real program ID
+};
 
-// Pool detection thresholds
-const MIN_POOL_LIQUIDITY_SOL = 5; // Minimum liquidity in SOL
-const MIN_TVL_FOR_LISTING = 10000; // Minimum total value locked in USD
-const MAX_FDV_FOR_OPPORTUNITY = 5000000; // Maximum fully diluted value in USD
+// Program account data types
+interface ProgramAccountData {
+  programId: string;
+  accountKey: string;
+  data: any;
+  timestamp: number;
+  parsed?: any;
+}
 
-// Neuron messaging event emitter
-const neuralEmitter = new EventEmitter();
+// Memory cache for program data - avoid excessive RPC calls
+const programDataCache: Map<string, ProgramAccountData[]> = new Map();
 
-// In-memory neuron cache for quick access
-const neuronCache = new Map<string, any>();
+// WebSocket subscription IDs for account changes
+const accountSubscriptions: Map<string, number> = new Map();
 
 /**
- * NeuralPoolDetector - monitors for newly created liquidity pools
+ * Initialize on-chain neural connector
  */
-class NeuralPoolDetector {
-  private connection: Connection;
-  private isMonitoring: boolean = false;
-  private monitoringInterval: NodeJS.Timeout | null = null;
-  private subscriptionIds: number[] = [];
-  
-  constructor() {
-    this.connection = getManagedConnection({
-      commitment: 'confirmed'
-    });
-  }
-  
-  /**
-   * Start monitoring for new pools
-   */
-  startMonitoring(): boolean {
-    if (this.isMonitoring) {
-      logger.info('[NeuralOnchain] Pool detector already running');
-      return true;
-    }
+export async function initNeuralOnchainConnector(): Promise<boolean> {
+  try {
+    logger.info('[NeuralOnchain] Initializing neural connection to on-chain programs');
     
-    try {
-      logger.info('[NeuralOnchain] Starting neural pool detector');
-      
-      // Subscribe to Raydium program for new pool creations
-      this.subscribeToRaydiumPools();
-      
-      // Subscribe to Orca program for new pools
-      this.subscribeToOrcaPools();
-      
-      // Subscribe to Jupiter aggregator for routing updates
-      this.subscribeToJupiterRouting();
-      
-      // Set up an interval to check for new pools that might have been missed
-      this.monitoringInterval = setInterval(() => {
-        this.scanForNewPools();
-      }, 30000); // Every 30 seconds
-      
-      this.isMonitoring = true;
-      
-      logger.info('[NeuralOnchain] Neural pool detector started successfully');
-      return true;
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error starting pool detector: ${error}`);
-      return false;
-    }
-  }
-  
-  /**
-   * Stop monitoring
-   */
-  stopMonitoring(): void {
-    try {
-      logger.info('[NeuralOnchain] Stopping neural pool detector');
-      
-      // Clear the interval
-      if (this.monitoringInterval) {
-        clearInterval(this.monitoringInterval);
-        this.monitoringInterval = null;
-      }
-      
-      // Unsubscribe from all subscriptions
-      this.subscriptionIds.forEach(id => {
-        try {
-          this.connection.removeAccountChangeListener(id);
-        } catch (error) {
-          logger.warn(`[NeuralOnchain] Error removing listener ${id}: ${error}`);
-        }
-      });
-      
-      this.subscriptionIds = [];
-      this.isMonitoring = false;
-      
-      logger.info('[NeuralOnchain] Neural pool detector stopped');
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error stopping pool detector: ${error}`);
-    }
-  }
-  
-  /**
-   * Subscribe to Raydium pools
-   */
-  private subscribeToRaydiumPools(): void {
-    try {
-      logger.info('[NeuralOnchain] Subscribing to Raydium pool creations');
-      
-      // Subscribe to program account changes
-      const subscriptionId = this.connection.onProgramAccountChange(
-        RAYDIUM_DEX_PROGRAM_ID,
-        (accountInfo, context) => {
-          try {
-            // Check if it's a new pool account
-            if (this.isRaydiumPoolAccount(accountInfo.accountInfo.data)) {
-              const poolAddress = accountInfo.accountId.toString();
-              logger.info(`[NeuralOnchain] Detected new Raydium pool: ${poolAddress}`);
-              
-              // Process the new pool
-              this.processNewPool({
-                address: poolAddress,
-                protocol: 'Raydium',
-                data: accountInfo.accountInfo.data,
-                timestamp: new Date().toISOString()
-              });
-            }
-          } catch (error) {
-            logger.error(`[NeuralOnchain] Error processing Raydium account update: ${error}`);
-          }
-        },
-        'confirmed',
-        [
-          // Filter for account creation
-          { dataSize: 1688 } // Raydium pool account size
-        ]
-      );
-      
-      this.subscriptionIds.push(subscriptionId);
-      logger.info(`[NeuralOnchain] Subscribed to Raydium pool creations with ID ${subscriptionId}`);
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error subscribing to Raydium pools: ${error}`);
-    }
-  }
-  
-  /**
-   * Subscribe to Orca pools
-   */
-  private subscribeToOrcaPools(): void {
-    try {
-      logger.info('[NeuralOnchain] Subscribing to Orca pool creations');
-      
-      // Subscribe to program account changes
-      const subscriptionId = this.connection.onProgramAccountChange(
-        ORCA_V2_PROGRAM_ID,
-        (accountInfo, context) => {
-          try {
-            // Check if it's a new pool account
-            if (this.isOrcaPoolAccount(accountInfo.accountInfo.data)) {
-              const poolAddress = accountInfo.accountId.toString();
-              logger.info(`[NeuralOnchain] Detected new Orca pool: ${poolAddress}`);
-              
-              // Process the new pool
-              this.processNewPool({
-                address: poolAddress,
-                protocol: 'Orca',
-                data: accountInfo.accountInfo.data,
-                timestamp: new Date().toISOString()
-              });
-            }
-          } catch (error) {
-            logger.error(`[NeuralOnchain] Error processing Orca account update: ${error}`);
-          }
-        },
-        'confirmed'
-      );
-      
-      this.subscriptionIds.push(subscriptionId);
-      logger.info(`[NeuralOnchain] Subscribed to Orca pool creations with ID ${subscriptionId}`);
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error subscribing to Orca pools: ${error}`);
-    }
-  }
-  
-  /**
-   * Subscribe to Jupiter routing updates
-   */
-  private subscribeToJupiterRouting(): void {
-    try {
-      logger.info('[NeuralOnchain] Subscribing to Jupiter routing updates');
-      
-      // Subscribe to program account changes
-      const subscriptionId = this.connection.onProgramAccountChange(
-        JUPITER_V3_PROGRAM_ID,
-        (accountInfo, context) => {
-          try {
-            // Process Jupiter routing update
-            logger.info(`[NeuralOnchain] Received Jupiter routing update`);
-            
-            // Notify the neural network about routing change
-            neuralEmitter.emit('jupiter-routing-update', {
-              timestamp: new Date().toISOString(),
-              slot: context.slot
-            });
-          } catch (error) {
-            logger.error(`[NeuralOnchain] Error processing Jupiter update: ${error}`);
-          }
-        },
-        'confirmed'
-      );
-      
-      this.subscriptionIds.push(subscriptionId);
-      logger.info(`[NeuralOnchain] Subscribed to Jupiter routing with ID ${subscriptionId}`);
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error subscribing to Jupiter routing: ${error}`);
-    }
-  }
-  
-  /**
-   * Scan for new pools that might have been missed by the event subscriptions
-   */
-  private async scanForNewPools(): Promise<void> {
-    try {
-      logger.info('[NeuralOnchain] Scanning for new pools');
-      
-      // Check for new Raydium pools
-      await this.scanRaydiumPools();
-      
-      // Check for new Orca pools
-      await this.scanOrcaPools();
-      
-      logger.info('[NeuralOnchain] Completed pool scan');
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error scanning for new pools: ${error}`);
-    }
-  }
-  
-  /**
-   * Scan for new Raydium pools
-   */
-  private async scanRaydiumPools(): Promise<void> {
-    try {
-      // Get recent Raydium pool accounts
-      // This is simplified and would need a more sophisticated approach in production
-      const accounts = await this.connection.getProgramAccounts(
-        RAYDIUM_DEX_PROGRAM_ID,
-        {
-          commitment: 'confirmed',
-          filters: [
-            { dataSize: 1688 } // Raydium pool account size
-          ]
-        }
-      );
-      
-      logger.info(`[NeuralOnchain] Found ${accounts.length} Raydium pool accounts`);
-      
-      // Check each account to see if it's a new pool
-      for (const account of accounts) {
-        try {
-          const poolAddress = account.pubkey.toString();
-          
-          // Check if we've already processed this pool
-          if (!neuronCache.has(`raydium-pool-${poolAddress}`)) {
-            logger.info(`[NeuralOnchain] Found new Raydium pool: ${poolAddress}`);
-            
-            // Process the new pool
-            this.processNewPool({
-              address: poolAddress,
-              protocol: 'Raydium',
-              data: account.account.data,
-              timestamp: new Date().toISOString()
-            });
-            
-            // Cache the pool to avoid reprocessing
-            neuronCache.set(`raydium-pool-${poolAddress}`, {
-              timestamp: Date.now(),
-              processed: true
-            });
-          }
-        } catch (error) {
-          logger.error(`[NeuralOnchain] Error processing Raydium pool account: ${error}`);
-        }
-      }
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error scanning Raydium pools: ${error}`);
-    }
-  }
-  
-  /**
-   * Scan for new Orca pools
-   */
-  private async scanOrcaPools(): Promise<void> {
-    try {
-      // This would be implemented similarly to scanRaydiumPools
-      // with appropriate filters for Orca pool accounts
-      
-      logger.info('[NeuralOnchain] Orca pool scanning not yet implemented');
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error scanning Orca pools: ${error}`);
-    }
-  }
-  
-  /**
-   * Check if data is a Raydium pool account
-   */
-  private isRaydiumPoolAccount(data: Buffer): boolean {
-    try {
-      // This would involve checking the structure of the data
-      // to determine if it matches the expected format for a Raydium pool
-      
-      // This is a simplified placeholder - actual implementation would be more complex
-      return data.length === 1688;
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error checking Raydium pool data: ${error}`);
-      return false;
-    }
-  }
-  
-  /**
-   * Check if data is an Orca pool account
-   */
-  private isOrcaPoolAccount(data: Buffer): boolean {
-    try {
-      // This would involve checking the structure of the data
-      // to determine if it matches the expected format for an Orca pool
-      
-      // This is a simplified placeholder - actual implementation would be more complex
-      return data.length > 300; // Simplified check
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error checking Orca pool data: ${error}`);
-      return false;
-    }
-  }
-  
-  /**
-   * Process a new pool
-   */
-  private async processNewPool(pool: {
-    address: string;
-    protocol: string;
-    data: Buffer;
-    timestamp: string;
-  }): Promise<void> {
-    try {
-      logger.info(`[NeuralOnchain] Processing new ${pool.protocol} pool: ${pool.address}`);
-      
-      // Extract token information and liquidity
-      const poolInfo = await this.extractPoolInfo(pool);
-      
-      if (!poolInfo) {
-        logger.warn(`[NeuralOnchain] Could not extract pool info for ${pool.address}`);
-        return;
-      }
-      
-      // Check if the pool meets our criteria for trading
-      if (this.isPoolInteresting(poolInfo)) {
-        logger.info(`[NeuralOnchain] Found interesting pool: ${poolInfo.tokenSymbol} with ${poolInfo.liquidityUSD.toFixed(2)} USD`);
-        
-        // Emit event for interesting pool
-        neuralEmitter.emit('interesting-pool', poolInfo);
-        
-        // If it's a very new token with initial liquidity, consider it a launch
-        if (poolInfo.isNewToken && poolInfo.liquiditySOL >= MIN_POOL_LIQUIDITY_SOL) {
-          // Trigger launch detection in Quantum Omega
-          logger.info(`[NeuralOnchain] Detected token launch: ${poolInfo.tokenSymbol}`);
-          
-          // Create a token launch event
-          const launchEvent = {
-            symbol: poolInfo.tokenSymbol,
-            launchTime: new Date().toISOString(),
-            platform: pool.protocol,
-            initialPrice: poolInfo.tokenPriceUSD,
-            initialMarketCap: poolInfo.fdv,
-            confidence: 0.9,
-            description: `New token launch detected on ${pool.protocol}`,
-            socialLinks: []
-          };
-          
-          // Pass to Quantum Omega for sniping
-          await quantumOmegaSniper.processTokenLaunch(launchEvent);
-        }
-      }
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error processing new pool: ${error}`);
-    }
-  }
-  
-  /**
-   * Extract detailed information about a pool
-   */
-  private async extractPoolInfo(pool: {
-    address: string;
-    protocol: string;
-    data: Buffer;
-  }): Promise<{
-    address: string;
-    protocol: string;
-    tokenA: string;
-    tokenB: string;
-    tokenSymbol: string;
-    tokenPriceUSD: number;
-    liquidityUSD: number;
-    liquiditySOL: number;
-    fdv: number;
-    isNewToken: boolean;
-  } | null> {
-    try {
-      // This is a simplified placeholder - actual implementation would
-      // decode the pool data and fetch token information
-      
-      // In a real implementation, we would:
-      // 1. Decode the pool data to get the token addresses
-      // 2. Fetch token information (name, symbol, decimals)
-      // 3. Calculate token price, liquidity, and FDV
-      
-      // For this demo, generate random values
-      const liquiditySOL = 5 + Math.random() * 100;
-      const tokenPriceUSD = 0.000001 + Math.random() * 0.1;
-      const isNewToken = Math.random() > 0.7;
-      
-      return {
-        address: pool.address,
-        protocol: pool.protocol,
-        tokenA: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-        tokenB: `TOKEN${Math.floor(Math.random() * 1000000)}`,
-        tokenSymbol: `TOKEN${Math.floor(Math.random() * 1000)}`,
-        tokenPriceUSD,
-        liquidityUSD: liquiditySOL * 20, // Assuming SOL price of $20
-        liquiditySOL,
-        fdv: liquiditySOL * 20 * 1000000, // Simplified FDV calculation
-        isNewToken
-      };
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error extracting pool info: ${error}`);
-      return null;
-    }
-  }
-  
-  /**
-   * Check if pool is interesting for trading
-   */
-  private isPoolInteresting(poolInfo: {
-    liquidityUSD: number;
-    fdv: number;
-    isNewToken: boolean;
-  }): boolean {
-    // Check if pool has sufficient liquidity
-    if (poolInfo.liquidityUSD < MIN_TVL_FOR_LISTING) {
-      return false;
-    }
+    // Initial data pull from all monitored programs
+    await Promise.all(Object.values(PROGRAM_IDS).map(async (programId) => {
+      await fetchProgramAccounts(new PublicKey(programId));
+    }));
     
-    // Check if FDV is below our threshold for new opportunities
-    if (poolInfo.fdv > MAX_FDV_FOR_OPPORTUNITY) {
-      return false;
-    }
+    // Set up WebSocket listeners for program changes
+    setupProgramChangeListeners();
     
-    // New tokens are always interesting
-    if (poolInfo.isNewToken) {
-      return true;
-    }
-    
-    // Provide some randomness for demo purposes
-    return Math.random() > 0.7;
+    logger.info('[NeuralOnchain] Neural connection established with on-chain programs');
+    return true;
+  } catch (error: any) {
+    logger.error(`[NeuralOnchain] Initialization failed: ${error.message}`);
+    return false;
   }
 }
 
 /**
- * NeuralPriceWatcher - monitors for price discrepancies across DEXes
+ * Set up WebSocket listeners for program account changes
  */
-class NeuralPriceWatcher {
-  private connection: Connection;
-  private isMonitoring: boolean = false;
-  private monitoringInterval: NodeJS.Timeout | null = null;
-  private tokens: string[] = [
-    'SOL', 'USDC', 'BONK', 'JUP', 'MEME', 'WIF', 'GUAC'
-  ];
+function setupProgramChangeListeners() {
+  const connection = rpcConnectionManager.getManagedConnection();
   
-  constructor() {
-    this.connection = getManagedConnection({
-      commitment: 'confirmed'
-    });
-  }
-  
-  /**
-   * Start monitoring for price discrepancies
-   */
-  startMonitoring(): boolean {
-    if (this.isMonitoring) {
-      logger.info('[NeuralOnchain] Price watcher already running');
-      return true;
-    }
-    
+  // Subscribe to program account changes
+  Object.entries(PROGRAM_IDS).forEach(([programName, programId]) => {
     try {
-      logger.info('[NeuralOnchain] Starting neural price watcher');
+      // Use a more efficient approach here - filter by memcmp, etc.
+      // if we know the specific accounts we're interested in
+      const subscriptionId = connection.onProgramAccountChange(
+        new PublicKey(programId),
+        (accountInfo, context) => {
+          processAccountChange(programId, accountInfo, context);
+        }
+      );
       
-      // Set up an interval to check for price discrepancies
-      this.monitoringInterval = setInterval(() => {
-        this.checkPriceDiscrepancies();
-      }, 15000); // Every 15 seconds
-      
-      this.isMonitoring = true;
-      
-      logger.info('[NeuralOnchain] Neural price watcher started successfully');
-      return true;
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error starting price watcher: ${error}`);
-      return false;
+      accountSubscriptions.set(programId, subscriptionId);
+      logger.info(`[NeuralOnchain] Subscribed to ${programName} program changes`);
+    } catch (error: any) {
+      logger.error(`[NeuralOnchain] Error subscribing to ${programName}: ${error.message}`);
     }
-  }
-  
-  /**
-   * Stop monitoring
-   */
-  stopMonitoring(): void {
-    try {
-      logger.info('[NeuralOnchain] Stopping neural price watcher');
-      
-      // Clear the interval
-      if (this.monitoringInterval) {
-        clearInterval(this.monitoringInterval);
-        this.monitoringInterval = null;
-      }
-      
-      this.isMonitoring = false;
-      
-      logger.info('[NeuralOnchain] Neural price watcher stopped');
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error stopping price watcher: ${error}`);
-    }
-  }
-  
-  /**
-   * Check for price discrepancies across DEXes
-   */
-  private async checkPriceDiscrepancies(): Promise<void> {
-    try {
-      // Randomly select a token pair to check
-      const baseToken = 'USDC';
-      const quoteToken = this.tokens[Math.floor(Math.random() * this.tokens.length)];
-      
-      if (quoteToken === 'USDC') {
-        return; // Skip USDC/USDC pair
-      }
-      
-      logger.info(`[NeuralOnchain] Checking ${quoteToken}/USDC prices across DEXes`);
-      
-      // In a real implementation, this would fetch actual prices
-      // from different DEXes using their APIs or on-chain data
-      
-      // Generate simulated prices for the demo
-      const prices = {
-        'Raydium': 1.0 + (Math.random() * 0.1 - 0.05), // Base price ±5%
-        'Jupiter': 1.0 + (Math.random() * 0.1 - 0.05),
-        'Orca': 1.0 + (Math.random() * 0.1 - 0.05)
-      };
-      
-      logger.info(`[NeuralOnchain] ${quoteToken} prices: ${JSON.stringify(prices)}`);
-      
-      // Check for significant price discrepancies
-      this.analyzeDiscrepancies(quoteToken, prices);
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error checking price discrepancies: ${error}`);
-    }
-  }
-  
-  /**
-   * Analyze price discrepancies to find arbitrage opportunities
-   */
-  private analyzeDiscrepancies(token: string, prices: Record<string, number>): void {
-    try {
-      // Find min and max prices
-      const entries = Object.entries(prices);
-      const minEntry = entries.reduce((min, entry) => 
-        entry[1] < min[1] ? entry : min, entries[0]);
-      const maxEntry = entries.reduce((max, entry) => 
-        entry[1] > max[1] ? entry : max, entries[0]);
-      
-      const minDex = minEntry[0];
-      const minPrice = minEntry[1];
-      const maxDex = maxEntry[0];
-      const maxPrice = maxEntry[1];
-      
-      // Calculate potential profit percentage
-      const discrepancyPct = ((maxPrice - minPrice) / minPrice) * 100;
-      
-      // If discrepancy is significant, emit arbitrage opportunity
-      if (discrepancyPct > 0.5) { // >0.5% discrepancy
-        logger.info(`[NeuralOnchain] Found ${discrepancyPct.toFixed(2)}% discrepancy for ${token}: ${minDex} ${minPrice} -> ${maxDex} ${maxPrice}`);
-        
-        // Emit arbitrage opportunity
-        neuralEmitter.emit('arbitrage-opportunity', {
-          token,
-          buyDex: minDex,
-          buyPrice: minPrice,
-          sellDex: maxDex,
-          sellPrice: maxPrice,
-          discrepancyPct,
-          timestamp: new Date().toISOString()
-        });
-      }
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error analyzing discrepancies: ${error}`);
-    }
-  }
+  });
 }
 
-// Main Neural Network class for on-chain program integration
-class NeuralOnchainConnector {
-  private poolDetector: NeuralPoolDetector;
-  private priceWatcher: NeuralPriceWatcher;
-  private connection: Connection;
-  private isInitialized: boolean = false;
-  
-  constructor() {
-    this.poolDetector = new NeuralPoolDetector();
-    this.priceWatcher = new NeuralPriceWatcher();
-    this.connection = getManagedConnection({
-      commitment: 'confirmed'
-    });
+/**
+ * Process account change data and propagate to neural network
+ */
+function processAccountChange(programId: string, accountInfo: any, context: any) {
+  try {
+    const accountKey = accountInfo.accountId.toString();
+    const timestamp = Date.now();
     
-    // Set up event listeners
-    this.setupEventListeners();
-  }
-  
-  /**
-   * Initialize the neural connector
-   */
-  async initialize(): Promise<boolean> {
-    if (this.isInitialized) {
-      logger.info('[NeuralOnchain] Neural connector already initialized');
-      return true;
-    }
-    
-    try {
-      logger.info('[NeuralOnchain] Initializing neural on-chain connector');
-      
-      // Start the pool detector
-      const poolDetectorStarted = this.poolDetector.startMonitoring();
-      
-      // Start the price watcher
-      const priceWatcherStarted = this.priceWatcher.startMonitoring();
-      
-      if (poolDetectorStarted && priceWatcherStarted) {
-        this.isInitialized = true;
-        logger.info('[NeuralOnchain] Neural on-chain connector initialized successfully');
-        return true;
-      } else {
-        logger.error('[NeuralOnchain] Failed to initialize all neural components');
-        return false;
-      }
-    } catch (error) {
-      logger.error(`[NeuralOnchain] Error initializing neural connector: ${error}`);
-      return false;
-    }
-  }
-  
-  /**
-   * Set up event listeners for neural network events
-   */
-  private setupEventListeners(): void {
-    // Listen for interesting pool events
-    neuralEmitter.on('interesting-pool', (poolInfo) => {
-      try {
-        logger.info(`[NeuralOnchain] Neural network detected interesting pool: ${poolInfo.tokenSymbol}`);
-        
-        // Further processing can be done here
-      } catch (error) {
-        logger.error(`[NeuralOnchain] Error handling interesting pool event: ${error}`);
-      }
-    });
-    
-    // Listen for arbitrage opportunities
-    neuralEmitter.on('arbitrage-opportunity', async (opportunity) => {
-      try {
-        logger.info(`[NeuralOnchain] Neural network detected arbitrage opportunity for ${opportunity.token}`);
-        
-        // Get active opportunities from the arb router
-        const activeOpportunities = getActiveArbitrageOpportunities();
-        
-        // If we already have too many active opportunities, skip
-        if (activeOpportunities.length >= 5) {
-          logger.info('[NeuralOnchain] Too many active arbitrage opportunities, skipping');
-          return;
-        }
-        
-        // Check if the opportunity is profitable enough
-        if (opportunity.discrepancyPct < 1.0) {
-          logger.info(`[NeuralOnchain] Discrepancy ${opportunity.discrepancyPct.toFixed(2)}% too small, waiting for better opportunity`);
-          return;
-        }
-        
-        logger.info(`[NeuralOnchain] Neural network triggering arbitrage execution for ${opportunity.token}`);
-        
-        // In a real implementation, this would trigger the arb-router program
-        // to execute the arbitrage opportunity
-      } catch (error) {
-        logger.error(`[NeuralOnchain] Error handling arbitrage opportunity event: ${error}`);
-      }
-    });
-    
-    // Listen for Jupiter routing updates
-    neuralEmitter.on('jupiter-routing-update', (update) => {
-      try {
-        logger.info(`[NeuralOnchain] Neural network detected Jupiter routing update at slot ${update.slot}`);
-        
-        // This could trigger a scan for new arbitrage opportunities
-      } catch (error) {
-        logger.error(`[NeuralOnchain] Error handling Jupiter routing update: ${error}`);
-      }
-    });
-  }
-  
-  /**
-   * Check if the neural network is initialized
-   */
-  isNeuralNetworkInitialized(): boolean {
-    return this.isInitialized;
-  }
-  
-  /**
-   * Get status of the neural connector
-   */
-  getStatus(): {
-    initialized: boolean;
-    poolDetectorRunning: boolean;
-    priceWatcherRunning: boolean;
-    neuronCacheSize: number;
-    lastUpdateTimestamp: string;
-  } {
-    return {
-      initialized: this.isInitialized,
-      poolDetectorRunning: this.poolDetector !== null,
-      priceWatcherRunning: this.priceWatcher !== null,
-      neuronCacheSize: neuronCache.size,
-      lastUpdateTimestamp: new Date().toISOString()
+    // Create a data object
+    const accountData: ProgramAccountData = {
+      programId,
+      accountKey,
+      data: accountInfo.accountInfo.data,
+      timestamp,
+      parsed: null
     };
+    
+    // Try to parse the data based on program ID
+    try {
+      accountData.parsed = parseOnchainData(programId, accountInfo.accountInfo.data);
+    } catch (parseError) {
+      logger.debug(`[NeuralOnchain] Could not parse data for ${programId}/${accountKey}: ${parseError}`);
+    }
+    
+    // Update cache
+    const programCache = programDataCache.get(programId) || [];
+    const existingIndex = programCache.findIndex(item => item.accountKey === accountKey);
+    
+    if (existingIndex >= 0) {
+      programCache[existingIndex] = accountData;
+    } else {
+      programCache.push(accountData);
+    }
+    
+    programDataCache.set(programId, programCache);
+    
+    // Send neural signal if the data is significant
+    if (isSignificantData(accountData)) {
+      sendNeuralSignal(accountData);
+    }
+  } catch (error: any) {
+    logger.error(`[NeuralOnchain] Error processing account change: ${error.message}`);
   }
 }
 
-// Singleton instance
-let instance: NeuralOnchainConnector | null = null;
-
 /**
- * Get the neural connector instance
+ * Determine if the on-chain data is significant enough to send a neural signal
  */
-export function getNeuralConnector(): NeuralOnchainConnector {
-  if (!instance) {
-    instance = new NeuralOnchainConnector();
+function isSignificantData(accountData: ProgramAccountData): boolean {
+  // Implement your significance criteria here
+  // For example:
+  
+  // For Serum DEX - significant price or liquidity changes
+  if (accountData.programId === PROGRAM_IDS.SERUM_DEX_V3) {
+    // Logic for DEX significance
+    return true;
   }
-  return instance;
+  
+  // For Pyth Oracle - significant price change
+  if (accountData.programId === PROGRAM_IDS.PYTH_ORACLE) {
+    // Logic for oracle significance
+    return true;
+  }
+  
+  // For custom program data
+  if (accountData.programId === PROGRAM_IDS.HYPERION_FLASH || 
+      accountData.programId === PROGRAM_IDS.QUANTUM_OMEGA) {
+    // Always consider our own program data significant
+    return true;
+  }
+  
+  // Default
+  return false;
 }
 
 /**
- * Initialize the neural on-chain connector
+ * Send neural signal based on on-chain data
  */
-export async function initializeNeuralConnector(): Promise<boolean> {
-  const connector = getNeuralConnector();
-  return await connector.initialize();
+function sendNeuralSignal(accountData: ProgramAccountData) {
+  try {
+    // Create transformer signal from onchain data
+    const signalType = detectSignalType(accountData);
+    
+    // Map program account data to transformer signal format
+    const transformerSignal = {
+      id: `onchain_${accountData.programId.substring(0, 8)}_${Date.now()}`,
+      timestamp: accountData.timestamp,
+      transformer: 'OnChainProgram',
+      type: mapToSignalType(signalType),
+      confidence: calculateSignalConfidence(accountData),
+      strength: mapToSignalStrength(accountData),
+      timeframe: mapToTimeframe(accountData),
+      action: mapToAction(signalType),
+      sourceToken: 'USDC', // Default, will be overridden if detected in data
+      targetToken: 'SOL',  // Default, will be overridden if detected in data
+      description: `On-chain signal detected from program ${accountData.programId}`,
+      metadata: {
+        program: accountData.programId,
+        account: accountData.accountKey,
+        rawData: accountData.data,
+        parsedData: accountData.parsed,
+        executionCode: generateExecutionCode(accountData)
+      }
+    };
+    
+    // Extract tokens if possible from the parsed data
+    if (accountData.parsed && accountData.parsed.sourceToken) {
+      transformerSignal.sourceToken = accountData.parsed.sourceToken;
+    }
+    
+    if (accountData.parsed && accountData.parsed.targetToken) {
+      transformerSignal.targetToken = accountData.parsed.targetToken;
+    }
+    
+    // Submit to signal hub for neural distribution
+    submitTransformerSignal(transformerSignal);
+    
+    logger.info(`[NeuralOnchain] Sent neural signal from ${accountData.programId}`);
+  } catch (error: any) {
+    logger.error(`[NeuralOnchain] Error sending neural signal: ${error.message}`);
+  }
+}
+
+// Map onchain signal type to transformer signal type
+function mapToSignalType(onchainType: string): any {
+  // Import at top of file would cause circular dependency
+  const SignalType = {
+    ENTRY: 'entry',
+    EXIT: 'exit',
+    REBALANCE: 'rebalance',
+    FLASH_OPPORTUNITY: 'flash_opportunity',
+    CROSS_CHAIN: 'cross_chain',
+    MARKET_SENTIMENT: 'market_sentiment',
+    ARBITRAGE_OPPORTUNITY: 'arbitrage_opportunity',
+    VOLATILITY_ALERT: 'volatility_alert'
+  };
+
+  switch (onchainType) {
+    case 'market_update':
+      return SignalType.MARKET_SENTIMENT;
+    case 'price_update':
+      return SignalType.VOLATILITY_ALERT;
+    case 'liquidity_update':
+      return SignalType.REBALANCE;
+    case 'arbitrage_opportunity':
+      return SignalType.ARBITRAGE_OPPORTUNITY;
+    case 'token_launch':
+      return SignalType.ENTRY;
+    default:
+      return SignalType.MARKET_SENTIMENT;
+  }
+}
+
+// Map onchain data to signal strength
+function mapToSignalStrength(accountData: ProgramAccountData): any {
+  // Import at top of file would cause circular dependency
+  const SignalStrength = {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+    EXTREME: 'extreme',
+    WEAK: 'weak',
+    STRONG: 'strong'
+  };
+
+  const confidence = calculateSignalConfidence(accountData);
+  
+  if (confidence >= 0.9) return SignalStrength.EXTREME;
+  if (confidence >= 0.75) return SignalStrength.HIGH;
+  if (confidence >= 0.5) return SignalStrength.MEDIUM;
+  return SignalStrength.LOW;
+}
+
+// Map onchain data to timeframe
+function mapToTimeframe(accountData: ProgramAccountData): any {
+  // Import at top of file would cause circular dependency
+  const SignalTimeframe = {
+    IMMEDIATE: 'immediate',
+    SHORT: 'short',
+    MEDIUM: 'medium',
+    LONG: 'long'
+  };
+
+  // Determine timeframe based on program and data characteristics
+  if (accountData.programId === PROGRAM_IDS.HYPERION_FLASH) {
+    return SignalTimeframe.IMMEDIATE;
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.QUANTUM_OMEGA) {
+    return SignalTimeframe.SHORT;
+  }
+  
+  // Default is medium timeframe
+  return SignalTimeframe.MEDIUM;
+}
+
+// Map onchain signal type to action
+function mapToAction(onchainType: string): 'buy' | 'sell' | 'swap' | 'borrow' | 'flash_loan' {
+  switch (onchainType) {
+    case 'market_update':
+      return 'swap';
+    case 'price_update':
+      return 'swap';
+    case 'liquidity_update':
+      return 'swap';
+    case 'arbitrage_opportunity':
+      return 'flash_loan';
+    case 'token_launch':
+      return 'buy';
+    default:
+      return 'swap';
+  }
+}
+
+/**
+ * Calculate confidence level for the signal
+ */
+function calculateSignalConfidence(accountData: ProgramAccountData): number {
+  // Implement custom confidence calculation
+  // For now return a default high confidence for our own programs
+  if (accountData.programId === PROGRAM_IDS.HYPERION_FLASH || 
+      accountData.programId === PROGRAM_IDS.QUANTUM_OMEGA) {
+    return 0.95; // 95% confidence
+  }
+  
+  // Default medium confidence
+  return 0.75;
+}
+
+/**
+ * Generate execution code for transaction acceleration
+ */
+function generateExecutionCode(accountData: ProgramAccountData): string {
+  // Customize based on program and data characteristics
+  
+  // For DEX/AMM data - optimize for MEV protection and priority
+  if (accountData.programId === PROGRAM_IDS.SERUM_DEX_V3 || 
+      accountData.programId === PROGRAM_IDS.RAYDIUM_LIQUIDITY) {
+    return "MEV:2|STEALTH:2|PRIORITY:3|ROUTE:1|TIMING:2";
+  }
+  
+  // For oracle data - optimize for timing
+  if (accountData.programId === PROGRAM_IDS.PYTH_ORACLE) {
+    return "MEV:1|STEALTH:1|PRIORITY:2|ROUTE:1|TIMING:3";
+  }
+  
+  // For our custom programs
+  if (accountData.programId === PROGRAM_IDS.HYPERION_FLASH) {
+    return "MEV:3|STEALTH:3|PRIORITY:3|ROUTE:2|TIMING:3"; // Max protection for flash loans
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.QUANTUM_OMEGA) {
+    return "MEV:2|STEALTH:3|PRIORITY:2|ROUTE:2|TIMING:2"; // Stealth focus for sniping
+  }
+  
+  // Default balanced code
+  return "MEV:1|STEALTH:1|PRIORITY:1|ROUTE:1|TIMING:1";
+}
+
+/**
+ * Detect the type of signal from account data
+ */
+function detectSignalType(accountData: ProgramAccountData): string {
+  // Different types based on program and data pattern
+  
+  if (accountData.programId === PROGRAM_IDS.SERUM_DEX_V3) {
+    return 'market_update';
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.PYTH_ORACLE) {
+    return 'price_update';
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.RAYDIUM_LIQUIDITY) {
+    return 'liquidity_update';
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.HYPERION_FLASH) {
+    return 'arbitrage_opportunity';
+  }
+  
+  if (accountData.programId === PROGRAM_IDS.QUANTUM_OMEGA) {
+    return 'token_launch';
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Parse on-chain data based on program type
+ */
+function parseOnchainData(programId: string, data: Buffer): any {
+  // Implement specific parsing logic for each program type
+  // This would be customized based on the program's data structure
+  
+  // Example parser - in real implementation, use specific decoders
+  // for each program's account structure
+  switch (programId) {
+    case PROGRAM_IDS.SERUM_DEX_V3:
+      return parseSerumMarketData(data);
+    case PROGRAM_IDS.PYTH_ORACLE:
+      return parsePythOracleData(data);
+    case PROGRAM_IDS.RAYDIUM_LIQUIDITY:
+      return parseRaydiumData(data);
+    case PROGRAM_IDS.HYPERION_FLASH:
+      return parseHyperionData(data);
+    case PROGRAM_IDS.QUANTUM_OMEGA:
+      return parseQuantumOmegaData(data);
+    default:
+      // Basic parse as fallback
+      return { raw: data.toString('hex') };
+  }
+}
+
+/**
+ * Fetch program accounts for a specific program
+ */
+async function fetchProgramAccounts(programId: PublicKey): Promise<ProgramAccountData[]> {
+  try {
+    // Use the connection manager to get accounts
+    const accounts = await rpcConnectionManager.getProgramAccounts(programId);
+    
+    // Process and cache accounts
+    const processedAccounts: ProgramAccountData[] = accounts.map(account => ({
+      programId: programId.toString(),
+      accountKey: account.pubkey.toString(),
+      data: account.account.data,
+      timestamp: Date.now(),
+      parsed: parseOnchainData(programId.toString(), account.account.data)
+    }));
+    
+    // Update cache
+    programDataCache.set(programId.toString(), processedAccounts);
+    
+    logger.info(`[NeuralOnchain] Fetched ${processedAccounts.length} accounts for program ${programId.toString()}`);
+    return processedAccounts;
+  } catch (error: any) {
+    logger.error(`[NeuralOnchain] Error fetching program accounts: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Get cached on-chain data for a specific program
+ */
+export function getOnchainProgramData(programId: string): ProgramAccountData[] {
+  return programDataCache.get(programId) || [];
+}
+
+/**
+ * Listen for specific on-chain events and take immediate action
+ */
+export function listenForOnchainEvent(
+  programId: string, 
+  filterFn: (data: ProgramAccountData) => boolean,
+  callback: (data: ProgramAccountData) => void
+): void {
+  // Register a callback for a specific event pattern
+  // This could be implemented using a more sophisticated event system
+  
+  // For now, we'll just log that this functionality would be implemented
+  logger.info(`[NeuralOnchain] Registered event listener for program ${programId}`);
+}
+
+// Placeholder implementations for the parsers
+// In a real implementation, these would use proper layout deserializers
+function parseSerumMarketData(data: Buffer): any {
+  // Implement Serum market parsing
+  return { type: 'serum_market', raw: data.toString('hex').substring(0, 64) };
+}
+
+function parsePythOracleData(data: Buffer): any {
+  // Implement Pyth oracle parsing
+  return { type: 'oracle_price', raw: data.toString('hex').substring(0, 64) };
+}
+
+function parseRaydiumData(data: Buffer): any {
+  // Implement Raydium parsing
+  return { type: 'liquidity_pool', raw: data.toString('hex').substring(0, 64) };
+}
+
+function parseHyperionData(data: Buffer): any {
+  // Implement Hyperion data parsing
+  return { type: 'flash_loan', raw: data.toString('hex').substring(0, 64) };
+}
+
+function parseQuantumOmegaData(data: Buffer): any {
+  // Implement Quantum Omega parsing
+  return { type: 'token_sniper', raw: data.toString('hex').substring(0, 64) };
 }

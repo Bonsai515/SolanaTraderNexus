@@ -34,6 +34,7 @@ import {
   onTradeFailure,
   forceSignalGeneration
 } from './neural-network-integrator';
+import { initNeuralOnchainConnector, getOnchainProgramData } from './neural-onchain-connector';
 
 // Neural event emitter - system-wide communication bus
 const neuralBus = new EventEmitter();
@@ -158,6 +159,15 @@ export async function initNeuralCommunicationHub(): Promise<boolean> {
     
     if (!neuralNetworkInitialized) {
       throw new Error("Failed to initialize neural network");
+    }
+    
+    // Initialize neural on-chain connector for program data
+    const onchainConnectorInitialized = await initNeuralOnchainConnector();
+    
+    if (!onchainConnectorInitialized) {
+      logger.warn("[NeuralComms] Failed to initialize on-chain connector, continuing without on-chain neural connections");
+    } else {
+      logger.info("[NeuralComms] On-chain neural connector successfully initialized");
     }
     
     // Register signal listeners
@@ -292,11 +302,8 @@ function connectAgentsToNexusEngine(): void {
             targetToken: params.targetToken,
             amount: params.amount,
             slippageBps: params.slippageBps,
-            isSimulation: false,
             stopLoss: params.stopLoss,
             takeProfit: params.takeProfit,
-            emergencySellConditions: params.emergencySellConditions,
-            holdInstructions: params.holdInstructions,
             signalId: params.signalId,
             strategy: params.strategy || agentId
           });
@@ -421,11 +428,8 @@ function enableCriticalSignalPathways(): void {
           targetToken: params.targetToken,
           amount: params.amount,
           slippageBps: params.slippageBps,
-          isSimulation: false,
           stopLoss: params.stopLoss,
           takeProfit: params.takeProfit,
-          emergencySellConditions: params.emergencySellConditions,
-          holdInstructions: params.holdInstructions,
           signalId: params.signalId,
           strategy: params.strategy
         });
