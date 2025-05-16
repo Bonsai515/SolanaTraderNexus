@@ -1,5 +1,5 @@
 {
-  "parallelExecutionLimit": 2,
+  "parallelExecutionLimit": 1,
   "priorityFeeTiers": {
     "LOW": 10000,
     "MEDIUM": 50000,
@@ -10,16 +10,22 @@
   "precomputePriorityFee": true,
   "useLookupTables": false,
   "retryPolicy": {
-    "maxRetries": 10,
-    "initialBackoffMs": 5000,
-    "maxBackoffMs": 60000,
+    "maxRetries": 20,
+    "initialBackoffMs": 10000,
+    "maxBackoffMs": 300000,
     "backoffMultiplier": 2
   },
   "rateLimit": {
     "requestsPerMinute": 225,
     "enabled": true,
     "strictEnforcement": true,
-    "distributedEnforcement": true
+    "distributedEnforcement": true,
+    "minDelayBetweenTxMs": 1000,
+    "tokenBucket": {
+      "enabled": true,
+      "refillRatePerSecond": 3,
+      "bucketSize": 5
+    }
   },
-  "optimizedAt": "2025-05-16T02:44:03.027Z"
+  "optimizedAt": "2025-05-16T02:51:05.493Z"
 }
