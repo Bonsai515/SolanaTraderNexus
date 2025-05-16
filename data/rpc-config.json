@@ -1,54 +1,46 @@
 {
-  "poolSize": 1,
-  "maxBatchSize": 1,
+  "poolSize": 2,
+  "maxBatchSize": 5,
   "cacheSettings": {
-    "accountInfo": 30000,
-    "tokenInfo": 120000,
-    "blockInfo": 20000,
-    "balance": 30000,
-    "transaction": 120000
+    "accountInfo": 10000,
+    "tokenInfo": 30000,
+    "blockInfo": 5000,
+    "balance": 10000,
+    "transaction": 30000
   },
   "endpoints": [
     {
       "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
       "weight": 10,
       "priority": 1,
-      "maxRequestsPerSecond": 1,
-      "minuteLimit": 60,
-      "delayBetweenRequests": 1050
+      "maxRequestsPerSecond": 3,
+      "minuteLimit": 225
     },
     {
       "url": "https://api.mainnet-beta.solana.com",
       "weight": 2,
       "priority": 2,
-      "maxRequestsPerSecond": 0.5,
-      "delayBetweenRequests": 2000
+      "maxRequestsPerSecond": 2
     }
   ],
   "httpOptions": {
-    "maxSockets": 5,
-    "timeout": 120000,
+    "maxSockets": 25,
+    "timeout": 60000,
     "keepAlive": true
   },
   "useGrpc": false,
   "keepAlive": true,
   "rateLimitHandling": {
     "enabled": true,
-    "retryDelayMs": 15000,
-    "maxRetries": 25,
+    "retryDelayMs": 5000,
+    "maxRetries": 15,
     "exponentialBackoff": true,
     "backoffMultiplier": 2,
     "requestTracking": {
       "enabled": true,
-      "windowMs": 70000,
-      "maxRequests": 60,
-      "enforcePerEndpoint": true
-    },
-    "tokenBucket": {
-      "enabled": true,
-      "refillRatePerSecond": 1,
-      "bucketSize": 3
+      "windowMs": 60000,
+      "maxRequests": 225
     }
   },
-  "optimizedAt": "2025-05-16T02:52:49.678Z"
+  "optimizedAt": "2025-05-16T03:00:19.978Z"
 }

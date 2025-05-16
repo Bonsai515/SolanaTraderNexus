@@ -3,17 +3,16 @@
   "asyncSignalProcessing": true,
   "backgroundProcessing": true,
   "maxStrategiesPerBlock": 1,
-  "signalBufferSize": 5,
+  "signalBufferSize": 20,
   "preemptivePositionSizing": true,
   "smartOrderRouting": true,
   "memoryBufferSizeMB": 256,
   "throttling": {
     "enabled": true,
-    "maxSignalsPerMinute": 2,
-    "maxExecutionsPerMinute": 1,
-    "minTimeBetweenSignalsMs": 30000,
-    "minTimeBetweenExecutionsMs": 60000
+    "maxSignalsPerMinute": 10,
+    "maxExecutionsPerMinute": 3,
+    "minTimeBetweenSignalsMs": 6000,
+    "minTimeBetweenExecutionsMs": 20000
   },
-  "signalProcessingDelay": 10000,
-  "optimizedAt": "2025-05-16T02:52:49.679Z"
+  "optimizedAt": "2025-05-16T03:00:19.979Z"
 }
