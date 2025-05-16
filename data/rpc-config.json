@@ -1,60 +1,46 @@
 {
-  "poolSize": 8,
-  "maxBatchSize": 25,
+  "poolSize": 2,
+  "maxBatchSize": 5,
   "cacheSettings": {
-    "accountInfo": 2000,
-    "tokenInfo": 5000,
-    "blockInfo": 1000,
-    "balance": 2000,
-    "transaction": 10000
+    "accountInfo": 10000,
+    "tokenInfo": 30000,
+    "blockInfo": 5000,
+    "balance": 10000,
+    "transaction": 30000
   },
   "endpoints": [
     {
       "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
       "weight": 10,
       "priority": 1,
-      "maxRequestsPerSecond": 15
-    },
-    {
-      "url": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
-      "type": "ws",
-      "weight": 8,
-      "priority": 2,
-      "maxRequestsPerSecond": 12
-    },
-    {
-      "url": "solana-grpc-geyser.instantnodes.io:443",
-      "type": "grpc",
-      "weight": 5,
-      "priority": 3,
-      "maxRequestsPerSecond": 10
+      "maxRequestsPerSecond": 3,
+      "minuteLimit": 225
     },
     {
       "url": "https://api.mainnet-beta.solana.com",
-      "weight": 3,
-      "priority": 4,
-      "maxRequestsPerSecond": 5
-    },
-    {
-      "url": "https://solana-mainnet.rpc.extrnode.com",
-      "weight": 3,
-      "priority": 5,
-      "maxRequestsPerSecond": 5
+      "weight": 2,
+      "priority": 2,
+      "maxRequestsPerSecond": 2
     }
   ],
   "httpOptions": {
-    "maxSockets": 100,
+    "maxSockets": 25,
     "timeout": 60000,
     "keepAlive": true
   },
-  "useGrpc": true,
+  "useGrpc": false,
   "keepAlive": true,
   "rateLimitHandling": {
     "enabled": true,
-    "retryDelayMs": 1000,
-    "maxRetries": 5,
+    "retryDelayMs": 5000,
+    "maxRetries": 15,
     "exponentialBackoff": true,
-    "backoffMultiplier": 2
+    "backoffMultiplier": 2,
+    "requestTracking": {
+      "enabled": true,
+      "windowMs": 60000,
+      "maxRequests": 225
+    }
   },
-  "optimizedAt": "2025-05-16T02:35:29.298Z"
+  "optimizedAt": "2025-05-16T02:44:03.026Z"
 }

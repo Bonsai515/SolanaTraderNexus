@@ -1,10 +1,11 @@
 {
   "wallets": [
     {
-      "address": "4MyfJj413sqtbLaEub8kw6qPsazAE6T4EhjgaxHWcrdC",
-      "privateKey": "793dec9a669ff717266b2544c44bb3990e226f2c21c620b733b53c1f3670f8a231f2be3d80903e77c93700b141f9f163e8dd0ba58c152cbc9ba047bfa245499f",
-      "type": "trading"
+      "address": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm",
+      "privateKey": "9fb95840b9bbeea045044f859cf74639fce71e78c1c95e23411b261ab343f1611b40c7c97815e628bbea174eba13763f6d4c8b6d5659d81098b97b62dcd98dac",
+      "type": "trading",
+      "label": "Trading Wallet 1 (95% reinvestment)"
     }
   ],
-  "timestamp": "2025-05-16T02:35:29.290Z"
+  "timestamp": "2025-05-16T02:44:03.022Z"
 }

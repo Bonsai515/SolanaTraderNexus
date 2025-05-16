@@ -1,19 +1,25 @@
 {
-  "parallelExecutionLimit": 16,
+  "parallelExecutionLimit": 2,
   "priorityFeeTiers": {
-    "LOW": 5000,
-    "MEDIUM": 10000,
+    "LOW": 10000,
+    "MEDIUM": 50000,
     "HIGH": 100000,
-    "VERY_HIGH": 500000
+    "VERY_HIGH": 200000
   },
   "dynamicPriorityFeeEnabled": true,
   "precomputePriorityFee": true,
-  "useLookupTables": true,
+  "useLookupTables": false,
   "retryPolicy": {
-    "maxRetries": 5,
-    "initialBackoffMs": 250,
-    "maxBackoffMs": 10000,
-    "backoffMultiplier": 1.5
+    "maxRetries": 10,
+    "initialBackoffMs": 5000,
+    "maxBackoffMs": 60000,
+    "backoffMultiplier": 2
   },
-  "optimizedAt": "2025-05-16T02:29:48.070Z"
+  "rateLimit": {
+    "requestsPerMinute": 225,
+    "enabled": true,
+    "strictEnforcement": true,
+    "distributedEnforcement": true
+  },
+  "optimizedAt": "2025-05-16T02:44:03.027Z"
 }
