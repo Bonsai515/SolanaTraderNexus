@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "captureIntervalMinutes": 30,
+  "lastCaptureTime": "2025-05-16T00:56:20.078Z",
+  "totalProfitCollected": 0,
+  "wallets": [
+    {
+      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "label": "Main Profit Collection Wallet",
+      "profitShare": 0.05
+    },
+    {
+      "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "label": "Prophet Wallet",
+      "profitShare": 0.05
+    }
+  ],
+  "reinvestment": {
+    "enabled": true,
+    "rate": 0.9,
+    "targetWallet": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm"
+  }
+}
