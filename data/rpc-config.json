@@ -1,0 +1,41 @@
+{
+  "poolSize": 8,
+  "maxBatchSize": 100,
+  "cacheSettings": {
+    "accountInfo": 2000,
+    "tokenInfo": 5000,
+    "blockInfo": 1000,
+    "balance": 2000,
+    "transaction": 10000
+  },
+  "endpoints": [
+    {
+      "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "weight": 10,
+      "priority": 1,
+      "maxRequestsPerSecond": 50
+    },
+    {
+      "url": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "type": "ws",
+      "weight": 8,
+      "priority": 2,
+      "maxRequestsPerSecond": 40
+    },
+    {
+      "url": "solana-grpc-geyser.instantnodes.io:443",
+      "type": "grpc",
+      "weight": 5,
+      "priority": 3,
+      "maxRequestsPerSecond": 30
+    }
+  ],
+  "httpOptions": {
+    "maxSockets": 200,
+    "timeout": 60000,
+    "keepAlive": true
+  },
+  "useGrpc": true,
+  "keepAlive": true,
+  "optimizedAt": "2025-05-16T02:29:48.068Z"
+}
