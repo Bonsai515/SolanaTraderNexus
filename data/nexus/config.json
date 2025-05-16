@@ -14,8 +14,8 @@
     "https://api.mainnet-beta.solana.com"
   ],
   "wallet": {
-    "address": "HLG44WF9VYquMGJGFoKP33D8H1iRTC2t8be6DAD5Wtqg",
-    "privateKeySet": true
+    "address": "D8UevDKnp9qk4nLwNGgnEm97NJ6yzFhYzuRr5wkv9HSL",
+    "privateKeySet": false
   },
   "rateLimitSettings": {
     "maxRequestsPerMinute": 60,
@@ -29,5 +29,5 @@
     "delayBetweenTransactionsMs": 15000,
     "useRateLimiterMiddleware": true
   },
-  "lastUpdated": "2025-05-16T02:52:49.683Z"
+  "lastUpdated": "2025-05-16T02:58:24.844Z"
 }
