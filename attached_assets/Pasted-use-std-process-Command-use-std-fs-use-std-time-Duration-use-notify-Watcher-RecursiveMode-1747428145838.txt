@@ -1,0 +1,79 @@
+use std::process::Command;
+use std::fs;
+use std::time::Duration;
+use notify::{Watcher, RecursiveMode, watcher};
+use std::sync::mpsc::channel;
+
+struct RepairBot {
+    git_hash: String,
+    last_healthy: std::time::Instant,
+}
+
+impl RepairBot {
+    pub fn new() -> Self {
+        Self {
+            git_hash: Self::current_commit(),
+            last_healthy: std::time::Instant::now(),
+        }
+    }
+
+    // Autonomous maintenance loop
+    pub fn watch(&mut self) {
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_secs(2)).unwrap();
+        
+        // Watch entire project
+        watcher.watch("trading-system", RecursiveMode::Recursive).unwrap();
+
+        loop {
+            match rx.recv() {
+                Ok(event) => self.handle_change(event),
+                Err(e) => eprintln!("Watch error: {}", e),
+            }
+            
+            self.health_check();
+            self.self_improve();
+        }
+    }
+
+    fn handle_change(&mut self, event: notify::Event) {
+        // Analyze modified files
+        for path in event.paths {
+            if let Some(ext) = path.extension() {
+                if ext == "rs" || ext == "ts" {
+                    self.analyze_code(&path);
+                }
+            }
+        }
+    }
+
+    fn analyze_code(&self, path: &std::path::Path) {
+        // Run static analysis
+        let output = Command::new("cargo")
+            .args(["clippy", "--fix", "--allow-dirty"])
+            .current_dir("trading-system")
+            .output()
+            .expect("Clippy failed");
+
+        if !output.status.success() {
+            self.generate_fix(path, &String::from_utf8_lossy(&output.stderr));
+        }
+    }
+
+    fn generate_fix(&self, path: &Path, error: &str) {
+        // Use OpenAI API for code repair
+        let fix = Command::new("curl")
+            .args([
+                "https://api.openai.com/v1/engines/davinci-codex/completions",
+                "-H", "Authorization: Bearer ${OPENAI_KEY}",
+                "-d", format!("{{\"prompt\":\"Fix this Rust error: {}\",\"max_tokens\":200}}", error)
+            ])
+            .output()
+            .expect("API call failed");
+
+        let patch = String::from_utf8_lossy(&fix.stdout);
+        fs::write(path, patch).expect("Write failed");
+        
+        self.commit_change(format!("Auto-fix for {}", path.display()));
+    }
+}

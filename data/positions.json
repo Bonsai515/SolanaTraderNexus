@@ -1,9 +1,20 @@
 {
-  "totalValueUSD": 3450,
+  "totalValueUSD": 4450,
   "totalBalanceSOL": 1.53442,
   "positions": [
     {
       "symbol": "JUP",
+      "address": "",
+      "amount": 1274,
+      "averageEntryPrice": 1.0204081632653061,
+      "currentPrice": 1.0204081632653061,
+      "valueUSD": 1300,
+      "unrealizedProfitLoss": 0,
+      "unrealizedProfitLossPercent": 0,
+      "lastUpdated": "2025-05-16T20:48:20.509Z"
+    },
+    {
+      "symbol": "SOL",
       "address": "",
       "amount": 1029,
       "averageEntryPrice": 1.0204081632653061,
@@ -11,52 +22,41 @@
       "valueUSD": 1050,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:12:37.747Z"
-    },
-    {
-      "symbol": "SOL",
-      "address": "",
-      "amount": 784,
-      "averageEntryPrice": 1.0204081632653061,
-      "currentPrice": 1.0204081632653061,
-      "valueUSD": 800,
-      "unrealizedProfitLoss": 0,
-      "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:12:35.888Z"
+      "lastUpdated": "2025-05-16T20:48:12.154Z"
     },
     {
       "symbol": "MEME",
       "address": "",
-      "amount": 441,
+      "amount": 563.5,
       "averageEntryPrice": 1.0204081632653061,
       "currentPrice": 1.0204081632653061,
-      "valueUSD": 450,
+      "valueUSD": 575,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:12:38.741Z"
+      "lastUpdated": "2025-05-16T20:48:15.532Z"
     },
     {
       "symbol": "GUAC",
       "address": "",
-      "amount": 441,
+      "amount": 563.5,
       "averageEntryPrice": 1.0204081632653061,
       "currentPrice": 1.0204081632653061,
-      "valueUSD": 450,
+      "valueUSD": 575,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:12:39.800Z"
+      "lastUpdated": "2025-05-16T20:48:15.927Z"
     },
     {
       "symbol": "BONK",
       "address": "",
-      "amount": 686,
+      "amount": 931,
       "averageEntryPrice": 1.0204081632653061,
       "currentPrice": 1.0204081632653061,
-      "valueUSD": 700,
+      "valueUSD": 950,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:12:36.750Z"
+      "lastUpdated": "2025-05-16T20:48:15.004Z"
     }
   ],
-  "lastUpdated": "2025-05-16T18:12:39.838Z"
+  "lastUpdated": "2025-05-16T20:48:20.599Z"
 }
