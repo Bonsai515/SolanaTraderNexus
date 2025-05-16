@@ -1,0 +1,13 @@
+{
+  "useRealFunds": true,
+  "profitWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "hyperion": {
+    "active": true
+  },
+  "quantumOmega": {
+    "active": true
+  },
+  "singularity": {
+    "active": true
+  }
+}

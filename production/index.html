@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Solana Quantum Trading Platform</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #0f172a;
+        color: #f8fafc;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+      }
+      h1 {
+        color: #38bdf8;
+      }
+      .card {
+        background-color: #1e293b;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px auto;
+        max-width: 600px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      button {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #2563eb;
+      }
+      pre {
+        background-color: #0f172a;
+        padding: 15px;
+        border-radius: 4px;
+        text-align: left;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Solana Quantum Trading Platform</h1>
+    
+    <div class="card">
+      <h2>Server Status</h2>
+      <p>This page confirms that the server is running and accessible.</p>
+      <p id="server-time">Server time: Loading...</p>
+      
+      <button onclick="checkHealth()">Check API Health</button>
+      <div id="health-result" style="margin-top: 20px;"></div>
+    </div>
+    
+    <div class="card">
+      <h2>Test Market Data</h2>
+      <button onclick="populateTestData()">Populate Test Data</button>
+      <div id="test-result" style="margin-top: 20px;"></div>
+    </div>
+    
+    <script>
+      // Update server time
+      function updateServerTime() {
+        document.getElementById('server-time').textContent = 'Server time: ' + new Date().toISOString();
+      }
+      updateServerTime();
+      setInterval(updateServerTime, 1000);
+      
+      // Check API health
+      async function checkHealth() {
+        const healthResult = document.getElementById('health-result');
+        healthResult.innerHTML = '<p>Checking API health...</p>';
+        
+        try {
+          const response = await fetch('/api/health');
+          const data = await response.json();
+          
+          healthResult.innerHTML = `
+            <p>API Health Check: <span style="color: #4ade80;">✓ Success</span></p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } catch (error) {
+          healthResult.innerHTML = `
+            <p>API Health Check: <span style="color: #ef4444;">✗ Failed</span></p>
+            <pre style="color: #ef4444;">${error.message}</pre>
+          `;
+        }
+      }
+      
+      // Populate test data
+      async function populateTestData() {
+        const testResult = document.getElementById('test-result');
+        testResult.innerHTML = '<p>Populating test data...</p>';
+        
+        try {
+          const response = await fetch('/api/test/populate-price-feed', {
+            method: 'POST'
+          });
+          const data = await response.json();
+          
+          testResult.innerHTML = `
+            <p>Test Data Population: <span style="color: #4ade80;">✓ Success</span></p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } catch (error) {
+          testResult.innerHTML = `
+            <p>Test Data Population: <span style="color: #ef4444;">✗ Failed</span></p>
+            <pre style="color: #ef4444;">${error.message}</pre>
+          `;
+        }
+      }
+      
+      // Initial health check
+      checkHealth();
+    </script>
+  </body>
+</html>
