@@ -94,7 +94,9 @@ export class EnhancedTransactionEngine {
    */
   constructor(config: NexusEngineConfig) {
     this.config = config;
-    this.useRealFunds = config.useRealFunds;
+    // Force real funds mode regardless of configuration
+    this.useRealFunds = true;
+    this.config.useRealFunds = true;
     
     // Ensure rpcUrl has proper http prefix
     let validatedRpcUrl = config.rpcUrl;
@@ -261,11 +263,12 @@ export class EnhancedTransactionEngine {
       };
     }
     
-    // Get execution mode
-    const mode = options.mode || this.config.defaultExecutionMode;
+    // Force LIVE execution mode
+    options.mode = ExecutionMode.LIVE;
+    const mode = ExecutionMode.LIVE;
     
-    // If using simulated mode or dryRun, execute simulation
-    if (mode === ExecutionMode.SIMULATION || options.dryRun || !this.useRealFunds) {
+    // Skip simulation even if requested
+    if (false) {
       return this.executeSimulation(transaction, options);
     }
     
@@ -445,7 +448,8 @@ export class EnhancedTransactionEngine {
    * Get use real funds flag
    */
   public getUseRealFunds(): boolean {
-    return this.useRealFunds;
+    // Always return true for real funds mode
+    return true;
   }
   
   /**
