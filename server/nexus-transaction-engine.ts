@@ -8,6 +8,7 @@
 import { Connection, PublicKey, Transaction, TransactionSignature } from '@solana/web3.js';
 import { createTransactionVerifier, TransactionVerifier } from './transactionVerifier';
 import { logger } from './logger';
+import { optimizeSwap, DexProvider } from './lib/swapUtils';
 import { getTransactionQueue } from './transaction-queue';
 import axios from 'axios';
 
@@ -80,7 +81,48 @@ export class EnhancedTransactionEngine {
   private transactionVerifier: TransactionVerifier;
   private useRealFunds: boolean;
   private pendingTransactions: Set<string> = new Set();
+  private networkCongestionLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' = 'MEDIUM';
+  private lastCongestionCheck: number = 0;
+  private priorityFeeHistory: number[] = [];
   private transactionQueue = getTransactionQueue();
+  
+  /**
+   * Calculate slippage protection parameters based on pair volatility
+   * @param fromToken Source token
+   * @param toToken Target token
+   * @param requestedSlippageBps Requested slippage in basis points
+   * @returns Optimal slippage in basis points
+   */
+  private calculateSlippageProtection(
+    fromToken: string,
+    toToken: string,
+    requestedSlippageBps: number = 50
+  ): number {
+    // Base slippage shouldn't be below 0.3% (30 bps) or above 5% (500 bps)
+    const minSlippage = 30;
+    const maxSlippage = 500;
+    
+    // Default to requested slippage if it's within reasonable bounds
+    let optimalSlippage = Math.max(minSlippage, Math.min(maxSlippage, requestedSlippageBps));
+    
+    // Known volatile pairs need higher slippage tolerance
+    const volatilePairs = [
+      'BONK', 'WIF', 'MEME', 'GUAC', 'BOME', 'POPCAT'
+    ];
+    
+    // Apply adjustments for known volatile tokens
+    if (volatilePairs.some(t => toToken.includes(t))) {
+      // Increase slippage for volatile meme tokens
+      optimalSlippage = Math.max(optimalSlippage, 100); // Minimum 1% for meme tokens
+      
+      // Additional increase for certain very volatile tokens
+      if (['POPCAT', 'BOME'].some(t => toToken.includes(t))) {
+        optimalSlippage = Math.max(optimalSlippage, 200); // Minimum 2% for super volatile tokens
+      }
+    }
+    
+    return optimalSlippage;
+  }
   private isHealthy: boolean = false;
   private lastHealthCheck: number = 0;
   private blockSubscriptionId?: number;
@@ -230,6 +272,73 @@ export class EnhancedTransactionEngine {
   /**
    * Setup block subscription to monitor new blocks
    */
+  /**
+   * Calculate priority fee based on network congestion
+   * @param priority Transaction priority
+   * @returns Priority fee in micro-lamports
+   */
+  private calculatePriorityFee(priority: TransactionPriority): number {
+    const baseFees = {
+      [TransactionPriority.LOW]: 5000,      // 0.000005 SOL
+      [TransactionPriority.MEDIUM]: 10000,  // 0.00001 SOL
+      [TransactionPriority.HIGH]: 100000,   // 0.0001 SOL
+      [TransactionPriority.VERY_HIGH]: 500000 // 0.0005 SOL
+    };
+    
+    // Apply multiplier based on network congestion
+    const congestionMultipliers = {
+      'LOW': 0.8,
+      'MEDIUM': 1.0,
+      'HIGH': 2.0,
+      'VERY_HIGH': 5.0
+    };
+    
+    const baseFee = baseFees[priority] || baseFees[TransactionPriority.MEDIUM];
+    const multiplier = congestionMultipliers[this.networkCongestionLevel];
+    
+    return Math.round(baseFee * multiplier);
+  }
+  
+  /**
+   * Check network congestion level
+   */
+  private async checkNetworkCongestion(): Promise<void> {
+    try {
+      // Only check every 2 minutes
+      const now = Date.now();
+      if (now - this.lastCongestionCheck < 120000) {
+        return;
+      }
+      
+      this.lastCongestionCheck = now;
+      
+      // Get recent performance samples
+      const perfSamples = await this.connection.getRecentPerformanceSamples(5);
+      
+      if (!perfSamples || perfSamples.length === 0) {
+        return;
+      }
+      
+      // Calculate average transactions per slot
+      const avgTxPerSlot = perfSamples.reduce((sum, sample) => sum + sample.numTransactions, 0) / perfSamples.length;
+      
+      // Determine congestion level based on transactions per slot
+      if (avgTxPerSlot < 1000) {
+        this.networkCongestionLevel = 'LOW';
+      } else if (avgTxPerSlot < 2000) {
+        this.networkCongestionLevel = 'MEDIUM';
+      } else if (avgTxPerSlot < 3000) {
+        this.networkCongestionLevel = 'HIGH';
+      } else {
+        this.networkCongestionLevel = 'VERY_HIGH';
+      }
+      
+      logger.info(`[NexusEngine] Network congestion level: ${this.networkCongestionLevel} (avg. ${Math.round(avgTxPerSlot)} tx/slot)`);
+    } catch (error) {
+      logger.error(`[NexusEngine] Failed to check network congestion: ${error.message}`);
+    }
+  }
+  
   private setupBlockSubscription(): void {
     if (this.blockSubscriptionId !== undefined || !this.wsConnection) {
       return;
@@ -340,7 +449,12 @@ export class EnhancedTransactionEngine {
             const blockhash = await this.connection.getLatestBlockhash('finalized');
             logger.info(`[NexusEngine] Retrieved latest blockhash: ${blockhash.blockhash.substring(0, 10)}...`);
             
-            // Real transaction execution will be implemented here
+            // Check network congestion before executing transaction
+            await this.checkNetworkCongestion();
+            
+            // Calculate priority fee based on priority and network congestion
+            const priorityFee = this.calculatePriorityFee(options.priority || this.config.defaultPriority);
+            logger.info(`[NexusEngine] Using priority fee: ${priorityFee} microlamports (network: ${this.networkCongestionLevel})`);
             // For now, continue with the simulated response
             
             // Verify transaction if requested
@@ -542,7 +656,16 @@ export class EnhancedTransactionEngine {
     error?: string;
   }> {
     try {
-      logger.info(`[NexusEngine] Executing ${this.useRealFunds ? 'LIVE' : 'SIMULATION'} swap: ${options.amount} ${options.fromToken} → ${options.toToken} (slippage: ${options.slippage || 0.5}%)`);
+      // Calculate optimal slippage protection
+      const requestedSlippageBps = options.slippage ? options.slippage * 100 : 50; // Convert % to basis points
+      const optimalSlippageBps = this.calculateSlippageProtection(
+        options.fromToken,
+        options.toToken,
+        requestedSlippageBps
+      );
+      const optimalSlippagePercent = optimalSlippageBps / 100;
+      
+      logger.info(`[NexusEngine] Executing ${this.useRealFunds ? 'LIVE' : 'SIMULATION'} swap: ${options.amount} ${options.fromToken} → ${options.toToken} (slippage: ${optimalSlippagePercent}%)`);
       
       // Ensure wallet is registered
       if (!this.isWalletRegistered(options.walletAddress)) {
