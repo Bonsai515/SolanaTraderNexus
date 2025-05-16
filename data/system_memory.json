@@ -4,7 +4,8 @@
     "memeSniper": true,
     "crossChainArbitrage": true,
     "nuclearStrategies": true,
-    "profitCollection": true
+    "profitCollection": true,
+    "realTrading": true
   },
   "config": {
     "flashLoans": {
@@ -28,6 +29,24 @@
       "minProfitThreshold": 0.01,
       "reinvestmentRate": 0.95,
       "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    "transaction": {
+      "useRealFunds": true,
+      "simulationMode": false,
+      "verifyTransactions": true,
+      "maxRetries": 3,
+      "priorityFee": 10000
+    },
+    "trading": {
+      "useRealFunds": true,
+      "useRealBlockchain": true,
+      "verifyTransactions": true,
+      "rpcProvider": "INSTANT_NODES",
+      "maxSlippageBps": 100,
+      "priorityFee": "MEDIUM"
     }
-  }
+  },
+  "useRealFunds": true,
+  "simulationMode": false,
+  "rpcProvider": "INSTANT_NODES"
 }
