@@ -376,6 +376,17 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     console.log('Connecting to Rust transformer binaries...');
     try {
       const transformersConnected = await connectToRustTransformers();
+      
+      // Initialize nuclear strategies with Nexus Pro Engine
+      console.log('🚀 Activating nuclear strategies with Nexus Professional Engine...');
+      try {
+        // Using dynamic import to avoid circular dependencies
+        const nuclearActivation = await import('../activate-nuclear-nexus');
+        console.log('✅ Successfully activated nuclear strategies through Nexus Pro Engine');
+      } catch (error) {
+        console.error('❌ Failed to activate nuclear strategies:', error instanceof Error ? error.message : 'Unknown error');
+      }
+      
       if (transformersConnected) {
         console.log('✅ Successfully connected to all Rust transformer binaries');
       } else {
