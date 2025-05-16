@@ -26,7 +26,7 @@ import { execSync } from 'child_process';
 const SYSTEM_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
 
 // RPC connection settings
-const COMMITMENT_LEVEL: Commitment = 'confirmed';
+const COMMITMENT_LEVEL: 'confirmed' as const = 'confirmed' as const;
 const MAX_RETRIES = 5;
 const CONNECTION_TIMEOUT_MS = 30000;
 
@@ -220,7 +220,7 @@ export class SolanaDirectEngine {
     // Create backup connections
     this.backupConnections = backupUrls.map(url => {
       logger.info(`Adding backup Solana RPC connection: ${url}`);
-      return new Connection(url, COMMITMENT_LEVEL);
+      return new Connection(url, { commitment: COMMITMENT_LEVEL });
     });
   }
 
