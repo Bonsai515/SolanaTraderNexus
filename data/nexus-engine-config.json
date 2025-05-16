@@ -1,0 +1,22 @@
+{
+  "useRealFunds": true,
+  "useOnChainPrograms": true,
+  "onChainPrograms": {
+    "HYPERION_FLASH_LOAN": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+    "QUANTUM_VAULT": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL",
+    "MEMECORTEX": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+    "SINGULARITY_BRIDGE": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+    "NEXUS_ENGINE": "NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx"
+  },
+  "priorityFees": {
+    "default": 10000,
+    "high": 100000,
+    "extreme": 500000
+  },
+  "slippageToleranceBps": {
+    "default": 50,
+    "memeTokens": 150,
+    "volatileTokens": 200
+  },
+  "updatedAt": "2025-05-16T02:02:41.242Z"
+}
