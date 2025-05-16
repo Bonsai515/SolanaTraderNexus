@@ -1,0 +1,17 @@
+{
+  "totalProfitUSD": 0,
+  "totalProfitSOL": 0,
+  "totalFeesSOL": 0,
+  "totalTrades": 0,
+  "successfulTrades": 0,
+  "failedTrades": 0,
+  "profitByStrategy": {},
+  "profitByToken": {},
+  "profitByTimeframe": {
+    "last24h": 0,
+    "last7d": 0,
+    "last30d": 0,
+    "allTime": 0
+  },
+  "lastUpdated": "2025-05-16T22:41:42.406Z"
+}

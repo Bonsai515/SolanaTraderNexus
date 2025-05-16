@@ -1773,6 +1773,56 @@ router.get('/api/price/:token', (req, res) => {
 });
 
 export async function registerRoutes(app: express.Express) {
+  
+  // Import the trade tracker for blockchain transaction monitoring
+  const { tradeTracker } = require('./transformers/trade-tracker');
+  
+  // API endpoint to get all tracked trades
+  app.get('/api/trades', (req, res) => {
+    const allTrades = tradeTracker.getAllTrades();
+    res.json({ success: true, data: allTrades });
+  });
+  
+  // API endpoint to get profit summary
+  app.get('/api/profit-summary', (req, res) => {
+    const profitSummary = tradeTracker.getProfitSummary();
+    res.json({ success: true, data: profitSummary });
+  });
+  
+  // API endpoint to get trades for a specific token
+  app.get('/api/trades/token/:token', (req, res) => {
+    const { token } = req.params;
+    const trades = tradeTracker.getTradesByToken(token);
+    res.json({ success: true, data: trades });
+  });
+  
+  // API endpoint to get trades by strategy
+  app.get('/api/trades/strategy/:strategy', (req, res) => {
+    const { strategy } = req.params;
+    const trades = tradeTracker.getTradesByStrategy(strategy);
+    res.json({ success: true, data: trades });
+  });
+  
+  // API endpoint to get trades in a time range
+  app.get('/api/trades/timerange', (req, res) => {
+    const { startTime, endTime } = req.query;
+    if (!startTime || !endTime) {
+      return res.status(400).json({ success: false, error: 'startTime and endTime are required' });
+    }
+    
+    const trades = tradeTracker.getTradesByTimeRange(startTime as string, endTime as string);
+    res.json({ success: true, data: trades });
+  });
+  
+  // API endpoint to force update trade tracking
+  app.post('/api/trades/force-update', async (req, res) => {
+    try {
+      await tradeTracker.forceUpdate();
+      res.json({ success: true, message: 'Trade tracking update initiated' });
+    } catch (error) {
+      res.status(500).json({ success: false, error: 'Failed to force update trade tracking' });
+    }
+  });
   // Use the router
   app.use(router);
   
