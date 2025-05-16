@@ -510,33 +510,56 @@ class SignalHub extends EventEmitter {
         });
       
         if (txResult.success) {
-          logger.info(`Successfully executed transaction for signal ${signal.id}, signature: ${txResult.signature}`);
+          // Import Solscan verifier
+          const { verifyTransaction, getTransactionUrl } = require('./lib/solscanVerifier');
           
-          // Track position and update balances
-          try {
-            const { positionTracker } = require('./position-tracker');
+          // Verify transaction on Solscan and get transaction URL
+          const verificationResult = await verifyTransaction(txResult.signature);
+          const solscanUrl = verificationResult.url;
+          
+          if (verificationResult.verified) {
+            // Log successful transaction with Solscan link
+            logger.info(`BLOCKCHAIN VERIFIED: Transaction for signal ${signal.id} confirmed on Solana blockchain`);
+            logger.info(`Transaction signature: ${txResult.signature}`);
+            logger.info(`Solscan URL: ${solscanUrl}`);
             
-            // Update portfolio after trade
-            await positionTracker.updateAfterTrade({
-              success: true,
-              signature: txResult.signature,
-              from: sourceToken || 'USDC',
-              to: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
-              fromAmount: amount,
-              toAmount: amount * 0.98, // Estimated received amount (accounting for slippage)
-              priceImpact: 0.5,
-              fee: amount * 0.0005, // Estimated fee
-              valueUSD: amount
-            });
+            // Track position and update balances
+            try {
+              const { positionTracker } = require('./position-tracker');
+              
+              // Update portfolio after trade
+              await positionTracker.updateAfterTrade({
+                success: true,
+                signature: txResult.signature,
+                from: sourceToken || 'USDC',
+                to: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
+                fromAmount: amount,
+                toAmount: amount * 0.98, // Estimated received amount (accounting for slippage)
+                priceImpact: 0.5,
+                fee: amount * 0.0005, // Estimated fee
+                valueUSD: amount,
+                solscanUrl: solscanUrl
+              });
+              
+              // Instant profit collection happens automatically in the position tracker
+              logger.info(`Updated portfolio tracking for ${signal.id} with blockchain verification`);
+            } catch (trackingError) {
+              logger.warn(`Error updating position tracking: ${trackingError}`);
+            }
             
-            // Instant profit collection happens automatically in the position tracker
-            logger.info(`Updated portfolio tracking for ${signal.id}`);
-          } catch (trackingError) {
-            logger.warn(`Error updating position tracking: ${trackingError}`);
+            // Mark signal as actioned and store transaction details
+            signal.actionTaken = true;
+            signal.verified = true;
+            signal.solscanUrl = solscanUrl;
+          } else {
+            // Transaction reported as successful by engine but not verified on blockchain
+            logger.warn(`Transaction reported as successful but not verified on blockchain: ${txResult.signature}`);
+            logger.warn(`Verification error: ${verificationResult.error}`);
+            
+            // Still mark as actioned but note verification failed
+            signal.actionTaken = true;
+            signal.verified = false;
           }
-          
-          // Mark signal as actioned
-          signal.actionTaken = true;
           signal.transactionSignature = txResult.signature;
           
           // Submit for verification if verification is available

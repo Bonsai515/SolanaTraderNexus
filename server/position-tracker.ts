@@ -52,6 +52,8 @@ interface TradeEntry {
   transactionSignature?: string;
   profitLoss?: number;
   profitLossPercent?: number;
+  solscanUrl?: string;
+  verified: boolean;
 }
 
 // Global instance
@@ -157,6 +159,7 @@ export class PositionTracker {
     priceImpact?: number;
     fee?: number;
     valueUSD?: number;
+    solscanUrl?: string;
   }): Promise<boolean> {
     if (!tradeResult.success) {
       return false;
@@ -174,7 +177,9 @@ export class PositionTracker {
         valueUSD: tradeResult.valueUSD || 0,
         fee: tradeResult.fee || 0,
         walletAddress: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb', // Main trading wallet
-        transactionSignature: tradeResult.signature
+        transactionSignature: tradeResult.signature,
+        solscanUrl: tradeResult.solscanUrl, 
+        verified: !!tradeResult.solscanUrl // Mark as verified if solscanUrl is provided
       };
       
       // Add to trade history
