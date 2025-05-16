@@ -158,5 +158,225 @@
     }
   },
   "lastUpdated": "2025-05-16T16:42:32.854Z",
-  "useRealFunds": true
+  "useRealFunds": true,
+  "nuclearStrategies": {
+    "enabled": true,
+    "strategies": [
+      {
+        "id": "quantum-nuclear-flash-arbitrage",
+        "name": "Quantum Nuclear Flash Arbitrage",
+        "description": "Ultra-high-frequency flash loan arbitrage across multiple DEXes with quantum-enhanced timing",
+        "dailyROI": 45,
+        "allocation": 30,
+        "risk": "Very High",
+        "requires": [
+          "flash-loans",
+          "quantum-timing",
+          "multi-dex"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 512,
+          "cpuRequirement": 50,
+          "timeframeMs": 500,
+          "maxSlippageBps": 20,
+          "fallbackOptions": [
+            "raydium-direct-route",
+            "jupiter-aggregation",
+            "orca-whirlpools"
+          ]
+        },
+        "config": {
+          "maxAmount": 100000,
+          "minProfitThreshold": 0.5,
+          "useFlashLoans": true,
+          "flashLoanProviders": [
+            "Solend",
+            "Mango",
+            "Kamino"
+          ],
+          "slippageTolerance": 1,
+          "gasMultiplier": 1.5,
+          "priorityFee": "VERY_HIGH",
+          "profitTarget": {
+            "daily": 1.45,
+            "monthly": 50,
+            "yearly": 500
+          },
+          "integrations": {
+            "useMEV": true,
+            "useJupiter": true,
+            "useOnChainProgram": true,
+            "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
+          }
+        }
+      },
+      {
+        "id": "singularity-black-hole",
+        "name": "Singularity Black Hole",
+        "description": "Cross-chain multi-token arbitrage with wormhole integration and gravitational-slingshot effect",
+        "dailyROI": 55,
+        "allocation": 20,
+        "risk": "Extreme",
+        "requires": [
+          "wormhole",
+          "cross-chain",
+          "time-warp"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 768,
+          "cpuRequirement": 75,
+          "timeframeMs": 2000,
+          "maxSlippageBps": 50,
+          "fallbackOptions": [
+            "direct-bridge-v2",
+            "allbridge-route",
+            "portal-backup"
+          ]
+        },
+        "config": {
+          "crossChainPairs": [
+            {
+              "source": "SOL/USDC",
+              "target": "ETH/USDC",
+              "chain": "Ethereum"
+            },
+            {
+              "source": "SOL/USDC",
+              "target": "AVAX/USDC",
+              "chain": "Avalanche"
+            },
+            {
+              "source": "SOL/USDC",
+              "target": "MATIC/USDC",
+              "chain": "Polygon"
+            }
+          ],
+          "bridgeParams": {
+            "useWormhole": true,
+            "useAllbridge": true,
+            "usePortal": true,
+            "maxBridgeTime": 120,
+            "maxFeeBps": 50
+          },
+          "executionParams": {
+            "maxConcurrentBridges": 3,
+            "minProfitThresholdUsd": 50,
+            "priorityFee": "VERY_HIGH"
+          }
+        }
+      },
+      {
+        "id": "memecortex-supernova",
+        "name": "MemeCortex Supernova",
+        "description": "Neural prediction of meme token price explosions with pre-liquidity detection and MEV protection",
+        "dailyROI": 75,
+        "allocation": 25,
+        "risk": "Extreme",
+        "requires": [
+          "neural-prediction",
+          "mev-protection",
+          "pre-liquidity"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 1024,
+          "cpuRequirement": 90,
+          "timeframeMs": 200,
+          "maxSlippageBps": 100,
+          "fallbackOptions": [
+            "immediate-sell",
+            "partial-position",
+            "extended-hold"
+          ]
+        },
+        "config": {
+          "memeDetection": {
+            "usePreLiquidity": true,
+            "useSocialSentiment": true,
+            "useWhaleTracking": true,
+            "confidenceThreshold": 0.85
+          },
+          "executionParams": {
+            "maxAllocation": 0.25,
+            "initialBuySize": 0.05,
+            "scaleInThresholds": [
+              0.1,
+              0.2,
+              0.5
+            ],
+            "takeProfitLevels": [
+              0.5,
+              1,
+              2,
+              5,
+              10
+            ],
+            "stopLossPercent": 0.15,
+            "useTrailingStop": true,
+            "trailingStopDistance": 0.25
+          },
+          "priorityFee": "VERY_HIGH"
+        }
+      },
+      {
+        "id": "hyperion-money-loop",
+        "name": "Hyperion Money Loop",
+        "description": "Perpetual borrow/lend/swap loop with flash loans and multi-DEX routing for continuous profit harvesting",
+        "dailyROI": 38,
+        "allocation": 25,
+        "risk": "Very High",
+        "requires": [
+          "flash-loans",
+          "lending-protocols",
+          "multi-dex"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 512,
+          "cpuRequirement": 60,
+          "timeframeMs": 800,
+          "maxSlippageBps": 30,
+          "fallbackOptions": [
+            "single-hop-route",
+            "direct-swap",
+            "lending-only"
+          ]
+        },
+        "config": {
+          "lendingParams": {
+            "platforms": [
+              "Solend",
+              "Mango",
+              "Kamino",
+              "Larix"
+            ],
+            "maxLeverageMultiplier": 3,
+            "targetUtilizationRate": 0.8,
+            "rebalanceThresholdBps": 50
+          },
+          "routingParams": {
+            "maxHops": 3,
+            "dexes": [
+              "Jupiter",
+              "Raydium",
+              "Orca",
+              "Meteora"
+            ],
+            "maxPriceImpactBps": 30,
+            "minProfitThresholdBps": 10
+          },
+          "executionFrequency": {
+            "loops": 12,
+            "minIntervalMinutes": 30,
+            "maxDuration": 20
+          }
+        }
+      }
+    ],
+    "lastUpdated": "2025-05-16T23:51:51.786Z",
+    "totalAllocation": 100,
+    "averageDailyROI": 52.75
+  }
 }
