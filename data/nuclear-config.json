@@ -84,5 +84,21 @@
     "hedgingEnabled": true,
     "failsafeCircuitBreaker": true,
     "manualOverrideAvailable": true
-  }
+  },
+  "wallet": {
+    "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "privateKeySet": true,
+    "balance": null
+  },
+  "liveTrading": true,
+  "rpc": {
+    "primary": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+    "websocket": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+    "grpc": "solana-grpc-geyser.instantnodes.io:443",
+    "backup": [
+      "https://api.mainnet-beta.solana.com",
+      "https://solana-mainnet.rpc.extrnode.com"
+    ]
+  },
+  "lastUpdated": "2025-05-16T02:35:29.297Z"
 }

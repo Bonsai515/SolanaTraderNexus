@@ -1,0 +1,44 @@
+{
+  "features": {
+    "realFundsTrading": true,
+    "optimizedRpc": true,
+    "nuclearStrategies": true,
+    "profitCollection": true,
+    "transactionVerification": true,
+    "awsIntegration": true,
+    "solscanVerification": true
+  },
+  "config": {
+    "transactionEngine": {
+      "useRealFunds": true,
+      "mode": "LIVE",
+      "priorityFee": "HIGH",
+      "maxSlippageBps": 100,
+      "mevProtection": true
+    },
+    "walletManager": {
+      "primaryWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "autoFunding": false
+    },
+    "profitCollection": {
+      "enabled": true,
+      "captureIntervalMinutes": 60,
+      "autoCapture": true,
+      "minProfitThreshold": 0.01,
+      "reinvestmentRate": 0.95,
+      "targetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+    },
+    "rpcConfig": {
+      "primaryProvider": "instantnodes",
+      "backupProviders": [
+        "helius",
+        "mainnet-beta"
+      ],
+      "connectionMode": "multi-connection",
+      "webSocketEnabled": true,
+      "grpcEnabled": true
+    },
+    "lastUpdated": "2025-05-16T02:35:29.294Z"
+  }
+}
