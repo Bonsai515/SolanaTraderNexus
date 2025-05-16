@@ -119,9 +119,9 @@ class SingularityAgent {
    * Activate the Singularity agent
    */
   public async activate(
-    sourceWallet: string,
-    targetWallet: string,
-    profitWallet: string
+    sourceWallet: string | null | undefined,
+    targetWallet: string | null | undefined,
+    profitWallet: string | null | undefined
   ): Promise<boolean> {
     try {
       if (this.isActive) {
@@ -129,41 +129,43 @@ class SingularityAgent {
         return true;
       }
 
-      this.sourceWallet = sourceWallet;
-      this.targetWallet = targetWallet;
-      this.profitWallet = profitWallet;
+      // Default to system wallet if no wallet is provided
+      const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+      const safeSourceWallet = sourceWallet || SYSTEM_WALLET;
+      const safeTargetWallet = targetWallet || safeSourceWallet;
+      const safeProfitWallet = profitWallet || safeSourceWallet;
+      
+      this.sourceWallet = safeSourceWallet;
+      this.targetWallet = safeTargetWallet;
+      this.profitWallet = safeProfitWallet;
       
       // Register wallets with the Nexus engine
       try {
         const engine = getNexusEngine();
         
-        // Check all wallet addresses are valid before registering
-        if (!sourceWallet) {
-          logger.warn('Source wallet address is undefined, skipping registration');
-        } else {
-          engine.registerWallet({
-            address: sourceWallet,
-            type: 'trading'
-          });
-        }
+        // Register trading wallet
+        engine.registerWallet({
+          address: safeSourceWallet,
+          type: 'trading'
+        });
         
-        if (targetWallet && targetWallet !== sourceWallet) {
+        // Register auxiliary wallet if different from source
+        if (safeTargetWallet !== safeSourceWallet) {
           engine.registerWallet({
-            address: targetWallet,
+            address: safeTargetWallet,
             type: 'auxiliary'
           });
         }
         
-        if (!profitWallet) {
-          logger.warn('Profit wallet address is undefined, skipping registration');
-        } else {
+        // Register profit wallet if different from source
+        if (safeProfitWallet !== safeSourceWallet) {
           engine.registerWallet({
-            address: profitWallet,
+            address: safeProfitWallet,
             type: 'profit'
           });
         }
         
-        logger.info(`Registered wallets with Nexus Engine: trading=${sourceWallet}, profit=${profitWallet}`);
+        logger.info(`Registered wallets with Nexus Engine: trading=${safeSourceWallet}, profit=${safeProfitWallet}`);
       } catch (err) {
         logger.warn(`Failed to register wallets: ${err.message}. Will continue without wallet registration.`);
       }
@@ -625,16 +627,25 @@ export async function startSingularity(config: {
   name: string;
   active: boolean;
   wallets: {
-    trading: string;
+    trading?: string;
     profit?: string;
     auxiliary?: string;
+    system?: string;
   }
 }): Promise<boolean> {
   try {
     logger.info(`Starting Singularity agent ${config.id}: ${config.name}`);
-    const tradingWallet = config.wallets.trading;
-    const profitWallet = config.wallets.profit || tradingWallet;
-    const auxiliaryWallet = config.wallets.auxiliary || tradingWallet;
+    
+    // Handle all wallet address formats
+    const tradingWallet = config.wallets.trading || config.wallets.system || '';
+    const profitWallet = config.wallets.profit || tradingWallet || '';
+    const auxiliaryWallet = config.wallets.auxiliary || tradingWallet || '';
+    
+    // Verify wallets are present
+    if (!tradingWallet) {
+      logger.error(`Cannot start Singularity agent: Missing trading wallet`);
+      return false;
+    }
     
     // Use the provided wallets for the agent
     return singularityAgent.activate(tradingWallet, auxiliaryWallet, profitWallet);

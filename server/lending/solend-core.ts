@@ -14,7 +14,7 @@ import {
 } from '@solana/web3.js';
 import * as logger from '../logger';
 import { executeWithRpcLoadBalancing } from '../lib/rpcConnectionManager';
-import { LiquidationOpportunity } from './solend-liquidator';
+// Export Liquidation related interfaces
 
 // SolendMarket represents a Solend lending market
 interface SolendMarket {
@@ -59,6 +59,31 @@ interface SolendPosition {
 /**
  * Solend Core class for Solend protocol operations
  */
+export interface Obligation {
+  id: PublicKey;
+  owner: PublicKey;
+  depositedValue: number;
+  borrowedValue: number;
+  unhealthyBorrowValue: number;
+  healthFactor: number;
+  borrower: string;
+  repayMint: string;
+  withdrawMint: string;
+}
+
+export interface LiquidationOpportunity {
+  obligation: Obligation;
+  borrower: string;
+  repayMint: string;
+  repaySymbol: string;
+  repayValue: number;
+  withdrawMint: string;
+  withdrawSymbol: string;
+  withdrawValue: number;
+  profit: number;
+  profitPercent: number;
+}
+
 export class SolendCore {
   private connection: Connection;
   private marketsCache: Map<string, SolendMarket> = new Map();
@@ -71,6 +96,60 @@ export class SolendCore {
    */
   constructor(connection: Connection) {
     this.connection = connection;
+  }
+  
+  /**
+   * Get unhealthy obligations
+   */
+  async getUnhealthyObligations(healthThreshold: number = 1.05): Promise<Obligation[]> {
+    try {
+      logger.info(`[SolendCore] Getting unhealthy obligations with threshold ${healthThreshold}`);
+      
+      // In a real implementation, this would fetch unhealthy obligations from Solend
+      // For now, return a simulated empty array
+      return [];
+    } catch (error) {
+      logger.error('[SolendCore] Error getting unhealthy obligations:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Calculate liquidation opportunities from obligations
+   */
+  calculateLiquidationOpportunities(
+    obligations: Obligation[],
+    healthThreshold: number = 1.05
+  ): LiquidationOpportunity[] {
+    try {
+      logger.info(`[SolendCore] Calculating liquidation opportunities for ${obligations.length} obligations`);
+      
+      // In a real implementation, this would analyze obligations for profitable liquidations
+      // For now, return an empty array
+      return [];
+    } catch (error) {
+      logger.error('[SolendCore] Error calculating liquidation opportunities:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Execute a liquidation
+   */
+  async executeLiquidation(
+    liquidator: Keypair,
+    opportunity: LiquidationOpportunity
+  ): Promise<string | null> {
+    try {
+      logger.info(`[SolendCore] Executing liquidation for borrower ${opportunity.borrower}`);
+      
+      // In a real implementation, this would execute the liquidation
+      // For now, return null to simulate no signature
+      return null;
+    } catch (error) {
+      logger.error('[SolendCore] Error executing liquidation:', error);
+      return null;
+    }
   }
   
   /**

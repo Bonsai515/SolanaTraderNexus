@@ -217,13 +217,36 @@ export class NexusEngine {
   /**
    * Register a wallet with the engine
    */
-  registerWallet(params: {
-    walletAddress: string;
-    walletType: 'trading' | 'profit' | 'liquidity' | 'holding';
-    label?: string;
-  }): boolean {
+  registerWallet(params: any): boolean {
     try {
-      const { walletAddress, walletType, label } = params;
+      // Handle multiple parameter formats for better backwards compatibility
+      let walletAddress: string;
+      let walletType: string;
+      let label: string | undefined;
+      
+      // Support for the old format: { address, type }
+      if (params.address !== undefined && params.type !== undefined) {
+        walletAddress = params.address;
+        walletType = params.type;
+        label = params.label;
+      } 
+      // Support for the new format: { walletAddress, walletType }
+      else if (params.walletAddress !== undefined && params.walletType !== undefined) {
+        walletAddress = params.walletAddress;
+        walletType = params.walletType;
+        label = params.label;
+      }
+      // Default case - couldn't find parameters
+      else {
+        logger.error('[NexusEngine] Invalid wallet registration parameters:', params);
+        return false;
+      }
+      
+      // Skip if wallet address is empty or undefined
+      if (!walletAddress) {
+        logger.error('[NexusEngine] Wallet address is undefined or empty');
+        return false;
+      }
       
       logger.info(`[NexusEngine] Registering ${walletType} wallet: ${walletAddress}${label ? ` (${label})` : ''}`);
       
