@@ -466,6 +466,29 @@ class SignalHub extends EventEmitter {
         if (txResult.success) {
           logger.info(`Successfully executed transaction for signal ${signal.id}, signature: ${txResult.signature}`);
           
+          // Track position and update balances
+          try {
+            const { positionTracker } = require('./position-tracker');
+            
+            // Update portfolio after trade
+            await positionTracker.updateAfterTrade({
+              success: true,
+              signature: txResult.signature,
+              from: sourceToken || 'USDC',
+              to: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
+              fromAmount: amount,
+              toAmount: amount * 0.98, // Estimated received amount (accounting for slippage)
+              priceImpact: 0.5,
+              fee: amount * 0.0005, // Estimated fee
+              valueUSD: amount
+            });
+            
+            // Instant profit collection happens automatically in the position tracker
+            logger.info(`Updated portfolio tracking for ${signal.id}`);
+          } catch (trackingError) {
+            logger.warn(`Error updating position tracking: ${trackingError}`);
+          }
+          
           // Mark signal as actioned
           signal.actionTaken = true;
           signal.transactionSignature = txResult.signature;
