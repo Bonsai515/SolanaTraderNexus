@@ -292,6 +292,18 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       await initNeuralCommunicationHub();
       console.log('✅ Successfully initialized Neural Communication Hub');
       console.log('   Transformer signal coordination and neural entanglement active');
+      
+      // Initialize Enhanced Communication Transformer
+      console.log('Initializing Enhanced Communication Transformer...');
+      const { initEnhancedCommunicationTransformer } = require('./transformers/enhanced-communication-transformer');
+      const enhancedTransformerInitialized = await initEnhancedCommunicationTransformer();
+      if (enhancedTransformerInitialized) {
+        console.log('✅ Successfully initialized Enhanced Communication Transformer');
+        console.log('   Advanced features activated: Adaptive Signal Prioritization, Enhanced Reporting,');
+        console.log('   Cross-Chain Gateway, Neural Caching, and Emergency Response System');
+      } else {
+        console.warn('⚠️ Failed to initialize Enhanced Communication Transformer');
+      }
     } catch (error) {
       console.error('❌ Error initializing Neural Communication Hub:', error instanceof Error ? error.message : 'Unknown error');
     }
