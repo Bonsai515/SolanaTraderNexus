@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "rpc": {
+    "mainnetRpc": "https://mainnet.block-engine.jito.io/rpc",
+    "mainnetWs": "wss://mainnet.block-engine.jito.io/ws",
+    "useMevProtection": true,
+    "useForPriorityTxs": true,
+    "useForFlashLoans": true
+  },
+  "bundles": {
+    "enabled": true,
+    "tipAccount": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "priorityFeeMultiplier": 1.5,
+    "maxRetries": 5,
+    "retryIntervalMs": 200,
+    "confirmationLevel": "confirmed"
+  },
+  "blockBuilding": {
+    "enabled": true,
+    "useSearchers": true,
+    "maxBundle": {
+      "size": 262144,
+      "cu": 1400000,
+      "signatureCu": 1000
+    }
+  },
+  "mevProtection": {
+    "enabled": true,
+    "protectAllTransactions": true,
+    "minValueThreshold": 10,
+    "blacklistedSearchers": [],
+    "whitelistedSearchers": [],
+    "privateTransactions": true
+  },
+  "flashLoans": {
+    "useJitoBundle": true,
+    "backrunProtection": true,
+    "minProfitThreshold": 0.8,
+    "maxBundleSize": 3
+  }
+}
