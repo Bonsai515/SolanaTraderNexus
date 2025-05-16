@@ -5,25 +5,29 @@
   "defaultExecutionMode": "LIVE",
   "defaultPriority": "HIGH",
   "defaultConfirmations": 1,
-  "maxConcurrentTransactions": 2,
-  "defaultTimeoutMs": 60000,
-  "defaultMaxRetries": 3,
+  "maxConcurrentTransactions": 1,
+  "defaultTimeoutMs": 300000,
+  "defaultMaxRetries": 20,
   "maxSlippageBps": 100,
   "mevProtection": true,
   "backupRpcUrls": [
     "https://api.mainnet-beta.solana.com"
   ],
   "wallet": {
-    "address": "HLG44WF9VYquMGJGFoKP33D8H1iRTC2t8be6DAD5Wtqg",
-    "privateKeySet": true
+    "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "privateKeySet": false
   },
   "rateLimitSettings": {
-    "maxRequestsPerMinute": 225,
-    "maxRequestsPerSecond": 3,
-    "initialBackoffMs": 5000,
-    "maxBackoffMs": 60000,
+    "maxRequestsPerMinute": 60,
+    "maxRequestsPerSecond": 1,
+    "initialBackoffMs": 15000,
+    "maxBackoffMs": 300000,
     "backoffMultiplier": 2,
-    "retryOnRateLimit": true
+    "retryOnRateLimit": true,
+    "useTokenBucket": true,
+    "enforcePerConnection": true,
+    "delayBetweenTransactionsMs": 15000,
+    "useRateLimiterMiddleware": true
   },
-  "lastUpdated": "2025-05-16T03:00:19.976Z"
+  "lastUpdated": "2025-05-16T03:09:32.783Z"
 }
