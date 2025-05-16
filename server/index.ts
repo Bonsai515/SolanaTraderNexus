@@ -175,6 +175,18 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const solanaConnection = await initializeRpcConnection();
     console.log('✅ Successfully established connection to Solana blockchain');
 
+    // Initialize Jito bundle support
+    console.log('Initializing Jito bundle support for MEV protection...');
+    try {
+      const jitoInitialized = initializeJitoBundles(solanaConnection);
+      if (jitoInitialized) {
+        console.log('✅ Jito bundle support initialized successfully');
+      } else {
+        console.warn('⚠️ Jito bundle support not available, using regular transactions');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing Jito bundle support:', error);
+    }
     // Initialize price feed cache
     console.log('Initializing price feed cache...');
     await waitForPriceFeedInit();

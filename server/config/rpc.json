@@ -3,16 +3,19 @@
   "rpcEndpoints": {
     "primary": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
     "backups": [
+      "https://mainnet.block-engine.jito.io/rpc",
       "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
       "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
       "https://api.mainnet-beta.solana.com"
-    ]
+    ],
+    "jito": "https://mainnet.block-engine.jito.io/rpc"
   },
   "websocketEndpoints": {
     "primary": "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
     "backups": [
       "wss://api.mainnet-beta.solana.com"
-    ]
+    ],
+    "jito": "wss://mainnet.block-engine.jito.io/ws"
   },
   "rateLimiting": {
     "enabled": true,
@@ -94,5 +97,27 @@
     "maxConcurrentRequests": 20,
     "queueSize": 100,
     "timeoutMs": 15000
+  },
+  "jitoConfig": {
+    "enabled": true,
+    "useBundles": true,
+    "mevProtection": true,
+    "flashLoanOptimization": true,
+    "rateLimits": {
+      "requestsPerMinute": 100,
+      "maxRetries": 5
+    }
+  },
+  "transactionTypes": {
+    "flashLoan": {
+      "rpc": "jito",
+      "priorityFee": "HIGH",
+      "useBundles": true
+    },
+    "arbitrage": {
+      "rpc": "jito",
+      "priorityFee": "HIGH",
+      "useBundles": true
+    }
   }
 }

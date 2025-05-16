@@ -16,7 +16,9 @@
     "rpcConfigPath": "server/config/rpc.json",
     "adaptiveRateLimiting": true,
     "useCircuitBreaker": true,
-    "intelligentEndpointRotation": true
+    "intelligentEndpointRotation": true,
+    "jitoRpc": "https://mainnet.block-engine.jito.io/rpc",
+    "jitoWs": "wss://mainnet.block-engine.jito.io/ws"
   },
   "flashLoanConfig": {
     "enabled": true,
@@ -112,5 +114,20 @@
     "stopLossEnabled": true,
     "takeProfitEnabled": true
   },
-  "skipPreflight": false
+  "skipPreflight": false,
+  "jitoIntegration": {
+    "enabled": true,
+    "useJitoRpc": true,
+    "useJitoBundles": true,
+    "mevProtection": true,
+    "bundleFlashLoans": true,
+    "bundleHighValueTrades": true,
+    "priorityFeeLevels": {
+      "LOW": 10000,
+      "MEDIUM": 100000,
+      "HIGH": 500000,
+      "VERY_HIGH": 1000000,
+      "MAXIMUM": 5000000
+    }
+  }
 }

@@ -1,0 +1,81 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, TokenAccount};
+
+declare_id!("YourProgramID");
+
+#[program]
+pub mod flash_arb {
+    use super::*;
+
+    pub fn execute_flash_arb(ctx: Context<ExecuteArb>, amount: u64) -> Result<()> {
+        // Step 1: Borrow SOL via flash loan (mint_to)
+        let mint = &ctx.accounts.mint;
+        let temp_token_account = &ctx.accounts.temp_token_account;
+        let authority = &ctx.accounts.authority;
+
+        // Mint tokens (flash loan borrow)
+        token::mint_to(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::MintTo {
+                    mint: mint.to_account_info(),
+                    to: temp_token_account.to_account_info(),
+                    authority: authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        // Step 2: Swap SOL -> USDC on Raydium (undervalued)
+        let swap_ix = create_raydium_swap_ix(
+            temp_token_account.key,
+            ctx.accounts.usdc_receiver.key,
+            amount,
+        )?;
+        invoke(&swap_ix, &[
+            temp_token_account.to_account_info(),
+            ctx.accounts.usdc_receiver.to_account_info(),
+            // ... other accounts
+        ])?;
+
+        // Step 3: Swap USDC -> SOL on Orca (overvalued)
+        let swap_ix = create_orca_swap_ix(
+            ctx.accounts.usdc_receiver.key,
+            temp_token_account.key,
+            amount,
+        )?;
+        invoke(&swap_ix, &[
+            ctx.accounts.usdc_receiver.to_account_info(),
+            temp_token_account.to_account_info(),
+            // ... other accounts
+        ])?;
+
+        // Step 4: Repay flash loan (burn)
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Burn {
+                    mint: mint.to_account_info(),
+                    from: temp_token_account.to_account_info(),
+                    authority: authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        // Profit remains in `usdc_receiver`
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct ExecuteArb<'info> {
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub temp_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub usdc_receiver: Account<'info, TokenAccount>,
+    pub authority: Signer<'info>,
+    pub token_program: Program<'info, token::Token>,
+}
