@@ -1,0 +1,19 @@
+{
+  "parallelExecutionLimit": 16,
+  "priorityFeeTiers": {
+    "LOW": 5000,
+    "MEDIUM": 10000,
+    "HIGH": 100000,
+    "VERY_HIGH": 500000
+  },
+  "dynamicPriorityFeeEnabled": true,
+  "precomputePriorityFee": true,
+  "useLookupTables": true,
+  "retryPolicy": {
+    "maxRetries": 5,
+    "initialBackoffMs": 250,
+    "maxBackoffMs": 10000,
+    "backoffMultiplier": 1.5
+  },
+  "optimizedAt": "2025-05-16T02:29:48.070Z"
+}
