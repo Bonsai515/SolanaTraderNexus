@@ -136,22 +136,32 @@ class SingularityAgent {
       // Register wallets with the Nexus engine
       try {
         const engine = getNexusEngine();
-        engine.registerWallet({
-          address: sourceWallet,
-          type: 'trading'
-        });
         
-        if (targetWallet !== sourceWallet) {
+        // Check all wallet addresses are valid before registering
+        if (!sourceWallet) {
+          logger.warn('Source wallet address is undefined, skipping registration');
+        } else {
+          engine.registerWallet({
+            address: sourceWallet,
+            type: 'trading'
+          });
+        }
+        
+        if (targetWallet && targetWallet !== sourceWallet) {
           engine.registerWallet({
             address: targetWallet,
             type: 'auxiliary'
           });
         }
         
-        engine.registerWallet({
-          address: profitWallet,
-          type: 'profit'
-        });
+        if (!profitWallet) {
+          logger.warn('Profit wallet address is undefined, skipping registration');
+        } else {
+          engine.registerWallet({
+            address: profitWallet,
+            type: 'profit'
+          });
+        }
         
         logger.info(`Registered wallets with Nexus Engine: trading=${sourceWallet}, profit=${profitWallet}`);
       } catch (err) {

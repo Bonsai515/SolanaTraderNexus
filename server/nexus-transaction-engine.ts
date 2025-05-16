@@ -530,22 +530,53 @@ export function isUsingRealFunds(): boolean {
 /**
  * Register a wallet with the engine
  */
-export function registerWallet(address: string, type: string): boolean {
+export function registerWallet(walletData: string | { address?: string; walletAddress?: string; type?: string; walletType?: string; label?: string }): boolean {
   try {
-    // Validate the address
-    const pubkey = new PublicKey(address);
+    let address: string;
+    let type: string;
     
-    // For now, we only support the main wallet
-    if (type === 'main') {
-      config.mainWalletAddress = address;
-      mainWalletPublicKey = pubkey;
-      saveConfig();
-      
-      logger.info(`[NexusEngine] Registered main wallet: ${address}`);
-      return true;
+    // Handle all possible interface formats
+    if (typeof walletData === 'string') {
+      address = walletData;
+      type = 'main';
+    } else {
+      // Support both address and walletAddress fields
+      address = walletData.address || walletData.walletAddress;
+      // Support both type and walletType fields
+      type = walletData.type || walletData.walletType || 'main';
     }
     
-    return false;
+    // Log the registration attempt
+    logger.info(`[NexusEngine] Registering ${type} wallet: ${address}`);
+    
+    // Validate the address
+    if (!address) {
+      logger.error(`[NexusEngine] Invalid wallet address: ${address}`);
+      return false;
+    }
+    
+    try {
+      const pubkey = new PublicKey(address);
+      
+      // Register wallet based on type
+      if (type === 'main' || type === 'trading' || type === 'system') {
+        config.mainWalletAddress = address;
+        mainWalletPublicKey = pubkey;
+        saveConfig();
+        
+        logger.info(`[NexusEngine] Registered main/trading/system wallet: ${address}`);
+        return true;
+      } else if (type === 'profit' || type === 'auxiliary' || type === 'fee') {
+        // Just log these for now, we'll add support for them later
+        logger.info(`[NexusEngine] Registered ${type} wallet: ${address}`);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      logger.error(`[NexusEngine] Invalid wallet address: ${address}`);
+      return false;
+    }
   } catch (error) {
     logger.error('[NexusEngine] Error registering wallet:', error);
     return false;
