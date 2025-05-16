@@ -14,12 +14,14 @@
       "mode": "LIVE",
       "priorityFee": "HIGH",
       "maxSlippageBps": 100,
-      "mevProtection": true
+      "mevProtection": true,
+      "walletAddress": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm"
     },
     "walletManager": {
-      "primaryWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "primaryWallet": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm",
       "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-      "autoFunding": false
+      "autoFunding": false,
+      "hasPrivateKey": true
     },
     "profitCollection": {
       "enabled": true,
@@ -32,13 +34,18 @@
     "rpcConfig": {
       "primaryProvider": "instantnodes",
       "backupProviders": [
-        "helius",
         "mainnet-beta"
       ],
       "connectionMode": "multi-connection",
       "webSocketEnabled": true,
-      "grpcEnabled": true
+      "grpcEnabled": false,
+      "maxRequestsPerMinute": 225
     },
-    "lastUpdated": "2025-05-16T02:35:29.294Z"
-  }
+    "lastUpdated": "2025-05-16T02:35:29.294Z",
+    "rateLimit": {
+      "requestsPerMinute": 225,
+      "enabled": true
+    }
+  },
+  "lastUpdated": "2025-05-16T02:44:03.026Z"
 }
