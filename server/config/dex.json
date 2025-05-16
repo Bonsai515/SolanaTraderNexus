@@ -1,0 +1,130 @@
+{
+  "version": "2.0.0",
+  "enabled": true,
+  "connections": {
+    "jupiter": {
+      "enabled": true,
+      "priorityLevel": 1,
+      "apiUrl": "https://quote-api.jup.ag/v6",
+      "useAggregator": true,
+      "versionTag": "v6",
+      "slippageBps": 50,
+      "requestTimeout": 5000,
+      "maxRetries": 3
+    },
+    "raydium": {
+      "enabled": true,
+      "priorityLevel": 2,
+      "programId": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "useConcentratedLiquidity": true,
+      "slippageBps": 50,
+      "maxRetries": 3
+    },
+    "orca": {
+      "enabled": true,
+      "priorityLevel": 2,
+      "useWhirlpools": true,
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "slippageBps": 50,
+      "maxRetries": 3
+    },
+    "saros": {
+      "enabled": true,
+      "priorityLevel": 3,
+      "programId": "SSwapUtytfBdBn1b9NUGG6foMVPtcWgpRU32HToDUZr",
+      "slippageBps": 80,
+      "maxRetries": 2
+    },
+    "lifinity": {
+      "enabled": true,
+      "priorityLevel": 3,
+      "programId": "LFNTYraetVioAPnGJht4yNg2aUZFXR776cMeN9VMjXp",
+      "slippageBps": 100,
+      "maxRetries": 2
+    },
+    "thalamus": {
+      "enabled": true,
+      "priorityLevel": 4,
+      "usesCrossChain": true,
+      "allowedDestinationChains": [
+        "ethereum",
+        "avalanche",
+        "polygon"
+      ],
+      "slippageBps": 100,
+      "maxRoutingFee": 0.5,
+      "maxRetries": 2
+    }
+  },
+  "routing": {
+    "smartRouter": {
+      "enabled": true,
+      "preferLargestLiquidity": true,
+      "checkMultipleRoutes": true,
+      "maxRoutesChecked": 3,
+      "maxSplits": 2
+    },
+    "fallbackPriority": [
+      "jupiter",
+      "raydium",
+      "orca",
+      "saros",
+      "lifinity",
+      "thalamus"
+    ],
+    "excludeFromArbitrage": []
+  },
+  "pools": {
+    "preferredPools": [
+      "SOL/USDC",
+      "BTC/USDC",
+      "ETH/USDC",
+      "MSOL/USDC",
+      "BONK/USDC",
+      "WIF/USDC",
+      "MEME/USDC",
+      "JUP/USDC",
+      "RAY/USDC",
+      "ORCA/USDC"
+    ],
+    "excludedTokens": [],
+    "minLiquidityUsd": 50000,
+    "minVolumeUsd": 10000
+  },
+  "priceImpact": {
+    "maxAcceptableImpact": 1,
+    "warnLevel": 0.5,
+    "impactBySize": {
+      "small": 0.1,
+      "medium": 0.3,
+      "large": 0.5,
+      "whale": 1
+    }
+  },
+  "arbitrage": {
+    "minProfitThreshold": 0.5,
+    "gasAdjustedProfitThreshold": 0.3,
+    "maxTimeValidityMs": 3000,
+    "maxRoutesCompared": 5
+  },
+  "updateIntervals": {
+    "priceMs": 1000,
+    "poolsMs": 30000,
+    "routesMs": 5000
+  },
+  "transactionConfiguration": {
+    "priorityFee": {
+      "enabled": true,
+      "microLamports": 500000
+    },
+    "computeUnits": {
+      "units": 1400000,
+      "price": 1
+    },
+    "retrySettings": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 3000
+    }
+  }
+}

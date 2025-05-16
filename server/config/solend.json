@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "monitoring": {
+    "enabled": true,
+    "pollIntervalMs": 10000,
+    "healthFactorThreshold": 1.05,
+    "minLiquidationValue": 100,
+    "maxPositionsToMonitor": 1000
+  },
+  "liquidation": {
+    "enabled": true,
+    "autoLiquidate": true,
+    "minProfitThreshold": 0.5,
+    "maxLiquidationSize": 1000,
+    "gasAdjustedProfitThreshold": 0.3,
+    "minHealthFactor": 1,
+    "priorityFee": {
+      "enabled": true,
+      "microLamports": 1000000
+    },
+    "maxSlippageBps": 100,
+    "reserves": {
+      "preferred": [
+        "USDC",
+        "USDT",
+        "SOL",
+        "BTC",
+        "ETH",
+        "mSOL"
+      ],
+      "excluded": []
+    },
+    "execution": {
+      "maxRetries": 3,
+      "retryDelayMs": 500,
+      "maxConcurrentLiquidations": 3,
+      "waitForConfirmation": true
+    }
+  },
+  "rewards": {
+    "trackLiquidationRewards": true,
+    "rewardsWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+  },
+  "risk": {
+    "maxExposure": 10000,
+    "maxExposurePerToken": 5000,
+    "maxDailyVolume": 50000,
+    "excludedCollateral": []
+  },
+  "markets": {
+    "enabled": [
+      "main",
+      "turbo"
+    ],
+    "priorityOrder": [
+      "main",
+      "turbo"
+    ]
+  },
+  "webhooks": {
+    "notifyOnLiquidation": true,
+    "notifyOnError": true,
+    "notifyOnLargeProfit": true,
+    "largeThresholdUsd": 100
+  },
+  "interfaces": {
+    "customRpcNode": "",
+    "useCachedConnection": true,
+    "cacheTimeMs": 60000
+  }
+}

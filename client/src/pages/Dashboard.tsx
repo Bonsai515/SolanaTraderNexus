@@ -1,575 +1,688 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
-import useWsStore, { useWsConnectionState, useSolanaConnectionInfo } from '../lib/wsStore';
-import useSolanaStore from '../lib/solanaUtils';
-import { useSignals } from '../hooks/useSignals';
-import LiveTradingActivator from '../components/LiveTradingActivator';
-import { ReloadIcon } from '@radix-ui/react-icons';
+/**
+ * Trading System Dashboard
+ * 
+ * Main dashboard for monitoring trading system performance,
+ * profit collection, and strategy execution.
+ */
 
-export default function Dashboard() {
-  const [connectionStatus, setConnectionStatus] = useState({
-    status: 'loading',
-    customRpc: false,
-    apiKey: false,
-    network: '',
-    timestamp: '',
-    websocket: false,
-    version: ''
-  });
+import React, { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, ArrowUpRight, ArrowDownRight, DollarSign, TrendingUp, Zap, RefreshCw, Clock, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { formatNumber, formatPercent, timeAgo } from "@/lib/dashboard/utils";
+import StrategyCard from "@/components/dashboard/StrategyCard";
+import ProfitMetrics from "@/components/dashboard/ProfitMetrics";
+import WalletBalances from "@/components/dashboard/WalletBalances";
+import TradeHistory from "@/components/dashboard/TradeHistory";
+import TradingFeed from "@/components/dashboard/TradingFeed";
+import StatusIndicator from "@/components/dashboard/StatusIndicator";
+
+// Colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+const Dashboard = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [systemStatus, setSystemStatus] = useState<'active' | 'inactive' | 'warning' | 'error'>('inactive');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // Get WebSocket store
-  const { messages, registerHandler } = useWsStore();
-  const wsConnectionState = useWsConnectionState();
-  
-  // Use the enhanced Solana connection info hook
-  const { 
-    connectionInfo, 
-    loading: loadingConnectionInfo, 
-    error: connectionInfoError, 
-    refresh: refreshConnectionInfo 
-  } = useSolanaConnectionInfo();
-  
-  // Get Solana connection status from HTTP API as fallback
-  const { data: solanaStatus, isLoading } = useQuery({
-    queryKey: ['/api/solana/status'],
-    staleTime: 60 * 1000, // 1 minute
-  });
-  
-  // Listen for WebSocket connection status updates
-  useEffect(() => {
-    const unregister = registerHandler('Solana connection status:', (message) => {
-      if (message.data) {
-        setConnectionStatus(prev => ({
-          ...prev,
-          ...message.data
-        }));
-      }
-    });
-    
-    return () => unregister();
-  }, [registerHandler]);
-  
-  // Update connection status when we get detailed info
-  useEffect(() => {
-    if (connectionInfo) {
-      setConnectionStatus(prev => ({
-        ...prev,
-        ...connectionInfo
-      }));
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setRefreshing(true);
+      const response = await apiRequest('GET', '/api/dashboard');
+      const data = await response.json();
+      
+      setDashboardData(data);
+      setSystemStatus(data.system.status || 'inactive');
+      setLastUpdated(new Date());
+      setLoading(false);
+      setRefreshing(false);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast({
+        title: "Error loading dashboard",
+        description: "Could not load dashboard data. Please try again.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [connectionInfo]);
+  };
   
-  // Get strategies from API
-  const { data: strategies, isLoading: loadingStrategies } = useQuery({
-    queryKey: ['/api/strategies'],
-    staleTime: 30 * 1000, // 30 seconds
-  });
+  // Handle manual refresh
+  const handleRefresh = () => {
+    fetchDashboardData();
+  };
   
-  // Get signals using our enhanced hook that combines API and WebSocket data
-  const { signals, isLoading: loadingSignals, refetch: refetchSignals, error: signalsError } = useSignals();
+  // Trigger profit collection
+  const triggerProfitCollection = async () => {
+    try {
+      setRefreshing(true);
+      const response = await apiRequest('POST', '/api/profit/capture');
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Profit collection triggered",
+          description: "Profit collection process started successfully.",
+        });
+      } else {
+        toast({
+          title: "Profit collection failed",
+          description: result.message || "Could not trigger profit collection.",
+          variant: "destructive",
+        });
+      }
+      
+      // Refresh data after a short delay
+      setTimeout(() => fetchDashboardData(), 2000);
+    } catch (error) {
+      console.error('Error triggering profit collection:', error);
+      toast({
+        title: "Profit collection failed",
+        description: "Could not trigger profit collection. Please try again.",
+        variant: "destructive",
+      });
+      setRefreshing(false);
+    }
+  };
   
-  // Get wallets from API
-  const { data: wallets, isLoading: loadingWallets } = useQuery({
-    queryKey: ['/api/wallets'],
-    staleTime: 60 * 1000, // 1 minute
-  });
+  // Initial data load
+  useEffect(() => {
+    fetchDashboardData();
+    
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
-  // Dashboard metrics
-  const activeStrategies = strategies?.filter(s => s.active).length || 0;
-  const totalStrategies = strategies?.length || 0;
-  const recentSignals = signals?.slice(0, 5) || [];
-  const totalBalance = wallets?.reduce((sum, wallet) => sum + wallet.balance, 0) || 0;
+  // Render loading state
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+          <h2 className="mt-4 text-2xl font-semibold">Loading Dashboard</h2>
+          <p className="mt-2 text-muted-foreground">Please wait while we fetch the latest data...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Extract data for charts
+  const profitData = dashboardData?.profit?.charts?.profitByDay || [];
+  const strategyData = dashboardData?.profit?.charts?.profitByStrategy || [];
+  const walletData = dashboardData?.wallets || [];
+  const recentTrades = dashboardData?.trades?.recent || [];
   
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-4 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className={`h-2 w-2 rounded-full ${connectionStatus.status === 'operational' ? 'bg-success' : 'bg-warning'}`}></div>
-            <span className="text-sm">
-              {connectionStatus.status === 'operational' ? 'Connected' : 'Connecting...'}
-            </span>
-          </div>
-          <LiveTradingActivator />
+        <div>
+          <h1 className="text-3xl font-bold">Trading Dashboard</h1>
+          <p className="text-muted-foreground">
+            Monitor system performance, profits, and trading activities
+          </p>
         </div>
-      </div>
-      
-      {/* Status Card */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-card rounded-lg shadow-md p-4 border border-border">
-          <div className="flex justify-between">
-            <h3 className="text-sm font-medium text-muted-foreground">Network</h3>
-            {wsConnectionState.connected && (
-              <button 
-                onClick={refreshConnectionInfo} 
-                className="text-primary hover:text-primary/80 transition-colors"
-                title="Refresh connection info"
-              >
-                <ReloadIcon className={`h-4 w-4 ${loadingConnectionInfo ? 'animate-spin' : ''}`} />
-              </button>
+        <div className="flex items-center gap-4">
+          <div className="text-right text-sm text-muted-foreground">
+            Last updated: {lastUpdated ? timeAgo(lastUpdated) : 'Never'}
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-1" />
             )}
-          </div>
-          <p className="text-2xl font-bold">{connectionStatus.network || solanaStatus?.network || 'Unknown'}</p>
-          <div className="mt-1 flex items-center text-xs">
-            <div className={`h-2 w-2 rounded-full mr-1.5 ${connectionStatus.websocket ? 'bg-success' : 'bg-orange-500'}`}></div>
-            <span className="text-muted-foreground">
-              {connectionStatus.websocket 
-                ? 'Using WebSocket connection' 
-                : 'Using HTTP connection'}
-            </span>
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {connectionStatus.customRpc ? 'Using custom RPC endpoint' : 'Using public RPC'}
-            {connectionStatus.version && ` · v${connectionStatus.version}`}
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-lg shadow-md p-4 border border-border">
-          <h3 className="text-sm font-medium text-muted-foreground">Strategies</h3>
-          <p className="text-2xl font-bold">{activeStrategies} / {totalStrategies}</p>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Active / Total
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-lg shadow-md p-4 border border-border">
-          <h3 className="text-sm font-medium text-muted-foreground">Signals (24h)</h3>
-          <p className="text-2xl font-bold">{signals?.length || 0}</p>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Last updated: {new Date().toLocaleTimeString()}
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-lg shadow-md p-4 border border-border">
-          <h3 className="text-sm font-medium text-muted-foreground">Total Balance</h3>
-          <p className="text-2xl font-bold">{totalBalance.toFixed(2)} SOL</p>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Across {wallets?.length || 0} wallets
-          </div>
+            Refresh
+          </Button>
         </div>
       </div>
       
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Link href="/trading">
-          <a className="bg-card rounded-lg shadow-md p-6 border border-border hover:bg-accent transition-colors">
-            <h3 className="text-xl font-semibold mb-2">Trading</h3>
-            <p className="text-muted-foreground">Execute trades and monitor market positions</p>
-          </a>
-        </Link>
+      {/* System Status */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <StatusIndicator status={systemStatus} />
+              <div className="text-2xl font-bold">{systemStatus.toUpperCase()}</div>
+            </div>
+          </CardContent>
+        </Card>
         
-        <Link href="/strategies">
-          <a className="bg-card rounded-lg shadow-md p-6 border border-border hover:bg-accent transition-colors">
-            <h3 className="text-xl font-semibold mb-2">Strategies</h3>
-            <p className="text-muted-foreground">Configure and manage trading strategies</p>
-          </a>
-        </Link>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <DollarSign className="h-5 w-5 text-green-500" />
+              <div className="text-2xl font-bold">
+                {formatNumber(dashboardData?.profit?.summary?.totalProfit || 0, true)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
-        <Link href="/ai-agents">
-          <a className="bg-card rounded-lg shadow-md p-6 border border-border hover:bg-accent transition-colors">
-            <h3 className="text-xl font-semibold mb-2">AI Agents</h3>
-            <p className="text-muted-foreground">Manage quantum-inspired AI trading agents</p>
-          </a>
-        </Link>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Profit Captures</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <Clock className="h-5 w-5 text-blue-500" />
+              <div className="text-2xl font-bold">
+                {dashboardData?.profit?.summary?.totalCaptures || 0}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Every {dashboardData?.profit?.summary?.captureIntervalMinutes || 4} minutes
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="w-full" 
+                onClick={triggerProfitCollection}
+                disabled={refreshing}
+              >
+                Capture Profit Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
-      {/* Connection Details */}
-      <div className="bg-card rounded-lg shadow-md p-6 border border-border mb-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Connection Details</h2>
-          <div className="flex items-center space-x-2">
-            <div className={`h-2 w-2 rounded-full ${wsConnectionState.connected ? 'bg-success' : 'bg-destructive'}`}></div>
-            <span className="text-sm text-muted-foreground">
-              {wsConnectionState.connected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
-            </span>
-          </div>
-        </div>
+      {/* Main Dashboard Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid grid-cols-4 mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="profits">Profits</TabsTrigger>
+          <TabsTrigger value="strategies">Strategies</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+        </TabsList>
         
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div>
-            <h3 className="text-sm font-medium mb-2">Solana Connection</h3>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Network:</span>
-                <span>{connectionStatus.network || 'Unknown'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">WebSocket Support:</span>
-                <span>{connectionStatus.websocket ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Custom RPC:</span>
-                <span>{connectionStatus.customRpc ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">API Key:</span>
-                <span>{connectionStatus.apiKey ? 'Present' : 'None'}</span>
-              </div>
-              {connectionStatus.version && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Version:</span>
-                  <span>{connectionStatus.version}</span>
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Performance Metrics */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Trading Performance</CardTitle>
+                <CardDescription>Overall system performance metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={profitData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="profit" stroke="#0088FE" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <div className="text-sm text-muted-foreground">Daily profit over time</div>
+                <Badge variant={
+                  dashboardData?.profit?.performance?.profitFactor > 1.5 ? "success" :
+                  dashboardData?.profit?.performance?.profitFactor > 1 ? "default" : "destructive"
+                }>
+                  Profit Factor: {dashboardData?.profit?.performance?.profitFactor || "N/A"}
+                </Badge>
+              </CardFooter>
+            </Card>
+            
+            {/* Strategy Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Strategy Distribution</CardTitle>
+                <CardDescription>Profit by strategy</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={strategyData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="profit"
+                      nameKey="strategy"
+                    >
+                      {strategyData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+              <CardFooter>
+                <div className="text-sm text-muted-foreground">
+                  Distribution of profits across different strategies
                 </div>
-              )}
-            </div>
+              </CardFooter>
+            </Card>
           </div>
           
-          <div>
-            <h3 className="text-sm font-medium mb-2">WebSocket Connection</h3>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status:</span>
-                <span>{wsConnectionState.connected ? 'Connected' : 'Disconnected'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Connection Attempts:</span>
-                <span>{wsConnectionState.connectionAttempts}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Message:</span>
-                <span>
-                  {wsConnectionState.lastMessageTime 
-                    ? new Date(wsConnectionState.lastMessageTime).toLocaleTimeString() 
-                    : 'None'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Messages:</span>
-                <span>{messages.length}</span>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Wallet Balances */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Wallet Balances</CardTitle>
+                <CardDescription>Current balance in each wallet</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WalletBalances wallets={walletData} />
+              </CardContent>
+            </Card>
+            
+            {/* Active Strategies */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Strategies</CardTitle>
+                <CardDescription>Currently active trading strategies</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {dashboardData?.strategies?.active?.map((strategy, index) => (
+                  <StrategyCard key={index} strategy={strategy} />
+                )) || (
+                  <div className="text-muted-foreground text-center py-4">
+                    No active strategies
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Recent Trades */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Trades</CardTitle>
+                <CardDescription>Latest executed trades</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TradeHistory trades={recentTrades} />
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="w-full">
+                  View All Trades
+                </Button>
+              </CardFooter>
+            </Card>
           </div>
-          
-          {/* AWS Services Status */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">AWS Services</h3>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">DynamoDB:</span>
-                <span className="flex items-center">
-                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
-                  Active
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">S3 Storage:</span>
-                <span className="flex items-center">
-                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
-                  Active
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">CloudWatch:</span>
-                <span className="flex items-center">
-                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
-                  Active
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Lambda:</span>
-                <span className="flex items-center">
-                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
-                  Active
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Region:</span>
-                <span>us-east-1</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* System Performance Metrics */}
-      <div className="bg-card rounded-lg shadow-md p-6 border border-border mb-4">
-        <h2 className="text-xl font-semibold mb-4">System Performance</h2>
+        </TabsContent>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Trading Performance */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Trading Performance</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Success Rate:</span>
-                <span className="font-medium">94.2%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-success h-2.5 rounded-full" style={{ width: '94%' }}></div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-3">
-                <span className="text-muted-foreground">Avg. Execution Time:</span>
-                <span className="font-medium">432ms</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Peak TPS:</span>
-                <span className="font-medium">324</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Daily Trades:</span>
-                <span className="font-medium">867</span>
-              </div>
-            </div>
+        {/* Profits Tab */}
+        <TabsContent value="profits" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Profit Metrics */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Profit Metrics</CardTitle>
+                <CardDescription>Detailed profit performance metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProfitMetrics metrics={dashboardData?.profit?.performance} />
+              </CardContent>
+            </Card>
+            
+            {/* Profit Collection */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Profit Collection</CardTitle>
+                <CardDescription>Profit collection settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Capture Interval:</span>
+                  <span className="font-medium">{dashboardData?.profit?.summary?.captureIntervalMinutes || 4} minutes</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reinvestment Rate:</span>
+                  <span className="font-medium">{dashboardData?.profit?.summary?.reinvestmentRate || 95}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Capture:</span>
+                  <span className="font-medium">
+                    {dashboardData?.profit?.summary?.lastCaptureTime ? 
+                      timeAgo(new Date(dashboardData.profit.summary.lastCaptureTime)) : 
+                      'Never'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Strategy:</span>
+                  <Badge>{dashboardData?.profit?.currentStrategy || "REINVEST"}</Badge>
+                </div>
+                <Button 
+                  onClick={triggerProfitCollection} 
+                  className="w-full"
+                  disabled={refreshing}
+                >
+                  Capture Profit Now
+                </Button>
+              </CardContent>
+            </Card>
           </div>
           
-          {/* Transformer Usage */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Transformer Utilization</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">MicroQHC:</span>
-                <span className="font-medium">86%</span>
+          {/* Profit History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profit History</CardTitle>
+              <CardDescription>Historical profit collection data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={profitData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="profit" fill="#0088FE" name="Profit" />
+                  <Bar dataKey="reinvested" fill="#00C49F" name="Reinvested" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          
+          {/* Recent Profit Captures */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Profit Captures</CardTitle>
+              <CardDescription>Latest profit collection events</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {dashboardData?.profit?.recentCaptures?.map((capture, index) => (
+                  <div key={index} className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <div className="font-medium">{new Date(capture.timestamp).toLocaleString()}</div>
+                      <div className="text-sm text-muted-foreground">
+                        From: {capture.sourceWallet.substring(0, 6)}...{capture.sourceWallet.substring(capture.sourceWallet.length - 4)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-500">{formatNumber(capture.amount, true)}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {capture.strategy || "REINVEST"}
+                      </div>
+                    </div>
+                  </div>
+                )) || (
+                  <div className="text-center text-muted-foreground py-4">
+                    No recent profit captures
+                  </div>
+                )}
               </div>
-              <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '86%' }}></div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-muted-foreground">MEME Cortex:</span>
-                <span className="font-medium">92%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: '92%' }}></div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-muted-foreground">Security:</span>
-                <span className="font-medium">78%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '78%' }}></div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-muted-foreground">CrossChain:</span>
-                <span className="font-medium">64%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: '64%' }}></div>
-              </div>
-            </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Strategies Tab */}
+        <TabsContent value="strategies" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Active Strategies */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Strategies</CardTitle>
+                <CardDescription>Currently active trading strategies</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {dashboardData?.strategies?.active?.map((strategy, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-lg">{strategy.name}</h3>
+                      <Badge variant="success">Active</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{strategy.description}</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Type:</span> {strategy.type}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Risk:</span> {strategy.risk}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Allocation:</span> {strategy.allocation}%
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Daily ROI:</span> {strategy.dailyRoi}%
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Executions:</span> {strategy.executions || 0}
+                      </div>
+                      <Button variant="outline" size="sm">View Details</Button>
+                    </div>
+                  </div>
+                )) || (
+                  <div className="text-center text-muted-foreground py-4">
+                    No active strategies
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Strategy Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Strategy Performance</CardTitle>
+                <CardDescription>Performance metrics by strategy</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={strategyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="strategy" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="profit" fill="#0088FE" name="Profit" />
+                    <Bar dataKey="executions" fill="#00C49F" name="Executions" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-4 space-y-2">
+                  {strategyData.map((strategy, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-3 h-3 rounded-full mr-2" 
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span>{strategy.strategy}</span>
+                      </div>
+                      <div className="font-medium">{formatNumber(strategy.profit, true)}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
           
-          {/* Agent Performance */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Agent Performance</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Hyperion:</span>
-                <span className="font-medium text-success">+3.4% (24h)</span>
+          {/* Strategy Config */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Strategy Configuration</CardTitle>
+              <CardDescription>Configure and manage trading strategies</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Flash Arbitrage</h3>
+                    <div className="text-sm text-muted-foreground">
+                      Status: <Badge variant="success">Active</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Min Profit: 0.8%
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full">Configure</Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Meme Token Sniper</h3>
+                    <div className="text-sm text-muted-foreground">
+                      Status: <Badge variant="success">Active</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Min Profit: 1.2%
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full">Configure</Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Cross-Chain Arbitrage</h3>
+                    <div className="text-sm text-muted-foreground">
+                      Status: <Badge variant="success">Active</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Min Profit: 1.0%
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full">Configure</Button>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Quantum Omega:</span>
-                <span className="font-medium text-success">+2.6% (24h)</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Singularity:</span>
-                <span className="font-medium text-success">+5.1% (24h)</span>
-              </div>
-              <div className="flex justify-between items-center mt-3">
-                <span className="text-muted-foreground">Total ROI:</span>
-                <span className="font-medium text-success">+42.8% (30d)</span>
-              </div>
-              <div className="flex justify-between items-center mt-3">
-                <span className="text-muted-foreground">System Health:</span>
-                <span className="flex items-center">
-                  <div className="h-2 w-2 rounded-full mr-1.5 bg-success"></div>
-                  Optimal
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Real-Time Trading Signals */}
-      <div className="bg-card rounded-lg shadow-md p-6 border border-border">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Real-Time Trading Signals</h2>
-          <div className="flex items-center">
-            <button 
-              onClick={refetchSignals}
-              className="text-primary hover:text-primary/80 transition-colors flex items-center"
-              title="Refresh signals"
-            >
-              <ReloadIcon className={`h-4 w-4 mr-1 ${loadingSignals ? 'animate-spin' : ''}`} />
-              <span className="text-sm">Refresh</span>
-            </button>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
         
-        {loadingSignals ? (
-          <div className="flex justify-center items-center py-10">
-            <ReloadIcon className="animate-spin h-8 w-8 text-primary" />
-          </div>
-        ) : signalsError ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="text-destructive mb-2">Error loading trading signals</div>
-            <div className="text-sm text-muted-foreground mb-4">
-              {String(signalsError)}
-            </div>
-            <button 
-              onClick={refetchSignals}
-              className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : signals && signals.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border text-left">
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Token Pair</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Signal Type</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Source</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Strength</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Amount</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Timestamp</th>
-                  <th className="py-2 px-4 font-medium text-muted-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {signals.slice(0, 5).map(signal => (
-                  <tr key={signal.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        <span className="font-medium">{signal.sourceToken || (signal.pair && signal.pair.split('/')[0]) || 'USDC'}</span>
-                        <span className="mx-1 text-muted-foreground">→</span>
-                        <span className="font-medium">{signal.targetToken || (signal.pair && signal.pair.split('/')[1]) || 'SOL'}</span>
+        {/* Transactions Tab */}
+        <TabsContent value="transactions" className="space-y-4">
+          {/* Transaction Feed */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Live Transaction Feed</CardTitle>
+              <CardDescription>Real-time transaction activity</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TradingFeed trades={dashboardData?.trades?.recent || []} />
+            </CardContent>
+          </Card>
+          
+          {/* Transaction History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction History</CardTitle>
+              <CardDescription>Historical transaction data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {dashboardData?.trades?.recent?.map((trade, index) => (
+                  <div key={index} className="flex justify-between items-center border-b pb-2">
+                    <div>
+                      <div className="font-medium">{trade.pair}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(trade.timestamp).toLocaleString()}
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        signal.type === 'BUY' || 
-                        (signal.type === 'MARKET_SENTIMENT' && signal.sentiment === 'BULLISH') || 
-                        (signal.type === 'FLASH_ARBITRAGE' && signal.sentiment === 'BULLISH') || 
-                        signal.sentiment === 'BULLISH' ? 
-                          'bg-green-100 text-green-800' : 
-                        signal.type === 'SELL' || 
-                        (signal.type === 'MARKET_SENTIMENT' && signal.sentiment === 'BEARISH') || 
-                        (signal.type === 'MARKET' && signal.sentiment === 'BEARISH') || 
-                        signal.sentiment === 'BEARISH' ? 
-                          'bg-red-100 text-red-800' : 
-                        signal.type === 'VOLATILITY_ALERT' || signal.type === 'QUANTUM' ? 
-                          'bg-purple-100 text-purple-800' :
-                        signal.type === 'ARBITRAGE_OPPORTUNITY' || signal.type === 'FLASH' || signal.type === 'MEV' ? 
-                          'bg-blue-100 text-blue-800' :
-                        signal.type === 'CROSSCHAIN' ? 
-                          'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
-                      }`}>
-                        {signal.type === 'MARKET_SENTIMENT' || signal.sentiment ? 
-                          (signal.sentiment || 'NEUTRAL') : 
-                          signal.type}
+                    </div>
+                    <div>
+                      <div className="text-sm">
+                        {trade.type === 'buy' ? 'Buy' : 'Sell'} • {trade.strategy}
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        {signal.source === 'MicroQHC' && (
-                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">MicroQHC</span>
-                        )}
-                        {signal.source === 'MEME Cortex' && (
-                          <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">MEME Cortex</span>
-                        )}
-                        {signal.source === 'MemeCortexRemix' && (
-                          <span className="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">MemeCortexRemix</span>
-                        )}
-                        {signal.source === 'Security' && (
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Security</span>
-                        )}
-                        {signal.source === 'CrossChain' && (
-                          <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2.5 py-0.5 rounded">CrossChain</span>
-                        )}
-                        {!signal.source && (
-                          <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">System</span>
-                        )}
+                      <div className="text-sm text-muted-foreground">
+                        {trade.amount} {trade.token}
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        {signal.confidence ? (
-                          <div className="w-16 bg-muted rounded-full h-2 mr-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                Number(signal.confidence) > 80 || Number(signal.confidence) > 0.8 ? 'bg-success' : 
-                                Number(signal.confidence) > 50 || Number(signal.confidence) > 0.5 ? 'bg-warning' : 
-                                'bg-destructive'
-                              }`} 
-                              style={{ width: `${Number(signal.confidence) > 1 ? Math.min(100, Number(signal.confidence)) : Math.min(100, Number(signal.confidence) * 100)}%` }}
-                            ></div>
-                          </div>
-                        ) : (
-                          <div className="w-16 bg-muted rounded-full h-2 mr-2">
-                            <div className="bg-primary h-2 rounded-full" style={{ width: '70%' }}></div>
-                          </div>
-                        )}
-                        <span className="text-sm">
-                          {signal.confidence ? 
-                            `${Number(signal.confidence) > 1 ? Math.min(100, Math.round(Number(signal.confidence))) : Math.min(100, Math.round(Number(signal.confidence) * 100))}%` 
-                            : '70%'}
-                        </span>
+                    </div>
+                    <div className="text-right">
+                      <div className={trade.profit >= 0 ? 'text-green-500' : 'text-red-500'}>
+                        {formatNumber(trade.profit, true)}
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="font-medium">
-                        {signal.amount ? `$${signal.amount.toFixed(2)}` : '$100.00'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-sm text-muted-foreground">
-                        {signal.created_at ? new Date(signal.created_at).toLocaleTimeString() : new Date().toLocaleTimeString()}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        signal.status === 'EXECUTED' || signal.status === 'executed' ? 'bg-green-100 text-green-800' : 
-                        signal.status === 'PENDING' || signal.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                        signal.status === 'PROCESSING' || signal.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                        signal.status === 'FAILED' || signal.status === 'failed' ? 'bg-red-100 text-red-800' : 
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {signal.status || (signal.signature ? 'EXECUTED' : 'PENDING')}
-                        {signal.signature && (
-                          <span className="ml-1 text-xs opacity-70" title={signal.signature}>
-                            #{signal.signature.substring(0, 8)}
-                          </span>
-                        )}
+                      <div className="text-sm text-muted-foreground">
+                        {trade.txId?.substring(0, 6)}...{trade.txId?.substring(trade.txId.length - 4)}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="text-muted-foreground mb-2">No trading signals available</div>
-            <div className="text-sm text-muted-foreground">
-              Signals will appear here as they are generated by the system transformers
-            </div>
-          </div>
-        )}
-        
-        {recentSignals.length > 0 && (
-          <div className="mt-6 flex justify-between items-center">
-            <div className="text-sm text-muted-foreground">
-              Showing {recentSignals.length} of {signals?.length || recentSignals.length} signals from the last 24 hours
-            </div>
-            <Link href="/trading">
-              <a className="text-sm text-primary hover:underline flex items-center">
-                View all signals
-                <svg className="w-4 h-4 ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
-            </Link>
-          </div>
-        )}
-      </div>
+                    </div>
+                  </div>
+                )) || (
+                  <div className="text-center text-muted-foreground py-4">
+                    No transaction history available
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full">Load More</Button>
+            </CardFooter>
+          </Card>
+          
+          {/* Transaction Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction Analytics</CardTitle>
+              <CardDescription>Transaction performance analytics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Success Rate</h3>
+                  <div className="text-2xl font-bold">
+                    {formatPercent(dashboardData?.transactions?.successRate || 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {dashboardData?.transactions?.successful || 0} successful / 
+                    {dashboardData?.transactions?.total || 0} total
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Average Profit</h3>
+                  <div className="text-2xl font-bold">
+                    {formatNumber(dashboardData?.transactions?.avgProfit || 0, true)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Per transaction
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Volume</h3>
+                  <div className="text-2xl font-bold">
+                    {formatNumber(dashboardData?.transactions?.totalVolume || 0, true)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    All time
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
+};
+
+export default Dashboard;

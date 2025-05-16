@@ -26,6 +26,8 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateStaticDashboard, Signal as DashboardSignal } from './static-dashboard';
+// Import special route modules in the registerRoutes function
+import solendRouter from './routes/solend';
 
 const router = express.Router();
 let usingNexusEngine = true; // Always use the Nexus Professional Engine
@@ -516,6 +518,45 @@ router.get('/api/market/analyze/:token', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// RPC Status endpoint to monitor health and rate limiting
+router.get('/api/system/rpc-status', async (req, res) => {
+  try {
+    // Import the RPC connection manager
+    const { getRpcStatus } = require('./lib/rpcConnectionManager');
+    
+    // Get the current RPC service status
+    const rpcStatus = getRpcStatus();
+    
+    // Add RPC rate limiter metrics if available
+    try {
+      const rpcRateLimiter = require('./lib/rpcRateLimiter');
+      const rateLimiterMetrics = {
+        totalRequests: rpcRateLimiter.getTotalRequests?.() || 0,
+        totalRateLimitErrors: rpcRateLimiter.getTotalRateLimitErrors?.() || 0,
+        isThrottled: rpcRateLimiter.isCurrentlyThrottled?.() || false,
+        currentCooldownMs: rpcRateLimiter.getCurrentCooldown?.() || 0
+      };
+      
+      // Add rate limiter metrics to status response
+      rpcStatus.rateLimiter = rateLimiterMetrics;
+    } catch (error) {
+      console.warn('Failed to get rate limiter metrics:', error.message);
+    }
+    
+    res.json({
+      status: 'success',
+      timestamp: new Date().toISOString(),
+      rpc: rpcStatus
+    });
+  } catch (error) {
+    console.error('Error getting RPC status:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: error.message || 'Failed to get RPC status'
+    });
   }
 });
 
@@ -1734,6 +1775,43 @@ router.get('/api/price/:token', (req, res) => {
 export async function registerRoutes(app: express.Express) {
   // Use the router
   app.use(router);
+  
+  // Import API routes dynamically to avoid circular dependencies
+  try {
+    const dashboardRoutes = require('./routes/dashboard').default;
+    app.use('/api/dashboard', dashboardRoutes);
+    console.log('✅ Dashboard routes registered successfully');
+  } catch (error) {
+    console.error('❌ Error loading dashboard routes:', error);
+  }
+  
+  // Register Solend liquidator routes
+  try {
+    const solendRoutes = require('./routes/solend').default;
+    app.use('/api/solend', solendRoutes);
+    console.log('✅ Solend liquidator routes registered successfully');
+  } catch (error) {
+    console.error('❌ Error loading Solend routes:', error);
+  }
+  // Add RPC rate limiter status endpoint
+  app.get('/api/system/rpc-status', (req, res) => {
+    try {
+      const rpcRateLimiter = require('./lib/rpcRateLimiter');
+      const status = rpcRateLimiter.getThrottleState();
+      res.json({
+        success: true,
+        status,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error getting RPC rate limiter status:', error instanceof Error ? error.message : 'Unknown error');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error getting RPC rate limiter status'
+      });
+    }
+  });
+  
   // Add system status endpoint
   app.get('/status', (req, res) => {
     const status = {

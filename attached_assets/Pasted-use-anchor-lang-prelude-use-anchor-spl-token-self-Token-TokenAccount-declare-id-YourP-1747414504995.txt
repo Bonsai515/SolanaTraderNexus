@@ -1,0 +1,69 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount};
+
+declare_id!("YourProgramID");
+
+#[program]
+pub mod liquidation_bot {
+    use super::*;
+
+    pub fn execute_liquidation(ctx: Context<ExecuteLiquidation>, amount: u64) -> Result<()> {
+        // Borrow flash loan (e.g., USDC)
+        let borrow_ix = solend::instruction::borrow(
+            ctx.accounts.solend_program.key(),
+            ctx.accounts.reserve.key(),
+            ctx.accounts.liquidity_supply.key(),
+            ctx.accounts.user_account.key(),
+            amount,
+        )?;
+        invoke(&borrow_ix, &[
+            ctx.accounts.reserve.to_account_info(),
+            ctx.accounts.user_account.to_account_info(),
+            // ... other accounts
+        ])?;
+
+        // Liquidate undercollateralized position
+        let liquidate_ix = solend::instruction::liquidate(
+            ctx.accounts.solend_program.key(),
+            ctx.accounts.reserve.key(),
+            ctx.accounts.collateral_account.key(),
+            ctx.accounts.user_account.key(),
+            amount,
+        )?;
+        invoke(&liquidate_ix, &[
+            ctx.accounts.reserve.to_account_info(),
+            ctx.accounts.collateral_account.to_account_info(),
+            // ... other accounts
+        ])?;
+
+        // Repay flash loan
+        let repay_ix = solend::instruction::repay(
+            ctx.accounts.solend_program.key(),
+            ctx.accounts.reserve.key(),
+            ctx.accounts.liquidity_supply.key(),
+            ctx.accounts.user_account.key(),
+            amount,
+        )?;
+        invoke(&repay_ix, &[
+            ctx.accounts.reserve.to_account_info(),
+            ctx.accounts.user_account.to_account_info(),
+            // ... other accounts
+        ])?;
+
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct ExecuteLiquidation<'info> {
+    #[account(mut)]
+    pub reserve: AccountInfo<'info>,
+    #[account(mut)]
+    pub liquidity_supply: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub collateral_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_account: Signer<'info>,
+    pub solend_program: Program<'info, SolendProgram>,
+    pub token_program: Program<'info, Token>,
+}

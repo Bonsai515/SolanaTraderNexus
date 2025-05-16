@@ -5,113 +5,61 @@
  * blockchain transactions by fixing connection issues with Solana RPC.
  */
 
-import { logger } from './logger';
-import * as agents from './agents';
-import * as transactionEngine from './transaction-connector';
-import { PriorityLevel, TransactionParams } from './transaction-connector';
-import { tryConnectAPI } from '../fix-connections';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Connection } from '@solana/web3.js';
+import * as nexusIntegration from './nexus-integration';
+import * as rpcConnectionManager from './lib/rpcConnectionManager';
+import * as rpcRateLimiter from './lib/rpcRateLimiter';
+import * as pythPriceOracle from './lib/pythPriceOracle';
+import * as logger from './logger';
 
-// System wallet for trading
-const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+/**
+ * Helper function to log messages both to console and file
+ * @param message The message to log
+ */
+function log(message: string): void {
+  logger.info(`[LiveTrading] ${message}`);
+  console.log(`[LiveTrading] ${message}`);
+  
+  // Append to activation log
+  const logDir = path.join('.', 'logs');
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  
+  const logFile = path.join(logDir, 'activation.log');
+  fs.appendFileSync(logFile, `${new Date().toISOString()} - ${message}\n`);
+}
 
 /**
  * Activate the transaction engine with the appropriate RPC URL
  */
-export async function activateTransactionEngine(): Promise<boolean> {
+async function activateTransactionEngine(): Promise<boolean> {
   try {
-    logger.info('Initializing transaction engine with RPC URL: NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9');
+    log('Activating transaction engine with Instant Nodes RPC');
     
-    // Try to get the best Solana RPC URL
-    let rpcUrl = process.env.INSTANT_NODES_RPC_URL || 
-                 process.env.SOLANA_RPC_API_KEY || 
-                 'https://api.mainnet-beta.solana.com';
+    // Configure RPC rate limiter
+    rpcRateLimiter.setNormalRateLimiting();
     
-    // Initialize the transaction engine with the RPC URL
-    if (!transactionEngine.initializeTransactionEngine(rpcUrl)) {
-      logger.error('Failed to initialize transaction engine');
-      return false;
+    // Get managed connection
+    const connection = rpcConnectionManager.getManagedConnection({
+      commitment: 'confirmed'
+    });
+    
+    log('Connection established. Initializing transaction engine');
+    
+    // Initialize with real funds
+    const engineInitialized = await nexusIntegration.initializeTransactionEngine();
+    
+    if (!engineInitialized) {
+      throw new Error('Failed to initialize transaction engine');
     }
     
-    // Register system wallet
-    if (!transactionEngine.registerWallet(SYSTEM_WALLET)) {
-      logger.error('Failed to register system wallet');
-      return false;
-    }
-    
-    logger.info(`System wallet ${SYSTEM_WALLET} registered for profit collection`);
-    
+    log('Transaction engine initialized successfully with real funds');
     return true;
   } catch (error) {
-    logger.error(`Failed to activate transaction engine: ${error}`);
-    return false;
-  }
-}
-
-/**
- * Execute a test transaction to verify the transaction engine
- */
-export async function executeTestTransaction(): Promise<boolean> {
-  try {
-    // Execute a test transaction
-    const params: TransactionParams = {
-      transaction_type: 'TEST',
-      wallet_address: SYSTEM_WALLET,
-      amount: 0.001,
-      token: 'SOL',
-      priority: PriorityLevel.LOW,
-      memo: 'Test transaction for engine verification',
-      verify_real_funds: true,
-    };
-    
-    const result = transactionEngine.executeTransaction(params);
-    
-    if (!result.success) {
-      logger.error(`Test transaction failed: ${result.error}`);
-      return false;
-    }
-    
-    logger.info(`Test transaction succeeded: ${result.signature}`);
-    return true;
-  } catch (error) {
-    logger.error(`Failed to execute test transaction: ${error}`);
-    return false;
-  }
-}
-
-/**
- * Activate all trading agents
- */
-export async function activateAllAgents(): Promise<boolean> {
-  try {
-    logger.info('Starting agent system for live real funds trading');
-    
-    // Start the agent system
-    if (typeof agents.startAgentSystem === 'function') {
-      if (!await agents.startAgentSystem()) {
-        logger.error('Failed to start agent system');
-        return false;
-      }
-    } else {
-      // Fall back to just using the existing agent system
-      logger.info('Using existing agent system');
-    }
-    
-    // Activate specific agents
-    if (typeof agents.activateAgent === 'function') {
-      await agents.activateAgent('hyperion', true);
-      await agents.activateAgent('quantum_omega', true);
-      await agents.activateAgent('singularity', true);
-      
-      // Set real funds trading
-      if (typeof agents.setUseRealFunds === 'function') {
-        await agents.setUseRealFunds(true);
-      }
-    }
-    
-    logger.info('Agent system activated for live trading');
-    return true;
-  } catch (error) {
-    logger.error(`Failed to activate agents: ${error}`);
+    log(`Error activating transaction engine: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -119,20 +67,99 @@ export async function activateAllAgents(): Promise<boolean> {
 /**
  * Enable real fund trading by setting appropriate flags
  */
-export async function enableRealFundTrading(): Promise<boolean> {
+async function enableRealFundTrading(): Promise<boolean> {
   try {
-    // Verify API connections
-    await tryConnectAPI();
+    log('Enabling real fund trading');
     
-    // Set agent flags for real trading (if API exists)
-    if (typeof agents.setUseRealFunds === 'function') {
-      await agents.setUseRealFunds(true);
+    // Integration will force useRealFunds to true
+    const systemActivated = await nexusIntegration.activateFullSystem();
+    
+    if (!systemActivated) {
+      throw new Error('Failed to activate full system');
     }
     
-    logger.info('Real fund trading enabled');
+    log('Real fund trading enabled successfully');
     return true;
   } catch (error) {
-    logger.error(`Failed to enable real fund trading: ${error}`);
+    log(`Error enabling real fund trading: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+}
+
+/**
+ * Initialize price feeds
+ */
+async function initializePriceFeeds(): Promise<boolean> {
+  try {
+    log('Initializing price feeds');
+    
+    // Get all available symbols
+    const symbols = pythPriceOracle.getAvailableSymbols();
+    log(`Available price symbols: ${symbols.join(', ')}`);
+    
+    // Test fetching price data
+    const prices = await pythPriceOracle.getMultiplePrices(symbols);
+    
+    // Log first few prices as test
+    for (const symbol of symbols.slice(0, 3)) {
+      const price = prices[symbol];
+      if (price) {
+        log(`Price for ${symbol}: $${price.price.toFixed(6)} (confidence: $${price.confidence.toFixed(6)})`);
+      } else {
+        log(`Failed to get price for ${symbol}`);
+      }
+    }
+    
+    log('Price feeds initialized successfully');
+    return true;
+  } catch (error) {
+    log(`Error initializing price feeds: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+}
+
+/**
+ * Activate all trading agents
+ */
+async function activateAllAgents(): Promise<boolean> {
+  try {
+    log('Activating trading agents');
+    
+    // This will be handled by the activateFullSystem call
+    log('Trading agents activated through system integration');
+    return true;
+  } catch (error) {
+    log(`Error activating trading agents: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+}
+
+/**
+ * Setup data directories
+ */
+async function setupDataDirectories(): Promise<boolean> {
+  try {
+    log('Setting up data directories');
+    
+    // Create required directories
+    const dirs = [
+      path.join('.', 'data'),
+      path.join('.', 'data', 'wallets'),
+      path.join('.', 'logs'),
+      path.join('.', 'server', 'config')
+    ];
+    
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        log(`Created directory: ${dir}`);
+      }
+    }
+    
+    log('Data directories setup successfully');
+    return true;
+  } catch (error) {
+    log(`Error setting up data directories: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -141,52 +168,63 @@ export async function enableRealFundTrading(): Promise<boolean> {
  * Main function to activate live trading
  */
 export async function activateLiveTrading(): Promise<boolean> {
-  logger.info('*** STARTING FULL TRADING SYSTEM WITH ALL COMPONENTS FOR LIVE TRADING ***');
+  log('Starting live trading activation process');
   
-  // Step 1: Activate the transaction engine
-  if (!await activateTransactionEngine()) {
-    logger.error('Failed to activate transaction engine');
+  try {
+    // Setup data directories
+    await setupDataDirectories();
+    
+    // Activate transaction engine
+    const engineActivated = await activateTransactionEngine();
+    if (!engineActivated) {
+      throw new Error('Failed to activate transaction engine');
+    }
+    
+    // Initialize price feeds
+    const pricesFeedsInitialized = await initializePriceFeeds();
+    if (!pricesFeedsInitialized) {
+      log('Warning: Price feeds not fully initialized, continuing with activation');
+    }
+    
+    // Enable real fund trading
+    const realFundsEnabled = await enableRealFundTrading();
+    if (!realFundsEnabled) {
+      throw new Error('Failed to enable real fund trading');
+    }
+    
+    // Activate all agents
+    const agentsActivated = await activateAllAgents();
+    if (!agentsActivated) {
+      log('Warning: Some agents may not be fully activated, continuing with activation');
+    }
+    
+    log('Live trading activation completed successfully!');
+    
+    // Load system status
+    const rpcStats = rpcRateLimiter.getRateLimitStats();
+    log(`RPC Rate Limiter: ${rpcStats.currentRequestRate}/${rpcStats.maxRequestsPerMinute} requests (${rpcStats.utilizationPercent}% utilization)`);
+    
+    return true;
+  } catch (error) {
+    log(`Error activating live trading: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
-  
-  // Step 2: Activate all trading agents
-  if (!await activateAllAgents()) {
-    logger.error('Failed to activate trading agents');
-    return false;
-  }
-  
-  // Step 3: Execute a test transaction to verify the engine
-  if (!await executeTestTransaction()) {
-    logger.warn('Test transaction failed, but continuing with activation');
-    // Continue anyway, as we might have just failed the test but the engine works
-  }
-  
-  // Step 4: Enable real fund trading
-  if (!await enableRealFundTrading()) {
-    logger.error('Failed to enable real fund trading');
-    return false;
-  }
-  
-  logger.info('✅ LIVE TRADING ACTIVATED SUCCESSFULLY');
-  logger.info('Trading agents are now actively scanning for opportunities');
-  
-  return true;
 }
 
-// Execute if this script is run directly
+// Run activation if executed directly
 if (require.main === module) {
   activateLiveTrading()
-    .then(success => {
+    .then((success) => {
       if (success) {
-        logger.info('Live trading activated successfully');
+        log('Live trading activation completed successfully. System is ready for trading.');
         process.exit(0);
       } else {
-        logger.error('Failed to activate live trading');
+        log('Live trading activation failed. Please check logs for details.');
         process.exit(1);
       }
     })
-    .catch(error => {
-      logger.error(`Error during live trading activation: ${error}`);
+    .catch((err: Error) => {
+      log(`Unexpected error during activation: ${err.message}`);
       process.exit(1);
     });
 }
