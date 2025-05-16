@@ -1,0 +1,87 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "tradingHours": {
+    "enabled": true,
+    "active24x7": true,
+    "timezone": "UTC",
+    "activeHours": [
+      {
+        "day": "monday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "tuesday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "wednesday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "thursday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "friday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "saturday",
+        "start": "00:00",
+        "end": "23:59"
+      },
+      {
+        "day": "sunday",
+        "start": "00:00",
+        "end": "23:59"
+      }
+    ]
+  },
+  "decisionEngine": {
+    "type": "NEURAL_QUANTUM",
+    "requiredConfidence": 0.8,
+    "useMultipleSources": true,
+    "minimumDataPoints": 3,
+    "backtestRequired": true,
+    "maxPositionHoldTime": 3600,
+    "minProfitRequirement": 0.5
+  },
+  "signalValidation": {
+    "enabled": true,
+    "minimumConfirmingSources": 2,
+    "timeWindow": 300,
+    "priceMovementThreshold": 0.5,
+    "volumeThreshold": 10000
+  },
+  "riskManagement": {
+    "maxDailyTransactions": 100,
+    "maxDailyVolume": 1000,
+    "maxTransactionSize": 100,
+    "stopLossEnabled": true,
+    "stopLossThreshold": 5,
+    "takeProfitEnabled": true,
+    "takeProfitThreshold": 10,
+    "maxDrawdown": 15,
+    "cooldownAfterLoss": 3600
+  },
+  "auditTrail": {
+    "enabled": true,
+    "logAllDecisions": true,
+    "recordTransactions": true,
+    "storePath": "data/autonomous-logs"
+  },
+  "notifications": {
+    "enabled": true,
+    "onTransaction": true,
+    "onProfit": true,
+    "onLoss": true,
+    "onError": true,
+    "dailySummary": true
+  }
+}

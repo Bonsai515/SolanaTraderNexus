@@ -72,6 +72,23 @@
           "coingecko"
         ],
         "updateInterval": 15000
+      },
+      "onChainIntegration": {
+        "enabled": true,
+        "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
+      },
+      "autonomous": {
+        "enabled": true,
+        "requireOnChainValidation": true,
+        "confidenceThreshold": 0.8,
+        "profitThreshold": 0.5
+      },
+      "riskManagement": {
+        "stopLoss": true,
+        "stopLossThreshold": 5,
+        "maxDrawdown": 10,
+        "maxPositionSize": 100,
+        "positionSizing": "DYNAMIC"
       }
     }
   },
@@ -142,6 +159,23 @@
         ],
         "updateInterval": 30000,
         "alternateSourceCheck": true
+      },
+      "onChainIntegration": {
+        "enabled": true,
+        "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg"
+      },
+      "autonomous": {
+        "enabled": true,
+        "requireOnChainValidation": true,
+        "confidenceThreshold": 0.8,
+        "profitThreshold": 0.5
+      },
+      "riskManagement": {
+        "stopLoss": true,
+        "stopLossThreshold": 5,
+        "maxDrawdown": 10,
+        "maxPositionSize": 100,
+        "positionSizing": "DYNAMIC"
       }
     }
   },
@@ -220,6 +254,23 @@
           "coingecko"
         ],
         "updateInterval": 30000
+      },
+      "onChainIntegration": {
+        "enabled": true,
+        "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV"
+      },
+      "autonomous": {
+        "enabled": true,
+        "requireOnChainValidation": true,
+        "confidenceThreshold": 0.8,
+        "profitThreshold": 0.5
+      },
+      "riskManagement": {
+        "stopLoss": true,
+        "stopLossThreshold": 5,
+        "maxDrawdown": 10,
+        "maxPositionSize": 100,
+        "positionSizing": "DYNAMIC"
       }
     }
   }

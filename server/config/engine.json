@@ -77,5 +77,37 @@
     "maxPriceAge": 180000,
     "requireMultipleSources": true,
     "minConfidence": 0.7
+  },
+  "onChainIntegration": {
+    "enabled": true,
+    "programs": {
+      "hyperion": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+      "quantumMEV": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+      "memeCortex": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+      "flashArb": "FlsH1zBxXz3ib9uqgHNtV6uqzGMcnTgoAutozBXH8Zff",
+      "priceOracle": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+    }
+  },
+  "autonomousMode": {
+    "enabled": true,
+    "profitThreshold": 0.5,
+    "riskManagement": {
+      "stopLoss": true,
+      "stopLossThreshold": 5,
+      "takeProfitThreshold": 10,
+      "maxTransactionsPerHour": 30,
+      "maxDailyLoss": 5
+    },
+    "decisionEngine": {
+      "requiredConfidence": 0.8,
+      "useAI": true,
+      "multipleSourceVerification": true,
+      "backtest": true
+    },
+    "execution": {
+      "maxSlippage": 1,
+      "priorityFee": "HIGH",
+      "confirmations": 2
+    }
   }
 }
