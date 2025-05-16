@@ -1,0 +1,129 @@
+[
+  {
+    "id": "nuclear-hyperion-flash-arb",
+    "name": "Hyperion Flash Arbitrage",
+    "description": "Ultra-fast flash loan powered arbitrage using neural-quantum path finding",
+    "type": "FLASH_ARBITRAGE",
+    "status": "ACTIVE",
+    "enabled": true,
+    "risk": "VERY_HIGH",
+    "pairs": [
+      "SOL/USDC",
+      "BONK/USDC",
+      "MEME/USDC",
+      "WIF/USDC",
+      "JUP/USDC"
+    ],
+    "config": {
+      "maxAmount": 100000,
+      "minProfitThreshold": 0.5,
+      "useFlashLoans": true,
+      "flashLoanProviders": [
+        "Solend",
+        "Mango",
+        "Kamino"
+      ],
+      "slippageTolerance": 1,
+      "gasMultiplier": 1.5,
+      "priorityFee": "VERY_HIGH",
+      "profitTarget": {
+        "daily": 1.45,
+        "monthly": 50,
+        "yearly": 500
+      },
+      "integrations": {
+        "useMEV": true,
+        "useJupiter": true,
+        "useOnChainProgram": true,
+        "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
+      },
+      "fallbackOptions": {
+        "useDex": true,
+        "useAMM": true,
+        "useCEX": false
+      }
+    }
+  },
+  {
+    "id": "nuclear-quantum-meme-sniper",
+    "name": "Quantum Omega Meme Sniper",
+    "description": "Ultra-high ROI meme token sniping with neural sentiment analysis",
+    "type": "MEME_SNIPER",
+    "status": "ACTIVE",
+    "enabled": true,
+    "risk": "VERY_HIGH",
+    "pairs": [
+      "BONK/USDC",
+      "MEME/USDC",
+      "WIF/USDC",
+      "POPCAT/USDC",
+      "SLERF/USDC"
+    ],
+    "config": {
+      "maxAmount": 50000,
+      "minROIThreshold": 10,
+      "useFlashLoans": false,
+      "slippageTolerance": 5,
+      "gasMultiplier": 2,
+      "priorityFee": "MAXIMUM",
+      "analysisWindow": 30,
+      "profitTarget": {
+        "daily": 1.4,
+        "monthly": 45,
+        "yearly": 500
+      },
+      "integrations": {
+        "useMemeCortex": true,
+        "useSocialSentiment": true,
+        "useOnChainProgram": true,
+        "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg"
+      }
+    }
+  },
+  {
+    "id": "nuclear-singularity-cross-chain",
+    "name": "Singularity Cross-Chain Arbitrage",
+    "description": "Quantum-driven cross-chain arbitrage using Wormhole and neural analysis",
+    "type": "CROSS_CHAIN_ARB",
+    "status": "ACTIVE",
+    "enabled": true,
+    "risk": "VERY_HIGH",
+    "pairs": [
+      "SOL/ETH",
+      "SOL/AVAX",
+      "SOL/SUI",
+      "SOL/BTC"
+    ],
+    "config": {
+      "maxAmount": 75000,
+      "minProfitThreshold": 0.8,
+      "slippageTolerance": 1.5,
+      "gasMultiplier": 1.5,
+      "priorityFee": "HIGH",
+      "bridges": [
+        "Wormhole",
+        "Portal",
+        "Allbridge"
+      ],
+      "chains": [
+        "Solana",
+        "Ethereum",
+        "Avalanche",
+        "Sui",
+        "BNB Chain"
+      ],
+      "profitTarget": {
+        "daily": 1.35,
+        "monthly": 40,
+        "yearly": 500
+      },
+      "integrations": {
+        "useWormhole": true,
+        "usePortal": true,
+        "useCEX": false,
+        "useOnChainProgram": true,
+        "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV"
+      }
+    }
+  }
+]

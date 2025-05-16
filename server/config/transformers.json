@@ -1,0 +1,89 @@
+{
+  "MemeCortexRemix": {
+    "enabled": true,
+    "pairs": [
+      "BONK/USDC",
+      "MEME/USDC",
+      "WIF/USDC",
+      "POPCAT/USDC",
+      "GUAC/USDC",
+      "SLERF/USDC"
+    ],
+    "analysisInterval": 30000,
+    "sniperScanInterval": 10000,
+    "usePerplexityAI": true,
+    "useSocialSentiment": true,
+    "onChainIntegration": {
+      "enabled": true,
+      "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg"
+    },
+    "maxSlippage": 5,
+    "priorityFee": "VERY_HIGH",
+    "profitTarget": 1.45
+  },
+  "Security": {
+    "enabled": true,
+    "pairs": [
+      "SOL/USDC",
+      "ETH/USDC",
+      "BTC/USDC",
+      "JUP/USDC"
+    ],
+    "analysisInterval": 60000,
+    "maxRetryAttempts": 5,
+    "priorityFee": "HIGH",
+    "onChainIntegration": {
+      "enabled": true,
+      "programId": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+    }
+  },
+  "CrossChain": {
+    "enabled": true,
+    "pairs": [
+      "SOL/USDC",
+      "ETH/USDC",
+      "BTC/USDC",
+      "SOL/ETH",
+      "BTC/ETH"
+    ],
+    "analysisInterval": 45000,
+    "bridges": [
+      "Wormhole",
+      "Portal",
+      "Allbridge"
+    ],
+    "chains": [
+      "Solana",
+      "Ethereum",
+      "Avalanche",
+      "Sui",
+      "BNB Chain"
+    ],
+    "priorityFee": "HIGH",
+    "maxSlippage": 1.5,
+    "onChainIntegration": {
+      "enabled": true,
+      "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV"
+    },
+    "profitTarget": 1.35
+  },
+  "MicroQHC": {
+    "enabled": true,
+    "pairs": [
+      "SOL/USDC",
+      "BONK/USDC",
+      "MEME/USDC",
+      "WIF/USDC",
+      "JUP/USDC"
+    ],
+    "analysisInterval": 15000,
+    "useQuantumPathfinding": true,
+    "priorityFee": "MAXIMUM",
+    "maxSlippage": 1,
+    "onChainIntegration": {
+      "enabled": true,
+      "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
+    },
+    "profitTarget": 1.4
+  }
+}

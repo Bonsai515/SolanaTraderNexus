@@ -1,0 +1,193 @@
+{
+  "hyperion": {
+    "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+    "accounts": [
+      {
+        "name": "flashArbitrage",
+        "type": "program",
+        "seeds": [
+          "flash",
+          "arb"
+        ]
+      },
+      {
+        "name": "vaultAccount",
+        "type": "program",
+        "seeds": [
+          "vault"
+        ]
+      }
+    ],
+    "instructions": [
+      {
+        "name": "executeFlashArbitrage",
+        "accounts": [
+          "flashArbitrage",
+          "vaultAccount",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "amountIn",
+            "type": "u64"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "u64"
+          },
+          {
+            "name": "routes",
+            "type": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "executeMultiHopTrade",
+        "accounts": [
+          "flashArbitrage",
+          "vaultAccount",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "amountIn",
+            "type": "u64"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "u64"
+          },
+          {
+            "name": "hops",
+            "type": "u8"
+          },
+          {
+            "name": "routes",
+            "type": "bytes"
+          }
+        ]
+      }
+    ]
+  },
+  "quantumMEV": {
+    "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+    "accounts": [
+      {
+        "name": "mevExtractor",
+        "type": "program",
+        "seeds": [
+          "mev",
+          "extract"
+        ]
+      },
+      {
+        "name": "bundler",
+        "type": "program",
+        "seeds": [
+          "bundle"
+        ]
+      }
+    ],
+    "instructions": [
+      {
+        "name": "extractMEV",
+        "accounts": [
+          "mevExtractor",
+          "bundler",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "searchParams",
+            "type": "bytes"
+          },
+          {
+            "name": "maxSlippage",
+            "type": "u64"
+          }
+        ]
+      },
+      {
+        "name": "bundleTransactions",
+        "accounts": [
+          "bundler",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "transactions",
+            "type": "bytes"
+          },
+          {
+            "name": "priorityFee",
+            "type": "u64"
+          }
+        ]
+      }
+    ]
+  },
+  "memeCortex": {
+    "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+    "accounts": [
+      {
+        "name": "memeAnalyzer",
+        "type": "program",
+        "seeds": [
+          "meme",
+          "analysis"
+        ]
+      },
+      {
+        "name": "sniper",
+        "type": "program",
+        "seeds": [
+          "snipe"
+        ]
+      }
+    ],
+    "instructions": [
+      {
+        "name": "analyzeMemeToken",
+        "accounts": [
+          "memeAnalyzer",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "tokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "timeWindow",
+            "type": "u64"
+          }
+        ]
+      },
+      {
+        "name": "executeMemeSnipe",
+        "accounts": [
+          "sniper",
+          "user"
+        ],
+        "args": [
+          {
+            "name": "tokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "amountIn",
+            "type": "u64"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "u64"
+          },
+          {
+            "name": "maxSlippage",
+            "type": "u16"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,7 +6,16 @@
     "profitCollection": true,
     "transactionVerification": true,
     "awsIntegration": true,
-    "solscanVerification": true
+    "solscanVerification": true,
+    "hyperion": true,
+    "quantumOmega": true,
+    "singularity": true,
+    "onChainIntegration": true,
+    "advancedRiskManagement": true,
+    "flashLoans": true,
+    "enhancedArbitrage": true,
+    "quantumMEV": true,
+    "multiChain": true
   },
   "config": {
     "transactionEngine": {
@@ -45,7 +54,25 @@
     "rateLimit": {
       "requestsPerMinute": 60,
       "enabled": true
+    },
+    "trading": {
+      "maxLeverageMultiplier": 3,
+      "useFlashLoans": true,
+      "useCrossChainBridges": true,
+      "minSlippageTolerance": 0.5,
+      "maxSlippageTolerance": 2,
+      "priorityFee": "MAX",
+      "riskLevel": "AGGRESSIVE",
+      "tradingStyle": "QUANTUM_NUCLEAR",
+      "enableTurboMode": true,
+      "enhancedLiquidityRouting": true
+    },
+    "profitProjection": {
+      "targetDailyROI": 1.37,
+      "compoundingEnabled": true,
+      "reinvestmentRate": 0.95,
+      "riskToleranceLevel": "VERY_HIGH"
     }
   },
-  "lastUpdated": "2025-05-16T03:51:29.946Z"
+  "lastUpdated": "2025-05-16T03:58:41.060Z"
 }
