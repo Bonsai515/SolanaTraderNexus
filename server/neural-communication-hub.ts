@@ -18,7 +18,8 @@ import * as logger from './logger';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getNexusEngine } from './nexus-transaction-engine';
+// Import only the ExecutionMode, avoiding circular dependency
+import { ExecutionMode } from './nexus-transaction-engine';
 import { 
   SignalType, 
   SignalStrength, 
@@ -88,6 +89,21 @@ interface EnhancedTransformerSignal extends TransformerSignal {
     executionResult?: 'success' | 'failure';
     failureReason?: string;
   };
+}
+
+// Trade execution parameters
+interface TradeExecutionParams {
+  signalId: string;
+  source: string;
+  target: string;
+  amount: number;
+  slippageBps: number;
+  strategy: string;
+  walletOverride: string;
+  executionMode: ExecutionMode;
+  timestamp: number;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  agentId: string;
 }
 
 // AI Agent decision
@@ -279,33 +295,31 @@ function connectTransformersToAgents(): void {
 /**
  * Connect agents to Nexus engine
  */
+/**
+ * Connect agents to Nexus Engine for direct trade execution
+ * Using the public API methods instead of events to avoid circular dependencies 
+ */
 function connectAgentsToNexusEngine(): void {
   try {
     AGENT_TYPES.forEach(agentId => {
       neuralBus.on(`agent:output:${agentId}`, async (params: TradeExecutionParams) => {
-        const nexusEngine = getNexusEngine();
-        if (!nexusEngine) {
-          logger.error(`[NeuralComms] Nexus Engine not available`);
-          return;
-        }
+        // Log trade request without creating circular dependencies
+        logger.info(`[NeuralComms] Processing trade from agent ${agentId} with signal ${params.signalId}`);
         
         try {
-          // Store execution params
+          // Store in local cache
           tradeExecutions.set(params.signalId, params);
           
-          // Log execution attempt
-          logger.info(`[NeuralComms] Agent ${agentId} executing trade via Nexus Engine: ${params.sourceToken} → ${params.targetToken}`);
+          // Log execution attempt  
+          logger.info(`[NeuralComms] Agent ${agentId} executing trade via Nexus Engine: ${params.source} → ${params.target}`);
           
-          // Execute trade through Nexus Engine
-          const result = await nexusEngine.executeTrade({
-            sourceToken: params.sourceToken,
-            targetToken: params.targetToken,
+          // Direct execution via Nexus Engine's public API
+          // This avoids circular event dependencies by not using event emission
+          const result = await nexusEngine.executeSwap({
+            source: params.source,
+            target: params.target,
             amount: params.amount,
-            slippageBps: params.slippageBps,
-            stopLoss: params.stopLoss,
-            takeProfit: params.takeProfit,
-            signalId: params.signalId,
-            strategy: params.strategy || agentId
+            slippageBps: params.slippageBps || 50
           });
           
           // Update signal processing state
@@ -410,17 +424,14 @@ function enableCriticalSignalPathways(): void {
       });
     });
     
-    // Handle direct engine executions
-    neuralBus.on('engine:direct:execution', async (params: TradeExecutionParams) => {
-      const nexusEngine = getNexusEngine();
-      if (!nexusEngine) {
-        logger.error(`[NeuralComms] Nexus Engine not available for direct execution`);
-        return;
-      }
-      
-      try {
-        // Store execution params
-        tradeExecutions.set(params.signalId, params);
+    // Create a bridge method to connect the event bus systems
+    // NO LISTENING TO 'engine:direct:execution' event as that causes circularity
+    
+    // Only use this private helper method to log and store executions
+    private storeTradeExecution = (params: TradeExecutionParams) => {
+      logger.info(`[NeuralComms] Storing execution params for signal ${params.signalId}`);
+      tradeExecutions.set(params.signalId, params);
+    }
         
         // Execute trade directly
         const result = await nexusEngine.executeTrade({
