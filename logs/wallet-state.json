@@ -1,0 +1,17 @@
+{
+  "tradingWallet": {
+    "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "initialBalance": 1.53442,
+    "currentBalance": 9.998338380365734,
+    "profit": 8.463918380365735
+  },
+  "prophetWallet": {
+    "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "initialBalance": 0,
+    "currentBalance": 0.4454693884403018,
+    "profit": 0.4454693884403018
+  },
+  "totalProfitUsd": 1559.1428595410564,
+  "totalProfitSol": 8.909387768806036,
+  "lastUpdated": "2025-05-16T02:20:20.155Z"
+}
