@@ -29,6 +29,8 @@ interface VerificationOptions {
   confirmations?: number;
   confirmationTimeout?: number;
   skipSimulations?: boolean;
+  blockhash?: string;
+  lastValidBlockHeight?: number;
 }
 
 // Interface for verification result
@@ -382,18 +384,10 @@ export class TransactionVerifier {
     signature: string,
     options: VerificationOptions = {}
   ): Promise<VerificationResult> {
-    // Skip verification for simulation signatures
-    if (signature.startsWith('sim-')) {
-      logger.info(`[TransactionVerifier] Transaction verification skipped for ${signature}`);
-      return {
-        success: true,
-        signature,
-        confirmations: 0
-      };
-    }
-
+    logger.info(`[TransactionVerifier] Verifying transaction: ${signature}`);
+    
     // Handle live test signatures
-    if (signature.startsWith('live-')) {
+    if (signature && signature.startsWith('live-')) {
       logger.info(`[TransactionVerifier] Transaction verification skipped for live test ${signature}`);
       return {
         success: true,
@@ -404,43 +398,18 @@ export class TransactionVerifier {
       };
     }
     
-    // Validate signature format
-    if (!this.isValidSignature(signature)) {
-      logger.error(`[TransactionVerifier] Invalid signature format: ${signature}`);
+    // For simulation signatures
+    if (signature && signature.startsWith('sim-')) {
+      logger.info(`[TransactionVerifier] Verification skipped for simulation signature: ${signature}`);
       return {
-        success: false,
+        success: true,
         signature,
-        error: 'Invalid signature format'
+        confirmations: 0
       };
     }
     
-    try {
-      // Try with RPC first
-      const rpcResult = await this.verifyTransactionWithRpc(signature, options);
-      
-      // If RPC verification fails, try Solscan if API key is available
-      if (!rpcResult.success && this.solscanApiKey) {
-        logger.warn(`[TransactionVerifier] RPC verification failed, trying Solscan for signature: ${signature}`);
-        const solscanResult = await this.verifyTransactionWithSolscan(signature);
-        
-        // If Solscan also fails, try Helius if API key is available
-        if (!solscanResult.success && this.heliusApiKey) {
-          logger.warn(`[TransactionVerifier] Solscan verification failed, trying Helius for signature: ${signature}`);
-          return await this.verifyTransactionWithHelius(signature);
-        }
-        
-        return solscanResult;
-      }
-      
-      return rpcResult;
-    } catch (error) {
-      logger.error(`[TransactionVerifier] Error during verification process: ${error.message}`);
-      return {
-        success: false,
-        signature,
-        error: error.message
-      };
-    }
+    // For real transactions, use RPC verification
+    return this.verifyTransactionWithRpc(signature, options);
   }
   
   /**
