@@ -1,0 +1,54 @@
+{
+  "tradeSizes": {
+    "default": 250.00,
+    "highConfidence": 500.00,
+    "lowConfidence": 100.00,
+    "maxTradeSize": 1000.00
+  },
+  "targetTokens": {
+    "primary": [
+      {
+        "symbol": "SOL",
+        "maxExposureUsd": 1000.00,
+        "priority": 1
+      },
+      {
+        "symbol": "JUP",
+        "maxExposureUsd": 750.00,
+        "priority": 2
+      },
+      {
+        "symbol": "BONK",
+        "maxExposureUsd": 500.00,
+        "priority": 3
+      }
+    ],
+    "secondary": [
+      {
+        "symbol": "GUAC",
+        "maxExposureUsd": 300.00,
+        "priority": 4
+      },
+      {
+        "symbol": "MEME",
+        "maxExposureUsd": 250.00,
+        "priority": 5
+      },
+      {
+        "symbol": "WIF",
+        "maxExposureUsd": 200.00,
+        "priority": 6
+      }
+    ],
+    "stablecoins": [
+      "USDC",
+      "USDT"
+    ],
+    "blacklist": []
+  },
+  "riskManagement": {
+    "maxPortfolioRisk": 0.75,
+    "maxExposurePerToken": 0.25,
+    "minConfidenceThreshold": 0.6
+  }
+}

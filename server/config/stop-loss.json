@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "globalStopLossPercentage": 3,
+  "takeProfitPercentage": 5,
+  "tokenSpecificRules": {
+    "BONK": {
+      "stopLossPercentage": 5,
+      "takeProfitPercentage": 7
+    },
+    "JUP": {
+      "stopLossPercentage": 4,
+      "takeProfitPercentage": 6
+    }
+  },
+  "maxDailyLossPercentage": 5,
+  "pauseTradingOnStopLoss": true,
+  "pauseDurationMinutes": 30
+}
