@@ -285,6 +285,17 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       console.error('❌ Error during price feed initialization:', error);
     }
     
+    // Initialize Neural Communication Hub
+    console.log('Initializing Neural Communication Hub...');
+    try {
+      const { initNeuralCommunicationHub } = require('./neural-communication-hub');
+      await initNeuralCommunicationHub();
+      console.log('✅ Successfully initialized Neural Communication Hub');
+      console.log('   Transformer signal coordination and neural entanglement active');
+    } catch (error) {
+      console.error('❌ Error initializing Neural Communication Hub:', error instanceof Error ? error.message : 'Unknown error');
+    }
+    
     // Initialize on-chain arbitrage router program
     console.log('Initializing on-chain arbitrage router program...');
     try {
