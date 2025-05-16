@@ -277,6 +277,21 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     await waitForPriceFeedInit();
     console.log('✅ Price feed cache initialized with data for multiple tokens');
     
+    // Initialize on-chain arbitrage router program
+    console.log('Initializing on-chain arbitrage router program...');
+    try {
+      const { initializeArbRouterIntegration } = require('./solana/arb-router-integration');
+      const arbRouterInitialized = await initializeArbRouterIntegration();
+      if (arbRouterInitialized) {
+        console.log('✅ Successfully initialized on-chain arbitrage router program');
+        console.log('   Cross-DEX arbitrage monitoring active with profit threshold: 0.001 SOL');
+      } else {
+        console.warn('⚠️ Failed to initialize arbitrage router program');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing arbitrage router program:', error instanceof Error ? error.message : 'Unknown error');
+    }
+    
     // Verify the system wallet exists and has SOL using Solscan and direct blockchain query
     const walletVerified = await verifyWalletConnection(SYSTEM_WALLET);
     if (walletVerified) {
