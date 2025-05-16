@@ -10,6 +10,7 @@ import { Toaster } from './components/ui/toaster';
 
 // Import LiveTradingActivator component
 import LiveTradingActivator from './components/LiveTradingActivator';
+import Dashboard from "@/pages/Dashboard";
 
 // Dashboard Component
 function Dashboard() {

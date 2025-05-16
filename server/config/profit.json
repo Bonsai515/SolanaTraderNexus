@@ -1,0 +1,118 @@
+{
+  "version": "2.0.0",
+  "enabled": true,
+  "captureIntervalMinutes": 4,
+  "lastCaptureTime": "2025-05-16T16:29:54.473Z",
+  "totalProfitCollected": 0,
+  "profitRouting": {
+    "enabled": true,
+    "defaultRoute": "REINVEST",
+    "strategies": {
+      "REINVEST": {
+        "description": "Reinvest profits back into trading",
+        "wallets": [
+          {
+            "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+            "label": "Trading Wallet",
+            "profitShare": 95
+          },
+          {
+            "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+            "label": "Prophet Wallet",
+            "profitShare": 5
+          }
+        ]
+      },
+      "SECURE": {
+        "description": "Lock in profits during high volatility",
+        "wallets": [
+          {
+            "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+            "label": "Trading Wallet",
+            "profitShare": 40
+          },
+          {
+            "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+            "label": "Prophet Wallet",
+            "profitShare": 60
+          }
+        ]
+      },
+      "BALANCED": {
+        "description": "Balanced profit routing",
+        "wallets": [
+          {
+            "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+            "label": "Trading Wallet",
+            "profitShare": 70
+          },
+          {
+            "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+            "label": "Prophet Wallet",
+            "profitShare": 30
+          }
+        ]
+      }
+    },
+    "autoSwitch": {
+      "enabled": true,
+      "volatilityThreshold": 5,
+      "profitThreshold": 20,
+      "defaultStrategy": "REINVEST"
+    }
+  },
+  "reinvestment": {
+    "enabled": true,
+    "rate": 95,
+    "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "compoundingEnabled": true,
+    "compoundingFrequency": "EVERY_CAPTURE",
+    "reinvestmentStrategy": "PROPORTIONAL",
+    "profitTargets": {
+      "daily": 2.5,
+      "weekly": 20,
+      "monthly": 100
+    }
+  },
+  "profitAnalytics": {
+    "enabled": true,
+    "metricTracking": {
+      "roi": true,
+      "profitFactor": true,
+      "maxDrawdown": true,
+      "volatility": true,
+      "sharpeRatio": true
+    },
+    "benchmarking": {
+      "compareToMarket": true,
+      "compareToStrategies": true
+    },
+    "historicalPeriods": {
+      "hourly": 24,
+      "daily": 30,
+      "weekly": 12,
+      "monthly": 12
+    }
+  },
+  "notifications": {
+    "profitMilestones": [
+      10,
+      50,
+      100,
+      500,
+      1000
+    ],
+    "captureConfirmation": true,
+    "reinvestmentConfirmation": true,
+    "performanceAlerts": {
+      "enabled": true,
+      "underperformanceThreshold": -5,
+      "outperformanceThreshold": 10
+    }
+  },
+  "taxAccounting": {
+    "trackTaxableEvents": true,
+    "splitByFiscalYear": true,
+    "generateReports": true
+  }
+}

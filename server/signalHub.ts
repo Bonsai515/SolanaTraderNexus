@@ -452,16 +452,15 @@ class SignalHub extends EventEmitter {
       logger.info(`Executing swap with: source=${sourceToken}, target=${targetToken}, amount=${amount}`);
       
       try {
-        // Get the Nexus engine instance
-        const engine = getNexusEngine();
+        // Import the engine adapter instead of direct engine
+        const { executeSwap } = require('./transaction-engine-adapter');
         
-        // Execute the swap
-        const txResult = await engine.executeSwap({
-          fromToken: sourceToken || 'USDC',
-          toToken: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
+        // Execute the swap with correct parameter names
+        const txResult = await executeSwap({
+          source: sourceToken || 'USDC',
+          target: targetToken || signal.pair?.split('/')[0] || signal.token_address || 'SOL',
           amount: amount,
-          slippage: 0.5, // 0.5% slippage
-          walletAddress: walletConfig.tradingWallet
+          slippageBps: 50 // 0.5% slippage (50 basis points)
         });
       
         if (txResult.success) {

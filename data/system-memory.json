@@ -26,7 +26,17 @@
     "simulateTransactions": false,
     "liveMode": true,
     "forceRealTransactions": true,
-    "autonomousTrading": true
+    "autonomousTrading": true,
+    "compoundInterest": true,
+    "profitAnalytics": true,
+    "multiDex": true,
+    "dexAggregator": true,
+    "jupiterIntegration": true,
+    "raydiumIntegration": true,
+    "orcaIntegration": true,
+    "solendLiquidator": true,
+    "liquidationMonitoring": true,
+    "defiIntegration": true
   },
   "config": {
     "transactionEngine": {
@@ -47,9 +57,9 @@
       "enabled": true,
       "captureIntervalMinutes": 4,
       "autoCapture": true,
-      "minProfitThreshold": 0.01,
-      "reinvestmentRate": 0.95,
-      "targetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+      "minProfitThreshold": 0.001,
+      "reinvestmentRate": 95,
+      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
     },
     "rpcConfig": {
       "primaryProvider": "instantnodes",
@@ -131,7 +141,21 @@
         "stopLossThreshold": 5,
         "maxDaily": 200
       }
+    },
+    "dex": {
+      "enabled": true,
+      "smartRouting": true,
+      "checkMultipleRoutes": true,
+      "allowCrossDexArbitrage": true,
+      "scanIntervalSeconds": 30
+    },
+    "solend": {
+      "enabled": true,
+      "liquidationMonitoring": true,
+      "autoLiquidate": true,
+      "minProfitThreshold": 0.5,
+      "pollIntervalSeconds": 10
     }
   },
-  "lastUpdated": "2025-05-16T16:05:06.995Z"
+  "lastUpdated": "2025-05-16T16:42:32.854Z"
 }

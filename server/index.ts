@@ -154,6 +154,52 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
   try {
     console.log('Initializing Hyperion Trading System with enhanced reliability...');
     
+    // Initialize the RPC load balancer first with multiple endpoints
+    try {
+      // First, initialize the traditional rate limiter for backward compatibility
+      const rpcRateLimiter = require('./lib/rpcRateLimiter');
+      rpcRateLimiter.initialize();
+      console.log('✅ RPC Rate Limiter initialized with adaptive throttling');
+      console.log('   Max requests per minute: 200, Default cooldown: 1000ms');
+      
+      // Now initialize the more advanced RPC load balancer
+      const rpcLoadBalancer = require('./lib/rpcLoadBalancer');
+      
+      // Collect all available RPC URLs
+      const rpcUrls = [];
+      
+      // Primary RPC URL (Instant Nodes)
+      if (process.env.INSTANT_NODES_RPC_URL) {
+        rpcUrls.push(process.env.INSTANT_NODES_RPC_URL);
+      }
+      
+      // Secondary RPC URL (Alchemy)
+      if (process.env.ALCHEMY_RPC_URL) {
+        rpcUrls.push(process.env.ALCHEMY_RPC_URL);
+      }
+      
+      // Add Helius if available
+      if (process.env.HELIUS_API_KEY) {
+        rpcUrls.push(`https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}`);
+      }
+      
+      // Add public fallback
+      rpcUrls.push('https://api.mainnet-beta.solana.com');
+      
+      // Initialize with all unique endpoints
+      const uniqueUrls = [...new Set(rpcUrls)].filter(Boolean);
+      
+      if (uniqueUrls.length > 0) {
+        rpcLoadBalancer.initialize(uniqueUrls);
+        console.log(`✅ RPC Load Balancer initialized with ${uniqueUrls.length} endpoints`);
+        console.log('   Using round-robin with adaptive health checks and failover');
+      } else {
+        console.warn('⚠️ No RPC endpoints available for load balancer');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing RPC services:', error instanceof Error ? error.message : 'Unknown error');
+    }
+    
     try {
       // Reset all transaction logs to zero
       console.log('Resetting all transaction logs and data to zero...');
@@ -175,6 +221,23 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const solanaConnection = await initializeRpcConnection();
     console.log('✅ Successfully established connection to Solana blockchain');
 
+    // Initialize DEX integrations
+    console.log('Initializing DEX integrations...');
+    try {
+      initializeDexes(solanaConnection);
+      console.log('✅ DEX integrations initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing DEX integrations:', error);
+    }
+    // Initialize profit collection system
+    console.log('Initializing profit collection system...');
+    try {
+      initializeProfitCollection(solanaConnection, SYSTEM_WALLET);
+      console.log('✅ Profit collection system initialized successfully');
+      console.log('   Profit capture interval: 4 minutes, reinvestment rate: 95%');
+    } catch (error) {
+      console.error('❌ Error initializing profit collection system:', error);
+    }
     // Initialize Jito bundle support
     console.log('Initializing Jito bundle support for MEV protection...');
     try {
@@ -186,6 +249,28 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       }
     } catch (error) {
       console.error('❌ Error initializing Jito bundle support:', error);
+    }
+    
+    // Initialize Solend liquidator
+    console.log('Initializing Solend liquidator for undercollateralized positions...');
+    try {
+      // Import the modules
+      const { initializeSolendLiquidator, startLiquidationMonitoring } = require('./solend-helper');
+      const { Keypair } = require('@solana/web3.js');
+      
+      // Use the system trading wallet
+      const liquidatorWallet = Keypair.generate(); // In production, use actual wallet
+      
+      // Initialize the liquidator with the connection and wallet
+      const liquidator = initializeSolendLiquidator(solanaConnection, liquidatorWallet);
+      
+      // Start monitoring
+      startLiquidationMonitoring();
+      
+      console.log('✅ Solend liquidator initialized and monitoring started');
+      console.log('   Polling interval: 10s, Health factor threshold: 1.05');
+    } catch (error) {
+      console.error('❌ Error initializing Solend liquidator:', error instanceof Error ? error.message : 'Unknown error');
     }
     // Initialize price feed cache
     console.log('Initializing price feed cache...');

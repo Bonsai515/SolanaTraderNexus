@@ -1,385 +1,271 @@
 /**
  * RPC Connection Manager
  * 
- * Handles Solana RPC connections with intelligent fallback, rate limiting,
- * and automatic error recovery. This is a critical component for ensuring
- * reliable operation even during periods of high API load.
+ * This module provides optimized RPC connection management with rate limit handling,
+ * load balancing, and automatic failover for Solana transactions.
  */
 
-import { Connection, Keypair, PublicKey, Transaction, SendOptions } from '@solana/web3.js';
+import { Connection, ConnectionConfig } from '@solana/web3.js';
 import * as logger from '../logger';
-import { executeWithRateLimit } from './rateLimitHandler';
+import { withRateLimiting } from './rpcRateLimiter';
 
-// RPC endpoints configuration
-type RpcEndpointKey = 'helius' | 'alchemy' | 'instantnodes' | 'public';
+// Available RPC endpoints
+const RPC_ENDPOINTS = [
+  process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
+  process.env.ALCHEMY_RPC_URL || 'https://solana-mainnet.g.alchemy.com/v2/demo',
+  process.env.SOLANA_RPC_API_KEY ? `https://solana-api.projectserum.com/${process.env.SOLANA_RPC_API_KEY}` : 'https://api.devnet.solana.com',
+  'https://rpc.ankr.com/solana'
+];
 
-interface RpcEndpoint {
+// Connection pool
+const connectionPool: Connection[] = [];
+let currentConnectionIndex = 0;
+let isConnectionManagerInitialized = false;
+
+// RPC endpoint health
+interface EndpointHealth {
   url: string;
-  priority: number;
-  maxRequestsPerMinute: number;
-  websocketSupport: boolean;
+  healthy: boolean;
+  latency: number;
+  lastChecked: number;
+  failCount: number;
+  successRate: number;
 }
 
-// Track connection status for each endpoint
-const connectionStatus: Record<string, {
-  lastUsed: number;
-  failureCount: number;
-  coolingDown: boolean;
-  coolingUntil?: number;
-}> = {};
-
-// Get RPC URLs from environment variables
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const SOLANA_RPC_API_KEY = process.env.SOLANA_RPC_API_KEY;
-const INSTANT_NODES_RPC_URL = process.env.INSTANT_NODES_RPC_URL;
-const ALCHEMY_RPC_URL = `https://solana-mainnet.g.alchemy.com/v2/${SOLANA_RPC_API_KEY || ''}`;
-const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY || ''}`;
-
-// Validate URL formatting
-const validateRpcUrl = (url?: string, defaultUrl: string = 'https://api.mainnet-beta.solana.com'): string => {
-  if (!url) return defaultUrl;
-  
-  try {
-    // Ensure URL has proper prefix
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    } else {
-      return `https://${url}`;
-    }
-  } catch (error) {
-    logger.error(`Invalid RPC URL format: ${error}`);
-    return defaultUrl;
-  }
-};
-
-// Configure the RPC endpoints
-const RPC_ENDPOINTS: Record<RpcEndpointKey, RpcEndpoint> = {
-  helius: {
-    url: HELIUS_API_KEY ? validateRpcUrl(HELIUS_RPC_URL) : validateRpcUrl(),
-    priority: 1,
-    maxRequestsPerMinute: 100,
-    websocketSupport: false
-  },
-  instantnodes: {
-    url: validateRpcUrl(INSTANT_NODES_RPC_URL),
-    priority: 2,
-    maxRequestsPerMinute: 120,
-    websocketSupport: true
-  },
-  alchemy: {
-    url: SOLANA_RPC_API_KEY ? validateRpcUrl(ALCHEMY_RPC_URL) : validateRpcUrl(),
-    priority: 3,
-    maxRequestsPerMinute: 100,
-    websocketSupport: true
-  },
-  public: {
-    url: 'https://api.mainnet-beta.solana.com',
-    priority: 4,
-    maxRequestsPerMinute: 10, // Very low limit for public endpoint
-    websocketSupport: false
-  }
-};
-
-// Current connection instances
-let currentConnection: Connection | null = null;
-let currentEndpointKey: RpcEndpointKey | null = null;
-let backupConnections: Connection[] = [];
+const endpointHealth: Map<string, EndpointHealth> = new Map();
 
 /**
- * Initialize all RPC connections
+ * Initialize the connection manager
  */
-export function initializeRpcConnections(): void {
-  logger.info('Initializing RPC connections');
+function initializeConnectionManager() {
+  if (isConnectionManagerInitialized) {
+    return;
+  }
   
   // Clear existing connections
-  currentConnection = null;
-  backupConnections = [];
+  connectionPool.length = 0;
   
-  // Find available endpoints
-  const availableEndpoints: Array<[RpcEndpointKey, RpcEndpoint]> = Object.entries(RPC_ENDPOINTS)
-    .filter(([_, endpoint]) => endpoint.url && endpoint.url.length > 10)
-    .sort((a, b) => a[1].priority - b[1].priority) as Array<[RpcEndpointKey, RpcEndpoint]>;
-  
-  if (availableEndpoints.length === 0) {
-    logger.error('No valid RPC endpoints found. Configure at least one RPC endpoint.');
-    throw new Error('No valid RPC endpoints available');
+  // Initialize endpoint health
+  for (const url of RPC_ENDPOINTS) {
+    endpointHealth.set(url, {
+      url,
+      healthy: true,
+      latency: 0,
+      lastChecked: 0,
+      failCount: 0,
+      successRate: 1.0
+    });
   }
   
-  // Set primary connection to the highest priority available endpoint
-  const [primaryKey, primaryEndpoint] = availableEndpoints[0];
-  currentEndpointKey = primaryKey;
-  currentConnection = new Connection(primaryEndpoint.url, 'confirmed');
-  
-  // Initialize connection status
-  connectionStatus[primaryKey] = {
-    lastUsed: Date.now(),
-    failureCount: 0,
-    coolingDown: false
-  };
-  
-  logger.info(`Primary RPC connection set to ${primaryKey}`);
-  
-  // Set up backup connections
-  for (let i = 1; i < availableEndpoints.length; i++) {
-    const [key, endpoint] = availableEndpoints[i];
-    backupConnections.push(new Connection(endpoint.url, 'confirmed'));
-    
-    // Initialize connection status
-    connectionStatus[key] = {
-      lastUsed: 0, // Not used yet
-      failureCount: 0,
-      coolingDown: false
-    };
-    
-    logger.info(`Backup RPC connection added: ${key}`);
-  }
-}
-
-/**
- * Get the current RPC connection with fallback capability
- */
-export function getRpcConnection(): Connection {
-  if (!currentConnection) {
-    initializeRpcConnections();
-  }
-  
-  return currentConnection!;
-}
-
-/**
- * Get the WebSocket URL for the current connection if available
- */
-export function getWebSocketUrl(): string | null {
-  if (!currentEndpointKey) {
-    return null;
-  }
-  
-  const endpoint = RPC_ENDPOINTS[currentEndpointKey];
-  
-  if (!endpoint.websocketSupport) {
-    return null;
-  }
-  
-  // For instantnodes, use their special websocket URL
-  if (currentEndpointKey === 'instantnodes' && INSTANT_NODES_RPC_URL) {
-    return INSTANT_NODES_RPC_URL.replace('https://', 'wss://');
-  }
-  
-  // For alchemy, convert the http URL to websocket
-  if (currentEndpointKey === 'alchemy' && SOLANA_RPC_API_KEY) {
-    return ALCHEMY_RPC_URL.replace('https://', 'wss://');
-  }
-  
-  return null;
-}
-
-/**
- * Execute an RPC request with automatic retries and rate limiting
- */
-export async function executeRpcRequest<T>(
-  requestName: string,
-  requestFn: (connection: Connection) => Promise<T>
-): Promise<T> {
-  // Handle the case where we haven't initialized yet
-  if (!currentConnection) {
-    initializeRpcConnections();
-  }
-  
-  // Ensure we have a connection to work with
-  if (!currentConnection || !currentEndpointKey) {
-    throw new Error('RPC connection not initialized');
-  }
-  
-  // Set up the RPC endpoint information for rate limiting
-  const endpointKey = currentEndpointKey;
-  const endpoint = RPC_ENDPOINTS[endpointKey];
-  
-  try {
-    return await executeWithRateLimit(
-      {
-        name: `rpc:${endpointKey}:${requestName}`,
-        maxRetries: 5,
-        initialDelay: 500,
-        maxDelay: 10000,
-        delayFactor: 2
-      },
-      async () => {
-        try {
-          // Mark this endpoint as recently used
-          connectionStatus[endpointKey].lastUsed = Date.now();
-          
-          // Execute the request
-          return await requestFn(currentConnection!);
-        } catch (error: any) {
-          // Handle different error types
-          if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
-            logger.warn(`Rate limit hit on ${endpointKey} RPC endpoint`);
-            connectionStatus[endpointKey].failureCount++;
-            
-            // If we've had multiple failures, try switching endpoints
-            if (connectionStatus[endpointKey].failureCount >= 3) {
-              await switchToNextEndpoint();
-            }
-            
-            throw error; // Rethrow to let the rate limiter handle it
-          } else if (
-            error.message?.includes('ECONNREFUSED') || 
-            error.message?.includes('ETIMEDOUT') ||
-            error.message?.includes('ENOTFOUND')
-          ) {
-            // Connection issues - try switching endpoints immediately
-            logger.error(`Connection error with ${endpointKey} RPC endpoint: ${error.message}`);
-            await switchToNextEndpoint();
-            throw error;
-          } else {
-            // Other errors - might need to switch endpoints
-            logger.error(`RPC error with ${endpointKey} endpoint: ${error.message}`);
-            connectionStatus[endpointKey].failureCount++;
-            
-            if (connectionStatus[endpointKey].failureCount >= 3) {
-              await switchToNextEndpoint();
-            }
-            
-            throw error;
-          }
-        }
-      }
-    );
-  } catch (error: any) {
-    // If we've exhausted all retries, try with a backup connection
-    logger.error(`Failed to execute ${requestName} after multiple retries: ${error.message}`);
-    
-    // If we have backup connections, try using one of them
-    if (backupConnections.length > 0) {
-      // Find an available backup that isn't cooling down
-      const availableEndpoints = Object.entries(RPC_ENDPOINTS)
-        .filter(([key, _]) => 
-          key !== currentEndpointKey && 
-          !connectionStatus[key]?.coolingDown &&
-          RPC_ENDPOINTS[key as RpcEndpointKey].url
-        )
-        .sort((a, b) => a[1].priority - b[1].priority);
+  // Create connections
+  for (const url of RPC_ENDPOINTS) {
+    try {
+      const connection = new Connection(url, {
+        commitment: 'confirmed',
+        confirmTransactionInitialTimeout: 60000
+      });
       
-      if (availableEndpoints.length > 0) {
-        const [backupKey, backupEndpoint] = availableEndpoints[0];
-        logger.info(`Trying backup endpoint ${backupKey} for request ${requestName}`);
+      connectionPool.push(connection);
+      logger.info(`[RPC] Added connection: ${url}`);
+    } catch (error) {
+      logger.error(`[RPC] Failed to create connection for ${url}:`, error);
+    }
+  }
+  
+  if (connectionPool.length === 0) {
+    logger.error('[RPC] No connections available. Using fallback connection.');
+    const fallbackConnection = new Connection('https://api.mainnet-beta.solana.com', {
+      commitment: 'confirmed'
+    });
+    connectionPool.push(fallbackConnection);
+  }
+  
+  // Start health check
+  startHealthCheck();
+  
+  isConnectionManagerInitialized = true;
+  logger.info(`[RPC] Connection manager initialized with ${connectionPool.length} endpoints`);
+}
+
+/**
+ * Start health check for all RPC endpoints
+ */
+function startHealthCheck() {
+  // Run health check every 60 seconds
+  setInterval(async () => {
+    for (const connection of connectionPool) {
+      const url = connection.rpcEndpoint;
+      
+      try {
+        const startTime = Date.now();
+        const result = await connection.getHealth();
+        const endTime = Date.now();
+        const latency = endTime - startTime;
         
-        const backupConnection = new Connection(backupEndpoint.url, 'confirmed');
-        try {
-          return await requestFn(backupConnection);
-        } catch (backupError: any) {
-          logger.error(`Backup request also failed: ${backupError.message}`);
-          throw backupError;
+        const health = endpointHealth.get(url);
+        if (health) {
+          health.healthy = result === 'ok';
+          health.latency = latency;
+          health.lastChecked = Date.now();
+          health.failCount = 0;
+          health.successRate = 1.0;
+          
+          endpointHealth.set(url, health);
+        }
+        
+        logger.debug(`[RPC] Health check for ${url}: ${result}, latency: ${latency}ms`);
+      } catch (error) {
+        const health = endpointHealth.get(url);
+        if (health) {
+          health.healthy = false;
+          health.lastChecked = Date.now();
+          health.failCount += 1;
+          health.successRate = Math.max(0, health.successRate - 0.2);
+          
+          endpointHealth.set(url, health);
+          logger.warn(`[RPC] Health check failed for ${url}: ${error}`);
         }
       }
     }
     
-    // If we reach here, all options have failed
-    throw new Error(`All RPC endpoints failed for request ${requestName}: ${error.message}`);
-  }
+    // Log overall health
+    logger.debug('[RPC] Endpoint health:', Array.from(endpointHealth.values()));
+  }, 60000);
 }
 
 /**
- * Switch to the next available RPC endpoint
+ * Get a managed connection with optimized settings
  */
-async function switchToNextEndpoint(): Promise<boolean> {
-  if (!currentEndpointKey) {
-    return false;
+export function getManagedConnection(config?: ConnectionConfig): Connection {
+  if (!isConnectionManagerInitialized) {
+    initializeConnectionManager();
   }
   
-  // Mark the current endpoint as cooling down
-  connectionStatus[currentEndpointKey].coolingDown = true;
-  connectionStatus[currentEndpointKey].coolingUntil = Date.now() + 60000; // 1 minute cooldown
+  const baseConfig = {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 30000,
+    ...config
+  };
   
-  // Find the next best endpoint that isn't cooling down
-  const availableEndpoints = Object.entries(RPC_ENDPOINTS)
-    .filter(([key, endpoint]) => 
-      endpoint.url && 
-      endpoint.url.length > 10 && 
-      key !== currentEndpointKey && 
-      !connectionStatus[key]?.coolingDown
-    )
-    .sort((a, b) => a[1].priority - b[1].priority);
+  // Find the best connection
+  let bestConnectionIndex = 0;
+  let bestRating = -1;
   
-  if (availableEndpoints.length === 0) {
-    logger.error('No available RPC endpoints to switch to, keeping current endpoint');
-    // Reset the cooling status of the current endpoint
-    connectionStatus[currentEndpointKey].coolingDown = false;
-    return false;
-  }
-  
-  // Get the best available endpoint
-  const [newKey, newEndpoint] = availableEndpoints[0] as [RpcEndpointKey, RpcEndpoint];
-  
-  logger.info(`Switching RPC endpoint from ${currentEndpointKey} to ${newKey}`);
-  
-  // Create a new connection with the new endpoint
-  try {
-    const newConnection = new Connection(newEndpoint.url, 'confirmed');
+  for (let i = 0; i < connectionPool.length; i++) {
+    const connection = connectionPool[i];
+    const health = endpointHealth.get(connection.rpcEndpoint);
     
-    // Test the connection
-    await newConnection.getVersion();
-    
-    // If successful, update the current connection
-    currentConnection = newConnection;
-    currentEndpointKey = newKey;
-    
-    // Reset the failure count for the new endpoint
-    connectionStatus[newKey] = {
-      lastUsed: Date.now(),
-      failureCount: 0,
-      coolingDown: false
-    };
-    
-    logger.info(`Successfully switched to ${newKey} RPC endpoint`);
-    
-    // Schedule the current endpoint to be taken off cooldown after 1 minute
-    setTimeout(() => {
-      if (connectionStatus[currentEndpointKey!]) {
-        connectionStatus[currentEndpointKey!].coolingDown = false;
-        connectionStatus[currentEndpointKey!].failureCount = 0;
-        logger.info(`${currentEndpointKey} RPC endpoint cooldown period ended`);
+    if (health && health.healthy) {
+      // Simple rating based on latency and success rate
+      const rating = health.successRate * (1000 / (health.latency + 10));
+      
+      if (rating > bestRating) {
+        bestRating = rating;
+        bestConnectionIndex = i;
       }
-    }, 60000);
-    
-    return true;
-  } catch (error) {
-    logger.error(`Failed to switch to ${newKey} RPC endpoint: ${error}`);
-    return false;
+    }
   }
+  
+  // Update current index
+  currentConnectionIndex = bestConnectionIndex;
+  
+  return connectionPool[currentConnectionIndex];
 }
 
 /**
- * Send a transaction with automatic retries and fallbacks
+ * Get the next connection in the pool
  */
-export async function sendTransaction(
-  transaction: Transaction,
-  signers: Keypair[],
-  options?: SendOptions
-): Promise<string> {
-  return await executeRpcRequest('sendTransaction', async (connection) => {
-    return await connection.sendTransaction(transaction, signers, options);
-  });
+function getNextConnection(): Connection {
+  if (!isConnectionManagerInitialized) {
+    initializeConnectionManager();
+  }
+  
+  // Increment index
+  currentConnectionIndex = (currentConnectionIndex + 1) % connectionPool.length;
+  
+  // Skip unhealthy connections
+  let attempts = 0;
+  while (attempts < connectionPool.length) {
+    const connection = connectionPool[currentConnectionIndex];
+    const health = endpointHealth.get(connection.rpcEndpoint);
+    
+    if (health && health.healthy) {
+      return connection;
+    }
+    
+    currentConnectionIndex = (currentConnectionIndex + 1) % connectionPool.length;
+    attempts++;
+  }
+  
+  // If all unhealthy, return the first connection
+  return connectionPool[0];
 }
 
 /**
- * Confirm a transaction with automatic retries and fallbacks
+ * Execute a function with a connection, with automatic retry on different endpoints if needed
  */
-export async function confirmTransaction(signature: string): Promise<boolean> {
-  return await executeRpcRequest('confirmTransaction', async (connection) => {
-    const result = await connection.confirmTransaction(signature);
-    return result.value.err === null;
-  });
+export async function executeWithRpcLoadBalancing<T>(
+  fn: (connection: Connection) => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  if (!isConnectionManagerInitialized) {
+    initializeConnectionManager();
+  }
+  
+  let lastError: Error | null = null;
+  let retries = 0;
+  
+  while (retries <= maxRetries) {
+    const connection = retries === 0 ? getManagedConnection() : getNextConnection();
+    
+    try {
+      // Execute the function with rate limiting
+      return await withRateLimiting(async () => {
+        return await fn(connection);
+      });
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Check if it's a rate limit error
+      const isRateLimit = error instanceof Error && 
+                          (error.message.includes('429') || 
+                           error.message.includes('rate limit') ||
+                           error.message.toLowerCase().includes('too many requests'));
+      
+      // Update endpoint health for rate limit errors
+      if (isRateLimit) {
+        const health = endpointHealth.get(connection.rpcEndpoint);
+        if (health) {
+          health.successRate = Math.max(0, health.successRate - 0.1);
+          endpointHealth.set(connection.rpcEndpoint, health);
+        }
+      }
+      
+      logger.warn(`[RPC] Execution failed on ${connection.rpcEndpoint}: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Only retry if we have retries left
+      if (retries >= maxRetries) {
+        break;
+      }
+      
+      retries++;
+      
+      // Wait before retrying (with exponential backoff)
+      const backoffMs = Math.min(100 * Math.pow(2, retries), 2000);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+  
+  // If we get here, all retries failed
+  throw lastError || new Error('Failed to execute RPC request after multiple retries');
 }
 
 /**
- * Get the balance of a public key with automatic retries and fallbacks
+ * Get health status of all endpoints
  */
-export async function getBalance(publicKey: PublicKey): Promise<number> {
-  return await executeRpcRequest('getBalance', async (connection) => {
-    return await connection.getBalance(publicKey);
-  });
+export function getEndpointHealthStatus(): EndpointHealth[] {
+  return Array.from(endpointHealth.values());
 }
 
-// Initialize the connections when this module is imported
-initializeRpcConnections();
+// Initialize on import
+initializeConnectionManager();
