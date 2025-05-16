@@ -9,13 +9,19 @@ import { Connection, ConnectionConfig } from '@solana/web3.js';
 import * as logger from '../logger';
 import { withRateLimiting } from './rpcRateLimiter';
 
-// Available RPC endpoints
+// Available RPC endpoints with priority order (most reliable first)
+const PRIMARY_ENDPOINT = process.env.INSTANT_NODES_RPC_URL;
+
+if (!PRIMARY_ENDPOINT) {
+  logger.error('CRITICAL: INSTANT_NODES_RPC_URL is not set in environment');
+}
+
+// Define RPC endpoints with primary endpoint first for prioritization
 const RPC_ENDPOINTS = [
-  process.env.INSTANT_NODES_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  process.env.ALCHEMY_RPC_URL || 'https://solana-mainnet.g.alchemy.com/v2/demo',
-  process.env.SOLANA_RPC_API_KEY ? `https://solana-api.projectserum.com/${process.env.SOLANA_RPC_API_KEY}` : 'https://api.devnet.solana.com',
-  'https://rpc.ankr.com/solana'
-];
+  PRIMARY_ENDPOINT || 'https://api.mainnet-beta.solana.com',
+  process.env.HELIUS_API_KEY ? `https://rpc.helius.xyz/?api-key=${process.env.HELIUS_API_KEY}` : null,
+  process.env.ALCHEMY_RPC_URL || null
+].filter(Boolean) as string[];
 
 // Connection pool
 const connectionPool: Connection[] = [];
