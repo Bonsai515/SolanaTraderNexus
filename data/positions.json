@@ -1,9 +1,20 @@
 {
-  "totalValueUSD": 2450,
+  "totalValueUSD": 3450,
   "totalBalanceSOL": 1.53442,
   "positions": [
     {
       "symbol": "JUP",
+      "address": "",
+      "amount": 1029,
+      "averageEntryPrice": 1.0204081632653061,
+      "currentPrice": 1.0204081632653061,
+      "valueUSD": 1050,
+      "unrealizedProfitLoss": 0,
+      "unrealizedProfitLossPercent": 0,
+      "lastUpdated": "2025-05-16T18:12:37.747Z"
+    },
+    {
+      "symbol": "SOL",
       "address": "",
       "amount": 784,
       "averageEntryPrice": 1.0204081632653061,
@@ -11,43 +22,10 @@
       "valueUSD": 800,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:01:54.494Z"
-    },
-    {
-      "symbol": "SOL",
-      "address": "",
-      "amount": 539,
-      "averageEntryPrice": 1.0204081632653061,
-      "currentPrice": 1.0204081632653061,
-      "valueUSD": 550,
-      "unrealizedProfitLoss": 0,
-      "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:01:53.407Z"
+      "lastUpdated": "2025-05-16T18:12:35.888Z"
     },
     {
       "symbol": "MEME",
-      "address": "",
-      "amount": 318.5,
-      "averageEntryPrice": 1.0204081632653061,
-      "currentPrice": 1.0204081632653061,
-      "valueUSD": 325,
-      "unrealizedProfitLoss": 0,
-      "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:01:52.537Z"
-    },
-    {
-      "symbol": "GUAC",
-      "address": "",
-      "amount": 318.5,
-      "averageEntryPrice": 1.0204081632653061,
-      "currentPrice": 1.0204081632653061,
-      "valueUSD": 325,
-      "unrealizedProfitLoss": 0,
-      "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:01:56.415Z"
-    },
-    {
-      "symbol": "BONK",
       "address": "",
       "amount": 441,
       "averageEntryPrice": 1.0204081632653061,
@@ -55,8 +33,30 @@
       "valueUSD": 450,
       "unrealizedProfitLoss": 0,
       "unrealizedProfitLossPercent": 0,
-      "lastUpdated": "2025-05-16T18:01:55.407Z"
+      "lastUpdated": "2025-05-16T18:12:38.741Z"
+    },
+    {
+      "symbol": "GUAC",
+      "address": "",
+      "amount": 441,
+      "averageEntryPrice": 1.0204081632653061,
+      "currentPrice": 1.0204081632653061,
+      "valueUSD": 450,
+      "unrealizedProfitLoss": 0,
+      "unrealizedProfitLossPercent": 0,
+      "lastUpdated": "2025-05-16T18:12:39.800Z"
+    },
+    {
+      "symbol": "BONK",
+      "address": "",
+      "amount": 686,
+      "averageEntryPrice": 1.0204081632653061,
+      "currentPrice": 1.0204081632653061,
+      "valueUSD": 700,
+      "unrealizedProfitLoss": 0,
+      "unrealizedProfitLossPercent": 0,
+      "lastUpdated": "2025-05-16T18:12:36.750Z"
     }
   ],
-  "lastUpdated": "2025-05-16T18:01:56.463Z"
+  "lastUpdated": "2025-05-16T18:12:39.838Z"
 }
