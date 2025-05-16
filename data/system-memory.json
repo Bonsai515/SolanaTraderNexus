@@ -15,11 +15,11 @@
       "priorityFee": "HIGH",
       "maxSlippageBps": 100,
       "mevProtection": true,
-      "walletAddress": "HLG44WF9VYquMGJGFoKP33D8H1iRTC2t8be6DAD5Wtqg"
+      "walletAddress": "D8UevDKnp9qk4nLwNGgnEm97NJ6yzFhYzuRr5wkv9HSL"
     },
     "walletManager": {
-      "primaryWallet": "HLG44WF9VYquMGJGFoKP33D8H1iRTC2t8be6DAD5Wtqg",
-      "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "primaryWallet": "D8UevDKnp9qk4nLwNGgnEm97NJ6yzFhYzuRr5wkv9HSL",
+      "prophetWallet": "D8UevDKnp9qk4nLwNGgnEm97NJ6yzFhYzuRr5wkv9HSL",
       "autoFunding": false,
       "hasPrivateKey": true
     },
@@ -47,5 +47,5 @@
       "enabled": true
     }
   },
-  "lastUpdated": "2025-05-16T02:49:23.116Z"
+  "lastUpdated": "2025-05-16T02:58:24.846Z"
 }
