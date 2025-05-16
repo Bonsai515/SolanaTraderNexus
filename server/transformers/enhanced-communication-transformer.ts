@@ -119,12 +119,41 @@ class EnhancedCommunicationTransformer {
   // Neural signal patterns cache lifetime (30 minutes)
   private static PATTERN_CACHE_TTL_MS = 30 * 60 * 1000;
   
-  // Type definition for TransformerSignal (to match neural-communication-hub)
+  // Memecoin cache update interval (2 minutes)
+  private static MEMECOIN_CACHE_UPDATE_INTERVAL_MS = 2 * 60 * 1000;
+  
   // Type definition for TransformerSignal (to match neural-communication-hub)
   type TransformerSignal = BaseSignal & {
     transformerId?: string;
     urgency?: number;
   };
+  
+  // Type definition for MemeToken price data
+  interface MemeTokenPrice {
+    symbol: string;
+    name: string;
+    address: string;
+    price: number;
+    priceChange24h: number;
+    priceChange1h?: number;
+    volume24h: number;
+    marketCap?: number;
+    profitabilityScore: number;
+    lastTradeProfit?: number;
+    lastTradeProfitPercent?: number;
+    timestamp: string;
+    confidence: number;
+    gainRank?: number;
+    profitRank?: number;
+  }
+  
+  // Memecoin cache structure
+  interface MemecoinCache {
+    lastUpdated: string;
+    topGainers: MemeTokenPrice[];
+    topProfitable: MemeTokenPrice[];
+    all: Record<string, MemeTokenPrice>;
+  }
   
   // Default performance metrics
   private static DEFAULT_METRICS: PerformanceMetrics = {

@@ -304,6 +304,31 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       } else {
         console.warn('⚠️ Failed to initialize Enhanced Communication Transformer');
       }
+      
+      // Initialize Memecoin Price Distributor
+      console.log('Initializing Memecoin Price Distributor...');
+      const { initMemecoinPriceDistributor } = require('./transformers/memecoin-price-distributor');
+      const memecoinDistributorInitialized = await initMemecoinPriceDistributor();
+      if (memecoinDistributorInitialized) {
+        console.log('✅ Successfully initialized Memecoin Price Distributor');
+        console.log('   Aggregating price feeds from DexScreener, Pump.fun, Raydium, Birdeye,');
+        console.log('   Meteora, Photon, GMGN.ai and other Solana memecoin sources');
+      } else {
+        console.warn('⚠️ Failed to initialize Memecoin Price Distributor');
+      }
+      
+      // Initialize Trade Tracker for blockchain transaction monitoring
+      console.log('Initializing Trade Tracker...');
+      const { initTradeTracker } = require('./transformers/trade-tracker');
+      const tradeTrackerInitialized = await initTradeTracker();
+      if (tradeTrackerInitialized) {
+        console.log('✅ Successfully initialized Trade Tracker');
+        console.log('   Monitoring blockchain trades and calculating profits in SOL and USDC');
+        console.log('   Trading wallet: HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb');
+        console.log('   Prophet wallet: 31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e');
+      } else {
+        console.warn('⚠️ Failed to initialize Trade Tracker');
+      }
     } catch (error) {
       console.error('❌ Error initializing Neural Communication Hub:', error instanceof Error ? error.message : 'Unknown error');
     }
