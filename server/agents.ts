@@ -217,14 +217,22 @@ export async function startAgentSystem(): Promise<boolean> {
       } else if (agent.type === AgentType.SINGULARITY) {
         // Initialize the Singularity agent with its cross-chain capabilities
         try {
+          // Make sure we have valid wallet addresses before starting
+          if (!SYSTEM_WALLET_ADDRESS) {
+            logger.error(`Cannot start ${agent.name}: Missing system wallet address`);
+            continue;
+          }
+
+          // Start Singularity with verified wallet addresses
+          logger.info(`Starting Singularity agent ${agent.id}: ${agent.name}`);
           startSingularity({
             id: agent.id,
             name: agent.name,
             active: true,
             wallets: {
+              system: SYSTEM_WALLET_ADDRESS,
               trading: SYSTEM_WALLET_ADDRESS,
-              profit: SYSTEM_WALLET_ADDRESS,
-              auxiliary: SYSTEM_WALLET_ADDRESS
+              profit: SYSTEM_WALLET_ADDRESS
             }
           });
           logger.info(`${agent.name} is now actively running cross-chain strategies and market prediction`);
