@@ -12,17 +12,11 @@
   },
   "defaultPriorityFee": "HIGH",
   "rpcConfig": {
-    "mainRpc": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
-    "backupRpc": [
-      "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
-      "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
-      "https://api.mainnet-beta.solana.com"
-    ],
-    "rateLimit": {
-      "requestsPerMinute": 225,
-      "maxRetries": 5,
-      "retryDelay": 1000
-    }
+    "useCentralizedRpcConfig": true,
+    "rpcConfigPath": "server/config/rpc.json",
+    "adaptiveRateLimiting": true,
+    "useCircuitBreaker": true,
+    "intelligentEndpointRotation": true
   },
   "flashLoanConfig": {
     "enabled": true,
@@ -109,5 +103,14 @@
       "priorityFee": "HIGH",
       "confirmations": 2
     }
-  }
+  },
+  "safetyConfig": {
+    "useCentralizedSafetyConfig": true,
+    "safetyConfigPath": "server/config/safety.json",
+    "enforceAllSafetyChecks": true,
+    "riskManagementEnabled": true,
+    "stopLossEnabled": true,
+    "takeProfitEnabled": true
+  },
+  "skipPreflight": false
 }

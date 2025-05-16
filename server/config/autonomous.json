@@ -1,74 +1,42 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "enabled": true,
   "tradingHours": {
     "enabled": true,
     "active24x7": true,
-    "timezone": "UTC",
-    "activeHours": [
-      {
-        "day": "monday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "tuesday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "wednesday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "thursday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "friday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "saturday",
-        "start": "00:00",
-        "end": "23:59"
-      },
-      {
-        "day": "sunday",
-        "start": "00:00",
-        "end": "23:59"
-      }
-    ]
+    "timezone": "UTC"
   },
   "decisionEngine": {
     "type": "NEURAL_QUANTUM",
-    "requiredConfidence": 0.8,
+    "requiredConfidence": 0.85,
     "useMultipleSources": true,
-    "minimumDataPoints": 3,
+    "minimumDataPoints": 4,
     "backtestRequired": true,
-    "maxPositionHoldTime": 3600,
-    "minProfitRequirement": 0.5
+    "minProfitRequirement": 0.8
   },
   "signalValidation": {
     "enabled": true,
     "minimumConfirmingSources": 2,
-    "timeWindow": 300,
-    "priceMovementThreshold": 0.5,
-    "volumeThreshold": 10000
+    "timeWindow": 120,
+    "priceMovementThreshold": 0.8,
+    "volumeThreshold": 20000
   },
   "riskManagement": {
     "maxDailyTransactions": 100,
     "maxDailyVolume": 1000,
     "maxTransactionSize": 100,
+    "minTransactionSize": 10,
     "stopLossEnabled": true,
-    "stopLossThreshold": 5,
+    "stopLossThreshold": 3,
     "takeProfitEnabled": true,
-    "takeProfitThreshold": 10,
-    "maxDrawdown": 15,
-    "cooldownAfterLoss": 3600
+    "takeProfitThreshold": 5,
+    "maxDrawdown": 10,
+    "maxExposurePerToken": 200,
+    "cooldownAfterLoss": 1800,
+    "consecutiveFailuresLimit": 3,
+    "pauseDurationMinutes": 60,
+    "portfolioDiversification": true,
+    "maxAllocationPerToken": 0.2
   },
   "auditTrail": {
     "enabled": true,
@@ -83,5 +51,81 @@
     "onLoss": true,
     "onError": true,
     "dailySummary": true
+  },
+  "status": "ACTIVE",
+  "forceRealTrading": true,
+  "updateRealWalletBalance": true,
+  "onChainIntegration": {
+    "enabled": true,
+    "useProgramVerification": true,
+    "autoRetry": true,
+    "maxRetries": 5,
+    "programs": {
+      "hyperion": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+      "quantumMEV": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+      "memeCortex": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg"
+    }
+  },
+  "execution": {
+    "maxSlippage": 1,
+    "priorityFee": "HIGH",
+    "confirmations": 2,
+    "executionTimeoutMs": 30000,
+    "useMEVProtection": true,
+    "useBundlr": true,
+    "verifyTransactions": true,
+    "retryOnFailure": true
+  },
+  "tokens": {
+    "whitelisted": [
+      "SOL",
+      "BTC",
+      "ETH",
+      "BONK",
+      "WIF",
+      "MEME",
+      "JUP",
+      "RAY"
+    ],
+    "memeTokens": [
+      "BONK",
+      "WIF",
+      "MEME",
+      "POPCAT",
+      "GUAC"
+    ],
+    "stablecoins": [
+      "USDC",
+      "USDT",
+      "BUSD"
+    ],
+    "minLiquidity": 50000,
+    "minVolume24h": 20000
+  },
+  "strategies": {
+    "FLASH_ARBITRAGE": {
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+      "maxAmount": 100,
+      "minProfitThreshold": 0.8,
+      "forceRealTransactions": true
+    },
+    "MEME_SNIPER": {
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+      "maxAmount": 75,
+      "minProfitThreshold": 1.2,
+      "forceRealTransactions": true
+    },
+    "CROSS_CHAIN_ARB": {
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+      "maxAmount": 50,
+      "minProfitThreshold": 1,
+      "forceRealTransactions": true
+    }
   }
 }
