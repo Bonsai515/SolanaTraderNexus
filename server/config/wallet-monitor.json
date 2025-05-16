@@ -1,0 +1,30 @@
+{
+  "enabled": true,
+  "monitoringIntervalMs": 60000,
+  "alertThresholdPercentage": 5,
+  "wallets": [
+    {
+      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "name": "Trading Wallet",
+      "lowBalanceThreshold": 0.05
+    },
+    {
+      "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "name": "Prophet Wallet"
+    }
+  ],
+  "tokens": [
+    {
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "symbol": "USDC",
+      "decimals": 6,
+      "minRequired": 10
+    },
+    {
+      "address": "So11111111111111111111111111111111111111112",
+      "symbol": "SOL",
+      "decimals": 9,
+      "minRequired": 0.05
+    }
+  ]
+}

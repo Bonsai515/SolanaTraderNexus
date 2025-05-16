@@ -389,7 +389,53 @@ class SignalHub extends EventEmitter {
     // Determine token and amount based on direction
     let sourceToken = signal.sourceToken;
     let targetToken = signal.targetToken;
-    let amount = 100; // Default amount
+    
+    // Load trading configuration
+    let tradingConfig;
+    try {
+      tradingConfig = require('./config/trading-config.json');
+    } catch (error) {
+      logger.warn(`Error loading trading config: ${error}. Using default values.`);
+      tradingConfig = {
+        tradeSizes: {
+          default: 250.00,
+          highConfidence: 500.00,
+          lowConfidence: 100.00,
+          maxTradeSize: 1000.00
+        }
+      };
+    }
+    
+    // Determine trade amount based on signal strength
+    let amount;
+    
+    // Check if token is in preferred list
+    const isPrimaryToken = targetToken && tradingConfig.targetTokens?.primary?.some(t => t.symbol === targetToken);
+    const isSecondaryToken = targetToken && tradingConfig.targetTokens?.secondary?.some(t => t.symbol === targetToken);
+    
+    // Apply token priority in sizing
+    if (isPrimaryToken) {
+      amount = tradingConfig.tradeSizes.highConfidence; // Higher allocation for primary tokens
+    } else if (isSecondaryToken) {
+      amount = tradingConfig.tradeSizes.default; // Normal allocation for secondary tokens
+    } else {
+      amount = tradingConfig.tradeSizes.lowConfidence; // Lower allocation for other tokens
+    }
+    
+    // Adjust based on signal strength
+    if (signal.strength === SignalStrength.VERY_STRONG) {
+      amount *= 1.5; // 50% larger position for very strong signals
+      logger.info(`VERY_STRONG signal for ${targetToken} - increasing position size by 50%`);
+    } else if (signal.strength === SignalStrength.STRONG) {
+      amount *= 1.2; // 20% larger position for strong signals
+      logger.info(`STRONG signal for ${targetToken} - increasing position size by 20%`);
+    } else if (signal.strength === SignalStrength.WEAK) {
+      amount *= 0.5; // 50% smaller position for weak signals
+      logger.info(`WEAK signal for ${targetToken} - reducing position size by 50%`);
+    }
+    
+    // Cap at maximum trade size
+    amount = Math.min(amount, tradingConfig.tradeSizes.maxTradeSize);
     
     if (direction === SignalDirection.BUY || direction === SignalDirection.LONG) {
       // Buy/Long: Use USDC as source token

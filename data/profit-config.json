@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "reinvestmentRate": 0.95,
+  "targetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "minProfitThreshold": 0.001
+}
