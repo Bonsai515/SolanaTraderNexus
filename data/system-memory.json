@@ -22,7 +22,10 @@
     "geyserIntegration": true,
     "realTrading": true,
     "simulation": false,
-    "testMode": false
+    "testMode": false,
+    "simulateTransactions": false,
+    "liveMode": true,
+    "forceRealTransactions": true
   },
   "config": {
     "transactionEngine": {
@@ -77,7 +80,9 @@
       "simulationMode": false,
       "testMode": false,
       "walletUpdate": true,
-      "confirmations": 3
+      "confirmations": 3,
+      "dryRun": false,
+      "forceLiveTransactions": true
     },
     "profitProjection": {
       "targetDailyROI": 1.37,
@@ -104,5 +109,5 @@
       "useRealWallet": true
     }
   },
-  "lastUpdated": "2025-05-16T10:33:03.734Z"
+  "lastUpdated": "2025-05-16T10:38:21.327Z"
 }

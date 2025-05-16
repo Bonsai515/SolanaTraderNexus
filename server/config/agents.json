@@ -1,13 +1,63 @@
 {
-  "useRealFunds": true,
-  "profitWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-  "hyperion": {
-    "active": true
+  "version": "3.0.0",
+  "globalConfig": {
+    "useRealFunds": true,
+    "simulationMode": false,
+    "testMode": false,
+    "walletUpdate": true,
+    "forceRealTransactions": true
   },
-  "quantumOmega": {
-    "active": true
-  },
-  "singularity": {
-    "active": true
-  }
+  "agents": [
+    {
+      "id": "hyperion-1",
+      "name": "Hyperion Flash Arbitrage",
+      "type": "hyperion",
+      "status": "active",
+      "active": true,
+      "config": {
+        "useRealFunds": true,
+        "simulationMode": false,
+        "testMode": false,
+        "walletUpdate": true,
+        "forceRealTransactions": true,
+        "maxAmount": 100,
+        "priorityFee": "HIGH"
+      },
+      "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    {
+      "id": "quantum-omega-1",
+      "name": "Quantum Omega Sniper",
+      "type": "quantum_omega",
+      "status": "active",
+      "active": true,
+      "config": {
+        "useRealFunds": true,
+        "simulationMode": false,
+        "testMode": false,
+        "walletUpdate": true,
+        "forceRealTransactions": true,
+        "maxAmount": 100,
+        "priorityFee": "HIGH"
+      },
+      "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    {
+      "id": "singularity-1",
+      "name": "Singularity Cross-Chain Oracle",
+      "type": "singularity",
+      "status": "active",
+      "active": true,
+      "config": {
+        "useRealFunds": true,
+        "simulationMode": false,
+        "testMode": false,
+        "walletUpdate": true,
+        "forceRealTransactions": true,
+        "maxAmount": 100,
+        "priorityFee": "HIGH"
+      },
+      "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    }
+  ]
 }
