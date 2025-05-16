@@ -62,7 +62,17 @@
       "updateWalletBalance": true,
       "dryRun": false,
       "forceRealTransactions": true,
-      "skipSimulation": true
+      "skipSimulation": true,
+      "priceFeed": {
+        "useEnhancedPriceFeed": true,
+        "requiredConfidence": 0.9,
+        "maxPriceAge": 60000,
+        "preferredSources": [
+          "birdeye",
+          "coingecko"
+        ],
+        "updateInterval": 15000
+      }
     }
   },
   {
@@ -121,7 +131,18 @@
       "updateWalletBalance": true,
       "dryRun": false,
       "forceRealTransactions": true,
-      "skipSimulation": true
+      "skipSimulation": true,
+      "priceFeed": {
+        "useEnhancedPriceFeed": true,
+        "requiredConfidence": 0.8,
+        "maxPriceAge": 180000,
+        "preferredSources": [
+          "birdeye",
+          "dexscreener"
+        ],
+        "updateInterval": 30000,
+        "alternateSourceCheck": true
+      }
     }
   },
   {
@@ -189,7 +210,17 @@
       "updateWalletBalance": true,
       "dryRun": false,
       "forceRealTransactions": true,
-      "skipSimulation": true
+      "skipSimulation": true,
+      "priceFeed": {
+        "useEnhancedPriceFeed": true,
+        "requiredConfidence": 0.8,
+        "maxPriceAge": 180000,
+        "preferredSources": [
+          "birdeye",
+          "coingecko"
+        ],
+        "updateInterval": 30000
+      }
     }
   }
 ]
