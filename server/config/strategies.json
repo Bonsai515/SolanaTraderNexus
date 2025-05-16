@@ -41,6 +41,21 @@
         "useDex": true,
         "useAMM": true,
         "useCEX": false
+      },
+      "priceFeedIntegration": {
+        "enabled": true,
+        "aggregated": true,
+        "sources": [
+          "birdeye",
+          "dexscreener",
+          "geyser"
+        ]
+      },
+      "geyserIntegration": {
+        "enabled": true,
+        "useForMEVProtection": true,
+        "useForSniping": false,
+        "useForArbitrage": true
       }
     }
   },
@@ -77,6 +92,23 @@
         "useSocialSentiment": true,
         "useOnChainProgram": true,
         "programId": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg"
+      },
+      "priceFeedIntegration": {
+        "enabled": true,
+        "aggregated": true,
+        "sources": [
+          "pumpfun",
+          "gmgn",
+          "moonshot",
+          "geyser",
+          "birdeye"
+        ]
+      },
+      "geyserIntegration": {
+        "enabled": true,
+        "useForMEVProtection": false,
+        "useForSniping": true,
+        "useForArbitrage": false
       }
     }
   },
@@ -123,6 +155,22 @@
         "useCEX": false,
         "useOnChainProgram": true,
         "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV"
+      },
+      "priceFeedIntegration": {
+        "enabled": true,
+        "aggregated": true,
+        "sources": [
+          "birdeye",
+          "dexscreener",
+          "proton",
+          "geyser"
+        ]
+      },
+      "geyserIntegration": {
+        "enabled": true,
+        "useForMEVProtection": false,
+        "useForSniping": false,
+        "useForArbitrage": true
       }
     }
   }

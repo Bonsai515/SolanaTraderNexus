@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "connectionSettings": {
+    "url": "wss://api.mainnet-beta.solana.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "reconnectInterval": 3000,
+    "maxRetries": 10
+  },
+  "programSubscriptions": [
+    {
+      "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "name": "Jupiter Aggregator",
+      "description": "Track DEX trades through Jupiter"
+    },
+    {
+      "programId": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "name": "Raydium AMM",
+      "description": "Monitor Raydium liquidity pools and swaps"
+    },
+    {
+      "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "name": "Orca Whirlpools",
+      "description": "Track concentrated liquidity actions in Orca"
+    },
+    {
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+      "name": "Openbook DEX",
+      "description": "Monitor Openbook orderbook trades"
+    }
+  ],
+  "accountSubscriptions": [
+    {
+      "address": "EXnGBBSamqzd3uxEdRLUiJnnAv3gFgRGR3WyEBUzpako",
+      "description": "Raydium SOL-USDC pool"
+    },
+    {
+      "address": "6FRwZSv2eczqSJYMmaabrYk4JqFVvNQwfrg3Vt5qh3WF",
+      "description": "Orca SOL-USDC pool"
+    },
+    {
+      "address": "5xBRGvPvLiP7sZhArPJtBQZ9ZjLBxcSQ9Zyn1XEh4nzZ",
+      "description": "BONK-USDC pool"
+    },
+    {
+      "address": "7QaS3xjCytYPKr1jZyAXWV3yYXoF4zQU3hLcMySp9aGZ",
+      "description": "WIF-USDC pool"
+    }
+  ],
+  "usageConfig": {
+    "mevProtection": {
+      "enabled": true,
+      "sandwichDetection": true,
+      "frontRunningDetection": true,
+      "minimumTransactionSize": 10000,
+      "blockSlotBuffer": 2
+    },
+    "flashArbitrage": {
+      "enabled": true,
+      "minimumProfitThreshold": 0.5,
+      "maxRouteHops": 3,
+      "maxExecutionTime": 500
+    },
+    "memeSniper": {
+      "enabled": true,
+      "liquidityThreshold": 50000,
+      "volumeThreshold": 10000,
+      "priceImpactThreshold": 3,
+      "executionDelayMs": 200
+    }
+  },
+  "analytics": {
+    "storageWindow": 30,
+    "aggregationInterval": 15,
+    "volumeTracking": true,
+    "liquidityTracking": true,
+    "priceImpactTracking": true,
+    "memorySizeLimit": 200
+  }
+}

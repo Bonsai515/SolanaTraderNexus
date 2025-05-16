@@ -265,6 +265,8 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       }
       
       // Now we can import and initialize the SignalHub
+import priceFeedService from './lib/priceFeedService';
+import geyserService from './lib/geyserService';
       try {
         const { signalHub } = require('./signalHub');
         if (!global.signalHub) {
@@ -356,7 +358,53 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Try to start server with basic routes in case the regular registration failed
     try {
-      const backupServer = app.listen(parseInt(process.env.PORT || '5000'), () => {
+      const backupServer = 
+// Initialize enhanced price feeds and Geyser integration
+console.log('Initializing enhanced price feeds and Geyser integration...');
+
+// Wait for price feed service to be ready
+priceFeedService.on('initialized', () => {
+  console.log('✅ Enhanced price feeds initialized with GMGN.ai, Pump.fun, DexScreener, Moonshot, Proton, Birdeye');
+});
+
+// Listen for Geyser real-time updates
+geyserService.on('connected', () => {
+  console.log('✅ Connected to Solana Geyser for real-time blockchain monitoring');
+});
+
+// Listen for real-time price updates
+priceFeedService.on('realtime_update', (data) => {
+  if (data.type === 'transaction' && data.data && data.data.programId) {
+    // Check if this is a DEX transaction we're interested in
+    const programId = data.data.programId;
+    if (programId === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4' || // Jupiter
+        programId === '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8' || // Raydium
+        programId === 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc') { // Orca
+      // Process DEX transaction for trading opportunities
+      console.log(`[Geyser] Detected DEX transaction in ${programId}`);
+    }
+  }
+});
+
+// Set up MEV protection using Geyser
+geyserService.on('mev_opportunity', (data) => {
+  console.log(`[Geyser] MEV opportunity detected: ${data.programId}`);
+  // Trigger MEV protection strategy
+});
+
+// Set up flash arbitrage detection using Geyser
+geyserService.on('arbitrage_opportunity', (data) => {
+  console.log(`[Geyser] Arbitrage opportunity detected: ${data.programId}`);
+  // Trigger flash arbitrage strategy
+});
+
+// Set up meme token sniper using Geyser
+geyserService.on('meme_token_opportunity', (data) => {
+  console.log(`[Geyser] Meme token opportunity detected: ${data.accountId}`);
+  // Trigger meme token sniper strategy
+});
+
+app.listen(parseInt(process.env.PORT || '5000'), () => {
         console.log('🚨 Started minimal backup server due to registration error');
         logger.info('🚨 Started minimal backup server due to registration error');
       });

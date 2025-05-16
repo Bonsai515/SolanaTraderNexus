@@ -9,8 +9,8 @@
       "GUAC/USDC",
       "SLERF/USDC"
     ],
-    "analysisInterval": 30000,
-    "sniperScanInterval": 10000,
+    "analysisInterval": 15000,
+    "sniperScanInterval": 5000,
     "usePerplexityAI": true,
     "useSocialSentiment": true,
     "onChainIntegration": {
@@ -19,7 +19,22 @@
     },
     "maxSlippage": 5,
     "priorityFee": "VERY_HIGH",
-    "profitTarget": 1.45
+    "profitTarget": 1.45,
+    "priceFeedIntegration": {
+      "enabled": true,
+      "primarySources": [
+        "pumpfun",
+        "gmgn",
+        "moonshot"
+      ],
+      "secondarySources": [
+        "dexscreener",
+        "birdeye"
+      ],
+      "realtimeUpdates": [
+        "geyser"
+      ]
+    }
   },
   "Security": {
     "enabled": true,
@@ -29,12 +44,25 @@
       "BTC/USDC",
       "JUP/USDC"
     ],
-    "analysisInterval": 60000,
+    "analysisInterval": 30000,
     "maxRetryAttempts": 5,
     "priorityFee": "HIGH",
     "onChainIntegration": {
       "enabled": true,
       "programId": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+    },
+    "priceFeedIntegration": {
+      "enabled": true,
+      "primarySources": [
+        "birdeye",
+        "dexscreener"
+      ],
+      "secondarySources": [
+        "proton"
+      ],
+      "realtimeUpdates": [
+        "geyser"
+      ]
     }
   },
   "CrossChain": {
@@ -46,7 +74,7 @@
       "SOL/ETH",
       "BTC/ETH"
     ],
-    "analysisInterval": 45000,
+    "analysisInterval": 25000,
     "bridges": [
       "Wormhole",
       "Portal",
@@ -65,7 +93,20 @@
       "enabled": true,
       "programId": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV"
     },
-    "profitTarget": 1.35
+    "profitTarget": 1.35,
+    "priceFeedIntegration": {
+      "enabled": true,
+      "primarySources": [
+        "birdeye",
+        "dexscreener"
+      ],
+      "secondarySources": [
+        "proton"
+      ],
+      "realtimeUpdates": [
+        "geyser"
+      ]
+    }
   },
   "MicroQHC": {
     "enabled": true,
@@ -76,7 +117,7 @@
       "WIF/USDC",
       "JUP/USDC"
     ],
-    "analysisInterval": 15000,
+    "analysisInterval": 10000,
     "useQuantumPathfinding": true,
     "priorityFee": "MAXIMUM",
     "maxSlippage": 1,
@@ -84,6 +125,25 @@
       "enabled": true,
       "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
     },
-    "profitTarget": 1.4
+    "profitTarget": 1.4,
+    "priceFeedIntegration": {
+      "enabled": true,
+      "primarySources": [
+        "birdeye",
+        "dexscreener"
+      ],
+      "secondarySources": [
+        "proton"
+      ],
+      "realtimeUpdates": [
+        "geyser"
+      ]
+    },
+    "arbitrageConfig": {
+      "useFlashLoans": true,
+      "minProfitThreshold": 0.5,
+      "maxRouteLength": 4,
+      "gasAdjustment": 1.5
+    }
   }
 }

@@ -1,0 +1,202 @@
+{
+  "version": "2.0.0",
+  "enabledFeeds": [
+    "gmgn",
+    "pumpfun",
+    "dexscreener",
+    "moonshot",
+    "proton",
+    "birdeye",
+    "geyser"
+  ],
+  "updateInterval": 15000,
+  "retryAttempts": 3,
+  "retryDelay": 1000,
+  "rateLimits": {
+    "gmgn": {
+      "requestsPerMinute": 30
+    },
+    "pumpfun": {
+      "requestsPerMinute": 20
+    },
+    "dexscreener": {
+      "requestsPerMinute": 30
+    },
+    "moonshot": {
+      "requestsPerMinute": 20
+    },
+    "proton": {
+      "requestsPerMinute": 25
+    },
+    "birdeye": {
+      "requestsPerMinute": 60
+    },
+    "geyser": {
+      "requestsPerMinute": 120
+    }
+  },
+  "endpoints": {
+    "gmgn": "https://api.gmgn.ai/v1/tokens",
+    "pumpfun": "https://api.pump.fun/memes/trending",
+    "dexscreener": "https://api.dexscreener.com/latest/dex/tokens",
+    "moonshot": "https://api.moonshot.observer/v1/tokens/trending",
+    "proton": "https://api.protonprotocol.info/tokens",
+    "birdeye": "https://public-api.birdeye.so/public/tokenlist",
+    "geyser": "https://api.geyser.solana.com/v1/program/subscribe"
+  },
+  "prioritization": {
+    "realtime": [
+      "geyser",
+      "birdeye",
+      "dexscreener"
+    ],
+    "volume": [
+      "birdeye",
+      "dexscreener",
+      "moonshot"
+    ],
+    "memeTokens": [
+      "pumpfun",
+      "gmgn",
+      "moonshot"
+    ],
+    "sentiment": [
+      "gmgn",
+      "pumpfun",
+      "proton"
+    ]
+  },
+  "geyserConfig": {
+    "programSubscriptions": [
+      "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+    ],
+    "accountSubscriptions": [
+      "EXnGBBSamqzd3uxEdRLUiJnnAv3gFgRGR3WyEBUzpako",
+      "6FRwZSv2eczqSJYMmaabrYk4JqFVvNQwfrg3Vt5qh3WF"
+    ],
+    "useForMEVProtection": true,
+    "useForFlashArbitrage": true,
+    "useForMemeSniper": true,
+    "transactionAnalysisBuffer": 50
+  },
+  "aggregation": {
+    "enabled": true,
+    "algorithm": "NEURAL_WEIGHTED",
+    "confidenceThreshold": 0.85,
+    "outlierRejection": true,
+    "sources": {
+      "gmgn": {
+        "weight": 0.9,
+        "usageCategory": [
+          "MEME_TOKENS",
+          "SENTIMENT"
+        ]
+      },
+      "pumpfun": {
+        "weight": 0.95,
+        "usageCategory": [
+          "MEME_TOKENS",
+          "TRENDING"
+        ]
+      },
+      "dexscreener": {
+        "weight": 0.8,
+        "usageCategory": [
+          "PRICE",
+          "VOLUME"
+        ]
+      },
+      "moonshot": {
+        "weight": 0.85,
+        "usageCategory": [
+          "MEME_TOKENS",
+          "TRENDING"
+        ]
+      },
+      "proton": {
+        "weight": 0.7,
+        "usageCategory": [
+          "PRICE",
+          "SENTIMENT"
+        ]
+      },
+      "birdeye": {
+        "weight": 0.9,
+        "usageCategory": [
+          "PRICE",
+          "VOLUME",
+          "LIQUIDITY"
+        ]
+      },
+      "geyser": {
+        "weight": 1,
+        "usageCategory": [
+          "REALTIME",
+          "MEV",
+          "TRANSACTION_FLOW"
+        ]
+      }
+    }
+  },
+  "tokens": {
+    "memeTokens": [
+      {
+        "symbol": "BONK",
+        "mintAddress": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      },
+      {
+        "symbol": "WIF",
+        "mintAddress": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
+      },
+      {
+        "symbol": "MEME",
+        "mintAddress": "MwYRS9t9QgZstHi5gt6kNNKthmU9hjGHRXmRyHmf2bA"
+      },
+      {
+        "symbol": "POPCAT",
+        "mintAddress": "p0pc4tWRpnVZJATipiH6YFxzQvLxRuH1Jq18Zy4zxU"
+      },
+      {
+        "symbol": "GUAC",
+        "mintAddress": "AVKnbqNQgXDY8kbnno9eSGfwpVz5idimBnDKsBJ5F2X5"
+      },
+      {
+        "symbol": "BOOK",
+        "mintAddress": "9huDUZfxoJ7wGMTffUE7vh1xePqef7gyrLJu9NApncqA"
+      },
+      {
+        "symbol": "PNUT",
+        "mintAddress": "HB5qTnZHmbQKgqn4TrpMZWeGTLb1ZfQbYEp6fUj4su4X"
+      },
+      {
+        "symbol": "SLERF",
+        "mintAddress": "4hUGBH9zd4UNjdZoQBrh1zcRJver8dJ7mcWwrKuVwvGR"
+      }
+    ],
+    "tradingPairs": [
+      "SOL/USDC",
+      "ETH/USDC",
+      "BTC/USDC",
+      "JUP/USDC",
+      "BONK/USDC",
+      "WIF/USDC",
+      "MEME/USDC",
+      "SLERF/USDC",
+      "POPCAT/USDC",
+      "GUAC/USDC"
+    ]
+  },
+  "pricingAlgorithm": {
+    "type": "NEURAL_CONSENSUS",
+    "weights": {
+      "volume": 0.3,
+      "liquidity": 0.3,
+      "recentTrades": 0.2,
+      "socialSentiment": 0.2
+    },
+    "anomalyDetection": true,
+    "confidenceScoring": true
+  }
+}
