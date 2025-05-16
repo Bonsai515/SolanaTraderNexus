@@ -1,0 +1,24 @@
+{
+  "features": {
+    "flashLoans": true,
+    "memeSniper": true,
+    "crossChainArbitrage": true,
+    "nuclearStrategies": true
+  },
+  "config": {
+    "flashLoans": {
+      "enabled": true,
+      "minProfitUsd": 5,
+      "maxSizeUsd": 10000,
+      "maxSlippageBps": 30
+    },
+    "memeSniper": {
+      "enabled": true,
+      "maxBuyUsd": 100,
+      "minLiquidityUsd": 5000,
+      "maxSlippageBps": 100,
+      "profitTarget": 30,
+      "stopLoss": 15
+    }
+  }
+}
