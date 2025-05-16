@@ -174,6 +174,11 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     console.log('Connecting to Solana blockchain via high-reliability connection...');
     const solanaConnection = await initializeRpcConnection();
     console.log('✅ Successfully established connection to Solana blockchain');
+
+    // Initialize price feed cache
+    console.log('Initializing price feed cache...');
+    await waitForPriceFeedInit();
+    console.log('✅ Price feed cache initialized with data for multiple tokens');
     
     // Verify the system wallet exists and has SOL using Solscan and direct blockchain query
     const walletVerified = await verifyWalletConnection(SYSTEM_WALLET);

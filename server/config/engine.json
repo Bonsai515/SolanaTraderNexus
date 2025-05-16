@@ -64,5 +64,18 @@
     "skipPreflight": false
   },
   "forceRealTransactions": true,
-  "skipSimulation": true
+  "skipSimulation": true,
+  "priceFeed": {
+    "useEnhancedPriceFeed": true,
+    "primarySource": "birdeye",
+    "secondarySources": [
+      "coingecko",
+      "dexscreener"
+    ],
+    "fallbackSource": "local",
+    "updateInterval": 30000,
+    "maxPriceAge": 180000,
+    "requireMultipleSources": true,
+    "minConfidence": 0.7
+  }
 }
