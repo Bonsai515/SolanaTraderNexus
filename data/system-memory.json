@@ -15,7 +15,11 @@
     "flashLoans": true,
     "enhancedArbitrage": true,
     "quantumMEV": true,
-    "multiChain": true
+    "multiChain": true,
+    "enhancedPriceFeeds": true,
+    "realtimeMarketMonitoring": true,
+    "mevProtection": true,
+    "geyserIntegration": true
   },
   "config": {
     "transactionEngine": {
@@ -72,7 +76,20 @@
       "compoundingEnabled": true,
       "reinvestmentRate": 0.95,
       "riskToleranceLevel": "VERY_HIGH"
+    },
+    "priceFeed": {
+      "enabled": true,
+      "gmgn": true,
+      "pumpfun": true,
+      "dexscreener": true,
+      "moonshot": true,
+      "proton": true,
+      "birdeye": true,
+      "geyser": true,
+      "updateFrequencyMs": 15000,
+      "useNeuralWeightedAggregation": true,
+      "useGeyserForRealtime": true
     }
   },
-  "lastUpdated": "2025-05-16T03:58:41.060Z"
+  "lastUpdated": "2025-05-16T04:04:29.664Z"
 }
