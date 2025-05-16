@@ -143,6 +143,8 @@ import { connectToRustTransformers } from './connect-transformer-rust';
 import { verifySolscanTransaction, verifyWalletBalance } from './lib/verification';
 import { resetTransactionLogs } from './lib/transactionLogs';
 import { awsServices } from './aws-services';
+import priceFeedService from './lib/priceFeedService';
+import geyserService from './lib/geyserService';
 
 // System wallet for all trading operations
 const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
@@ -265,8 +267,6 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       }
       
       // Now we can import and initialize the SignalHub
-import priceFeedService from './lib/priceFeedService';
-import geyserService from './lib/geyserService';
       try {
         const { signalHub } = require('./signalHub');
         if (!global.signalHub) {

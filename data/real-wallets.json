@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "wallets": {
+    "main": {
+      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "type": "main",
+      "active": true,
+      "description": "Main trading wallet",
+      "useForTrading": true
+    },
+    "prophet": {
+      "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "type": "profit",
+      "active": true,
+      "description": "Prophet wallet for profit collection",
+      "useForTrading": false
+    }
+  },
+  "config": {
+    "useRealWallet": true,
+    "updateBalanceAfterTrades": true,
+    "verifyTransactions": true,
+    "recordTransactions": true,
+    "transactionSigningMethod": "nexus"
+  }
+}

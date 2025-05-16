@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "maxDailyTransactions": 100,
+  "maxDailyVolume": 500,
+  "maxTransactionAmount": 100,
+  "stopLoss": {
+    "enabled": true,
+    "threshold": 5,
+    "cooldownMinutes": 60
+  },
+  "profitTaking": {
+    "enabled": true,
+    "threshold": 10,
+    "percentage": 50
+  },
+  "riskLevels": {
+    "low": {
+      "maxAmount": 25,
+      "slippage": 0.5
+    },
+    "medium": {
+      "maxAmount": 50,
+      "slippage": 1
+    },
+    "high": {
+      "maxAmount": 100,
+      "slippage": 2
+    }
+  },
+  "tokenSafety": {
+    "requireLiquidity": true,
+    "minLiquidityUsd": 50000,
+    "excludeNonVerified": true
+  }
+}
