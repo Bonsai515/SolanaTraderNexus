@@ -9,7 +9,7 @@ packages = ["openssl", "pkg-config", "jq"]
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["sh", "-c", "npm run build"]
-run = ["sh", "-c", "node dist/server/index.js"]
+run = ["sh", "-c", "./deploy-production.sh"]
 
 [[ports]]
 localPort = 80
