@@ -1,8 +1,8 @@
 {
   "name": "Nexus Professional Engine",
-  "version": "2.5.0",
+  "version": "3.0.0",
   "useRealFunds": true,
-  "maxConcurrentTransactions": 8,
+  "maxConcurrentTransactions": 5,
   "priorityFeeLevels": {
     "LOW": 10000,
     "MEDIUM": 100000,
@@ -49,5 +49,18 @@
   "wallets": {
     "main": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
     "prophet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "simulationMode": false,
+  "testTransactions": false,
+  "realBlockchainTransactions": true,
+  "updateWalletBalance": true,
+  "transactionConfig": {
+    "maxRetries": 5,
+    "retryDelay": 1000,
+    "confirmationLevel": "confirmed",
+    "confirmations": 3,
+    "maxSlippage": 1,
+    "timeout": 60000,
+    "skipPreflight": false
   }
 }

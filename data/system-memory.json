@@ -19,7 +19,10 @@
     "enhancedPriceFeeds": true,
     "realtimeMarketMonitoring": true,
     "mevProtection": true,
-    "geyserIntegration": true
+    "geyserIntegration": true,
+    "realTrading": true,
+    "simulation": false,
+    "testMode": false
   },
   "config": {
     "transactionEngine": {
@@ -64,12 +67,17 @@
       "useFlashLoans": true,
       "useCrossChainBridges": true,
       "minSlippageTolerance": 0.5,
-      "maxSlippageTolerance": 2,
-      "priorityFee": "MAX",
+      "maxSlippageTolerance": 1,
+      "priorityFee": "HIGH",
       "riskLevel": "AGGRESSIVE",
       "tradingStyle": "QUANTUM_NUCLEAR",
       "enableTurboMode": true,
-      "enhancedLiquidityRouting": true
+      "enhancedLiquidityRouting": true,
+      "useRealFunds": true,
+      "simulationMode": false,
+      "testMode": false,
+      "walletUpdate": true,
+      "confirmations": 3
     },
     "profitProjection": {
       "targetDailyROI": 1.37,
@@ -89,7 +97,12 @@
       "updateFrequencyMs": 15000,
       "useNeuralWeightedAggregation": true,
       "useGeyserForRealtime": true
+    },
+    "wallet": {
+      "mainWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "useRealWallet": true
     }
   },
-  "lastUpdated": "2025-05-16T04:04:29.664Z"
+  "lastUpdated": "2025-05-16T10:33:03.734Z"
 }

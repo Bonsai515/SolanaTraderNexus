@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "verifyAllTransactions": true,
+  "methods": {
+    "solscan": true,
+    "explorer": true,
+    "rpcConfirmation": true
+  },
+  "requiredConfirmations": 3,
+  "recordTransactions": true,
+  "recordPath": "data/transactions",
+  "alertOnFailure": true,
+  "alertOnSuccess": true,
+  "minVerificationAmount": 0,
+  "maxWaitTimeMs": 60000
+}

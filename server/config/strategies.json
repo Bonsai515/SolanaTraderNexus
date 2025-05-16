@@ -15,7 +15,7 @@
       "JUP/USDC"
     ],
     "config": {
-      "maxAmount": 100000,
+      "maxAmount": 100,
       "minProfitThreshold": 0.5,
       "useFlashLoans": true,
       "flashLoanProviders": [
@@ -56,7 +56,10 @@
         "useForMEVProtection": true,
         "useForSniping": false,
         "useForArbitrage": true
-      }
+      },
+      "useRealFunds": true,
+      "simulationMode": false,
+      "updateWalletBalance": true
     }
   },
   {
@@ -75,8 +78,8 @@
       "SLERF/USDC"
     ],
     "config": {
-      "maxAmount": 50000,
-      "minROIThreshold": 10,
+      "maxAmount": 50,
+      "minROIThreshold": 5,
       "useFlashLoans": false,
       "slippageTolerance": 5,
       "gasMultiplier": 2,
@@ -109,7 +112,10 @@
         "useForMEVProtection": false,
         "useForSniping": true,
         "useForArbitrage": false
-      }
+      },
+      "useRealFunds": true,
+      "simulationMode": false,
+      "updateWalletBalance": true
     }
   },
   {
@@ -127,7 +133,7 @@
       "SOL/BTC"
     ],
     "config": {
-      "maxAmount": 75000,
+      "maxAmount": 75,
       "minProfitThreshold": 0.8,
       "slippageTolerance": 1.5,
       "gasMultiplier": 1.5,
@@ -171,7 +177,10 @@
         "useForMEVProtection": false,
         "useForSniping": false,
         "useForArbitrage": true
-      }
+      },
+      "useRealFunds": true,
+      "simulationMode": false,
+      "updateWalletBalance": true
     }
   }
 ]
