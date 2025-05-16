@@ -1,0 +1,57 @@
+{
+  "transformers": [
+    {
+      "name": "MemeCortexRemix",
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+      "settings": {
+        "priority": "high",
+        "useNeuralOptimization": true,
+        "maxSignalsPerInterval": 10,
+        "intervalMs": 30000
+      },
+      "updatedAt": "2025-05-16T02:05:03.595Z"
+    },
+    {
+      "name": "Security",
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx",
+      "settings": {
+        "priority": "high",
+        "useNeuralOptimization": true,
+        "maxSignalsPerInterval": 10,
+        "intervalMs": 30000
+      },
+      "updatedAt": "2025-05-16T02:05:03.595Z"
+    },
+    {
+      "name": "CrossChain",
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+      "settings": {
+        "priority": "high",
+        "useNeuralOptimization": true,
+        "maxSignalsPerInterval": 10,
+        "intervalMs": 30000
+      },
+      "updatedAt": "2025-05-16T02:05:03.595Z"
+    },
+    {
+      "name": "MicroQHC",
+      "enabled": true,
+      "useOnChainProgram": true,
+      "programId": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+      "settings": {
+        "priority": "high",
+        "useNeuralOptimization": true,
+        "maxSignalsPerInterval": 10,
+        "intervalMs": 30000
+      },
+      "updatedAt": "2025-05-16T02:05:03.595Z"
+    }
+  ],
+  "updatedAt": "2025-05-16T02:05:03.595Z"
+}

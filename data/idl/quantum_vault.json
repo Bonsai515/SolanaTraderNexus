@@ -1,0 +1,30 @@
+{
+  "version": "0.1.0",
+  "name": "quantum_vault",
+  "instructions": [
+    {
+      "name": "execute",
+      "accounts": [
+        {
+          "name": "signer",
+          "isSigner": true,
+          "isWritable": true
+        },
+        {
+          "name": "systemProgram",
+          "isSigner": false,
+          "isWritable": false
+        }
+      ],
+      "args": [
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "address": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL"
+  }
+}

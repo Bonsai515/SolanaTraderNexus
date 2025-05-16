@@ -1,0 +1,13 @@
+{
+  "useOnChainPrograms": true,
+  "programs": {
+    "HYPERION_FLASH_LOAN": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+    "QUANTUM_VAULT": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL",
+    "MEMECORTEX": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+    "SINGULARITY_BRIDGE": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+    "NEXUS_ENGINE": "NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx"
+  },
+  "useHardwareAcceleration": true,
+  "executeDirectly": true,
+  "updatedAt": "2025-05-16T02:05:03.599Z"
+}
