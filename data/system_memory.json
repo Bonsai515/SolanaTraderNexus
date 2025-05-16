@@ -3,7 +3,8 @@
     "flashLoans": true,
     "memeSniper": true,
     "crossChainArbitrage": true,
-    "nuclearStrategies": true
+    "nuclearStrategies": true,
+    "profitCollection": true
   },
   "config": {
     "flashLoans": {
@@ -19,6 +20,14 @@
       "maxSlippageBps": 100,
       "profitTarget": 30,
       "stopLoss": 15
+    },
+    "profitCollection": {
+      "enabled": true,
+      "captureIntervalMinutes": 30,
+      "autoCapture": true,
+      "minProfitThreshold": 0.01,
+      "reinvestmentRate": 0.95,
+      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
     }
   }
 }

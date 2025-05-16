@@ -3,7 +3,7 @@
     "type": "PROFIT_COLLECTION",
     "publicKey": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
     "label": "Profit Collection Wallet",
-    "isActive": false
+    "isActive": true
   },
   {
     "type": "PROFIT_COLLECTION",
