@@ -5,7 +5,12 @@
  * using actual funds and recording all transactions.
  */
 
-import { getFlashStrategyIntegration } from './flash_strategy_integration';
+import { FlashStrategyIntegration } from './server/strategies/flash_strategy_integration';
+
+// Initialize flash strategy integration
+function getFlashStrategyIntegration(walletProvider: () => any): FlashStrategyIntegration {
+  return new FlashStrategyIntegration(walletProvider);
+}
 import { rpcManager } from './server/lib/enhancedRpcManager';
 import { multiSourcePriceFeed } from './server/lib/multiSourcePriceFeed';
 import * as fs from 'fs';
