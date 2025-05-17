@@ -375,7 +375,7 @@
         }
       }
     ],
-    "lastUpdated": "2025-05-17T21:56:41.545Z",
+    "lastUpdated": "2025-05-17T22:07:03.154Z",
     "totalAllocation": 100,
     "averageDailyROI": 52.75
   },
@@ -391,7 +391,8 @@
     "preferredProtocol": "solend",
     "maxLoanAmount": 500,
     "maxBorrowSizeUSD": 1000,
-    "minProfitThresholdUSD": 0.05
+    "minProfitThresholdUSD": 0.001,
+    "useEnhancedDataFeeds": true
   },
   "safety": {
     "maxSlippageBps": 200,
@@ -401,5 +402,10 @@
     "enabled": true,
     "minInvestmentAmount": 0.01,
     "maxLossPercentage": 10
+  },
+  "dataSources": {
+    "priceFeeds": "enhanced-price-feeds.json",
+    "flashLoanProtocols": "flash-loan-protocols.json",
+    "dexIntegrations": "dex-integrations.json"
   }
 }
