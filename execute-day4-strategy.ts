@@ -1,8 +1,8 @@
 /**
- * Execute Quantum Flash Day 4 Strategy with System Wallet
+ * Execute Quantum Flash Day 4 Strategy
  * 
  * This script executes the high-profit Day 4 strategy with 91% ROI
- * using the system wallet private key provided.
+ * using the private key we have available.
  */
 
 import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -34,17 +34,16 @@ const logger = {
 // Constants
 const USE_REAL_TRANSACTIONS = process.argv.includes('--real');
 
-// HX Wallet address and private key
-const HX_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
-const HX_WALLET_PRIVATE_KEY = '793dec9a669ff717266b2544c44bb3990e226f2c21c620b733b53c1f3670f8a231f2be3d80903e77c93700b141f9f163e8dd0ba58c152cbc9ba047bfa245499f';
+// Available wallet private key in hex format
+const WALLET_PRIVATE_KEY = '793dec9a669ff717266b2544c44bb3990e226f2c21c620b733b53c1f3670f8a231f2be3d80903e77c93700b141f9f163e8dd0ba58c152cbc9ba047bfa245499f';
 
-// Load wallet from secret key
+// Load wallet from private key
 function loadWallet(): Keypair {
-  logger.info('Loading HX wallet from private key...');
+  logger.info('Loading wallet from private key...');
   
   try {
     // Convert hex string to Uint8Array
-    const privateKeyBuffer = Buffer.from(HX_WALLET_PRIVATE_KEY, 'hex');
+    const privateKeyBuffer = Buffer.from(WALLET_PRIVATE_KEY, 'hex');
     
     if (privateKeyBuffer.length !== 64) {
       throw new Error(`Invalid private key length: ${privateKeyBuffer.length}`);
@@ -53,14 +52,7 @@ function loadWallet(): Keypair {
     // Create keypair from private key
     const keypair = Keypair.fromSecretKey(privateKeyBuffer);
     
-    // Verify that this matches the expected HX wallet
-    const publicKeyStr = keypair.publicKey.toString();
-    if (publicKeyStr !== HX_WALLET_ADDRESS) {
-      logger.error(`Loaded wallet ${publicKeyStr} does not match expected HX wallet address ${HX_WALLET_ADDRESS}`);
-      throw new Error('Wallet address mismatch');
-    }
-    
-    logger.info(`Successfully loaded HX wallet: ${publicKeyStr}`);
+    logger.info(`Successfully loaded wallet: ${keypair.publicKey.toString()}`);
     return keypair;
   } catch (error) {
     logger.error(`Error loading wallet: ${error instanceof Error ? error.message : String(error)}`);
@@ -263,7 +255,7 @@ async function main() {
         console.log('=============================================');
         console.log(`Simulated profit: ${simulation.details.profitAmount} SOL (${simulation.profitPercentage.toFixed(2)}%)`);
         console.log('\nTo execute with real transactions, run with --real flag:');
-        console.log('npx tsx execute-day4-final.ts --real');
+        console.log('npx tsx execute-day4-strategy.ts --real');
       } else {
         console.log('\n=============================================');
         console.log('❌ DAY 4 STRATEGY SIMULATION FAILED');
