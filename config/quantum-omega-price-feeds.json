@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "primarySources": [
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 1,
+      "refreshIntervalMs": 2000
+    },
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 2,
+      "refreshIntervalMs": 2500
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "CoinGecko",
+      "url": "https://api.coingecko.com/api/v3",
+      "priority": 3,
+      "refreshIntervalMs": 5000
+    },
+    {
+      "name": "DexScreener",
+      "url": "https://api.dexscreener.com",
+      "priority": 4,
+      "refreshIntervalMs": 3000
+    }
+  ],
+  "memecoinSpecificSources": [
+    {
+      "name": "MemeLabs",
+      "url": "https://memelabs.ai/api",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "SolScan",
+      "url": "https://api.solscan.io",
+      "priority": 2,
+      "refreshIntervalMs": 2000
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "BONK": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 1000
+    },
+    "WIF": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 1200
+    },
+    "MEME": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 1000
+    }
+  }
+}
