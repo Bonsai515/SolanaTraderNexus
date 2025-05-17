@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-05-17T10-45-48-446Z",
+  "type": "quantum-flash",
+  "day": 1,
+  "startingAmount": 1.1,
+  "endingAmount": 1177000000,
+  "profit": 77000000,
+  "profitPercentage": 0,
+  "successRate": 0,
+  "operations": 7,
+  "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+}
