@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-05-17T11-15-07-797Z",
+  "type": "quantum-flash",
+  "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "strategy": "Day 1 (Conservative)",
+  "rpc": "Alchemy",
+  "mode": "simulation",
+  "startingAmount": 1.1,
+  "endingAmount": 1.177,
+  "profit": 0.07700000000000001,
+  "profitPercentage": 7,
+  "walletBalance": 1.53442,
+  "success": true,
+  "error": null,
+  "parameters": {
+    "slippageBps": 30,
+    "maxHops": 2,
+    "routeCandidates": 3,
+    "flashLoanEnabled": true,
+    "flashLoanSource": "solend"
+  }
+}

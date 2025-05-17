@@ -1,17 +1,17 @@
 [
   {
     "label": "Prophet Wallet (Profit Collection)",
-    "publicKey": "73TTzhMfzyvX1gLZiBmnAE7VLJf6xPAkBKvJN6tZEogE",
-    "privateKey": "644670af7e2412a5b252b919acd192b686831933fb6dbfb87418872333b07d0459c7352dc71bd71cc5fa3bbf654684364572dc7f0fba11ec7f9de3d207bc8103"
+    "publicKey": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
+    "privateKey": "d28c249469fd4ba35a58800b64e38ccbe22db4df2e115647aa85ff75d5a94544401f38419785a5c053f82d85106a0a1c737619ab0dff383aa24ae8ec4ffde787"
   },
   {
     "label": "Trading Wallet 1",
-    "publicKey": "BUDZc1tnsAWciTSMADhBt7hoF5GP4mjQy9y1hCjgkPNt",
-    "privateKey": "52c4f86b5ee958a24c3f30bef9da8988435448c0287ea9b7a67f45075b55b06d9b8dc15202594856ae9ceccf0c99fbdf243e9d26e278d2e6166b9d2026fe5d35"
+    "publicKey": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "privateKey": "b2f40c191bcafb0ad45a2574da2a16a586a59736e1d7c208b1c96965d478f94af37637bb9e234b8aad9427aba01b590669aee952bb312ac1b670c341389053da"
   },
   {
     "label": "Trading Wallet 2",
-    "publicKey": "4u3EKTsr6jhvRStdYu58UbEjSSk4GX4MwaPzLFzciJUD",
-    "privateKey": "ca40e3ff2b112de04b8f65c404b8610dd8816b8cdc82574bf4ca92091c3046c539e7c8ad83d310f66b4343b82ceef50f09a54fc4adf0e0a06542beec849f57c6"
+    "publicKey": "HH2hMVDuw4WT8QoGTBZX2H5BPWubDL9BFemH6UhhDPYR",
+    "privateKey": "69995cf93de5220f423e76cd73cbe2eea129d0b42ea00c0322d804745ec6c7bff1d6337eb1eefbc8e5d45d65e51bdcff596aeec7b957f34d2d910dd3da11f6d6"
   }
 ]
