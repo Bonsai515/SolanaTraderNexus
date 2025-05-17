@@ -810,13 +810,56 @@ function routeTransformerSignal(signal: EnhancedTransformerSignal): void {
     // Add signal to active signals
     activeSignals.set(signal.id, signal);
     
-    // Emit signal to specific transformer channel
-    neuralBus.emit(`transformer:signal:${signal.transformer}`, signal);
+    // Use the pre-defined connections to route signals directly to agents
+    // This avoids emitting the same event that triggered this function
+    const routedToAgent = routeSignalToAgentBasedOnTransformer(signal);
     
-    logger.info(`[NeuralComms] Routed signal from ${signal.transformer}: ${signal.id}`);
+    // Only if not routed to an agent through predefined connections, use default routing
+    if (!routedToAgent) {
+      logger.info(`[NeuralComms] Routed signal from ${signal.transformer} to Hyperion: ${signal.id}`);
+      
+      // Enhance with timing and risk parameters
+      enhanceSignalWithTimingParameters(signal);
+      enhanceSignalWithRiskParameters(signal);
+      
+      // Default to Hyperion agent as fallback
+      neuralBus.emit('agent:input:Hyperion', signal);
+    }
   } catch (error) {
     logger.error(`[NeuralComms] Error routing transformer signal: ${error}`);
   }
+}
+
+/**
+ * Helper function to route signal to agent based on transformer type
+ * This prevents recursive event emissions
+ */
+function routeSignalToAgentBasedOnTransformer(signal: EnhancedTransformerSignal): boolean {
+  // Mapping of transformers to agents
+  const routingMap = {
+    'MicroQHC': 'Hyperion',
+    'MemeCortex': 'QuantumOmega',
+    'MemeCortexRemix': 'Singularity',
+    'Security': 'QuantumOmega',
+    'CrossChain': 'Hyperion'
+  };
+  
+  const targetAgent = routingMap[signal.transformer];
+  if (targetAgent) {
+    // Add entry/exit timing if not present
+    enhanceSignalWithTimingParameters(signal);
+    
+    // Add risk management parameters if not present
+    enhanceSignalWithRiskParameters(signal);
+    
+    // Forward to appropriate agent
+    neuralBus.emit(`agent:input:${targetAgent}`, signal);
+    
+    logger.info(`[NeuralComms] Routed signal from ${signal.transformer} to ${targetAgent}: ${signal.id}`);
+    return true;
+  }
+  
+  return false;
 }
 
 /**
