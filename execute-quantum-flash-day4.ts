@@ -124,45 +124,33 @@ async function executeDay4Strategy(): Promise<void> {
 }
 
 /**
- * Retrieve wallet from database
+ * Retrieve wallet from wallet.json file
  */
 async function getWalletFromDatabase(): Promise<Keypair | null> {
   try {
-    // Connect to PostgreSQL database
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-    });
+    // Load the wallet from wallet.json file where we found the system wallet
+    const WALLET_PATH = './wallet.json';
+    logger.info(`Loading system wallet from ${WALLET_PATH}...`);
     
-    const client = await pool.connect();
-    logger.info('Connected to database');
-    
-    try {
-      // Query for the wallet
-      const res = await client.query(
-        'SELECT * FROM wallets WHERE address = $1',
-        [WALLET_ADDRESS]
-      );
-      
-      if (res.rows.length === 0) {
-        logger.error(`Wallet ${WALLET_ADDRESS} not found in database`);
-        return null;
-      }
-      
-      const walletData = res.rows[0];
-      logger.info(`Retrieved wallet data for ${walletData.name}`);
-      
-      // For this demo, we'll create a keypair from a seed phrase
-      // In production, the private key would be securely retrieved and decrypted
-      // This is just placeholder code for the demo
-      const secretKey = bs58.decode('PLACEHOLDER_FOR_PRIVATE_KEY');
-      const keypair = Keypair.fromSecretKey(secretKey);
-      
-      return keypair;
-    } finally {
-      client.release();
+    if (!fs.existsSync(WALLET_PATH)) {
+      logger.error(`Wallet file not found at ${WALLET_PATH}`);
+      return null;
     }
+    
+    const secretKeyData = fs.readFileSync(WALLET_PATH, 'utf8');
+    const secretKey = new Uint8Array(JSON.parse(secretKeyData));
+    const keypair = Keypair.fromSecretKey(secretKey);
+    
+    // Verify that this is the expected wallet
+    if (keypair.publicKey.toString() !== WALLET_ADDRESS) {
+      logger.error(`Loaded wallet ${keypair.publicKey.toString()} does not match expected wallet ${WALLET_ADDRESS}`);
+      return null;
+    }
+    
+    logger.info(`Successfully loaded system wallet: ${keypair.publicKey.toString()}`);
+    return keypair;
   } catch (error) {
-    logger.error(`Database error: ${error.message}`);
+    logger.error(`Error loading wallet: ${error.message}`);
     return null;
   }
 }
