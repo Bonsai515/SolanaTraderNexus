@@ -1,0 +1,270 @@
+[
+  {
+    "timestamp": 1747476625778,
+    "uptime": 1,
+    "memory": {
+      "rss": 116,
+      "heapTotal": 31,
+      "heapUsed": 22,
+      "external": 5
+    },
+    "rpc": {
+      "endpoints": [
+        {
+          "url": "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+          "label": "Alchemy",
+          "healthy": true,
+          "state": "CLOSED",
+          "latency": 0
+        },
+        {
+          "url": "https://api.mainnet-beta.solana.com",
+          "label": "Public RPC",
+          "healthy": true,
+          "state": "CLOSED",
+          "latency": 0
+        }
+      ],
+      "callsPerSecond": 0,
+      "healthyEndpoints": 2,
+      "totalEndpoints": 2
+    },
+    "priceFeeds": {
+      "sources": [
+        {
+          "id": "jupiter",
+          "name": "Jupiter API",
+          "priority": 1,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "birdeye",
+          "name": "Birdeye API",
+          "priority": 2,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "dex",
+          "name": "DEX On-Chain",
+          "priority": 3,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "coingecko",
+          "name": "CoinGecko API",
+          "priority": 4,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        }
+      ],
+      "pyth": [
+        {
+          "service": "pyth",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        },
+        {
+          "service": "dex",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        },
+        {
+          "service": "coingecko",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        }
+      ],
+      "sourceCount": 4,
+      "healthySources": 4
+    },
+    "health": {
+      "status": "unknown",
+      "services": [
+        {
+          "name": "Solana RPC",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Price Aggregator",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Pyth Network",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "CoinGecko API",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Jupiter Aggregator",
+          "status": "unknown",
+          "lastCheck": 0
+        }
+      ],
+      "healthyServices": 0,
+      "unhealthyServices": 0,
+      "totalServices": 5
+    }
+  },
+  {
+    "timestamp": 1747476630793,
+    "uptime": 5016,
+    "memory": {
+      "rss": 116,
+      "heapTotal": 31,
+      "heapUsed": 16,
+      "external": 5
+    },
+    "rpc": {
+      "endpoints": [
+        {
+          "url": "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+          "label": "Alchemy",
+          "healthy": true,
+          "state": "CLOSED",
+          "latency": 0
+        },
+        {
+          "url": "https://api.mainnet-beta.solana.com",
+          "label": "Public RPC",
+          "healthy": true,
+          "state": "CLOSED",
+          "latency": 0
+        }
+      ],
+      "callsPerSecond": 0,
+      "healthyEndpoints": 2,
+      "totalEndpoints": 2
+    },
+    "priceFeeds": {
+      "sources": [
+        {
+          "id": "jupiter",
+          "name": "Jupiter API",
+          "priority": 1,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "birdeye",
+          "name": "Birdeye API",
+          "priority": 2,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "dex",
+          "name": "DEX On-Chain",
+          "priority": 3,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        },
+        {
+          "id": "coingecko",
+          "name": "CoinGecko API",
+          "priority": 4,
+          "state": "CLOSED",
+          "requestCount": 0,
+          "failCount": 0,
+          "lastSuccess": "2025-05-17T10:10:25.716Z",
+          "lastFailure": null,
+          "isRateLimited": false
+        }
+      ],
+      "pyth": [
+        {
+          "service": "pyth",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        },
+        {
+          "service": "dex",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        },
+        {
+          "service": "coingecko",
+          "failures": 0,
+          "lastFailure": null,
+          "isOpen": false
+        }
+      ],
+      "sourceCount": 4,
+      "healthySources": 4
+    },
+    "health": {
+      "status": "unknown",
+      "services": [
+        {
+          "name": "Solana RPC",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Price Aggregator",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Pyth Network",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "CoinGecko API",
+          "status": "unknown",
+          "lastCheck": 0
+        },
+        {
+          "name": "Jupiter Aggregator",
+          "status": "unknown",
+          "lastCheck": 0
+        }
+      ],
+      "healthyServices": 0,
+      "unhealthyServices": 0,
+      "totalServices": 5
+    }
+  }
+]
