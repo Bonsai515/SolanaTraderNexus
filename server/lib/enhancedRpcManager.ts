@@ -1,421 +1,623 @@
 /**
- * Enhanced RPC Manager
- * Provides robust connection management for Solana RPC endpoints with
- * automatic fallback, circuit breaker, and exponential backoff
+ * Enhanced RPC Management System
+ * 
+ * This system manages multiple RPC endpoints with automatic failover, load balancing,
+ * circuit breaker patterns, and health monitoring.
  */
 
-import { Connection, ConnectionConfig } from '@solana/web3.js';
-import axios from 'axios';
-
-// Configure fallback RPC endpoints
-const SOLANA_RPC_ENDPOINTS = [
-  "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
-  "https://api.mainnet-beta.solana.com",
-  "https://solana-api.projectserum.com", 
-  "https://rpc.ankr.com/solana"
-];
-
-// RPC endpoint interface
-interface RpcEndpoint {
-  url: string;
-  isHealthy: boolean;
-  failCount: number;
-  lastFailTime: number;
-  lastSuccessTime: number;
-  currentBackoff: number;
-  priority: number;
-  rateLimit: {
-    maxRequests: number;
-    interval: number; // ms
-    currentRequests: number[];
-  };
-}
+import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+import WebSocket from 'ws';
 
 // Circuit breaker states
 enum CircuitState {
-  CLOSED,   // Normal operation
-  OPEN,     // Circuit is open - fail fast
-  HALF_OPEN // Testing if service is back
+  CLOSED,   // Working normally
+  OPEN,     // Failed, not trying
+  HALF_OPEN // Failed, testing if working
 }
 
-// Circuit breaker interface
-interface CircuitBreakerState {
-  state: CircuitState;
-  failures: number;
-  lastFailure: number;
-  lastSuccess: number;
-  timeout: number;
+// RPC Endpoint interface
+interface RpcEndpoint {
+  url: string;
+  wsUrl?: string;
+  priority: number;
+  healthy: boolean;
+  lastSuccess: number | 'never';
+  lastFailure: number | 'never';
+  failCount: number;
+  latency: number;
+  circuitState: CircuitState;
+  failureWindow: number[];
+  wsConnection?: WebSocket | null;
+  wsConnectionState?: 'connecting' | 'open' | 'closed' | 'error';
+  label?: string;
+}
+
+// Rate Limiting interface
+interface RateLimiter {
+  windowMs: number;
+  maxRequests: number;
+  requestLog: number[];
 }
 
 /**
- * Enhanced RPC Manager with circuit breaker pattern and rate limiting
+ * Enhanced RPC Manager with fallback and load balancing
  */
 export class EnhancedRpcManager {
   private endpoints: RpcEndpoint[] = [];
-  private connections: Map<string, Connection> = new Map();
   private currentEndpointIndex: number = 0;
-  private circuitBreakers: Map<string, CircuitBreakerState> = new Map();
-  
-  // Configuration
-  private readonly HEALTH_CHECK_INTERVAL = 30_000; // 30 seconds
-  private readonly MAX_FAILURES = 3;
-  private readonly BASE_BACKOFF = 1000; // 1 second
-  private readonly MAX_BACKOFF = 60000; // 1 minute
-  private readonly CIRCUIT_TIMEOUT = 60000; // 1 minute
-  
+  private connection: Connection | null = null;
+  private rateLimiter: RateLimiter;
+  private failoverThreshold: number = 3;
+  private backoffTime: number = 5000;
+  private maxBackoffTime: number = 60000;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private readonly CHECK_INTERVAL = 30000; // 30 seconds
+
   constructor() {
-    // Initialize endpoints
-    this.setupEndpoints();
-    
-    // Start health monitoring
-    this.startHealthMonitoring();
+    // Set up rate limiter
+    this.rateLimiter = {
+      windowMs: 60000, // 1 minute window
+      maxRequests: 100, // 100 requests per minute
+      requestLog: []
+    };
+
+    // Initialize default endpoints
+    this.initializeEndpoints();
+
+    // Start health checks
+    this.startHealthChecks();
   }
-  
+
   /**
-   * Setup RPC endpoints
+   * Initialize RPC endpoints
    */
-  private setupEndpoints(): void {
-    // Prioritize environment variable if available
-    const priorityEndpoint = process.env.SOLANA_RPC_URL || SOLANA_RPC_ENDPOINTS[0];
-    
-    // Add all endpoints with assigned priorities
-    this.endpoints = [
-      // Primary endpoint
-      {
-        url: priorityEndpoint,
-        isHealthy: true,
-        failCount: 0,
-        lastFailTime: 0,
-        lastSuccessTime: Date.now(),
-        currentBackoff: this.BASE_BACKOFF,
-        priority: 1,
-        rateLimit: {
-          maxRequests: 30,
-          interval: 1000,
-          currentRequests: []
-        }
-      },
-      // Other endpoints with lower priorities
-      ...SOLANA_RPC_ENDPOINTS
-        .filter(url => url !== priorityEndpoint)
-        .map((url, index) => ({
-          url,
-          isHealthy: true,
-          failCount: 0,
-          lastFailTime: 0,
-          lastSuccessTime: Date.now(),
-          currentBackoff: this.BASE_BACKOFF,
-          priority: index + 2, // Start at priority 2
-          rateLimit: {
-            maxRequests: 20,
-            interval: 1000,
-            currentRequests: []
-          }
-        }))
-    ];
-    
-    // Initialize circuit breakers
-    for (const endpoint of this.endpoints) {
-      this.circuitBreakers.set(endpoint.url, {
-        state: CircuitState.CLOSED,
-        failures: 0,
-        lastFailure: 0,
-        lastSuccess: Date.now(),
-        timeout: this.CIRCUIT_TIMEOUT
-      });
-      
-      // Create Solana connection
-      this.createConnection(endpoint.url);
+  private initializeEndpoints(): void {
+    // Your primary endpoint
+    if (process.env.SOLANA_RPC_URL) {
+      this.addEndpoint(
+        process.env.SOLANA_RPC_URL, 
+        process.env.SOLANA_WS_URL || process.env.SOLANA_RPC_URL.replace('https://', 'wss://'),
+        1,
+        'Primary'
+      );
+    } else {
+      console.warn('[RPC] No primary SOLANA_RPC_URL found in env');
+    }
+
+    // InstantNodes endpoint (if available)
+    if (process.env.INSTANT_NODES_URL) {
+      this.addEndpoint(
+        process.env.INSTANT_NODES_URL,
+        process.env.INSTANT_NODES_WS_URL || process.env.INSTANT_NODES_URL.replace('https://', 'wss://'),
+        2,
+        'InstantNodes'
+      );
+    }
+
+    // Add Alchemy endpoint as primary backup (high priority, lower rate limits)
+    if (process.env.ALCHEMY_RPC_URL) {
+      this.addEndpoint(
+        process.env.ALCHEMY_RPC_URL,
+        process.env.ALCHEMY_WS_URL || process.env.ALCHEMY_RPC_URL.replace('https://', 'wss://'),
+        2,
+        'Alchemy'
+      );
     }
     
-    console.log(`Initialized ${this.endpoints.length} RPC endpoints`);
+    // Add Helius endpoint as a secondary backup (if available)
+    if (process.env.HELIUS_RPC_URL) {
+      this.addEndpoint(
+        process.env.HELIUS_RPC_URL,
+        process.env.HELIUS_WS_URL || process.env.HELIUS_RPC_URL.replace('https://', 'wss://'),
+        3,
+        'Helius'
+      );
+    }
+
+    // Add QuickNode endpoint as a backup (if available)
+    if (process.env.QUICKNODE_RPC_URL) {
+      this.addEndpoint(
+        process.env.QUICKNODE_RPC_URL,
+        process.env.QUICKNODE_WS_URL || process.env.QUICKNODE_RPC_URL.replace('https://', 'wss://'),
+        4,
+        'QuickNode'
+      );
+    }
+
+    // Add Ankr endpoint as a backup (if available)
+    if (process.env.ANKR_RPC_URL) {
+      this.addEndpoint(
+        process.env.ANKR_RPC_URL,
+        process.env.ANKR_WS_URL,
+        5,
+        'Ankr'
+      );
+    }
+
+    // Fallback to public endpoints as last resort
+    this.addEndpoint('https://api.mainnet-beta.solana.com', 'wss://api.mainnet-beta.solana.com', 999, 'Public RPC');
+
+    // Sort by priority
+    this.endpoints.sort((a, b) => a.priority - b.priority);
+
+    // Log the endpoints
+    console.log(`[RPC] Initialized ${this.endpoints.length} endpoints`);
   }
-  
+
   /**
-   * Start health monitoring
+   * Add a new RPC endpoint
    */
-  private startHealthMonitoring(): void {
-    setInterval(() => this.checkEndpointHealth(), this.HEALTH_CHECK_INTERVAL);
+  addEndpoint(url: string, wsUrl?: string, priority: number = 999, label?: string): void {
+    this.endpoints.push({
+      url,
+      wsUrl,
+      priority,
+      healthy: true,
+      lastSuccess: 'never',
+      lastFailure: 'never',
+      failCount: 0,
+      latency: 0,
+      circuitState: CircuitState.CLOSED,
+      failureWindow: [],
+      label
+    });
+
+    console.log(`[RPC] Added endpoint: ${url} (priority: ${priority}${label ? ', label: ' + label : ''})`);
   }
-  
+
+  /**
+   * Get a connection for RPC calls
+   */
+  getConnection(): Connection {
+    if (!this.connection || !this.isCurrentEndpointHealthy()) {
+      this.selectBestEndpoint();
+      const endpoint = this.endpoints[this.currentEndpointIndex];
+      this.connection = new Connection(endpoint.url, 'confirmed');
+      console.log(`[RPC] Connected to ${endpoint.label || endpoint.url}`);
+    }
+    return this.connection;
+  }
+
+  /**
+   * Initialize websocket for the current endpoint
+   */
+  initializeWebsocket(): WebSocket | null {
+    const endpoint = this.endpoints[this.currentEndpointIndex];
+    
+    if (!endpoint.wsUrl) {
+      console.warn(`[RPC] No WebSocket URL for endpoint ${endpoint.label || endpoint.url}`);
+      return null;
+    }
+
+    try {
+      // Close any existing connection
+      if (endpoint.wsConnection && endpoint.wsConnection.readyState === WebSocket.OPEN) {
+        endpoint.wsConnection.close();
+      }
+
+      // Create new connection
+      const ws = new WebSocket(endpoint.wsUrl);
+      endpoint.wsConnection = ws;
+      endpoint.wsConnectionState = 'connecting';
+
+      // Set up event handlers
+      ws.on('open', () => {
+        console.log(`[RPC] WebSocket connected to ${endpoint.label || endpoint.wsUrl}`);
+        endpoint.wsConnectionState = 'open';
+      });
+
+      ws.on('error', (error) => {
+        console.error(`[RPC] WebSocket error for ${endpoint.label || endpoint.wsUrl}:`, error);
+        endpoint.wsConnectionState = 'error';
+        this.updateEndpointHealth(endpoint, false);
+      });
+
+      ws.on('close', () => {
+        console.log(`[RPC] WebSocket closed for ${endpoint.label || endpoint.wsUrl}`);
+        endpoint.wsConnectionState = 'closed';
+      });
+
+      return ws;
+    } catch (error) {
+      console.error(`[RPC] Error initializing WebSocket for ${endpoint.label || endpoint.wsUrl}:`, error);
+      endpoint.wsConnectionState = 'error';
+      return null;
+    }
+  }
+
+  /**
+   * Get the websocket connection
+   */
+  getWebSocket(): WebSocket | null {
+    const endpoint = this.endpoints[this.currentEndpointIndex];
+    
+    if (!endpoint.wsConnection || 
+        (endpoint.wsConnection.readyState !== WebSocket.OPEN && 
+         endpoint.wsConnection.readyState !== WebSocket.CONNECTING)) {
+      return this.initializeWebsocket();
+    }
+    
+    return endpoint.wsConnection;
+  }
+
+  /**
+   * Execute a request with rate limiting and retry
+   */
+  async executeRequest<T>(request: () => Promise<T>, endpointLabel?: string): Promise<T> {
+    // If specific endpoint is requested, use that one
+    if (endpointLabel) {
+      const endpointIndex = this.endpoints.findIndex(e => e.label === endpointLabel);
+      if (endpointIndex >= 0) {
+        this.currentEndpointIndex = endpointIndex;
+        this.connection = new Connection(this.endpoints[endpointIndex].url, 'confirmed');
+      }
+    }
+
+    // Check if current endpoint is InstantNodes and approaching limit
+    const endpoint = this.endpoints[this.currentEndpointIndex];
+    const isInstantNodes = endpoint.label === 'InstantNodes';
+    
+    // If using InstantNodes and approaching monthly limit, prefer alternative endpoints
+    if (isInstantNodes && this.rateLimiter.requestLog.length > 800) { // Approaching 1M monthly limit
+      console.log('[RPC] Preserving InstantNodes quota, trying alternative endpoint first');
+      
+      // Find a non-InstantNodes endpoint
+      const alternativeEndpoint = this.endpoints.find(e => 
+        e.label !== 'InstantNodes' && 
+        e.healthy && 
+        e.circuitState !== CircuitState.OPEN
+      );
+      
+      if (alternativeEndpoint) {
+        const newIndex = this.endpoints.indexOf(alternativeEndpoint);
+        this.currentEndpointIndex = newIndex;
+        this.connection = new Connection(alternativeEndpoint.url, 'confirmed');
+        console.log(`[RPC] Using ${alternativeEndpoint.label || alternativeEndpoint.url} to preserve InstantNodes quota`);
+        return this.executeRequest(request);
+      }
+    }
+    
+    // Check if we can make the request (rate limiting)
+    if (this.isRateLimited()) {
+      console.warn(`[RPC] Rate limited, waiting for ${this.backoffTime}ms`);
+      
+      // If InstantNodes is rate limited, try another endpoint immediately
+      if (isInstantNodes) {
+        // Find any healthy alternative endpoint to try
+        const alternativeEndpoint = this.endpoints.find(e => 
+          e.label !== 'InstantNodes' && 
+          e.healthy && 
+          e.circuitState !== CircuitState.OPEN
+        );
+        
+        if (alternativeEndpoint) {
+          const newIndex = this.endpoints.indexOf(alternativeEndpoint);
+          this.currentEndpointIndex = newIndex;
+          this.connection = new Connection(alternativeEndpoint.url, 'confirmed');
+          console.log(`[RPC] Switched to ${alternativeEndpoint.label || alternativeEndpoint.url} due to InstantNodes rate limit`);
+          return this.executeRequest(request);
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, this.backoffTime));
+      // Double backoff time for next request if needed
+      this.backoffTime = Math.min(this.backoffTime * 2, this.maxBackoffTime);
+    } else {
+      // Reset backoff time if we're not rate limited
+      this.backoffTime = 5000;
+    }
+
+    // Track this request
+    this.trackRequest();
+
+    try {
+      // Attempt to execute the request
+      const startTime = Date.now();
+      const result = await request();
+      const endTime = Date.now();
+
+      // Update endpoint health and latency
+      const endpoint = this.endpoints[this.currentEndpointIndex];
+      endpoint.latency = endTime - startTime;
+      endpoint.lastSuccess = Date.now();
+      endpoint.healthy = true;
+      endpoint.failCount = 0;
+      endpoint.circuitState = CircuitState.CLOSED;
+
+      return result;
+    } catch (error) {
+      // Handle request failure
+      const endpoint = this.endpoints[this.currentEndpointIndex];
+      endpoint.lastFailure = Date.now();
+      endpoint.failCount++;
+      endpoint.failureWindow.push(Date.now());
+
+      // Clean up failure window (keep last 5 minutes)
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      endpoint.failureWindow = endpoint.failureWindow.filter(time => time > fiveMinutesAgo);
+
+      // Check if we need to open the circuit breaker
+      if (endpoint.failureWindow.length >= this.failoverThreshold) {
+        endpoint.circuitState = CircuitState.OPEN;
+        endpoint.healthy = false;
+        console.warn(`[RPC] Execution failed on ${endpoint.url}: ${error}`);
+      }
+
+      // Try to failover to another endpoint if available
+      if (this.endpoints.length > 1) {
+        console.log(`[RPC] Switching to backup endpoint`);
+        const oldEndpointIndex = this.currentEndpointIndex;
+        this.selectBestEndpoint();
+
+        // If we found a different endpoint, retry the request
+        if (oldEndpointIndex !== this.currentEndpointIndex) {
+          this.connection = new Connection(this.endpoints[this.currentEndpointIndex].url, 'confirmed');
+          console.log(`[RPC] Switching to ${this.endpoints[this.currentEndpointIndex].label || this.endpoints[this.currentEndpointIndex].url}`);
+          return this.executeRequest(request);
+        }
+      }
+
+      // No other healthy connections available
+      console.error('[RPC] No other healthy connections available, keeping current connection');
+      throw error;
+    }
+  }
+
+  /**
+   * Track request for rate limiting
+   */
+  private trackRequest(): void {
+    const now = Date.now();
+    this.rateLimiter.requestLog.push(now);
+
+    // Clean up old requests from the log
+    this.rateLimiter.requestLog = this.rateLimiter.requestLog.filter(
+      time => time > now - this.rateLimiter.windowMs
+    );
+  }
+
+  /**
+   * Check if we're rate limited
+   */
+  private isRateLimited(): boolean {
+    const now = Date.now();
+    
+    // Clean up old requests
+    this.rateLimiter.requestLog = this.rateLimiter.requestLog.filter(
+      time => time > now - this.rateLimiter.windowMs
+    );
+
+    // Check if we've hit the limit
+    return this.rateLimiter.requestLog.length >= this.rateLimiter.maxRequests;
+  }
+
+  /**
+   * Check if the current endpoint is healthy
+   */
+  private isCurrentEndpointHealthy(): boolean {
+    const endpoint = this.endpoints[this.currentEndpointIndex];
+    return endpoint.healthy && endpoint.circuitState !== CircuitState.OPEN;
+  }
+
+  /**
+   * Select the best endpoint based on health, priority, and latency
+   */
+  private selectBestEndpoint(): void {
+    // Reset circuit breakers that have been open for more than 30 seconds
+    this.resetOpenCircuits();
+
+    // First, filter to only healthy endpoints
+    const healthyEndpoints = this.endpoints.filter(
+      e => e.healthy && e.circuitState !== CircuitState.OPEN
+    );
+
+    // If no healthy endpoints, try half-open ones
+    if (healthyEndpoints.length === 0) {
+      const halfOpenEndpoints = this.endpoints.filter(
+        e => e.circuitState === CircuitState.HALF_OPEN
+      );
+
+      if (halfOpenEndpoints.length > 0) {
+        // Sort by priority
+        halfOpenEndpoints.sort((a, b) => a.priority - b.priority);
+        this.currentEndpointIndex = this.endpoints.indexOf(halfOpenEndpoints[0]);
+        console.log(`[RPC] Using half-open endpoint: ${halfOpenEndpoints[0].label || halfOpenEndpoints[0].url}`);
+        return;
+      }
+
+      // If still no endpoints, reset all circuits and try again
+      this.resetAllCircuits();
+      return this.selectBestEndpoint();
+    }
+
+    // Sort by priority first, then by latency
+    healthyEndpoints.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      return a.latency - b.latency;
+    });
+
+    this.currentEndpointIndex = this.endpoints.indexOf(healthyEndpoints[0]);
+    console.log(`[RPC] Selected endpoint: ${healthyEndpoints[0].label || healthyEndpoints[0].url}`);
+  }
+
+  /**
+   * Reset circuit breakers that have been open too long
+   */
+  private resetOpenCircuits(): void {
+    const now = Date.now();
+    
+    for (const endpoint of this.endpoints) {
+      if (endpoint.circuitState === CircuitState.OPEN) {
+        // If it's been at least 30 seconds since the last failure, try half-open
+        if (endpoint.lastFailure !== 'never' && 
+            typeof endpoint.lastFailure === 'number' && 
+            now - endpoint.lastFailure > 30000) {
+          endpoint.circuitState = CircuitState.HALF_OPEN;
+          console.log(`[RPC] Circuit HALF_OPEN for ${endpoint.label || endpoint.url}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Reset all circuits for emergency recovery
+   */
+  private resetAllCircuits(): void {
+    for (const endpoint of this.endpoints) {
+      endpoint.circuitState = CircuitState.HALF_OPEN;
+      endpoint.healthy = true;
+    }
+    console.log('[RPC] Emergency reset of all circuits');
+  }
+
+  /**
+   * Start health check interval
+   */
+  startHealthChecks(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    this.healthCheckInterval = setInterval(() => {
+      this.checkEndpointHealth();
+    }, this.CHECK_INTERVAL);
+
+    console.log(`[RPC] Started health checks at ${this.CHECK_INTERVAL}ms intervals`);
+  }
+
+  /**
+   * Stop health check interval
+   */
+  stopHealthChecks(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
   /**
    * Check health of all endpoints
    */
   private async checkEndpointHealth(): Promise<void> {
-    console.log('Checking health of RPC endpoints...');
-    
+    console.log('[RPC] Checking health of all endpoints');
+
     for (const endpoint of this.endpoints) {
-      const circuitBreaker = this.circuitBreakers.get(endpoint.url);
-      if (!circuitBreaker) continue;
-      
-      // Skip health check if circuit is OPEN and timeout not elapsed
-      if (circuitBreaker.state === CircuitState.OPEN) {
-        if (Date.now() - circuitBreaker.lastFailure < circuitBreaker.timeout) {
-          continue;
-        }
-        // Transition to HALF_OPEN for testing
-        circuitBreaker.state = CircuitState.HALF_OPEN;
-        console.log(`Circuit for ${endpoint.url} moved to HALF_OPEN state`);
+      // Skip if we're already checking it or the circuit is open
+      if (endpoint.circuitState === CircuitState.OPEN && 
+          endpoint.lastFailure !== 'never' && 
+          typeof endpoint.lastFailure === 'number' && 
+          Date.now() - endpoint.lastFailure < 30000) {
+        continue;
       }
-      
-      try {
-        await this.checkSingleEndpointHealth(endpoint);
-        
-        // Mark as healthy
-        endpoint.isHealthy = true;
-        endpoint.failCount = 0;
-        endpoint.lastSuccessTime = Date.now();
-        
-        // Update circuit breaker
-        circuitBreaker.state = CircuitState.CLOSED;
-        circuitBreaker.failures = 0;
-        circuitBreaker.lastSuccess = Date.now();
-        
-        console.log(`Health check passed for ${endpoint.url}`);
-      } catch (error) {
-        console.log(`Health check failed for ${endpoint.url}: ${error instanceof Error ? error.message : String(error)}`);
-        this.handleEndpointFailure(endpoint, error as Error);
-      }
+
+      // Test the connection
+      this.testConnection(endpoint);
     }
   }
-  
+
   /**
-   * Check health of a single endpoint
+   * Test a single endpoint connection
    */
-  private async checkSingleEndpointHealth(endpoint: RpcEndpoint): Promise<void> {
+  private async testConnection(endpoint: RpcEndpoint): Promise<void> {
     try {
-      // First try REST API health check
-      const jsonRpcPayload = {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getHealth',
-        params: []
-      };
+      // Create a connection just for testing
+      const connection = new Connection(endpoint.url, 'confirmed');
       
-      const response = await axios.post(endpoint.url, jsonRpcPayload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 5000
-      });
-      
-      if (response.status !== 200 || response.data.error) {
-        throw new Error(`Health check failed with status ${response.status}: ${JSON.stringify(response.data.error || {})}`);
-      }
-      
-      return;
+      // Simple test: get a recent block hash
+      const startTime = Date.now();
+      await connection.getLatestBlockhash();
+      const endTime = Date.now();
+
+      // Update metrics
+      endpoint.latency = endTime - startTime;
+      endpoint.lastSuccess = Date.now();
+      endpoint.healthy = true;
+      endpoint.circuitState = CircuitState.CLOSED;
+      endpoint.failCount = 0;
+
+      //console.log(`[RPC] Health check passed for ${endpoint.label || endpoint.url}`);
     } catch (error) {
-      // If REST check fails, try Solana Connection
-      try {
-        const connection = this.connections.get(endpoint.url);
-        if (!connection) {
-          throw new Error('Connection not initialized');
-        }
-        
-        await connection.getLatestBlockhash();
-        return;
-      } catch (secondError) {
-        throw new Error(`Health check failed via REST and Solana Connection: ${secondError instanceof Error ? secondError.message : String(secondError)}`);
-      }
+      console.warn(`[RPC] Health check failed for ${endpoint.label || endpoint.url}: ${error}`);
+      
+      // Update metrics
+      endpoint.lastFailure = Date.now();
+      endpoint.failCount++;
+      this.updateEndpointHealth(endpoint, false);
     }
   }
-  
+
   /**
-   * Create a Solana connection
+   * Update endpoint health status
    */
-  private createConnection(url: string): Connection {
-    const connectionConfig: ConnectionConfig = {
-      commitment: 'confirmed',
-      disableRetryOnRateLimit: false,
-      confirmTransactionInitialTimeout: 60000
+  private updateEndpointHealth(endpoint: RpcEndpoint, isHealthy: boolean): void {
+    if (!isHealthy) {
+      endpoint.failCount++;
+      endpoint.failureWindow.push(Date.now());
+      
+      // Clean up failure window (keep last 5 minutes)
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      endpoint.failureWindow = endpoint.failureWindow.filter(time => time > fiveMinutesAgo);
+      
+      // If too many failures, open the circuit
+      if (endpoint.failureWindow.length >= this.failoverThreshold) {
+        endpoint.circuitState = CircuitState.OPEN;
+        endpoint.healthy = false;
+      }
+    } else {
+      endpoint.healthy = true;
+      endpoint.circuitState = CircuitState.CLOSED;
+      endpoint.failCount = 0;
+    }
+
+    // If this was our current endpoint and it's now unhealthy, select a new one
+    if (!endpoint.healthy && this.endpoints[this.currentEndpointIndex].url === endpoint.url) {
+      this.selectBestEndpoint();
+      // Update the connection object
+      this.connection = new Connection(this.endpoints[this.currentEndpointIndex].url, 'confirmed');
+    }
+  }
+
+  /**
+   * Get the status of all endpoints
+   */
+  getEndpointStatus(): any[] {
+    return this.endpoints.map(endpoint => ({
+      url: endpoint.url,
+      label: endpoint.label,
+      wsUrl: endpoint.wsUrl,
+      priority: endpoint.priority,
+      healthy: endpoint.healthy,
+      latency: endpoint.latency,
+      circuitState: CircuitState[endpoint.circuitState],
+      lastSuccess: endpoint.lastSuccess,
+      lastFailure: endpoint.lastFailure,
+      failCount: endpoint.failCount,
+      wsState: endpoint.wsConnectionState
+    }));
+  }
+
+  /**
+   * Get overall RPC status
+   */
+  getStatus(): {
+    healthy: boolean,
+    activeEndpoint: string,
+    endpointCount: number,
+    healthyEndpoints: number
+  } {
+    const healthyEndpoints = this.endpoints.filter(e => e.healthy).length;
+    
+    return {
+      healthy: healthyEndpoints > 0,
+      activeEndpoint: this.endpoints[this.currentEndpointIndex].label || this.endpoints[this.currentEndpointIndex].url,
+      endpointCount: this.endpoints.length,
+      healthyEndpoints
     };
-    
-    const connection = new Connection(url, connectionConfig);
-    this.connections.set(url, connection);
-    return connection;
-  }
-  
-  /**
-   * Handle endpoint failure
-   */
-  private handleEndpointFailure(endpoint: RpcEndpoint, error: Error): void {
-    endpoint.failCount++;
-    endpoint.lastFailTime = Date.now();
-    
-    // Update circuit breaker
-    const circuitBreaker = this.circuitBreakers.get(endpoint.url);
-    if (circuitBreaker) {
-      circuitBreaker.failures++;
-      circuitBreaker.lastFailure = Date.now();
-      
-      // Open circuit if too many failures
-      if (circuitBreaker.failures >= this.MAX_FAILURES) {
-        circuitBreaker.state = CircuitState.OPEN;
-        endpoint.isHealthy = false;
-        console.log(`Circuit breaker OPENED for ${endpoint.url}`);
-      }
-    }
-    
-    // Apply exponential backoff
-    endpoint.currentBackoff = Math.min(
-      endpoint.currentBackoff * 2,
-      this.MAX_BACKOFF
-    );
-    
-    // Log failure
-    console.log(`RPC endpoint ${endpoint.url} failed: ${error.message}`);
-    console.log(`  Fail count: ${endpoint.failCount}, Backoff: ${endpoint.currentBackoff}ms`);
-    
-    // Switch endpoints if needed
-    if (this.endpoints[this.currentEndpointIndex].url === endpoint.url) {
-      this.findNextHealthyEndpoint();
-    }
-  }
-  
-  /**
-   * Check if an endpoint is rate limited
-   */
-  private isRateLimited(endpoint: RpcEndpoint): boolean {
-    const now = Date.now();
-    
-    // Clean up old requests outside the interval window
-    endpoint.rateLimit.currentRequests = endpoint.rateLimit.currentRequests.filter(
-      timestamp => now - timestamp < endpoint.rateLimit.interval
-    );
-    
-    // Check if we've hit the rate limit
-    return endpoint.rateLimit.currentRequests.length >= endpoint.rateLimit.maxRequests;
-  }
-  
-  /**
-   * Track request for rate limiting
-   */
-  private trackRequest(endpoint: RpcEndpoint): void {
-    endpoint.rateLimit.currentRequests.push(Date.now());
-  }
-  
-  /**
-   * Find the next healthy endpoint
-   */
-  private findNextHealthyEndpoint(): Connection | null {
-    // Sort endpoints by health and priority
-    const availableEndpoints = this.endpoints
-      .filter(e => e.isHealthy && !this.isRateLimited(e))
-      .sort((a, b) => a.priority - b.priority);
-    
-    if (availableEndpoints.length === 0) {
-      return null;
-    }
-    
-    // Find endpoint by index in original array
-    const bestEndpoint = availableEndpoints[0];
-    this.currentEndpointIndex = this.endpoints.findIndex(e => e.url === bestEndpoint.url);
-    
-    console.log(`Switched to RPC endpoint: ${bestEndpoint.url} (priority: ${bestEndpoint.priority})`);
-    return this.connections.get(bestEndpoint.url)!;
-  }
-  
-  /**
-   * Get the best available connection
-   */
-  public getConnection(): Connection {
-    const endpoint = this.endpoints[this.currentEndpointIndex];
-    const circuitBreaker = this.circuitBreakers.get(endpoint.url);
-    
-    // Check circuit breaker state
-    if (circuitBreaker && circuitBreaker.state === CircuitState.OPEN) {
-      // Check if enough time has passed to try again
-      if (Date.now() - circuitBreaker.lastFailure >= circuitBreaker.timeout) {
-        circuitBreaker.state = CircuitState.HALF_OPEN;
-        console.log(`Circuit for ${endpoint.url} moved to HALF_OPEN state`);
-      } else {
-        // Find another endpoint
-        const nextConnection = this.findNextHealthyEndpoint();
-        if (nextConnection) {
-          return nextConnection;
-        }
-        throw new Error('All RPC endpoints are unavailable');
-      }
-    }
-    
-    // Check rate limits
-    if (this.isRateLimited(endpoint)) {
-      console.log(`RPC endpoint ${endpoint.url} is rate limited, switching...`);
-      
-      // Find another endpoint
-      const nextConnection = this.findNextHealthyEndpoint();
-      if (nextConnection) {
-        return nextConnection;
-      }
-      
-      // If all are rate limited, use the current one but log a warning
-      console.warn('All RPC endpoints are rate limited, proceeding with caution');
-    }
-    
-    // Track the request
-    this.trackRequest(endpoint);
-    
-    // Return the current connection
-    return this.connections.get(endpoint.url)!;
-  }
-  
-  /**
-   * Execute an RPC request with circuit breaker and automatic retries
-   */
-  public async executeRequest<T>(requestFn: (connection: Connection) => Promise<T>): Promise<T> {
-    // Try each endpoint in sequence until one succeeds
-    let lastError: Error | null = null;
-    
-    for (let attempt = 0; attempt < this.endpoints.length; attempt++) {
-      try {
-        const connection = this.getConnection();
-        const endpoint = this.endpoints[this.currentEndpointIndex];
-        const circuitBreaker = this.circuitBreakers.get(endpoint.url);
-        
-        // Execute the request
-        const result = await requestFn(connection);
-        
-        // Update success metrics
-        endpoint.lastSuccessTime = Date.now();
-        if (circuitBreaker) {
-          circuitBreaker.state = CircuitState.CLOSED;
-          circuitBreaker.failures = 0;
-          circuitBreaker.lastSuccess = Date.now();
-        }
-        
-        return result;
-      } catch (error) {
-        lastError = error as Error;
-        const endpoint = this.endpoints[this.currentEndpointIndex];
-        
-        // Handle endpoint failure
-        this.handleEndpointFailure(endpoint, lastError);
-      }
-    }
-    
-    // If we get here, all endpoints failed
-    throw lastError || new Error('All RPC endpoints failed');
-  }
-  
-  /**
-   * Get status of all endpoints
-   */
-  public getEndpointStatus(): any[] {
-    return this.endpoints.map(endpoint => {
-      const circuitBreaker = this.circuitBreakers.get(endpoint.url);
-      return {
-        url: endpoint.url,
-        healthy: endpoint.isHealthy,
-        failCount: endpoint.failCount,
-        priority: endpoint.priority,
-        circuitState: circuitBreaker ? 
-          CircuitState[circuitBreaker.state] : 'UNKNOWN',
-        lastSuccess: endpoint.lastSuccessTime ? 
-          new Date(endpoint.lastSuccessTime).toISOString() : 'never',
-        backoff: endpoint.currentBackoff
-      };
-    });
   }
 }
 
-// Export singleton instance
+// Create singleton instance
 export const rpcManager = new EnhancedRpcManager();
 export default rpcManager;
