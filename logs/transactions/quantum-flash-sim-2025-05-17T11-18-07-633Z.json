@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-05-17T11-18-07-633Z",
+  "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "strategy": "Day 1",
+  "mode": "simulation",
+  "startingAmount": 1.1,
+  "endingAmount": 1.101672443324937,
+  "profit": 0.0006824433249368322,
+  "profitPercentage": 0.06204030226698474,
+  "flashLoanSource": "solend",
+  "flashLoanRepayment": 1.1009900000000001,
+  "route": {
+    "id": "route-2",
+    "hops": [
+      {
+        "dex": "Jupiter",
+        "fromToken": "SOL",
+        "toToken": "USDC"
+      },
+      {
+        "dex": "Orca",
+        "fromToken": "USDC",
+        "toToken": "SOL"
+      }
+    ],
+    "expectedProfit": 0.079,
+    "slippage": 0.003,
+    "executionTimeMs": 950
+  },
+  "success": true,
+  "error": null,
+  "parameters": {
+    "slippageBps": 30,
+    "maxHops": 2,
+    "routeCandidates": 3,
+    "flashLoanEnabled": true,
+    "flashLoanSource": "solend"
+  }
+}
