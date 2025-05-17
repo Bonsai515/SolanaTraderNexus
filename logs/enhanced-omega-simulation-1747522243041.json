@@ -1,0 +1,105 @@
+{
+  "simulation": {
+    "initialCapitalSOL": 1,
+    "initialCapitalUSD": 160,
+    "finalCapitalSOL": 0.9979346371030708,
+    "finalCapitalUSD": 159.66954193649133,
+    "profitLossSOL": -0.002065362896929157,
+    "profitLossUSD": -0.33045806350866513,
+    "roi": -0.2065362896929157,
+    "durationMinutes": 60
+  },
+  "trades": {
+    "total": 5,
+    "completed": 5,
+    "profitable": 3,
+    "winRate": 60,
+    "bestTrade": {
+      "token": "Wooh",
+      "profitSOL": 0.0486365973592848,
+      "profitPercent": 28.43065287446958
+    },
+    "worstTrade": {
+      "token": "Wooh",
+      "lossSOL": -0.04960564973401296,
+      "lossPercent": -27.55869429667387
+    }
+  },
+  "tradeHistory": [
+    {
+      "id": "trade-1747522243027-2525",
+      "timestamp": "2025-05-17T23:22:43.006Z",
+      "token": "Wooh",
+      "action": "buy",
+      "entryPrice": 0.00009734343719025398,
+      "amountSOL": 0.18,
+      "amountTokens": 265946.8630576764,
+      "feesSOL": 0.000545,
+      "status": "closed",
+      "reason": "New token launch: WoofCash (Wooh) with 139.0 SOL liquidity",
+      "exitPrice": 0.00008541840358758763,
+      "profitLossSOL": -0.04960564973401296,
+      "profitLossPercent": -27.55869429667387
+    },
+    {
+      "id": "trade-1747522243029-2406",
+      "timestamp": "2025-05-17T23:23:43.006Z",
+      "token": "Wooh",
+      "action": "buy",
+      "entryPrice": 0.00008541840358758763,
+      "amountSOL": 0.17107098304787766,
+      "amountTokens": 288040.75761184376,
+      "feesSOL": 0.000518212949143633,
+      "status": "closed",
+      "reason": "New token launch: WoofCash (Wooh) with 139.0 SOL liquidity",
+      "exitPrice": 0.00013288374991062075,
+      "profitLossSOL": 0.0486365973592848,
+      "profitLossPercent": 28.43065287446958
+    },
+    {
+      "id": "trade-1747522243031-7027",
+      "timestamp": "2025-05-17T23:30:43.006Z",
+      "token": "Barn",
+      "action": "buy",
+      "entryPrice": 0.000015267756645075047,
+      "amountSOL": 0.1402782060992597,
+      "amountTokens": 1335792.9270780266,
+      "feesSOL": 0.0004258346182977791,
+      "status": "closed",
+      "reason": "New token launch: BarkMoon (Barn) with 208.9 SOL liquidity",
+      "exitPrice": 0.000012977812443283769,
+      "profitLossSOL": -0.04606563784086384,
+      "profitLossPercent": -32.8387702707491
+    },
+    {
+      "id": "trade-1747522243033-66",
+      "timestamp": "2025-05-17T23:33:43.006Z",
+      "token": "Barn",
+      "action": "buy",
+      "entryPrice": 0.000014248954415029325,
+      "amountSOL": 0.1319863912879042,
+      "amountTokens": 1346698.334044628,
+      "feesSOL": 0.00040095917386371265,
+      "status": "closed",
+      "reason": "New token launch: BarkMoon (Barn) with 208.9 SOL liquidity",
+      "exitPrice": 0.000021893367646053234,
+      "profitLossSOL": 0.028249794804619394,
+      "profitLossPercent": 21.40356632904496
+    },
+    {
+      "id": "trade-1747522243034-4490",
+      "timestamp": "2025-05-17T23:40:43.006Z",
+      "token": "BarI",
+      "action": "buy",
+      "entryPrice": 0.000027579485105468665,
+      "amountSOL": 0.09424373210519302,
+      "amountTokens": 523520.40614415915,
+      "feesSOL": 0.0002877311963155791,
+      "status": "closed",
+      "reason": "New token launch: BarkAI (BarI) with 100.5 SOL liquidity",
+      "exitPrice": 0.000038143675240839314,
+      "profitLossSOL": 0.016719532514043386,
+      "profitLossPercent": 17.740736853864583
+    }
+  ]
+}
