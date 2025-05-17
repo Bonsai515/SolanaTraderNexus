@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const http = require('http');
 
 // Load environment variables
 dotenv.config({ path: '.env.deployment' });
@@ -17,9 +18,13 @@ dotenv.config({ path: '.env.deployment' });
 // Import enhanced managers (with .js extension for CommonJS compatibility)
 const { rpcManager } = require('./server/lib/enhancedRpcManager.js');
 const { priceAggregator } = require('./server/lib/advancedPriceAggregator.js');
+const { pythPriceService } = require('./server/lib/pythPriceService.js');
+const { multiSourcePriceFeed } = require('./server/lib/multiSourcePriceFeed.js');
+const { healthMonitor } = require('./server/lib/healthMonitor.js');
 
-// Create Express app
+// Create Express app and HTTP server
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -53,12 +58,23 @@ const SAMPLE_TRADES = [
 
 // API Routes
 
+// Start health monitoring
+healthMonitor.startMonitoring();
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   const memoryUsage = process.memoryUsage();
+  const systemHealth = healthMonitor.getSystemHealth();
+  
   const status = {
-    status: 'healthy',
+    status: systemHealth.status,
     timestamp: new Date().toISOString(),
+    services: {
+      total: systemHealth.services,
+      healthy: systemHealth.healthy,
+      degraded: systemHealth.degraded,
+      unhealthy: systemHealth.unhealthy
+    },
     memory: {
       rss: Math.round(memoryUsage.rss / (1024 * 1024)) + ' MB',
       heapTotal: Math.round(memoryUsage.heapTotal / (1024 * 1024)) + ' MB',
@@ -69,27 +85,62 @@ app.get('/health', (req, res) => {
   res.json(status);
 });
 
+// Detailed service health status
+app.get('/health/services', (req, res) => {
+  res.json(healthMonitor.getServiceHealth());
+});
+
+// RPC status endpoint
+app.get('/health/rpc', (req, res) => {
+  try {
+    res.json(rpcManager.getEndpointStatus());
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      status: 'unhealthy'
+    });
+  }
+});
+
 // API Status endpoint
 app.get('/api/status', (req, res) => {
+  const systemHealth = healthMonitor.getSystemHealth();
+  
   res.json({
-    status: 'online',
+    status: systemHealth.status,
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     services: {
-      priceFeeds: true,
+      priceFeeds: systemHealth.services > 0,
       trading: true,
       wallets: true,
-      signals: true
+      signals: true,
+      health: {
+        healthy: systemHealth.healthy,
+        degraded: systemHealth.degraded,
+        unhealthy: systemHealth.unhealthy
+      }
+    },
+    rpc: {
+      status: rpcManager.getStatus()
     }
   });
+});
+
+// Status dashboard UI
+app.get('/status', (req, res) => {
+  // Load and serve the HTML status dashboard
+  const dashboardHtml = fs.readFileSync('./server/lib/status-dashboard.html', 'utf8');
+  res.send(dashboardHtml);
 });
 
 // Price API endpoints
 app.get('/api/prices', async (req, res) => {
   try {
-    // Get all prices from our enhanced price aggregator
-    const prices = priceAggregator.getAllPrices();
-    res.json(prices);
+    // Use the multi-source price feed for more reliable data
+    const supportedTokens = ['SOL', 'USDC', 'BONK', 'JUP', 'MEME', 'WIF', 'ETH', 'BTC'];
+    const prices = await multiSourcePriceFeed.getPrices(supportedTokens);
+    res.json(Object.values(prices));
   } catch (error) {
     console.error('[API] Error fetching prices:', error);
     res.status(500).json({ error: 'Failed to fetch prices' });
@@ -100,17 +151,98 @@ app.get('/api/prices/:token', async (req, res) => {
   try {
     const token = req.params.token.toUpperCase();
     
-    // Get price from our enhanced price aggregator
-    const price = await priceAggregator.getPrice(token);
+    // Try the multi-source price feed first (most reliable)
+    const price = await multiSourcePriceFeed.getPrice(token);
     
-    if (!price) {
+    if (price) {
+      return res.json(price);
+    }
+    
+    // Fallback to the old price aggregator
+    const legacyPrice = await priceAggregator.getPrice(token);
+    
+    if (!legacyPrice) {
       return res.status(404).json({ error: `Token ${token} not found` });
     }
     
-    res.json(price);
+    res.json(legacyPrice);
   } catch (error) {
     console.error(`[API] Error fetching price for ${req.params.token}:`, error);
     res.status(500).json({ error: `Failed to fetch price for ${req.params.token}` });
+  }
+});
+
+// On-chain price data from Pyth Network
+app.get('/api/pyth-prices/:token', async (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    
+    // Get price from Pyth Network with fallbacks
+    const priceData = await pythPriceService.getPrice(token);
+    
+    if (!priceData || priceData.price === 0) {
+      return res.status(404).json({ error: `Token ${token} not found` });
+    }
+    
+    res.json(priceData);
+  } catch (error) {
+    console.error(`[API] Error fetching Pyth price for ${req.params.token}:`, error);
+    res.status(500).json({ error: `Failed to fetch Pyth price for ${req.params.token}` });
+  }
+});
+
+// Enhanced market data API with multi-source pricing
+app.get('/api/market/:token', async (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    
+    // Get prices from multiple sources in parallel for maximum reliability
+    const [multiSourcePrice, pythPrice, aggregatorPrice] = await Promise.all([
+      multiSourcePriceFeed.getPrice(token),
+      pythPriceService.getPrice(token).catch(() => null),
+      priceAggregator.getPrice(token).catch(() => null)
+    ]);
+    
+    // Use the most reliable source, prioritize multi-source
+    if (!multiSourcePrice && !aggregatorPrice) {
+      return res.status(404).json({ error: `Token ${token} not found` });
+    }
+    
+    // Use multi-source price or fall back to aggregator
+    const mainPrice = multiSourcePrice || aggregatorPrice;
+    
+    // Combine the data from all sources
+    res.json({
+      symbol: token,
+      price: mainPrice.price,
+      price_change_24h: mainPrice.priceChange || (aggregatorPrice ? aggregatorPrice.price_change_24h : 0),
+      on_chain_price: pythPrice ? pythPrice.price : null,
+      sources: {
+        primary: mainPrice.source,
+        on_chain: pythPrice ? pythPrice.source : 'unavailable',
+        aggregator: aggregatorPrice ? aggregatorPrice.source : 'unavailable'
+      },
+      timestamp: Date.now(),
+      last_updated: mainPrice.lastUpdated
+    });
+  } catch (error) {
+    console.error(`[API] Error fetching market data for ${req.params.token}:`, error);
+    res.status(500).json({ error: `Failed to fetch market data for ${req.params.token}` });
+  }
+});
+
+// Price source status endpoint
+app.get('/api/price-sources', (req, res) => {
+  try {
+    const sources = {
+      multiSource: multiSourcePriceFeed.getSourceStatus(),
+      pyth: pythPriceService.getCircuitStatus()
+    };
+    
+    res.json(sources);
+  } catch (error) {
+    console.error('[API] Error fetching price source status:', error);
+    res.status(500).json({ error: 'Failed to fetch price source status' });
   }
 });
 
@@ -205,10 +337,15 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/index.html'));
 });
 
-// Start the server
-app.listen(PORT, '0.0.0.0', () => {
+// Initialize WebSocket server
+const { WebSocketManager } = require('./server/websocket.js');
+const wsManager = new WebSocketManager(httpServer);
+
+// Start the server with httpServer (needed for WebSocket)
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`[Production] Server running on port ${PORT}`);
   console.log(`[Production] Access the trading platform at http://localhost:${PORT}`);
+  console.log(`[Production] WebSocket server available at ws://localhost:${PORT}/ws`);
 });
 
 module.exports = app;
