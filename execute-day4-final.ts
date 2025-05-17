@@ -34,20 +34,23 @@ const logger = {
 // Constants
 const USE_REAL_TRANSACTIONS = process.argv.includes('--real');
 
-// The private key provided by the user
-const WALLET_PRIVATE_KEY = '793dec9a669ff717266b2544c44bb3990e226f2c21c620b733b53c1f3670f8a231f2be3d80903e77c93700b141f9f163e8dd0ba58c152cbc9ba047bfa245499f';
+// The private key provided by the user in array format
+const WALLET_SECRET_KEY = [
+  121, 61, 236, 154, 102, 159, 247, 23, 38, 107, 37, 68, 196, 75, 179, 153,
+  14, 34, 111, 44, 33, 198, 32, 183, 51, 181, 60, 31, 54, 112, 248, 162,
+  49, 242, 190, 61, 128, 144, 62, 119, 201, 55, 0, 177, 65, 249, 241, 99,
+  232, 221, 11, 165, 140, 21, 44, 188, 155, 160, 71, 191, 162, 69, 73, 159
+];
 
 // Load wallet from secret key
 function loadWallet(): Keypair {
   logger.info('Loading wallet from private key...');
   
   try {
-    // Convert hex string to Uint8Array
-    const privateKeyHex = WALLET_PRIVATE_KEY.replace(/\s+/g, ''); // Remove any whitespace
-    const privateKeyBuffer = Buffer.from(privateKeyHex, 'hex');
-    const secretKey = new Uint8Array(privateKeyBuffer);
+    // Create a Uint8Array directly from the secret key array
+    const secretKey = new Uint8Array(WALLET_SECRET_KEY);
     
-    // Create keypair from private key
+    // Create keypair from secret key
     const keypair = Keypair.fromSecretKey(secretKey);
     
     logger.info(`Successfully loaded wallet: ${keypair.publicKey.toString()}`);
