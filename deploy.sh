@@ -1,22 +1,12 @@
 #!/bin/bash
 
-echo "Preparing for deployment..."
+# Deployment script for the Solana trading platform
+echo "Starting deployment process..."
 
-# Create necessary directories
-mkdir -p dist/server
-mkdir -p dist/client
-mkdir -p data/signals
+# Step 1: Copy production configuration
+echo "Setting up deployment environment..."
+cp .env.deployment .env.production
 
-# Ensure we have the latest dependencies
-echo "Checking dependencies..."
-
-# Build with skipLibCheck to bypass TypeScript errors
-echo "Building TypeScript files..."
-npx tsc --skipLibCheck
-
-# Copy modified index.js to dist
-echo "Setting up deployment files..."
-cp index.js dist/
-
-echo "Deployment package ready!"
-echo "To start the application, run: node dist/index.js"
+# Step 2: Start the production server
+echo "Starting production server..."
+node production-server.js

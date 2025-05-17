@@ -8,10 +8,10 @@ import { Connection, ConnectionConfig } from '@solana/web3.js';
 
 // Configure fallback RPC endpoints
 const SOLANA_RPC_ENDPOINTS = [
+  "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
   "https://api.mainnet-beta.solana.com",
   "https://solana-api.projectserum.com", 
-  "https://rpc.ankr.com/solana",
-  "https://ssc-dao.genesysgo.net"
+  "https://rpc.ankr.com/solana"
 ];
 
 // Custom error for connection issues
