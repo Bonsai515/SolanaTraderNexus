@@ -36,7 +36,8 @@
     "orcaIntegration": true,
     "solendLiquidator": true,
     "liquidationMonitoring": true,
-    "defiIntegration": true
+    "defiIntegration": true,
+    "quantumOmegaMemeSniper": true
   },
   "config": {
     "transactionEngine": {
@@ -407,5 +408,49 @@
     "priceFeeds": "enhanced-price-feeds.json",
     "flashLoanProtocols": "flash-loan-protocols.json",
     "dexIntegrations": "dex-integrations.json"
+  },
+  "wallets": {
+    "tradingWallet1": {
+      "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+      "balance": 0.097506,
+      "type": "trading",
+      "strategies": [
+        "QuantumOmegaMemeSniper"
+      ]
+    }
+  },
+  "strategies": {
+    "QuantumOmegaMemeSniper": {
+      "active": true,
+      "wallets": [
+        "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      ],
+      "config": {
+        "maxPositionSizePercent": 0.05,
+        "entryConfidenceThreshold": 0.75,
+        "takeProfit": 0.3,
+        "stopLoss": 0.15,
+        "maxActivePositions": 4,
+        "minLiquiditySOL": 10,
+        "maxBuyTax": 5,
+        "maxSellTax": 7,
+        "requireLiquidityLock": true,
+        "minimumLaunchTimeMinutes": 0,
+        "multiPositionStrategy": false,
+        "transactionTimeoutSeconds": 45,
+        "slippageTolerance": 0.03,
+        "prioritizeEarlyLaunches": true,
+        "useSmartSizing": true,
+        "useMemeCortexIntegration": true,
+        "maxGasFeeSOL": 0.000025,
+        "detectionListeners": [
+          "jupiter-memelist",
+          "birdeye-launches",
+          "dexscreener-trending",
+          "memecortex",
+          "telegram-signals"
+        ]
+      }
+    }
   }
 }

@@ -1,0 +1,126 @@
+{
+  "version": "1.2.0",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "strategy": "QuantumOmegaMemeSniper",
+  "params": {
+    "maxPositionSizePercent": 0.05,
+    "entryConfidenceThreshold": 0.75,
+    "takeProfit": 0.3,
+    "stopLoss": 0.15,
+    "maxActivePositions": 4,
+    "minLiquiditySOL": 10,
+    "maxBuyTax": 5,
+    "maxSellTax": 7,
+    "requireLiquidityLock": true,
+    "minimumLaunchTimeMinutes": 0,
+    "multiPositionStrategy": false,
+    "transactionTimeoutSeconds": 45,
+    "slippageTolerance": 0.03,
+    "prioritizeEarlyLaunches": true,
+    "useSmartSizing": true,
+    "useMemeCortexIntegration": true,
+    "maxGasFeeSOL": 0.000025,
+    "detectionListeners": [
+      "jupiter-memelist",
+      "birdeye-launches",
+      "dexscreener-trending",
+      "memecortex",
+      "telegram-signals"
+    ]
+  },
+  "dexConfig": [
+    {
+      "name": "Jupiter",
+      "enabled": true,
+      "priorityLevel": 10,
+      "feeMultiplier": 1,
+      "defaultSlippage": 0.01,
+      "endpoints": [
+        "https://quote-api.jup.ag/v6"
+      ],
+      "requiresKYC": false
+    },
+    {
+      "name": "Raydium",
+      "enabled": true,
+      "priorityLevel": 8,
+      "feeMultiplier": 1,
+      "defaultSlippage": 0.01,
+      "endpoints": [
+        "https://api.raydium.io"
+      ],
+      "requiresKYC": false
+    },
+    {
+      "name": "Orca",
+      "enabled": true,
+      "priorityLevel": 7,
+      "feeMultiplier": 1,
+      "defaultSlippage": 0.01,
+      "endpoints": [
+        "https://api.orca.so"
+      ],
+      "requiresKYC": false
+    },
+    {
+      "name": "MeanFi",
+      "enabled": false,
+      "priorityLevel": 4,
+      "feeMultiplier": 1.2,
+      "defaultSlippage": 0.02,
+      "endpoints": [
+        "https://api.meanfi.com"
+      ],
+      "requiresKYC": true
+    }
+  ],
+  "tokenRoutes": {
+    "base": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "BONK"
+    ],
+    "pairs": [
+      [
+        "SOL",
+        "USDC"
+      ],
+      [
+        "SOL",
+        "BONK"
+      ],
+      [
+        "SOL",
+        "USDT"
+      ],
+      [
+        "USDC",
+        "USDT"
+      ],
+      [
+        "BONK",
+        "USDC"
+      ]
+    ],
+    "preferredRoute": [
+      [
+        "SOL",
+        "MEME"
+      ],
+      [
+        "SOL",
+        "USDC",
+        "MEME"
+      ],
+      [
+        "SOL",
+        "BONK",
+        "MEME"
+      ]
+    ]
+  },
+  "minimumSOLRequired": 0.002125,
+  "active": true,
+  "lastUpdated": "2025-05-17T23:16:34.528Z"
+}
