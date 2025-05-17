@@ -375,13 +375,13 @@
         }
       }
     ],
-    "lastUpdated": "2025-05-17T19:11:32.746Z",
+    "lastUpdated": "2025-05-17T21:56:41.545Z",
     "totalAllocation": 100,
     "averageDailyROI": 52.75
   },
   "trading": {
     "minimumCapital": 0.05,
-    "preferredWallet": "4MyfJj413sqtbLaEub8kw6qPsazAE6T4EhjgaxHWcrdC"
+    "preferredWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
   },
   "flashLoans": {
     "enabled": true,
@@ -392,5 +392,10 @@
   "safety": {
     "maxSlippageBps": 200,
     "minSuccessRate": 70
+  },
+  "memeTokens": {
+    "enabled": true,
+    "minInvestmentAmount": 0.01,
+    "maxLossPercentage": 10
   }
 }
