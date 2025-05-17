@@ -226,14 +226,16 @@ async function main() {
     
     // Since we can't get interactive input in this environment,
     // we'll use an environment variable to decide action
-    const action = process.env.ACTION || '1';
+    const action = process.env.ACTION || '2';
     
     if (action === '2') {
       // Transfer funds option
       console.log('\n===== TRANSFERRING FUNDS FROM HX WALLET =====');
       
-      // Target wallet for transfer (Prophet Wallet)
-      const TARGET_WALLET = '5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG';
+      // Target wallet for transfer (Default to Accessible Wallet if not specified)
+      const TARGET_WALLET = process.env.DESTINATION_WALLET || '4MyfJj413sqtbLaEub8kw6qPsazAE6T4EhjgaxHWcrdC';
+      
+      console.log(`Target wallet for transfer: ${TARGET_WALLET}`);
       
       // Check balance before transfer
       const balance = await checkWalletBalance(connection, wallet.publicKey.toString());
@@ -245,6 +247,9 @@ async function main() {
       
       // Calculate transfer amount (leave a small amount for fees)
       const transferAmount = balance - 0.01;
+      
+      console.log(`\nTransferring ${transferAmount.toFixed(6)} SOL to ${TARGET_WALLET}`);
+      console.log('This will leave 0.01 SOL in the HX wallet for transaction fees');
       
       // Transfer funds
       const signature = await transferFunds(
