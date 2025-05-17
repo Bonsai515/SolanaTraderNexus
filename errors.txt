@@ -1,0 +1,60 @@
+
+1. TypeScript/Build Errors:
+- Over 150 type errors in server code
+- TypeScript compilation failing
+- Build command failing due to TypeScript compilation issues
+
+2. Rust Compilation Errors:
+- Failed to resolve rayon crate/module
+- Missing rayon::prelude imports
+- par_iter method not found for Vec types
+- Missing Strategy trait implementations
+- Closure lifetime issues in scan_sentiment_opportunities
+- Borrowed data escaping method scope
+
+3. RPC Connection Errors:
+- Failed to connect to primary Solana RPC
+- RPC rate limit errors (429 Too Many Requests)
+- Connection timeout errors with Instant Nodes
+- Failed RPC health checks
+
+4. Neural Network Errors:
+- Maximum call stack size exceeded in transformer signal routing
+- Recursive routing issues in NeuralComms
+- Signal routing failures between MicroQHC and Hyperion
+
+5. Transaction Engine Errors:
+- Transaction engine not active
+- Failed transaction executions
+- Error executing transactions for multiple signals
+- Transaction verification failures
+
+6. Dependency Issues:
+- Missing transformers: microqhc, memecortexremix, security, crosschain
+- Failed to build transformers
+- Missing trait implementations
+- Unresolved crate dependencies
+
+7. Wallet/Connection Errors:
+- Failed to get wallet balances
+- Error checking wallet balances
+- Solana connection not initialized
+- Invalid/missing RPC URLs
+
+8. Rate Limiting Issues:
+- RPC rate limiting on Instant Nodes
+- CoinGecko API rate limits
+- Multiple "429 Too Many Requests" errors
+- Rate limit exhaustion for 30-day period
+
+9. Integration Errors:
+- Failed transformer signal routing
+- Error routing transformer signals
+- Integration failures between components
+- Communication errors between neural network nodes
+
+10. System Memory/Resource Errors:
+- Stack size exceeded errors
+- Memory allocation issues
+- Resource exhaustion errors
+- Maximum call stack size limitations
