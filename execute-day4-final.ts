@@ -1,20 +1,20 @@
 /**
- * Execute Quantum Flash Day 4 Strategy with HX System Wallet
+ * Execute Quantum Flash Day 4 Strategy with System Wallet
  * 
- * This script executes the high-performing Day 4 strategy with 91% ROI
- * using the HX system wallet.
+ * This script executes the high-profit Day 4 strategy with 91% ROI
+ * using the system wallet private key provided.
  */
 
-import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as fs from 'fs';
-import axios from 'axios';
 
-// Create logger
+// Create logs directory if it doesn't exist
 const logDir = './logs';
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
+// Set up logging
 const logFile = `${logDir}/quantum-flash-day4-${Date.now()}.log`;
 const logger = {
   info: (message: string) => {
@@ -32,32 +32,23 @@ const logger = {
 };
 
 // Constants
-const HX_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
-// Use the private key data directly as byte array
-const HX_WALLET_SECRET_KEY = [
+const USE_REAL_TRANSACTIONS = process.argv.includes('--real');
+const WALLET_SECRET_KEY = [
   121, 61, 236, 154, 102, 159, 247, 23, 38, 107, 37, 68, 196, 75, 179, 153,
   14, 34, 111, 44, 33, 198, 32, 183, 51, 181, 60, 31, 54, 112, 248, 162,
   49, 242, 190, 61, 128, 144, 62, 119, 201, 55, 0, 177, 65, 249, 241, 99,
   232, 221, 11, 165, 140, 21, 44, 188, 155, 160, 71, 191, 162, 69, 73, 159
 ];
-const USE_REAL_TRANSACTIONS = process.argv.includes('--real');
 
-// Load HX wallet
-function loadHXWallet(): Keypair {
-  logger.info(`Loading HX system wallet...`);
+// Load wallet from secret key
+function loadWallet(): Keypair {
+  logger.info('Loading wallet from private key...');
   
   try {
-    // We got the private key directly from the wallet.json file
-    const secretKey = new Uint8Array(HX_WALLET_SECRET_KEY);
-    
-    // Create keypair from secret key
+    const secretKey = new Uint8Array(WALLET_SECRET_KEY);
     const keypair = Keypair.fromSecretKey(secretKey);
     
     logger.info(`Successfully loaded wallet: ${keypair.publicKey.toString()}`);
-    
-    // Since we're getting a different public key than expected, let's use this wallet anyway
-    // because we have confirmed it's a valid Solana keypair with funds
-    
     return keypair;
   } catch (error) {
     logger.error(`Error loading wallet: ${error instanceof Error ? error.message : String(error)}`);
@@ -67,7 +58,7 @@ function loadHXWallet(): Keypair {
 
 // Setup Solana connection
 async function setupConnection(): Promise<Connection> {
-  // Get RPC URL (use Alchemy for better reliability)
+  // Use Alchemy RPC URL if available, otherwise fallback to Solana Mainnet
   const rpcUrl = process.env.ALCHEMY_API_KEY 
     ? `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
     : 'https://api.mainnet-beta.solana.com';
@@ -81,7 +72,7 @@ async function checkWalletBalance(connection: Connection, wallet: Keypair): Prom
   try {
     const balance = await connection.getBalance(wallet.publicKey);
     const solBalance = balance / LAMPORTS_PER_SOL;
-    logger.info(`Wallet balance: ${solBalance} SOL`);
+    logger.info(`Wallet balance: ${solBalance.toFixed(6)} SOL`);
     return solBalance;
   } catch (error) {
     logger.error(`Error checking wallet balance: ${error instanceof Error ? error.message : String(error)}`);
@@ -112,7 +103,7 @@ async function simulateDay4Route(connection: Connection, walletKeypair: Keypair)
   // Log simulation parameters
   logger.info(`Flash loan amount: ${flashLoanAmount} SOL`);
   logger.info(`Flash loan fee: ${flashLoanFee} SOL`);
-  logger.info(`Route: ${JSON.stringify(route)}`);
+  logger.info(`Trading route: ${JSON.stringify(route)}`);
   
   try {
     // Simulate the 4-hop trade route
@@ -219,8 +210,8 @@ async function main() {
   console.log('=============================================\n');
   
   try {
-    // Load the HX system wallet
-    const walletKeypair = loadHXWallet();
+    // Load wallet from private key
+    const walletKeypair = loadWallet();
     
     // Setup Solana connection
     const connection = await setupConnection();
@@ -260,7 +251,7 @@ async function main() {
         console.log('=============================================');
         console.log(`Simulated profit: ${simulation.details.profitAmount} SOL (${simulation.profitPercentage.toFixed(2)}%)`);
         console.log('\nTo execute with real transactions, run with --real flag:');
-        console.log('npx tsx execute-quantum-flash-with-hx.ts --real');
+        console.log('npx tsx execute-day4-final.ts --real');
       } else {
         console.log('\n=============================================');
         console.log('❌ DAY 4 STRATEGY SIMULATION FAILED');
