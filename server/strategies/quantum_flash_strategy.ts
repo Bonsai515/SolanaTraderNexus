@@ -25,35 +25,38 @@ import {
 
 import BN from 'bn.js';
 
-// On-chain flash loan program IDs
-const FLASH_LOAN_PROGRAM_IDS = [
-  new PublicKey("SoLenDR6hFxHFGk7KSwKr3cMBdcc8oR7jcK4orfTKyc"), // Solend
-  new PublicKey("FLASHHnYxpuKjotSsGMGbkJJvBzMJiLGvcyBcVxzJiL"), // Flash Exchange
-  new PublicKey("Fl1P9MUT2xP3vYWgZ3Qv8sQkpQJkVNZxcCZyq9Jo2jyV"), // Flashy
+// Let's define program/token addresses as strings
+// They'll be converted to PublicKey objects in the strategy methods
+
+// On-chain flash loan program IDs (as strings)
+const FLASH_LOAN_PROGRAM_ADDRESSES = [
+  "SoLenDR6hFxHFGk7KSwKr3cMBdcc8oR7jcK4orfTKyc", // Solend
+  "Flashv1qXiRXNRMrG3qRd3TKZkJaJvYvQM9XAcmwZxDXE", // Flash Exchange
+  "FLSHFcxxGVMKSkzBSybzsRscR5qywZX8f7uBrFHPbPy7", // Flashy
 ];
 
-// Common token mints on Solana
-const TOKEN_MINTS = {
-  SOL: new PublicKey("So11111111111111111111111111111111111111112"),
-  USDC: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-  USDT: new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"),
-  MSOL: new PublicKey("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-  RAY: new PublicKey("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
-  ORCA: new PublicKey("orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE"),
+// Common token mints on Solana (as strings)
+const TOKEN_MINT_ADDRESSES = {
+  SOL: "So11111111111111111111111111111111111111112",
+  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  MSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+  RAY: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+  ORCA: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
 };
 
-// DEX program IDs
-const DEX_PROGRAM_IDS = {
-  RAYDIUM: new PublicKey("RVKd61ztZW9GUwhRbbLoYVRE5Xf1B2tVscKqwZqXgEr"),
-  ORCA: new PublicKey("9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP"),
-  JUPITER: new PublicKey("JUP6i4ozu5ydDCnLiMogSckDPpbtr7BJ4FtzYWkb5Rk"),
-  SERUM: new PublicKey("SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ"),
+// DEX program IDs (as strings)
+const DEX_PROGRAM_ADDRESSES = {
+  RAYDIUM: "RVKd61ztZW9GUwhRbbLoYVRE5Xf1B2tVscKqwZqXgEr",
+  ORCA: "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP",
+  JUPITER: "JUP6i4ozu5ydDCnLiMogSckDPpbtr7BJ4FtzYWkb5Rk",
+  SERUM: "SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ",
 };
 
 // Type definitions
 interface FlashLoanParams {
   sourceProgram: PublicKey;
-  tokenMint: PublicKey;
+  tokenMint: string;
   amount: number;
   feeBps: number;
 }
@@ -61,8 +64,8 @@ interface FlashLoanParams {
 interface ArbitrageParams {
   sourceDex: PublicKey;
   targetDex: PublicKey;
-  tokenA: PublicKey;
-  tokenB: PublicKey;
+  tokenA: string;
+  tokenB: string;
   amountIn: number;
   minAmountOut: number;
 }
@@ -101,8 +104,8 @@ interface DailyProgress {
 }
 
 interface TokenPair {
-  tokenA: PublicKey;
-  tokenB: PublicKey;
+  tokenA: string;
+  tokenB: string;
   name: string;
 }
 
@@ -331,15 +334,15 @@ export class QuantumFlashStrategy {
   /**
    * Execute a multi-layer flash loan operation
    * 
-   * @param tokenA First token in the pair
-   * @param tokenB Second token in the pair
+   * @param tokenA First token in the pair (address string)
+   * @param tokenB Second token in the pair (address string)
    * @param baseAmount Base amount in lamports
    * @param layerCount Number of flash loan layers
    * @returns Flash loan result
    */
   async executeMultiLayerFlashLoan(
-    tokenA: PublicKey,
-    tokenB: PublicKey,
+    tokenA: string,
+    tokenB: string,
     baseAmount: number,
     layerCount: number = 2
   ): Promise<{
@@ -379,8 +382,10 @@ export class QuantumFlashStrategy {
       
       // Add arbitrage instructions
       // First swap: tokenA -> tokenB on sourceDex
-      const sourceDex = DEX_PROGRAM_IDS.RAYDIUM; // Could be optimized based on current rates
-      const targetDex = DEX_PROGRAM_IDS.ORCA;    // Could be optimized based on current rates
+      const sourceDex = new PublicKey(DEX_PROGRAM_ADDRESSES.RAYDIUM); // Could be optimized based on current rates
+      const targetDex = new PublicKey(DEX_PROGRAM_ADDRESSES.ORCA);    // Could be optimized based on current rates
+      const tokenAPubkey = new PublicKey(tokenA);
+      const tokenBPubkey = new PublicKey(tokenB);
       
       // Calculate minimum amount out with slippage tolerance
       const minAmountOut = Math.floor(totalBorrowed * (10000 - this.slippageTolerance) / 10000);
@@ -503,11 +508,13 @@ export class QuantumFlashStrategy {
   private async createFlashLoanInstruction(params: FlashLoanParams): Promise<TransactionInstruction> {
     // In a real implementation, this would create the actual flash loan instruction
     // For now, we'll return a placeholder
+    const tokenMintPubkey = new PublicKey(params.tokenMint);
+
     return new TransactionInstruction({
       keys: [
         { pubkey: this.getWalletPublicKey(), isSigner: true, isWritable: true },
         { pubkey: params.sourceProgram, isSigner: false, isWritable: false },
-        { pubkey: params.tokenMint, isSigner: false, isWritable: true },
+        { pubkey: tokenMintPubkey, isSigner: false, isWritable: true },
       ],
       programId: params.sourceProgram,
       data: Buffer.from([0]), // Placeholder
@@ -520,11 +527,13 @@ export class QuantumFlashStrategy {
   private async createFlashLoanRepaymentInstruction(params: FlashLoanParams): Promise<TransactionInstruction> {
     // In a real implementation, this would create the actual repayment instruction
     // For now, we'll return a placeholder
+    const tokenMintPubkey = new PublicKey(params.tokenMint);
+    
     return new TransactionInstruction({
       keys: [
         { pubkey: this.getWalletPublicKey(), isSigner: true, isWritable: true },
         { pubkey: params.sourceProgram, isSigner: false, isWritable: false },
-        { pubkey: params.tokenMint, isSigner: false, isWritable: true },
+        { pubkey: tokenMintPubkey, isSigner: false, isWritable: true },
       ],
       programId: params.sourceProgram,
       data: Buffer.from([1]), // Placeholder
@@ -537,12 +546,15 @@ export class QuantumFlashStrategy {
   private async createSwapInstruction(params: ArbitrageParams): Promise<TransactionInstruction> {
     // In a real implementation, this would create the actual swap instruction
     // For now, we'll return a placeholder
+    const tokenAPubkey = new PublicKey(params.tokenA);
+    const tokenBPubkey = new PublicKey(params.tokenB);
+    
     return new TransactionInstruction({
       keys: [
         { pubkey: this.getWalletPublicKey(), isSigner: true, isWritable: true },
         { pubkey: params.sourceDex, isSigner: false, isWritable: false },
-        { pubkey: params.tokenA, isSigner: false, isWritable: true },
-        { pubkey: params.tokenB, isSigner: false, isWritable: true },
+        { pubkey: tokenAPubkey, isSigner: false, isWritable: true },
+        { pubkey: tokenBPubkey, isSigner: false, isWritable: true },
       ],
       programId: params.sourceDex,
       data: Buffer.from([2]), // Placeholder
@@ -555,7 +567,8 @@ export class QuantumFlashStrategy {
   private async verifyFlashLoanPrograms(): Promise<boolean> {
     try {
       // Check if programs exist
-      for (const programId of FLASH_LOAN_PROGRAM_IDS) {
+      for (const programAddress of FLASH_LOAN_PROGRAM_ADDRESSES) {
+        const programId = new PublicKey(programAddress);
         const accountInfo = await this.connection.getAccountInfo(programId);
         if (!accountInfo) {
           console.warn(`Flash loan program ${programId.toString()} not found on chain`);
@@ -574,7 +587,8 @@ export class QuantumFlashStrategy {
   private getOptimalFlashProgram(layer: number): PublicKey {
     // In a real implementation, this would select the best program based on various factors
     // For now, we'll just cycle through the available programs
-    return FLASH_LOAN_PROGRAM_IDS[layer % FLASH_LOAN_PROGRAM_IDS.length];
+    const address = FLASH_LOAN_PROGRAM_ADDRESSES[layer % FLASH_LOAN_PROGRAM_ADDRESSES.length];
+    return new PublicKey(address);
   }
   
   /**
@@ -632,19 +646,19 @@ export class QuantumFlashStrategy {
     // Earlier days use more stable pairs, later days more volatile
     
     const stablePairs: TokenPair[] = [
-      { tokenA: TOKEN_MINTS.SOL, tokenB: TOKEN_MINTS.USDC, name: 'SOL-USDC' },
-      { tokenA: TOKEN_MINTS.SOL, tokenB: TOKEN_MINTS.USDT, name: 'SOL-USDT' },
+      { tokenA: TOKEN_MINT_ADDRESSES.SOL, tokenB: TOKEN_MINT_ADDRESSES.USDC, name: 'SOL-USDC' },
+      { tokenA: TOKEN_MINT_ADDRESSES.SOL, tokenB: TOKEN_MINT_ADDRESSES.USDT, name: 'SOL-USDT' },
     ];
     
     const mediumPairs: TokenPair[] = [
-      { tokenA: TOKEN_MINTS.SOL, tokenB: TOKEN_MINTS.MSOL, name: 'SOL-MSOL' },
-      { tokenA: TOKEN_MINTS.USDC, tokenB: TOKEN_MINTS.USDT, name: 'USDC-USDT' },
+      { tokenA: TOKEN_MINT_ADDRESSES.SOL, tokenB: TOKEN_MINT_ADDRESSES.MSOL, name: 'SOL-MSOL' },
+      { tokenA: TOKEN_MINT_ADDRESSES.USDC, tokenB: TOKEN_MINT_ADDRESSES.USDT, name: 'USDC-USDT' },
     ];
     
     const volatilePairs: TokenPair[] = [
-      { tokenA: TOKEN_MINTS.SOL, tokenB: TOKEN_MINTS.RAY, name: 'SOL-RAY' },
-      { tokenA: TOKEN_MINTS.SOL, tokenB: TOKEN_MINTS.ORCA, name: 'SOL-ORCA' },
-      { tokenA: TOKEN_MINTS.USDC, tokenB: TOKEN_MINTS.RAY, name: 'USDC-RAY' },
+      { tokenA: TOKEN_MINT_ADDRESSES.SOL, tokenB: TOKEN_MINT_ADDRESSES.RAY, name: 'SOL-RAY' },
+      { tokenA: TOKEN_MINT_ADDRESSES.SOL, tokenB: TOKEN_MINT_ADDRESSES.ORCA, name: 'SOL-ORCA' },
+      { tokenA: TOKEN_MINT_ADDRESSES.USDC, tokenB: TOKEN_MINT_ADDRESSES.RAY, name: 'USDC-RAY' },
     ];
     
     if (day <= 2) {
