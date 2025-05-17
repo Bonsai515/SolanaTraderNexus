@@ -3,14 +3,13 @@
 
 echo "🚀 Starting deployment process..."
 
-# Install dependencies including TypeScript
+# Install dependencies
 npm install
-npm install -g typescript tsx
 
-# Run TypeScript compilation
+# Build with TypeScript
 echo "Building TypeScript files..."
-tsc --project tsconfig.json
+npm run build
 
-# Start the server with TypeScript support
-echo "Starting server with TypeScript..."
-tsx server/index.ts
+# Start the production server
+echo "Starting production server..."
+node dist/server/index.js
