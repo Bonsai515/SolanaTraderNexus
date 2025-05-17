@@ -1,0 +1,277 @@
+# Deployment Blockers and Solutions
+
+## 1. RPC Rate Limiting Issues
+
+### Problem:
+```
+[WARN] [RPC Rate Limiter] Rate limiting Instant Nodes for 2 seconds
+[ERROR] [RPC Rate Limiter] Request to Instant Nodes failed after 2 attempts
+[WARN] [RPC] Execution failed on https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9: 429 Too Many Requests: {"error":{"code":429,"message":"requests limit for 30days exhausted"},"jsonrpc":"2.0"}
+```
+
+### Solution:
+We've implemented the Enhanced RPC Manager with multiple fallback endpoints, but the system is still primarily trying to use Instant Nodes. We need to:
+
+1. Set a different primary RPC endpoint in the environment:
+```javascript
+// In .env file
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+```
+
+2. Modify the RPC endpoint selection logic to better distribute load:
+```typescript
+// In enhancedRpcManager.ts
+private setupEndpoints(): void {
+  // Randomly shuffle endpoints for better load distribution
+  const shuffledEndpoints = [...SOLANA_RPC_ENDPOINTS].sort(() => Math.random() - 0.5);
+  
+  // Initialize from environment if available and place at the beginning
+  if (process.env.SOLANA_RPC_URL) {
+    shuffledEndpoints.unshift(process.env.SOLANA_RPC_URL);
+  }
+  
+  // Create connection status for each endpoint
+  this.endpoints = shuffledEndpoints.map(url => ({
+    url,
+    isHealthy: true,
+    failCount: 0,
+    lastFailTime: 0,
+    lastSuccessTime: Date.now(),
+    currentBackoff: this.BASE_BACKOFF
+  }));
+  
+  // Create connections for each endpoint
+  for (const endpoint of this.endpoints) {
+    this.createConnection(endpoint.url);
+  }
+}
+```
+
+## 2. CoinGecko API Rate Limiting Issues
+
+### Problem:
+```
+[ERROR] Error fetching CoinGecko prices: Request failed with status code 429
+[WARN] Rate limit hit for CoinGecko, retrying in 8000ms (attempt 3/3)
+[WARN] Skipping CoinGecko after 3 failed retry attempts due to rate limiting
+```
+
+### Solution:
+We need to implement a more robust fallback system for price data. While we have a placeholder for Jupiter Aggregator, we should:
+
+1. Create a proper price aggregator service:
+```typescript
+// In server/lib/priceAggregator.ts
+import axios from 'axios';
+
+// Multiple price sources
+const PRICE_SOURCES = [
+  { name: 'CoinGecko', priority: 1 },
+  { name: 'Jupiter', priority: 2 },
+  { name: 'Birdeye', priority: 3 }
+];
+
+export class PriceAggregator {
+  private cache: Map<string, { price: number, timestamp: number }> = new Map();
+  private readonly CACHE_EXPIRY = 60000; // 1 minute
+  
+  async getPrice(token: string): Promise<number> {
+    // Check cache first
+    const cached = this.cache.get(token);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY) {
+      return cached.price;
+    }
+    
+    // Try each source in order of priority
+    for (const source of PRICE_SOURCES) {
+      try {
+        const price = await this.fetchPriceFromSource(source.name, token);
+        if (price > 0) {
+          // Update cache
+          this.cache.set(token, { price, timestamp: Date.now() });
+          return price;
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch price for ${token} from ${source.name}`);
+      }
+    }
+    
+    // Return last known price or zero
+    return cached?.price || 0;
+  }
+  
+  private async fetchPriceFromSource(source: string, token: string): Promise<number> {
+    switch (source) {
+      case 'CoinGecko':
+        return this.fetchFromCoinGecko(token);
+      case 'Jupiter':
+        return this.fetchFromJupiter(token);
+      case 'Birdeye':
+        return this.fetchFromBirdeye(token);
+      default:
+        return 0;
+    }
+  }
+  
+  // Implement source-specific fetching methods
+  private async fetchFromCoinGecko(token: string): Promise<number> {
+    // Implementation
+  }
+  
+  private async fetchFromJupiter(token: string): Promise<number> {
+    // Implementation
+  }
+  
+  private async fetchFromBirdeye(token: string): Promise<number> {
+    // Implementation
+  }
+}
+```
+
+## 3. TypeScript Configuration Issues
+
+### Problem:
+Our current TypeScript configuration is causing compilation errors:
+```
+Error on line 109:
+Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+```
+
+### Solution:
+1. Create a proper tsconfig.json file with the right settings:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "strict": false,  // Initially false to reduce errors
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./server/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "typeRoots": ["./node_modules/@types", "./server/types"],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "./server/**/*",
+    "./shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
+```
+
+2. Add a global.d.ts file for missing types:
+```typescript
+// In server/types/global.d.ts
+declare module "*.module.css";
+declare module "@project-serum/serum";
+declare module "@project-serum/anchor";
+
+// Add specific types for untyped libraries
+declare module "microqhc" {
+  export interface MicroQHCConfig {
+    // Define the interface
+  }
+  // More type definitions
+}
+
+declare module "memecortexremix" {
+  // Type definitions
+}
+
+// Add missing globals
+interface Window {
+  solana?: any;
+}
+
+// Declare garbage collection for Node.js
+declare namespace NodeJS {
+  interface Global {
+    gc?: () => void;
+  }
+}
+```
+
+## 4. Missing API Endpoint Integration
+
+### Problem:
+The system tries to fetch data from missing endpoints:
+```
+Cannot GET /solana/tokens/trending?limit=50
+```
+
+### Solution:
+We need to implement these endpoints in our production API:
+
+```javascript
+// In production.js
+app.get('/solana/tokens/trending', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Either fetch from cache or from our own database
+    const trendingTokens = [
+      { symbol: "BONK", price_change_24h: 5.2 },
+      { symbol: "WIF", price_change_24h: -2.1 },
+      { symbol: "MEME", price_change_24h: 7.8 },
+      // More trending tokens
+    ].slice(0, limit);
+    
+    res.json(trendingTokens);
+  } catch (error) {
+    console.error('Error fetching trending tokens:', error);
+    res.status(500).json({ error: 'Failed to fetch trending tokens' });
+  }
+});
+```
+
+## 5. Memory Optimization Issues
+
+### Problem:
+The system may experience memory leaks during long-running operations:
+```
+[SystemOptimizer] Memory usage: 85%
+```
+
+### Solution:
+1. Implement explicit cleanup for large objects:
+```javascript
+// In any module that processes large datasets
+function processData(data) {
+  // Process the data
+  const result = heavyComputation(data);
+  
+  // Clear references to large objects
+  data = null;
+  
+  // Return result
+  return result;
+}
+```
+
+2. Use the systemOptimizer to monitor and clean up resources:
+```javascript
+// In server startup
+import { systemOptimizer } from './lib/systemOptimizer';
+
+// Start monitoring
+systemOptimizer.startMonitoring();
+
+// Register cleanup callback
+systemOptimizer.registerMemoryOptimizationCallback(() => {
+  console.log('Cleaning up resources due to high memory usage');
+  // Clear any caches or large objects
+  priceCache.clear();
+  signalCache.clear();
+});
+```

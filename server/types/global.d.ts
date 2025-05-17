@@ -1,47 +1,127 @@
-// Global type declarations for the Solana Trading Platform
-
-// CSS modules declaration
+// Global type declarations
 declare module "*.module.css";
+declare module "@project-serum/serum";
+declare module "@project-serum/anchor";
 
-// Ensure any missing modules have type declarations
-declare module "microqhc";
-declare module "memecortexremix";
-declare module "security";
-declare module "crosschain";
-
-// Add interfaces for neural network components
-interface SignalType {
-  id: string;
-  transformer: string;
-  type: string;
-  token: string;
-  confidence: number;
-  timestamp: number;
+// Add specific types for untyped libraries
+declare module "microqhc" {
+  export interface MicroQHCConfig {
+    version: string;
+    endpoint: string;
+    apiKey?: string;
+    mode: 'simulation' | 'production';
+  }
+  
+  export interface MicroQHCSignal {
+    id: string;
+    token: string;
+    confidence: number;
+    direction: 'bullish' | 'bearish' | 'neutral';
+    timestamp: number;
+  }
+  
+  export class MicroQHC {
+    constructor(config: MicroQHCConfig);
+    generateSignals(): Promise<MicroQHCSignal[]>;
+    process(signal: MicroQHCSignal): Promise<boolean>;
+  }
+  
+  export default MicroQHC;
 }
 
-interface NeuralConnection {
-  from: string;
-  to: string;
-  status: 'active' | 'inactive';
+declare module "memecortexremix" {
+  export interface MemeCortexConfig {
+    version: string;
+    endpoint: string;
+    apiKey?: string;
+    mode: 'simulation' | 'production';
+  }
+  
+  export interface MemeCortexSignal {
+    id: string;
+    token: string;
+    confidence: number;
+    direction: 'bullish' | 'bearish' | 'neutral';
+    strength: 'weak' | 'medium' | 'strong';
+    timestamp: number;
+  }
+  
+  export class MemeCortex {
+    constructor(config: MemeCortexConfig);
+    analyzeToken(token: string): Promise<MemeCortexSignal>;
+    scanMarket(): Promise<MemeCortexSignal[]>;
+  }
+  
+  export default MemeCortex;
 }
 
-interface TransactionType {
-  id: string;
-  sourceToken: string;
-  targetToken: string; 
-  amount: number;
-  strategy: string;
-  status: 'pending' | 'completed' | 'failed';
-  timestamp: number;
+declare module "security" {
+  export interface SecurityConfig {
+    version: string;
+    endpoint: string;
+    apiKey?: string;
+  }
+  
+  export interface SecurityCheck {
+    token: string;
+    safe: boolean;
+    score: number;
+    issues?: string[];
+  }
+  
+  export class Security {
+    constructor(config: SecurityConfig);
+    checkToken(token: string): Promise<SecurityCheck>;
+  }
+  
+  export default Security;
 }
 
-// Declare module augmentations for missing/incomplete types
+declare module "crosschain" {
+  export interface CrossChainConfig {
+    version: string;
+    endpoint: string;
+    apiKey?: string;
+  }
+  
+  export interface CrossChainOpportunity {
+    id: string;
+    sourceChain: string;
+    targetChain: string;
+    sourceToken: string;
+    targetToken: string;
+    profit: number;
+    confidence: number;
+    timestamp: number;
+  }
+  
+  export class CrossChain {
+    constructor(config: CrossChainConfig);
+    scanOpportunities(): Promise<CrossChainOpportunity[]>;
+  }
+  
+  export default CrossChain;
+}
+
+// Add missing globals
+interface Window {
+  solana?: any;
+}
+
+// Declare garbage collection for Node.js
 declare namespace NodeJS {
-  interface ProcessEnv {
-    NODE_ENV: 'development' | 'production' | 'test';
-    PORT?: string;
-    SOLANA_RPC_URL?: string;
-    COINGECKO_API_KEY?: string;
-    JUPITER_API_KEY?: string;
+  interface Global {
+    gc?: () => void;
+  }
+}
+
+// For Solana specific missing types
+declare namespace Solana {
+  interface Transaction {
+    id: string;
+    instructions: any[];
+    recentBlockhash?: string;
+    feePayer: any;
+    signatures: any[];
   }
 }
