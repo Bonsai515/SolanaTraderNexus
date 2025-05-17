@@ -14,7 +14,8 @@
  * 5. Enables real-time system-wide communication
  */
 
-import { logger } from './logger';
+import * as loggerModule from './logger';
+const logger = loggerModule.default || loggerModule;
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -68,6 +69,11 @@ interface EnhancedTransformerSignal extends TransformerSignal {
     marketConditionTrigger?: string;
     volumeDropPercent?: number;
   };
+  
+  // Execution parameters
+  source?: string;
+  target?: string;
+  walletOverride?: string;
   
   // Special instructions
   holdInstructions?: {
@@ -400,7 +406,10 @@ function enableCriticalSignalPathways(): void {
             source: signal.source || 'direct',
             target: signal.target || 'nexus',
             walletOverride: signal.walletOverride,
-            executionMode: ExecutionMode.LIVE
+            executionMode: ExecutionMode.LIVE,
+            // Add required fields from the interface
+            priority: 'high',    // Direct execution is high priority
+            agentId: 'system'    // System-initiated execution
           };
           
           // Add risk parameters if present
@@ -751,7 +760,14 @@ function createExecutionParams(
       amount: modifications?.sourceAmount || signal.sourceAmount || 0,
       slippageBps: modifications?.slippageBps || 50, // Default slippage
       strategy: `${agentId}-${signal.transformer}`,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      // Add required properties
+      source: signal.source || 'default',
+      target: signal.target || 'nexus',
+      walletOverride: signal.walletOverride || '',
+      executionMode: ExecutionMode.LIVE,
+      priority: 'medium',
+      agentId: agentId
     };
     
     // Add risk parameters if present
@@ -945,7 +961,13 @@ function summarizeNeuralConnections(): void {
     logger.info(`[NeuralComms] - Transformer-to-agent pathways: ${TRANSFORMER_TYPES.length * AGENT_TYPES.length}`);
     logger.info(`[NeuralComms] - Direct execution pathways: ${TRANSFORMER_TYPES.length}`);
     logger.info(`[NeuralComms] - Agent-to-engine pathways: ${AGENT_TYPES.length}`);
-    logger.info(`[NeuralComms] - Active event listeners: ${neuralBus.eventNames().length}`);
+    
+    // Check if eventNames() method exists on the EventEmitter implementation
+    if (typeof neuralBus.eventNames === 'function') {
+      logger.info(`[NeuralComms] - Active event listeners: ${neuralBus.eventNames().length}`);
+    } else {
+      logger.info(`[NeuralComms] - Active event listeners: Unknown (eventNames not supported)`);
+    }
   } catch (error) {
     logger.error(`[NeuralComms] Error summarizing neural connections: ${error}`);
   }

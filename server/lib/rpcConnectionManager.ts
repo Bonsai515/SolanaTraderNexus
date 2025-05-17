@@ -753,11 +753,24 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
     try {
       const result = await connection.getProgramAccounts(programId, filters);
       
-      // Convert result to expected Array<any> format
-      return result.map(item => ({
-        pubkey: item.pubkey,
-        account: item.account
-      }));
+      // Handle different return types - might be array or RpcResponseAndContext
+      if (Array.isArray(result)) {
+        // It's already an array, just map it
+        return result.map(item => ({
+          pubkey: item.pubkey,
+          account: item.account
+        }));
+      } else if (result && typeof result === 'object' && 'value' in result) {
+        // It's an RpcResponseAndContext, map the value array
+        return result.value.map(item => ({
+          pubkey: item.pubkey,
+          account: item.account
+        }));
+      } else {
+        // Unexpected result format
+        logger.warn(`[RPC] Unexpected getProgramAccounts result format: ${JSON.stringify(result)}`);
+        return [];
+      }
     } catch (error: any) {
       // Handle specific provider errors
       if (error.message && (
@@ -775,10 +788,25 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
         
         try {
           const result = await connection.getProgramAccounts(programId, restrictiveFilters);
-          return result.map(item => ({
-            pubkey: item.pubkey,
-            account: item.account
-          }));
+          
+          // Handle different return types - might be array or RpcResponseAndContext
+          if (Array.isArray(result)) {
+            // It's already an array, just map it
+            return result.map(item => ({
+              pubkey: item.pubkey,
+              account: item.account
+            }));
+          } else if (result && typeof result === 'object' && 'value' in result) {
+            // It's an RpcResponseAndContext, map the value array
+            return result.value.map(item => ({
+              pubkey: item.pubkey,
+              account: item.account
+            }));
+          } else {
+            // Unexpected result format
+            logger.warn(`[RPC] Unexpected getProgramAccounts result format: ${JSON.stringify(result)}`);
+            return [];
+          }
         } catch (secondError) {
           // If even restrictive filters fail, return empty array instead of failing
           logger.error(`[RPC] Failed to fetch accounts even with restrictive filters: ${secondError.message}`);

@@ -5,7 +5,8 @@
  * with the neural network and on-chain programs.
  */
 
-import * as logger from '../logger';
+import * as loggerModule from '../logger';
+const logger = loggerModule.default || loggerModule;
 import { getNexusEngine } from '../nexus-transaction-engine';
 import { sendNeuralMessage } from '../neural-network-integrator';
 import { Connection, PublicKey } from '@solana/web3.js';
