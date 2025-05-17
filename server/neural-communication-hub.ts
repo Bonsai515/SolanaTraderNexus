@@ -14,7 +14,7 @@
  * 5. Enables real-time system-wide communication
  */
 
-import * as logger from './logger';
+import { logger } from './logger';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';

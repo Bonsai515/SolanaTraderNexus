@@ -547,33 +547,37 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     
     // Try to start server with basic routes in case the regular registration failed
     try {
-      const backupServer = 
-// Initialize enhanced price feeds and Geyser integration
-console.log('Initializing enhanced price feeds and Geyser integration...');
+      // Disabled backup server to prevent port conflicts
+      // We're using the same port for all services
+      console.log('🚨 Backup server startup skipped to prevent port conflicts');
+      logger.info('🚨 Backup server startup skipped to prevent port conflicts');
+    
+      // Initialize enhanced price feeds and Geyser integration
+      console.log('Initializing enhanced price feeds and Geyser integration...');
 
-// Wait for price feed service to be ready
-priceFeedService.on('initialized', () => {
-  console.log('✅ Enhanced price feeds initialized with GMGN.ai, Pump.fun, DexScreener, Moonshot, Proton, Birdeye');
-});
+      // Wait for price feed service to be ready
+      priceFeedService.on('initialized', () => {
+        console.log('✅ Enhanced price feeds initialized with GMGN.ai, Pump.fun, DexScreener, Moonshot, Proton, Birdeye');
+      });
 
-// Listen for Geyser real-time updates
-geyserService.on('connected', () => {
-  console.log('✅ Connected to Solana Geyser for real-time blockchain monitoring');
-});
+      // Listen for Geyser real-time updates
+      geyserService.on('connected', () => {
+        console.log('✅ Connected to Solana Geyser for real-time blockchain monitoring');
+      });
 
-// Listen for real-time price updates
-priceFeedService.on('realtime_update', (data) => {
-  if (data.type === 'transaction' && data.data && data.data.programId) {
-    // Check if this is a DEX transaction we're interested in
-    const programId = data.data.programId;
-    if (programId === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4' || // Jupiter
-        programId === '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8' || // Raydium
-        programId === 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc') { // Orca
-      // Process DEX transaction for trading opportunities
-      console.log(`[Geyser] Detected DEX transaction in ${programId}`);
-    }
-  }
-});
+      // Listen for real-time price updates
+      priceFeedService.on('realtime_update', (data) => {
+        if (data.type === 'transaction' && data.data && data.data.programId) {
+          // Check if this is a DEX transaction we're interested in
+          const programId = data.data.programId;
+          if (programId === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4' || // Jupiter
+              programId === '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8' || // Raydium
+              programId === 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc') { // Orca
+            // Process DEX transaction for trading opportunities
+            console.log(`[Geyser] Detected DEX transaction in ${programId}`);
+          }
+        }
+      });
 
 // Set up MEV protection using Geyser
 geyserService.on('mev_opportunity', (data) => {
