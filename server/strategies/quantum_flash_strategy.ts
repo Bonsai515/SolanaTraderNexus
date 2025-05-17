@@ -80,13 +80,28 @@ export class QuantumFlashStrategy {
    * Create a new Quantum Flash Strategy
    * @param connection Solana connection
    * @param wallet Wallet for transactions
-   * @param slippageBps Slippage in basis points
+   * @param options Strategy options
    */
   constructor(
     private connection: Connection,
     private wallet: any,
-    private slippageBps: number = 30
-  ) {}
+    private options: {
+      slippageBps?: number;
+      realTrading?: boolean;
+    } = {}
+  ) {
+    // Set default slippage if not provided
+    this.options.slippageBps = this.options.slippageBps || 30;
+    
+    // Default to simulation mode unless explicitly enabled
+    this.options.realTrading = !!this.options.realTrading;
+    
+    if (this.options.realTrading) {
+      console.log('⚠️ REAL BLOCKCHAIN TRADING ENABLED ⚠️');
+    } else {
+      console.log('Simulation mode enabled (no real transactions)');
+    }
+  }
   
   /**
    * Initialize the strategy
