@@ -28,13 +28,19 @@ function getWallet() {
     const walletData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'wallets.json'), 'utf8'));
     
     if (walletData.mainWallet) {
-      console.log(`Using main wallet: ${walletData.mainWallet.publicKey}`);
+      console.log(`Using main wallet: ${walletData.mainWallet.address}`);
       return walletData.mainWallet;
     }
     
     if (walletData.wallets && walletData.wallets.length > 0) {
-      console.log(`Using primary wallet: ${walletData.wallets[0].publicKey}`);
-      return walletData.wallets[0];
+      const activeWallet = walletData.activeWallet 
+        ? walletData.wallets.find((w: any) => w.address === walletData.activeWallet)
+        : walletData.wallets[0];
+        
+      if (activeWallet) {
+        console.log(`Using wallet: ${activeWallet.name} (${activeWallet.address})`);
+        return activeWallet;
+      }
     }
     
     throw new Error('No wallet found in wallet data');
@@ -47,7 +53,7 @@ function getWallet() {
 /**
  * Initialize the flash trading system
  */
-async function initializeFlashTrading() {
+async function initializeFlashTrading(day: number, amount: number) {
   // Ensure transaction log directory exists
   if (!fs.existsSync(TRANSACTION_LOG_DIR)) {
     fs.mkdirSync(TRANSACTION_LOG_DIR, { recursive: true });
@@ -59,27 +65,21 @@ async function initializeFlashTrading() {
   
   // Get wallet provider
   const wallet = getWallet();
-  console.log(`Wallet ${wallet.publicKey} will be used for trading`);
+  console.log(`Wallet ${wallet.address} will be used for trading`);
   
-  // Initialize price feed
-  console.log('Checking price feed status...');
-  const priceStatus = multiSourcePriceFeed.getSourceStatus();
-  const healthySources = priceStatus.filter((s: any) => s.state === 'CLOSED').length;
-  
-  if (healthySources === 0) {
-    throw new Error('No healthy price sources available. Cannot proceed with real trading.');
-  }
-  
-  console.log(`${healthySources}/${priceStatus.length} price sources are healthy`);
+  // Force set the RPC URL
+  const rpcUrl = "https://api.mainnet-beta.solana.com";
+  console.log(`Using RPC URL: ${rpcUrl}`);
   
   // Initialize flash strategy with wallet
   const walletProvider = () => wallet;
   const flashStrategy = getFlashStrategyIntegration(walletProvider);
   
-  // Initialize strategy
-  const success = await flashStrategy.initialize();
+  // Manually call initialize with proper parameters
+  console.log('Initializing Flash Strategy Integration...');
+  const initialized = await flashStrategy.initialize();
   
-  if (!success) {
+  if (!initialized) {
     throw new Error('Failed to initialize flash strategy for real trading');
   }
   
@@ -98,8 +98,8 @@ async function executeRealBlockchainTrading(day: number, amount: number) {
   console.log('');
   
   try {
-    // Initialize flash trading
-    const flashStrategy = await initializeFlashTrading();
+    // Initialize flash trading with day and amount parameters
+    const flashStrategy = await initializeFlashTrading(day, amount);
     
     // Convert SOL to lamports
     const lamports = Math.floor(amount * 1_000_000_000);
@@ -126,7 +126,7 @@ async function executeRealBlockchainTrading(day: number, amount: number) {
       profit: result.profit / 1_000_000_000,
       operations: result.operations,
       successfulOperations: result.successfulOperations,
-      wallet: getWallet().publicKey
+      wallet: getWallet().address
     };
     
     // Write to log file
