@@ -68,13 +68,22 @@ export class EnhancedRpcManager {
    * Set up RPC endpoints
    */
   private setupEndpoints(): void {
-    // Initialize from environment if available
+    // Randomly shuffle endpoints for better load distribution
+    const shuffledEndpoints = [...SOLANA_RPC_ENDPOINTS].sort(() => Math.random() - 0.5);
+    
+    // Initialize from environment if available and place at the beginning
     if (process.env.SOLANA_RPC_URL) {
-      SOLANA_RPC_ENDPOINTS.unshift(process.env.SOLANA_RPC_URL);
+      shuffledEndpoints.unshift(process.env.SOLANA_RPC_URL);
+    } else {
+      // If no environment URL provided, add a public endpoint at the beginning
+      shuffledEndpoints.unshift("https://api.mainnet-beta.solana.com");
     }
     
+    // Remove duplicates
+    const uniqueEndpoints = Array.from(new Set(shuffledEndpoints));
+    
     // Create connection status for each endpoint
-    this.endpoints = SOLANA_RPC_ENDPOINTS.map(url => ({
+    this.endpoints = uniqueEndpoints.map(url => ({
       url,
       isHealthy: true,
       failCount: 0,
