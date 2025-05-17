@@ -290,7 +290,13 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     // Initialize Neural Communication Hub
     console.log('Initializing Neural Communication Hub...');
     try {
-      const { initNeuralCommunicationHub } = require('./neural-communication-hub');
+      const neuralCommsModule = require('./neural-communication-hub');
+      const initNeuralCommunicationHub = neuralCommsModule.initNeuralCommunicationHub || neuralCommsModule.default?.initNeuralCommunicationHub;
+      
+      if (typeof initNeuralCommunicationHub !== 'function') {
+        throw new Error('Neural Communication Hub initialization function not found');
+      }
+      
       await initNeuralCommunicationHub();
       console.log('✅ Successfully initialized Neural Communication Hub');
       console.log('   Transformer signal coordination and neural entanglement active');

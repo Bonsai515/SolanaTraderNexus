@@ -9,7 +9,8 @@
  * 5. Emergency Response System
  */
 
-import * as logger from '../logger';
+import * as loggerModule from '../logger';
+const logger = loggerModule.default || loggerModule;
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -105,7 +106,7 @@ interface NeuralCacheEntry {
   ttlMs: number;
 }
 
-import { log } from '../logger';
+// Logger is already imported at the top of the file
 
 export class EnhancedCommunicationTransformer extends EventEmitter {
   private isActive: boolean = false;
@@ -116,18 +117,18 @@ export class EnhancedCommunicationTransformer extends EventEmitter {
 
   async activate(): Promise<void> {
     if (this.isActive) {
-      log('Enhanced communication transformer already active');
+      logger.info('Enhanced communication transformer already active');
       return;
     }
 
     try {
       this.isActive = true;
-      log('Enhanced communication transformer activated');
+      logger.info('Enhanced communication transformer activated');
 
       // Start periodic signal checks
       this.startPeriodicChecks();
     } catch (error) {
-      log(`Failed to activate enhanced communication transformer: ${error}`);
+      logger.error(`Failed to activate enhanced communication transformer: ${error}`);
       throw error;
     }
   }
@@ -153,13 +154,13 @@ export class EnhancedCommunicationTransformer extends EventEmitter {
 
       this.emit('signal', signal);
     } catch (error) {
-      log(`Error checking for signals: ${error}`);
+      logger.error(`Error checking for signals: ${error}`);
     }
   }
 
   deactivate(): void {
     this.isActive = false;
-    log('Enhanced communication transformer deactivated');
+    logger.info('Enhanced communication transformer deactivated');
   }
 
   isRunning(): boolean {

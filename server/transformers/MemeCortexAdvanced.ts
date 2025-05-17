@@ -16,7 +16,8 @@
 
 import { Connection } from '@solana/web3.js';
 import { EventEmitter } from 'events';
-import * as logger from '../logger';
+import * as loggerModule from '../logger';
+const logger = loggerModule.default || loggerModule;
 import axios from 'axios';
 import { SignalDirection, SignalSource, SignalStrength, SignalType } from '../../shared/signalTypes';
 
