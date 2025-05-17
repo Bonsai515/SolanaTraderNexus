@@ -57,6 +57,7 @@ interface NeuralPattern {
   executionCount: number;
   profitRate: number;
   lastExecuted: number;
+  profitRate: number;
 }
 
 // Performance tracking metrics
