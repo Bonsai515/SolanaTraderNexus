@@ -1,0 +1,61 @@
+{
+  "id": "minimal-flash-strategy",
+  "name": "Minimal Capital Flash Loan Strategy",
+  "description": "Optimized flash loan strategy for minimal starting capital",
+  "type": "flash-loan",
+  "enabled": true,
+  "settings": {
+    "flashLoanProvider": "solend",
+    "maxLoanSizeSOL": 0.5,
+    "minProfitThreshold": 0.0001,
+    "maxSlippageBps": 200,
+    "routeLength": 3,
+    "preferredDEXs": [
+      "jupiter",
+      "orca"
+    ],
+    "backoffMultiplier": 1.5,
+    "maxExecutionsPerHour": 6,
+    "gasOptimized": true
+  },
+  "routes": [
+    {
+      "name": "Basic SOL-USDC-SOL",
+      "steps": [
+        {
+          "from": "SOL",
+          "to": "USDC",
+          "dex": "jupiter"
+        },
+        {
+          "from": "USDC",
+          "to": "SOL",
+          "dex": "orca"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "Basic USDC-ETH-USDC",
+      "steps": [
+        {
+          "from": "USDC",
+          "to": "ETH",
+          "dex": "jupiter"
+        },
+        {
+          "from": "ETH",
+          "to": "USDC",
+          "dex": "orca"
+        }
+      ],
+      "enabled": true
+    }
+  ],
+  "safety": {
+    "maxPercentOfWalletBalance": 100,
+    "stopLossPercentage": 2,
+    "requireFlashLoan": true,
+    "onlyExecuteInProfit": true
+  }
+}
