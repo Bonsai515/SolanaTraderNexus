@@ -39,11 +39,10 @@ export class FlashStrategyIntegration {
     try {
       console.log('Initializing Flash Strategy Integration...');
       
-      // Get connection from RPC manager
-      // Use the most healthy endpoint from the RPC manager
-      const endpoints = rpcManager.getEndpointStatus();
-      const healthyEndpoint = endpoints.find(e => e.healthy)?.url || 'https://api.mainnet-beta.solana.com';
-      const connection = new Connection(healthyEndpoint);
+      // Always use the public RPC endpoint to ensure connection works
+      const rpcUrl = 'https://api.mainnet-beta.solana.com';
+      console.log('Using RPC URL:', rpcUrl);
+      const connection = new Connection(rpcUrl);
       
       // Get wallet
       const wallet = this.walletProvider();
