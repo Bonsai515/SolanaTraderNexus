@@ -1,0 +1,1 @@
+import { config } from 'dotenv'; config(); console.log('VITE_INSTANT_NODES_RPC_URL:', process.env.VITE_INSTANT_NODES_RPC_URL); console.log('INSTANT_NODES_RPC_URL:', process.env.INSTANT_NODES_RPC_URL);
