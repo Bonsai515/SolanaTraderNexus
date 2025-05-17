@@ -1,9 +1,9 @@
 {
   "isEnabled": true,
-  "lastCollectionTime": 1747445205269,
-  "totalCollected": 4573260000,
-  "totalReinvested": 4344597000,
-  "totalToHoldWallet": 228663000,
+  "lastCollectionTime": 1747449736910,
+  "totalCollected": 6097680000,
+  "totalReinvested": 5792796000,
+  "totalToHoldWallet": 304884000,
   "collectionEvents": [
     {
       "timestamp": 1747444725301,
@@ -21,6 +21,13 @@
     },
     {
       "timestamp": 1747445205269,
+      "amount": 1524420000,
+      "reinvested": 1448199000,
+      "toHoldWallet": 76221000,
+      "txSignature": "simulation_only"
+    },
+    {
+      "timestamp": 1747449736910,
       "amount": 1524420000,
       "reinvested": 1448199000,
       "toHoldWallet": 76221000,
