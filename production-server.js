@@ -14,6 +14,10 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config({ path: '.env.deployment' });
 
+// Import enhanced managers (with .js extension for CommonJS compatibility)
+const { rpcManager } = require('./server/lib/enhancedRpcManager.js');
+const { priceAggregator } = require('./server/lib/advancedPriceAggregator.js');
+
 // Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,19 +85,33 @@ app.get('/api/status', (req, res) => {
 });
 
 // Price API endpoints
-app.get('/api/prices', (req, res) => {
-  res.json(SAMPLE_TOKENS);
+app.get('/api/prices', async (req, res) => {
+  try {
+    // Get all prices from our enhanced price aggregator
+    const prices = priceAggregator.getAllPrices();
+    res.json(prices);
+  } catch (error) {
+    console.error('[API] Error fetching prices:', error);
+    res.status(500).json({ error: 'Failed to fetch prices' });
+  }
 });
 
-app.get('/api/prices/:token', (req, res) => {
-  const token = req.params.token.toUpperCase();
-  const tokenData = SAMPLE_TOKENS.find(t => t.symbol === token);
-  
-  if (!tokenData) {
-    return res.status(404).json({ error: `Token ${token} not found` });
+app.get('/api/prices/:token', async (req, res) => {
+  try {
+    const token = req.params.token.toUpperCase();
+    
+    // Get price from our enhanced price aggregator
+    const price = await priceAggregator.getPrice(token);
+    
+    if (!price) {
+      return res.status(404).json({ error: `Token ${token} not found` });
+    }
+    
+    res.json(price);
+  } catch (error) {
+    console.error(`[API] Error fetching price for ${req.params.token}:`, error);
+    res.status(500).json({ error: `Failed to fetch price for ${req.params.token}` });
   }
-  
-  res.json(tokenData);
 });
 
 // Signals API endpoints
