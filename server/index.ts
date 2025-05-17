@@ -224,7 +224,9 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     // Initialize DEX integrations
     console.log('Initializing DEX integrations...');
     try {
-      initializeDexes(solanaConnection);
+      // Import from proper module path
+      const dexHelper = require('./dexHelper');
+      dexHelper.initializeDexes(solanaConnection);
       console.log('✅ DEX integrations initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing DEX integrations:', error);
@@ -532,7 +534,7 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
     const appServer = await registerRoutes(app);
     
     // Listen on port 5000 for production deployment
-    const port = parseInt(process.env.PORT || '5002');
+    const port = parseInt(process.env.PORT || '5000');
     appServer.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`💻 WebSocket server accessible at ws://0.0.0.0:${port}/ws`);
@@ -591,10 +593,10 @@ geyserService.on('meme_token_opportunity', (data) => {
   // Trigger meme token sniper strategy
 });
 
-app.listen(parseInt(process.env.PORT || '5000'), () => {
-        console.log('🚨 Started minimal backup server due to registration error');
-        logger.info('🚨 Started minimal backup server due to registration error');
-      });
+      // Only start backup server if main server fails
+      // We're disabling this to prevent port conflicts
+      console.log('🚨 Backup server startup skipped to prevent port conflicts');
+      logger.info('🚨 Backup server startup skipped to prevent port conflicts');
     } catch (backupError: any) {
       console.error('❌ Failed to start backup server:', backupError.message);
       logger.error('Failed to start backup server:', backupError);
