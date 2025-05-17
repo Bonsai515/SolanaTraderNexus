@@ -20,7 +20,7 @@ import { Router } from 'express';
 const strategyRouter = Router();
 
 // Get all strategies
-strategyRouter.get('/', (req, res) => {
+strategyRouter.get('/', (req: express.Request, res: express.Response) => {
   try {
     const strategies = getAllStrategies();
     res.json(strategies);
@@ -59,7 +59,7 @@ strategyRouter.get('/:id', async (req: express.Request, res: express.Response) =
 });
 
 // Get active strategies
-strategyRouter.get('/active/list', (req, res) => {
+strategyRouter.get('/active/list', (req: express.Request, res: express.Response) => {
   try {
     const strategies = strategyController.getActiveStrategies();
     res.json(strategies);
@@ -74,7 +74,7 @@ strategyRouter.get('/active/list', (req, res) => {
 });
 
 // Get top strategies
-strategyRouter.get('/top/list', (req, res) => {
+strategyRouter.get('/top/list', (req: express.Request, res: express.Response) => {
   try {
     const yieldCount = req.query.yieldCount ? parseInt(req.query.yieldCount as string, 10) : 2;
     const successRateCount = req.query.successRateCount ? parseInt(req.query.successRateCount as string, 10) : 1;
@@ -100,7 +100,7 @@ strategyRouter.get('/top/list', (req, res) => {
 });
 
 // Activate strategies
-strategyRouter.post('/activate', (req, res) => {
+strategyRouter.post('/activate', (req: express.Request, res: express.Response) => {
   try {
     const { strategyIds } = req.body;
 
@@ -130,7 +130,7 @@ strategyRouter.post('/activate', (req, res) => {
 });
 
 // Deactivate strategies
-strategyRouter.post('/deactivate', (req, res) => {
+strategyRouter.post('/deactivate', (req: express.Request, res: express.Response) => {
   try {
     const { strategyIds } = req.body;
 
@@ -160,7 +160,7 @@ strategyRouter.post('/deactivate', (req, res) => {
 });
 
 // Start strategy controller with top strategies
-strategyRouter.post('/start', (req, res) => {
+strategyRouter.post('/start', (req: express.Request, res: express.Response) => {
   try {
     const { 
       yieldCount = 2, 
@@ -200,7 +200,7 @@ strategyRouter.post('/start', (req, res) => {
 });
 
 // Stop strategy controller
-strategyRouter.post('/stop', (req, res) => {
+strategyRouter.post('/stop', (req: express.Request, res: express.Response) => {
   try {
     strategyController.stop();
 
@@ -220,7 +220,7 @@ strategyRouter.post('/stop', (req, res) => {
 });
 
 // Get strategy controller status
-strategyRouter.get('/status', (req, res) => {
+strategyRouter.get('/status', (req: express.Request, res: express.Response) => {
   try {
     const status = strategyController.getStatus();
     const activeStrategies = strategyController.getActiveStrategies();

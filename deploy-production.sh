@@ -1,11 +1,16 @@
+
 #!/bin/bash
 
-echo "🚀 Starting Solana Trading System..."
+echo "🚀 Starting deployment process..."
 
-# Ensure TypeScript compilation succeeds
+# Install dependencies including TypeScript
+npm install
+npm install -g typescript tsx
+
+# Run TypeScript compilation
 echo "Building TypeScript files..."
-npx tsc --skipLibCheck
+tsc --project tsconfig.json
 
-# Run the server
-echo "Starting server..."
-npx tsx server/index.ts
+# Start the server with TypeScript support
+echo "Starting server with TypeScript..."
+tsx server/index.ts
