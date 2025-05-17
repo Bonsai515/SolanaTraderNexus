@@ -380,14 +380,18 @@
     "averageDailyROI": 52.75
   },
   "trading": {
-    "minimumCapital": 0.05,
+    "minimumCapital": 0.01,
     "preferredWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
   },
   "flashLoans": {
     "enabled": true,
     "maxLoanSize": 0.5,
     "provider": "solend",
-    "minProfitThreshold": 0.0001
+    "minProfitThreshold": 0.0001,
+    "preferredProtocol": "solend",
+    "maxLoanAmount": 500,
+    "maxBorrowSizeUSD": 1000,
+    "minProfitThresholdUSD": 0.05
   },
   "safety": {
     "maxSlippageBps": 200,
