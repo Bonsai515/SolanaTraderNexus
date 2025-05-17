@@ -396,7 +396,11 @@ function enableCriticalSignalPathways(): void {
             amount: signal.sourceAmount || 0,
             slippageBps: 50, // Default slippage
             strategy: `${transformerId}-Direct`,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            source: signal.source || 'direct',
+            target: signal.target || 'nexus',
+            walletOverride: signal.walletOverride,
+            executionMode: ExecutionMode.LIVE
           };
           
           // Add risk parameters if present
@@ -416,72 +420,72 @@ function enableCriticalSignalPathways(): void {
             executionParams.holdInstructions = signal.holdInstructions;
           }
           
-          // Forward directly to Nexus engine
-          neuralBus.emit('engine:direct:execution', executionParams);
+          // Forward to nexus engine directly
+          processDirectExecution(executionParams);
           
           logger.info(`[NeuralComms] Critical signal from ${transformerId} routed directly to Nexus Engine: ${signal.id}`);
         }
       });
     });
     
-    // Create a bridge method to connect the event bus systems
-    // NO LISTENING TO 'engine:direct:execution' event as that causes circularity
-    
-    // Only use this private helper method to log and store executions
-    private storeTradeExecution = (params: TradeExecutionParams) => {
-      logger.info(`[NeuralComms] Storing execution params for signal ${params.signalId}`);
-      tradeExecutions.set(params.signalId, params);
-    }
-        
-        // Execute trade directly
-        const result = await nexusEngine.executeTrade({
-          sourceToken: params.sourceToken,
-          targetToken: params.targetToken,
-          amount: params.amount,
-          slippageBps: params.slippageBps,
-          stopLoss: params.stopLoss,
-          takeProfit: params.takeProfit,
-          signalId: params.signalId,
-          strategy: params.strategy
-        });
-        
-        // Update signal processing state
-        const signal = activeSignals.get(params.signalId);
-        if (signal) {
-          signal.processingState = signal.processingState || {};
-          signal.processingState.engineReceived = true;
-          signal.processingState.engineProcessed = true;
-          signal.processingState.executionResult = result.success ? 'success' : 'failure';
-          signal.processingState.failureReason = result.error;
-          
-          // Update active signals
-          activeSignals.set(params.signalId, signal);
-        }
-        
-        // Emit execution result
-        neuralBus.emit('engine:execution:result', {
-          signalId: params.signalId,
-          agentId: 'direct',
-          success: result.success,
-          signature: result.signature,
-          error: result.error
-        });
-        
-        // Log execution result
-        if (result.success) {
-          logger.info(`[NeuralComms] Direct trade executed successfully: ${result.signature}`);
-        } else {
-          logger.error(`[NeuralComms] Direct trade execution failed: ${result.error}`);
-        }
-        
-      } catch (error) {
-        logger.error(`[NeuralComms] Error during direct trade execution: ${error}`);
-      }
-    });
-    
     logger.info(`[NeuralComms] Enabled critical signal pathways for direct execution`);
   } catch (error) {
     logger.error(`[NeuralComms] Error setting up critical signal pathways: ${error}`);
+  }
+}
+
+/**
+ * Process direct execution requests
+ */
+async function processDirectExecution(params: TradeExecutionParams): Promise<void> {
+  try {
+    // Store execution for tracking
+    logger.info(`[NeuralComms] Storing execution params for signal ${params.signalId}`);
+    tradeExecutions.set(params.signalId, params);
+    
+    // Execute trade directly
+    const result = await nexusEngine.executeTrade({
+      sourceToken: params.sourceToken,
+      targetToken: params.targetToken,
+      amount: params.amount,
+      slippageBps: params.slippageBps,
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+      signalId: params.signalId,
+      strategy: params.strategy
+    });
+    
+    // Update signal processing state
+    const signal = activeSignals.get(params.signalId);
+    if (signal) {
+      signal.processingState = signal.processingState || {};
+      signal.processingState.engineReceived = true;
+      signal.processingState.engineProcessed = true;
+      signal.processingState.executionResult = result.success ? 'success' : 'failure';
+      signal.processingState.failureReason = result.error;
+      
+      // Update active signals
+      activeSignals.set(params.signalId, signal);
+    }
+    
+    // Emit execution result
+    neuralBus.emit('engine:execution:result', {
+      signalId: params.signalId,
+      agentId: 'direct',
+      success: result.success,
+      signature: result.signature,
+      error: result.error
+    });
+    
+    // Log execution result
+    if (result.success) {
+      logger.info(`[NeuralComms] Direct trade executed successfully: ${result.signature}`);
+    } else {
+      logger.error(`[NeuralComms] Direct trade execution failed: ${result.error}`);
+    }
+    
+  } catch (error) {
+    logger.error(`[NeuralComms] Error during direct trade execution: ${error}`);
   }
 }
 
