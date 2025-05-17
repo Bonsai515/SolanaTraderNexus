@@ -26,7 +26,7 @@ import { execSync } from 'child_process';
 const SYSTEM_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
 
 // RPC connection settings
-const COMMITMENT_LEVEL: 'confirmed' as const = 'confirmed' as const;
+const COMMITMENT_LEVEL = 'confirmed' as const;
 const MAX_RETRIES = 5;
 const CONNECTION_TIMEOUT_MS = 30000;
 
