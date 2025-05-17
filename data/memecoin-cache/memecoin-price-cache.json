@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-05-17T08:58:22.659Z",
+  "lastUpdated": "2025-05-17T09:02:54.253Z",
   "topGainers": [
     {
       "symbol": "BONK",
@@ -9,7 +9,7 @@
       "priceChange24h": 0,
       "volume24h": 0,
       "profitabilityScore": 10,
-      "timestamp": "2025-05-17T08:58:13.733Z",
+      "timestamp": "2025-05-17T09:02:45.036Z",
       "confidence": 0.5,
       "gainRank": 1,
       "profitRank": 2
@@ -19,11 +19,11 @@
       "name": "Bonk",
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "price": 0.00001862,
-      "priceChange24h": -11.76,
-      "priceChange1h": -0.31,
-      "volume24h": 1433080.11,
+      "priceChange24h": -11.7,
+      "priceChange1h": -0.88,
+      "volume24h": 1422791.66,
       "profitabilityScore": 31,
-      "timestamp": "2025-05-17T08:58:14.006Z",
+      "timestamp": "2025-05-17T09:02:45.211Z",
       "confidence": 0.8,
       "gainRank": 2,
       "profitRank": 1
@@ -35,11 +35,11 @@
       "name": "Bonk",
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "price": 0.00001862,
-      "priceChange24h": -11.76,
-      "priceChange1h": -0.31,
-      "volume24h": 1433080.11,
+      "priceChange24h": -11.7,
+      "priceChange1h": -0.88,
+      "volume24h": 1422791.66,
       "profitabilityScore": 31,
-      "timestamp": "2025-05-17T08:58:14.006Z",
+      "timestamp": "2025-05-17T09:02:45.211Z",
       "confidence": 0.8,
       "gainRank": 2,
       "profitRank": 1
@@ -52,7 +52,7 @@
       "priceChange24h": 0,
       "volume24h": 0,
       "profitabilityScore": 10,
-      "timestamp": "2025-05-17T08:58:13.733Z",
+      "timestamp": "2025-05-17T09:02:45.036Z",
       "confidence": 0.5,
       "gainRank": 1,
       "profitRank": 2
@@ -67,7 +67,7 @@
       "priceChange24h": 0,
       "volume24h": 0,
       "profitabilityScore": 10,
-      "timestamp": "2025-05-17T08:58:13.733Z",
+      "timestamp": "2025-05-17T09:02:45.036Z",
       "confidence": 0.5,
       "gainRank": 1,
       "profitRank": 2
@@ -77,11 +77,11 @@
       "name": "Bonk",
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "price": 0.00001862,
-      "priceChange24h": -11.76,
-      "priceChange1h": -0.31,
-      "volume24h": 1433080.11,
+      "priceChange24h": -11.7,
+      "priceChange1h": -0.88,
+      "volume24h": 1422791.66,
       "profitabilityScore": 31,
-      "timestamp": "2025-05-17T08:58:14.006Z",
+      "timestamp": "2025-05-17T09:02:45.211Z",
       "confidence": 0.8,
       "gainRank": 2,
       "profitRank": 1
