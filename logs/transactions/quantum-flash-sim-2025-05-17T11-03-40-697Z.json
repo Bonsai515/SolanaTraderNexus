@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-05-17T11-03-40-697Z",
+  "type": "quantum-flash",
+  "mode": "simulation",
+  "day": 1,
+  "wallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "rpc": "Alchemy",
+  "startingAmount": 1.1,
+  "endingAmount": 1.177,
+  "profit": 0.07700000000000001,
+  "profitPercentage": 7.000000000000001,
+  "signature": null,
+  "executionTimeMs": null,
+  "success": true
+}
