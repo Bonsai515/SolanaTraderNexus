@@ -1,0 +1,14 @@
+{
+  "id": "signal_1747498968934_j02lb909",
+  "timestamp": 1747498968934,
+  "transformer": "CrossChain",
+  "type": "flash_opportunity",
+  "confidence": 0.92,
+  "strength": "extreme",
+  "timeframe": "immediate",
+  "action": "flash_loan",
+  "sourceToken": "USDC",
+  "targetToken": "SOL",
+  "sourceAmount": 1000,
+  "description": "CrossChain detected flash loan arbitrage opportunity"
+}
