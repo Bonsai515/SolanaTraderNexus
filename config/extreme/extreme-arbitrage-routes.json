@@ -1,0 +1,282 @@
+[
+  {
+    "name": "USDC-USDT Hyperloop",
+    "type": "stablecoin",
+    "profitLevel": "extreme",
+    "description": "Ultra-high volume USDC-USDT cross-market hyperloop",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial",
+          "Saber",
+          "Orca"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USTv2",
+          "USTv2/USDC",
+          "USDC/USDT"
+        ],
+        "estimatedFee": 0.00028,
+        "estimatedSpreadPercent": 0.02,
+        "flashLoanSize": 10000000,
+        "minimumProfit": 0.00012,
+        "confidence": 95,
+        "priority": 1
+      }
+    ],
+    "executionStrategy": "parallel",
+    "recursionDepth": 2,
+    "capitalRequirement": 0.01,
+    "riskLevel": "low"
+  },
+  {
+    "name": "Stablecoin Mega-Volume Blitz",
+    "type": "stablecoin",
+    "profitLevel": "ludicrous",
+    "description": "Extreme-volume multi-path stablecoin arbitrage",
+    "paths": [
+      {
+        "sequence": [
+          "Mercurial",
+          "Saber",
+          "Orca",
+          "Jupiter"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/BUSD",
+          "BUSD/USTv2",
+          "USTv2/USDC"
+        ],
+        "estimatedFee": 0.00034,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 20000000,
+        "minimumProfit": 0.0001,
+        "confidence": 90,
+        "priority": 1
+      },
+      {
+        "sequence": [
+          "Jupiter",
+          "Orca",
+          "Mercurial",
+          "Saber"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/FRAX",
+          "FRAX/DAI",
+          "DAI/USDC"
+        ],
+        "estimatedFee": 0.00036,
+        "estimatedSpreadPercent": 0.014,
+        "flashLoanSize": 15000000,
+        "minimumProfit": 0.00009,
+        "confidence": 91,
+        "priority": 1
+      }
+    ],
+    "executionStrategy": "parallel",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.02,
+    "riskLevel": "low"
+  },
+  {
+    "name": "Triple-Decker Arbitrage",
+    "type": "multi",
+    "profitLevel": "insane",
+    "description": "Triple simultaneous arbitrage routes across major assets",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Raydium",
+          "Orca"
+        ],
+        "pairs": [
+          "SOL/USDC",
+          "USDC/USDT",
+          "USDT/SOL"
+        ],
+        "estimatedFee": 0.00042,
+        "estimatedSpreadPercent": 0.04,
+        "flashLoanSize": 100000,
+        "minimumProfit": 0.00015,
+        "confidence": 88,
+        "priority": 2
+      },
+      {
+        "sequence": [
+          "Orca",
+          "Raydium",
+          "Jupiter"
+        ],
+        "pairs": [
+          "ETH/USDC",
+          "USDC/USDT",
+          "USDT/ETH"
+        ],
+        "estimatedFee": 0.00044,
+        "estimatedSpreadPercent": 0.035,
+        "flashLoanSize": 200000,
+        "minimumProfit": 0.00018,
+        "confidence": 87,
+        "priority": 2
+      },
+      {
+        "sequence": [
+          "Raydium",
+          "Jupiter",
+          "Orca"
+        ],
+        "pairs": [
+          "BTC/USDC",
+          "USDC/USDT",
+          "USDT/BTC"
+        ],
+        "estimatedFee": 0.00048,
+        "estimatedSpreadPercent": 0.03,
+        "flashLoanSize": 300000,
+        "minimumProfit": 0.00022,
+        "confidence": 85,
+        "priority": 2
+      }
+    ],
+    "executionStrategy": "parallel",
+    "recursionDepth": 2,
+    "capitalRequirement": 0.05,
+    "riskLevel": "medium"
+  },
+  {
+    "name": "Octa-Hop Ultimate",
+    "type": "complex",
+    "profitLevel": "godlike",
+    "description": "Eight sequential trades across multiple stablecoins",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial",
+          "Saber",
+          "Orca",
+          "Raydium",
+          "Jupiter",
+          "Mercurial",
+          "Saber"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USTv2",
+          "USTv2/BUSD",
+          "BUSD/DAI",
+          "DAI/FRAX",
+          "FRAX/USDH",
+          "USDH/PAI",
+          "PAI/USDC"
+        ],
+        "estimatedFee": 0.00072,
+        "estimatedSpreadPercent": 0.09,
+        "flashLoanSize": 25000000,
+        "minimumProfit": 0.0003,
+        "confidence": 80,
+        "priority": 3
+      }
+    ],
+    "executionStrategy": "atomic",
+    "recursionDepth": 1,
+    "capitalRequirement": 0.1,
+    "riskLevel": "high"
+  },
+  {
+    "name": "Token Tsunami",
+    "type": "mid-token",
+    "profitLevel": "extreme",
+    "description": "Mid-cap token arbitrage with higher volatility",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Raydium"
+        ],
+        "pairs": [
+          "BONK/USDC",
+          "USDC/BONK"
+        ],
+        "estimatedFee": 0.00038,
+        "estimatedSpreadPercent": 0.25,
+        "flashLoanSize": 50000,
+        "minimumProfit": 0.00025,
+        "confidence": 85,
+        "priority": 2
+      },
+      {
+        "sequence": [
+          "Orca",
+          "Raydium"
+        ],
+        "pairs": [
+          "JUP/USDC",
+          "USDC/JUP"
+        ],
+        "estimatedFee": 0.00036,
+        "estimatedSpreadPercent": 0.18,
+        "flashLoanSize": 75000,
+        "minimumProfit": 0.00022,
+        "confidence": 86,
+        "priority": 2
+      },
+      {
+        "sequence": [
+          "Raydium",
+          "Jupiter"
+        ],
+        "pairs": [
+          "RAY/USDC",
+          "USDC/RAY"
+        ],
+        "estimatedFee": 0.00034,
+        "estimatedSpreadPercent": 0.2,
+        "flashLoanSize": 60000,
+        "minimumProfit": 0.00028,
+        "confidence": 82,
+        "priority": 2
+      }
+    ],
+    "executionStrategy": "parallel",
+    "recursionDepth": 1,
+    "capitalRequirement": 0.03,
+    "riskLevel": "medium-high"
+  },
+  {
+    "name": "Lightning Loop",
+    "type": "speed-optimized",
+    "profitLevel": "high",
+    "description": "Speed-optimized routes for maximum frequency",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Orca"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00024,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 1000000,
+        "minimumProfit": 0.00008,
+        "confidence": 97,
+        "priority": 1,
+        "executionTimeMs": 2500
+      }
+    ],
+    "executionStrategy": "ultra-fast",
+    "recursionDepth": 4,
+    "capitalRequirement": 0.005,
+    "riskLevel": "low",
+    "maxFrequencyPerMinute": 12
+  }
+]
