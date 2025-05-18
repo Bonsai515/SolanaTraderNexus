@@ -8,10 +8,10 @@
   "lastUpdated": "2025-05-18T02:50:33.024Z",
   "params": {
     "maxPositionSizePercent": 99.5,
-    "minProfitThresholdUSD": 0.00005,
-    "maxSlippageTolerance": 0.0015,
-    "maxActiveLoans": 8,
-    "maxDailyTransactions": 7200,
+    "minProfitThresholdUSD": 0.00001,
+    "maxSlippageTolerance": 0.0012,
+    "maxActiveLoans": 12,
+    "maxDailyTransactions": 9600,
     "flashLoanSources": [
       {
         "name": "Solend",
@@ -118,8 +118,8 @@
     ],
     "pairConfigurations": {
       "stablecoin": {
-        "minSpreadPercent": 0.01,
-        "targetFlashLoanSize": 5000000,
+        "minSpreadPercent": 0.005,
+        "targetFlashLoanSize": 10000000,
         "maxPositionSizePercent": 99.9,
         "maxSlippageTolerance": 0.001,
         "priorityMultiplier": 3,
@@ -187,19 +187,20 @@
     "techniques": {
       "recursiveFlashLoans": {
         "enabled": true,
-        "maxDepth": 3,
+        "maxDepth": 4,
         "scalingFactor": [
           1,
           5,
-          25
+          25,
+          50
         ],
         "minProfitThresholdMultiplier": 3
       },
       "parallelExecution": {
         "enabled": true,
-        "maxParallelTransactions": 8,
+        "maxParallelTransactions": 12,
         "priorityBasedExecution": true,
-        "staggerIntervalMs": 100
+        "staggerIntervalMs": 50
       },
       "atomicMegaBundle": {
         "enabled": true,
@@ -227,7 +228,7 @@
       }
     },
     "execution": {
-      "transactionPriority": "max",
+      "transactionPriority": "extreme",
       "timeoutMs": 15000,
       "maxRetries": 3,
       "gasMultiplier": 1.2,
@@ -240,8 +241,8 @@
     },
     "safety": {
       "emergencyShutdownEnabled": true,
-      "maxLossPerTransactionPercent": 1,
-      "maxDailyLossPercent": 5,
+      "maxLossPerTransactionPercent": 1.5,
+      "maxDailyLossPercent": 7.5,
       "maxDailyCapitalUsagePercent": 1000,
       "alertsEnabled": true,
       "realTimeDashboardEnabled": true,
@@ -250,7 +251,7 @@
     },
     "capital": {
       "leveragedFlashLoans": true,
-      "maxLeverage": 15,
+      "maxLeverage": 25,
       "autoReinvestment": true,
       "reinvestmentRate": 99,
       "autoCompounding": true,

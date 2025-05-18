@@ -29,7 +29,8 @@
     "executionStrategy": "parallel",
     "recursionDepth": 2,
     "capitalRequirement": 0.01,
-    "riskLevel": "low"
+    "riskLevel": "low",
+    "priority": 1
   },
   {
     "name": "Stablecoin Mega-Volume Blitz",
@@ -81,7 +82,8 @@
     "executionStrategy": "parallel",
     "recursionDepth": 3,
     "capitalRequirement": 0.02,
-    "riskLevel": "low"
+    "riskLevel": "low",
+    "priority": 1
   },
   {
     "name": "Triple-Decker Arbitrage",
@@ -147,12 +149,13 @@
     "executionStrategy": "parallel",
     "recursionDepth": 2,
     "capitalRequirement": 0.05,
-    "riskLevel": "medium"
+    "riskLevel": "medium",
+    "priority": 1
   },
   {
     "name": "Octa-Hop Ultimate",
     "type": "complex",
-    "profitLevel": "godlike",
+    "profitLevel": "beyond_godlike",
     "description": "Eight sequential trades across multiple stablecoins",
     "paths": [
       {
@@ -178,16 +181,18 @@
         ],
         "estimatedFee": 0.00072,
         "estimatedSpreadPercent": 0.09,
-        "flashLoanSize": 25000000,
-        "minimumProfit": 0.0003,
+        "flashLoanSize": 30000000,
+        "minimumProfit": 0.0002,
         "confidence": 80,
-        "priority": 3
+        "priority": 0,
+        "executionFrequency": "maximum"
       }
     ],
-    "executionStrategy": "atomic",
+    "executionStrategy": "ultra-atomic",
     "recursionDepth": 1,
-    "capitalRequirement": 0.1,
-    "riskLevel": "high"
+    "capitalRequirement": 0.05,
+    "riskLevel": "high",
+    "priority": 0
   },
   {
     "name": "Token Tsunami",
@@ -247,7 +252,8 @@
     "executionStrategy": "parallel",
     "recursionDepth": 1,
     "capitalRequirement": 0.03,
-    "riskLevel": "medium-high"
+    "riskLevel": "medium-high",
+    "priority": 1
   },
   {
     "name": "Lightning Loop",
@@ -270,13 +276,162 @@
         "minimumProfit": 0.00008,
         "confidence": 97,
         "priority": 1,
-        "executionTimeMs": 2500
+        "executionTimeMs": 2000
       }
     ],
     "executionStrategy": "ultra-fast",
     "recursionDepth": 4,
     "capitalRequirement": 0.005,
     "riskLevel": "low",
-    "maxFrequencyPerMinute": 12
+    "maxFrequencyPerMinute": 30,
+    "priority": 1
+  },
+  {
+    "name": "Alternative Octa-Hop",
+    "type": "complex",
+    "profitLevel": "beyond_godlike",
+    "description": "Alternative 8-hop route through different exchanges",
+    "paths": [
+      {
+        "sequence": [
+          "Raydium",
+          "Orca",
+          "Jupiter",
+          "Saber",
+          "Mercurial",
+          "Aldrin",
+          "Lifinity",
+          "Raydium"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/PAI",
+          "PAI/BUSD",
+          "BUSD/DAI",
+          "DAI/FRAX",
+          "FRAX/USTv2",
+          "USTv2/USDH",
+          "USDH/USDC"
+        ],
+        "estimatedFee": 0.00074,
+        "estimatedSpreadPercent": 0.088,
+        "flashLoanSize": 30000000,
+        "minimumProfit": 0.0002,
+        "confidence": 78,
+        "priority": 0,
+        "executionFrequency": "maximum"
+      }
+    ],
+    "executionStrategy": "ultra-atomic",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.05,
+    "riskLevel": "high",
+    "frequency": "maximum",
+    "executionMode": "aggressive",
+    "priority": null
+  },
+  {
+    "name": "Ultra-Frequency USDC-USDT",
+    "type": "speed-optimized",
+    "profitLevel": "high",
+    "description": "Extreme-frequency USDC-USDT micro-arbitrage",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.0002,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 2000000,
+        "minimumProfit": 0.00005,
+        "confidence": 98,
+        "priority": 1,
+        "executionTimeMs": 1800
+      }
+    ],
+    "executionStrategy": "maximum-speed",
+    "recursionDepth": 6,
+    "capitalRequirement": 0.005,
+    "riskLevel": "low",
+    "maxFrequencyPerMinute": 60,
+    "priority": null
+  },
+  {
+    "name": "Alternative Octa-Hop",
+    "type": "complex",
+    "profitLevel": "beyond_godlike",
+    "description": "Alternative 8-hop route through different exchanges",
+    "paths": [
+      {
+        "sequence": [
+          "Raydium",
+          "Orca",
+          "Jupiter",
+          "Saber",
+          "Mercurial",
+          "Aldrin",
+          "Lifinity",
+          "Raydium"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/PAI",
+          "PAI/BUSD",
+          "BUSD/DAI",
+          "DAI/FRAX",
+          "FRAX/USTv2",
+          "USTv2/USDH",
+          "USDH/USDC"
+        ],
+        "estimatedFee": 0.00074,
+        "estimatedSpreadPercent": 0.088,
+        "flashLoanSize": 30000000,
+        "minimumProfit": 0.0002,
+        "confidence": 78,
+        "priority": 0,
+        "executionFrequency": "maximum"
+      }
+    ],
+    "executionStrategy": "ultra-atomic",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.05,
+    "riskLevel": "high",
+    "frequency": "maximum",
+    "executionMode": "aggressive"
+  },
+  {
+    "name": "Ultra-Frequency USDC-USDT",
+    "type": "speed-optimized",
+    "profitLevel": "high",
+    "description": "Extreme-frequency USDC-USDT micro-arbitrage",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.0002,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 2000000,
+        "minimumProfit": 0.00005,
+        "confidence": 98,
+        "priority": 1,
+        "executionTimeMs": 1800
+      }
+    ],
+    "executionStrategy": "maximum-speed",
+    "recursionDepth": 6,
+    "capitalRequirement": 0.005,
+    "riskLevel": "low",
+    "maxFrequencyPerMinute": 60
   }
 ]
