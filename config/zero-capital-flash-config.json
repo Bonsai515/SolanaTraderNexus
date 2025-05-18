@@ -287,5 +287,14 @@
   ],
   "minimumSOLRequired": 0.000165,
   "active": true,
-  "lastUpdated": "2025-05-17T23:26:23.466Z"
+  "lastUpdated": "2025-05-17T23:26:23.466Z",
+  "zeroCapitalParams": {
+    "collateralUtilizationPercent": 70,
+    "minProfitThresholdUSD": 0.06,
+    "maxSlippageTolerance": 0.45,
+    "maxDailyTransactions": 12,
+    "useAdvancedCollateralization": true,
+    "maxGasFeeSOL": 0.0012,
+    "profitReinvestmentRate": 70
+  }
 }

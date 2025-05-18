@@ -253,5 +253,20 @@
   ],
   "minimumSOLRequired": 0.000355,
   "active": true,
-  "lastUpdated": "2025-05-17T23:28:37.022Z"
+  "lastUpdated": "2025-05-17T23:28:37.022Z",
+  "hyperionParams": {
+    "maxPositionSizePercent": 65,
+    "minProfitThresholdUSD": 0.025,
+    "maxSlippageTolerance": 0.55,
+    "parallelExecution": true,
+    "adaptiveRiskManagement": true,
+    "executionPriorities": [
+      9,
+      8,
+      7,
+      5
+    ],
+    "optimizationInterval": 750,
+    "transactionTimeoutMs": 40000
+  }
 }

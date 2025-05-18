@@ -122,5 +122,18 @@
   },
   "minimumSOLRequired": 0.002125,
   "active": true,
-  "lastUpdated": "2025-05-17T23:16:34.528Z"
+  "lastUpdated": "2025-05-17T23:16:34.528Z",
+  "positionSizing": {
+    "maxPositionSizePercent": 7.5,
+    "maxConcurrentPositions": 3,
+    "minPositionSizeSOL": 0.01,
+    "maxPositionSizeSOL": 0.04
+  },
+  "riskManagement": {
+    "stopLossPercent": 12,
+    "takeProfitPercent": 35,
+    "trailingStopEnabled": true,
+    "trailingStopActivationPercent": 20,
+    "trailingStopDistancePercent": 10
+  }
 }

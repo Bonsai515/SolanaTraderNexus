@@ -132,5 +132,15 @@
   ],
   "minimumSOLRequired": 0.001115,
   "active": true,
-  "lastUpdated": "2025-05-17T23:33:46.540Z"
+  "lastUpdated": "2025-05-17T23:33:46.540Z",
+  "flashLoanParams": {
+    "maxPositionSizePercent": 90,
+    "minProfitThresholdUSD": 0.0012,
+    "maxActiveLoans": 2,
+    "routingOptimization": true,
+    "useFeeDiscounting": true,
+    "minLiquidityPoolSize": 10000,
+    "useHangingOrderStrategy": true,
+    "profitSplitPercent": 80
+  }
 }
