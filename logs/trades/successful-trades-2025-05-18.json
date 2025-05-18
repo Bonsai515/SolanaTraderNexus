@@ -1,0 +1,24 @@
+[
+  {
+    "id": "trade-1747533370348-5210",
+    "timestamp": "2025-05-18T01:56:12.609Z",
+    "strategy": "Quantum Omega",
+    "action": "BUY",
+    "tokenSymbol": "CAT",
+    "amount": 0.027046,
+    "signature": "trade-17...72609",
+    "status": "SUCCESS",
+    "processingTimeMs": 2262
+  },
+  {
+    "id": "trade-1747533370348-3111",
+    "timestamp": "2025-05-18T01:56:12.751Z",
+    "strategy": "Quantum Omega",
+    "action": "BUY",
+    "tokenSymbol": "PNUT",
+    "amount": 0.020284,
+    "signature": "trade-17...72751",
+    "status": "SUCCESS",
+    "processingTimeMs": 2403
+  }
+]
