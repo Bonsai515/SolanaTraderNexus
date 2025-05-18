@@ -11,5 +11,18 @@
   "features": {
     "enhancedPriceFeeds": true,
     "coinGecko": false
+  },
+  "capital": {
+    "initialBalance": 0.097506,
+    "additionalCapital": 0.443410306,
+    "totalBalance": 0.540916306,
+    "lastUpdated": "2025-05-18T01:39:10.725Z",
+    "currency": "SOL"
+  },
+  "allocation": {
+    "quantumOmega": 25,
+    "quantumFlash": 35,
+    "zeroCapital": 15,
+    "hyperion": 25
   }
 }
