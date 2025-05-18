@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "2.1.0",
   "enabled": true,
   "defaultProvider": "jupiter",
   "refreshInterval": 5000,
@@ -165,5 +165,31 @@
         "USDC"
       ]
     ]
+  },
+  "rateLimitHandling": {
+    "enabled": true,
+    "strategies": [
+      "exponential_backoff",
+      "source_rotation",
+      "cache_fallback",
+      "adaptive_intervals"
+    ],
+    "maxRetries": 5,
+    "initialBackoffMs": 500,
+    "maxBackoffMs": 10000,
+    "backoffMultiplier": 2,
+    "adaptiveRefreshEnabled": true
+  },
+  "sourceRotation": {
+    "enabled": true,
+    "rotationIntervalMs": 120000,
+    "priorityWeighting": true
+  },
+  "resilienceOptions": {
+    "cacheStaleDataTimeoutMs": 300000,
+    "allowPartialFailures": true,
+    "healthCheckIntervalMs": 60000,
+    "circuitBreakerThreshold": 3,
+    "circuitBreakerResetTimeMs": 1800000
   }
 }

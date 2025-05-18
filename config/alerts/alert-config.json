@@ -1,0 +1,14 @@
+{
+  "minProfitAlertSOL": 0.005,
+  "maxLossAlertSOL": 0.01,
+  "enabledAlertTypes": [
+    "trade_execution",
+    "profit_target_reached",
+    "stop_loss_triggered",
+    "balance_change",
+    "opportunity_detected"
+  ],
+  "notificationChannels": [
+    "console"
+  ]
+}

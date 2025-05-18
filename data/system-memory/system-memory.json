@@ -6,7 +6,13 @@
     "useBirdeye": true,
     "usePyth": true,
     "registryPath": "./config/price-feed-registry.json",
-    "lastUpdated": "2025-05-18T00:45:20.105Z"
+    "lastUpdated": "2025-05-18T01:44:58.245Z",
+    "version": "2.1.0",
+    "improvedRateLimitHandling": true,
+    "adaptiveRefresh": true,
+    "sourceRotation": true,
+    "exponentialBackoff": true,
+    "cacheFallback": true
   },
   "features": {
     "enhancedPriceFeeds": true,
