@@ -1,0 +1,116 @@
+{
+  "version": "2.0.0",
+  "mainProviders": [
+    {
+      "name": "Helius",
+      "url": "https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_KEY",
+      "priority": 1,
+      "rateLimit": {
+        "requestsPerSecond": 20,
+        "requestsPerMinute": 600
+      },
+      "healthCheckIntervalMs": 30000,
+      "timeoutMs": 30000,
+      "enabled": true
+    },
+    {
+      "name": "GenesysGo",
+      "url": "https://ssc-dao.genesysgo.net",
+      "priority": 2,
+      "rateLimit": {
+        "requestsPerSecond": 10,
+        "requestsPerMinute": 300
+      },
+      "healthCheckIntervalMs": 60000,
+      "timeoutMs": 20000,
+      "enabled": true
+    },
+    {
+      "name": "Solana RPC",
+      "url": "https://api.mainnet-beta.solana.com",
+      "priority": 3,
+      "rateLimit": {
+        "requestsPerSecond": 5,
+        "requestsPerMinute": 100
+      },
+      "healthCheckIntervalMs": 90000,
+      "timeoutMs": 15000,
+      "enabled": true
+    },
+    {
+      "name": "Instant Nodes",
+      "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "priority": 4,
+      "rateLimit": {
+        "requestsPerSecond": 2,
+        "requestsPerMinute": 50
+      },
+      "healthCheckIntervalMs": 120000,
+      "timeoutMs": 10000,
+      "enabled": true
+    }
+  ],
+  "fallbackProviders": [
+    {
+      "name": "Triton",
+      "url": "https://free.rpcpool.com",
+      "priority": 5,
+      "rateLimit": {
+        "requestsPerSecond": 2,
+        "requestsPerMinute": 40
+      },
+      "healthCheckIntervalMs": 180000,
+      "timeoutMs": 8000,
+      "enabled": true
+    },
+    {
+      "name": "Public RPC",
+      "url": "https://solana-api.projectserum.com",
+      "priority": 6,
+      "rateLimit": {
+        "requestsPerSecond": 1,
+        "requestsPerMinute": 30
+      },
+      "healthCheckIntervalMs": 300000,
+      "timeoutMs": 5000,
+      "enabled": true
+    }
+  ],
+  "rateLimitHandling": {
+    "exponentialBackoff": true,
+    "initialBackoffMs": 500,
+    "maxBackoffMs": 60000,
+    "backoffMultiplier": 2,
+    "maxRetries": 5,
+    "shuffleOnFailure": true
+  },
+  "loadBalancing": {
+    "enabled": true,
+    "method": "weighted_round_robin",
+    "weightByPriority": true,
+    "adaptiveWeighting": true,
+    "reserveCapacityPercent": 20
+  },
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 5,
+    "resetTimeoutMs": 300000,
+    "halfOpenRequests": 2
+  },
+  "requestStrategy": {
+    "batchingEnabled": true,
+    "maxBatchSize": 10,
+    "cachingEnabled": true,
+    "cacheTTLMs": 2000,
+    "prioritizationEnabled": true,
+    "lowPriorityOperations": [
+      "getProgramAccounts",
+      "getSignaturesForAddress"
+    ],
+    "highPriorityOperations": [
+      "sendTransaction",
+      "getRecentBlockhash",
+      "getBalance"
+    ]
+  }
+}

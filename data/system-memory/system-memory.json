@@ -30,5 +30,29 @@
     "quantumFlash": 35,
     "zeroCapital": 15,
     "hyperion": 25
+  },
+  "rpcOptimization": {
+    "enabled": true,
+    "version": "2.0.0",
+    "lastUpdated": "2025-05-18T01:54:28.739Z",
+    "features": {
+      "multiProvider": true,
+      "loadBalancing": true,
+      "rateLimitHandling": true,
+      "circuitBreaker": true,
+      "exponentialBackoff": true
+    }
+  },
+  "tradeOrchestration": {
+    "enabled": true,
+    "version": "1.0.0",
+    "lastUpdated": "2025-05-18T01:54:28.739Z",
+    "features": {
+      "queueing": true,
+      "prioritization": true,
+      "retries": true,
+      "delayedExecution": true,
+      "rateControls": true
+    }
   }
 }
