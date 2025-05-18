@@ -29,7 +29,10 @@
     "extremeFrequencyScalping",
     "hyperFrequencyMicroArbitrage",
     "octaHopOptimization",
-    "hyperRiskAdjustedExecution"
+    "hyperRiskAdjustedExecution",
+    "octaHopSpecialization",
+    "dedicatedOctaHopExecution",
+    "superchargedStablecoinArbitrage"
   ],
   "configuration": {
     "scanIntervalMs": 150,
@@ -39,7 +42,10 @@
     "useReattemptLogic": true,
     "logLevel": "info",
     "priority": "maximum+",
-    "optimizationLevel": "beyond_extreme"
+    "optimizationLevel": "beyond_extreme",
+    "octaHopScanIntervalMs": 125,
+    "octaHopExecutionTimeoutMs": 10000,
+    "prioritizeOctaHop": true
   },
   "performance": {
     "averageExecutionTimeMs": 0,
@@ -65,5 +71,16 @@
     "networkPriority": "maximum+",
     "diskIOPriority": "maximum",
     "systemResourceUsagePercent": 95
+  },
+  "octaHopSpecialization": {
+    "enabled": true,
+    "dedicatedScanner": true,
+    "dedicatedExecutor": true,
+    "priorityLevel": "maximum+",
+    "scanInterval": 125,
+    "executionTimeoutMs": 10000,
+    "maxRetries": 2,
+    "customGasSettings": true,
+    "useHyperPriority": true
   }
 }
