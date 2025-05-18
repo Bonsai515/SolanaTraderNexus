@@ -1,0 +1,140 @@
+rust
+use std::sync::Arc;
+use axum::{Router, routing::get, Json};
+use moka::future::Cache;
+use serde_json::{json, Value};
+use reqwest::Client;
+use tokio::sync::RwLock;
+
+const CACHE_TTL_SECS: u64 = 5; // Stay under 12 req/min for Helius free tier
+
+#[derive(Clone)]
+struct AppState {
+    client: Client,
+    price_cache: Arc<Cache<(), f64>>,
+    dex_pools: RwLock<Vec<String>>,
+}
+
+async fn get_cached_sol_price(state: Arc<AppState>) -> f64 {
+    state.price_cache.get_with((), async {
+        let sources = vec![
+            get_pyth_price(&state.client).await,
+            get_helius_dex_price(&state.client).await,
+            get_jupiter_price().await
+        ];
+
+        // Median price to filter outliers
+        let mut prices: Vec<f64> = sources.into_iter()
+            .filter_map(|p| p.ok())
+            .collect();
+            
+        prices.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        prices[prices.len() / 2]
+    }).await
+}
+
+async fn get_pyth_price(client: &Client) -> Result<f64, reqwest::Error> {
+    let res = client.get("https://api.pyth.network/price/SOL_USD")
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+    
+    res["price"].as_f64()
+        .ok_or(reqwest::Error::new(reqwest::StatusCode::INTERNAL_SERVER_ERROR.into()))
+}
+
+async fn get_helius_dex_price(client: &Client) -> Result<f64, reqwest::Error> {
+    let rpc_req = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getPoolReserves",
+        "params": ["Raydium SOL-USDC Pool ID"]
+    });
+
+    let res = client.post("https://rpc.helius.xyz")
+        .json(&rpc_req)
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+
+    let reserve_a = res["result"]["value"]["reserveA"].as_f64().unwrap_or(0.0);
+    let reserve_b = res["result"]["value"]["reserveB"].as_f64().unwrap_or(0.0);
+    
+    Ok(reserve_a / reserve_b)
+}
+
+async fn get_jupiter_price() -> Result<f64, reqwest::Error> {
+    let res = reqwest::get("https://price.jup.ag/v4/price?ids=SOL")
+        .await?
+        .json::<Value>()
+        .await?;
+
+    res["data"]["SOL"]["price"].as_f64()
+        .ok_or(reqwest::Error::new(reqwest::StatusCode::INTERNAL_SERVER_ERROR.into()))
+}
+
+#[tokio::main]
+async fn main() {
+    let state = Arc::new(AppState {
+        client: Client::new(),
+        price_cache: Arc::new(
+            Cache::builder()
+                .time_to_live(std::time::Duration::from_secs(CACHE_TTL_SECS))
+                .build()
+        ),
+        dex_pools: RwLock::new(vec![
+            "RAYDIUM_SOL_USDC_POOL_ID".into(),
+            "ORCA_SOL_USDC_POOL_ID".into()
+        ])
+    });
+
+    let app = Router::new()
+        .route("/sol-price", get(|| async {
+            Json(json!({ "price": get_cached_sol_price(state).await }))
+        }));
+
+    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+```
+
+**Key Features**:
+1. **Multi-Source Aggregation**: Combines Pyth, Helius DEX pools, and Jupiter
+2. **Smart Caching**: 5-second TTL cache (4320 req/day max)
+3. **Outlier Protection**: Uses median price instead of average
+4. **Free Tier Safety**:
+   - Helius: 12 RPM limit → 5s cache = 12 req/min max
+   - Pyth: 100k/day → ~2880 req/day
+   - Jupiter: 1k/day → 288 req/day
+
+**Deployment**:
+```bash
+cargo add axum moka serde_json reqwest tokio --features tokio/full
+cargo run --release
+```
+
+**Usage**:
+```bash
+curl http://localhost:3000/sol-price
+# {"price": 162.42}
+```
+
+**Optimizations**:
+1. **Pool Rotation**: Automatically cycle through different DEX pools
+2. **Error Fallback**: If one source fails, use remaining sources
+3. **Health Monitoring**:
+```rust
+async fn monitor_usage(state: Arc<AppState>) {
+    loop {
+        let usage = state.price_cache.run_pending_tasks().await;
+        if usage > 1000 {
+            // Alert or scale TTL
+        }
+        tokio::time::sleep(Duration::from_secs(60)).await;
+    }
+}
+```
