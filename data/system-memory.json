@@ -43,7 +43,8 @@
     "hyperionFlashLoan": true,
     "neuralTransformers": true,
     "moneyGlitchStrategy": true,
-    "nuclearMoneyGlitchStrategy": true
+    "nuclearMoneyGlitchStrategy": true,
+    "extremeYieldStrategy": true
   },
   "config": {
     "transactionEngine": {
@@ -424,7 +425,8 @@
         "QuantumOmegaMemeSniper",
         "QuantumFlashLoan",
         "MoneyGlitchStrategy",
-        "NuclearMoneyGlitchStrategy"
+        "NuclearMoneyGlitchStrategy",
+        "ExtremeYieldStrategy"
       ]
     }
   },
@@ -997,6 +999,11 @@
       "name": "Nuclear Money Glitch Flash Arbitrage",
       "active": true,
       "lastUpdated": "2025-05-18T02:43:43.096Z"
+    },
+    "ExtremeYieldStrategy": {
+      "name": "Extreme Yield Strategy",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:50:33.034Z"
     }
   },
   "transformers": {

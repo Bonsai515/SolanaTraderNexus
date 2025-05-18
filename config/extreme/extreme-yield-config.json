@@ -1,0 +1,273 @@
+{
+  "name": "Extreme Yield Strategy",
+  "version": "3.0.0",
+  "description": "Maximum aggression yield strategy using multiple techniques",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "active": true,
+  "createdAt": "2025-05-18T02:50:33.023Z",
+  "lastUpdated": "2025-05-18T02:50:33.024Z",
+  "params": {
+    "maxPositionSizePercent": 99.5,
+    "minProfitThresholdUSD": 0.00005,
+    "maxSlippageTolerance": 0.0015,
+    "maxActiveLoans": 8,
+    "maxDailyTransactions": 7200,
+    "flashLoanSources": [
+      {
+        "name": "Solend",
+        "priority": 1,
+        "enabled": true
+      },
+      {
+        "name": "Mango",
+        "priority": 2,
+        "enabled": true
+      },
+      {
+        "name": "Port",
+        "priority": 3,
+        "enabled": true
+      },
+      {
+        "name": "Tulip",
+        "priority": 4,
+        "enabled": true
+      },
+      {
+        "name": "Jet",
+        "priority": 5,
+        "enabled": true
+      },
+      {
+        "name": "Kamino",
+        "priority": 6,
+        "enabled": true
+      }
+    ],
+    "markets": [
+      {
+        "name": "Jupiter",
+        "priority": 1,
+        "enabled": true
+      },
+      {
+        "name": "Orca",
+        "priority": 2,
+        "enabled": true
+      },
+      {
+        "name": "Raydium",
+        "priority": 3,
+        "enabled": true
+      },
+      {
+        "name": "Mercurial",
+        "priority": 4,
+        "enabled": true
+      },
+      {
+        "name": "Saber",
+        "priority": 5,
+        "enabled": true
+      },
+      {
+        "name": "Aldrin",
+        "priority": 6,
+        "enabled": true
+      },
+      {
+        "name": "Serum",
+        "priority": 7,
+        "enabled": true
+      },
+      {
+        "name": "Lifinity",
+        "priority": 8,
+        "enabled": true
+      },
+      {
+        "name": "Cropper",
+        "priority": 9,
+        "enabled": true
+      },
+      {
+        "name": "Meteora",
+        "priority": 10,
+        "enabled": true
+      },
+      {
+        "name": "GooseFX",
+        "priority": 11,
+        "enabled": true
+      },
+      {
+        "name": "Openbook",
+        "priority": 12,
+        "enabled": true
+      },
+      {
+        "name": "Invariant",
+        "priority": 13,
+        "enabled": true
+      },
+      {
+        "name": "Phoenix",
+        "priority": 14,
+        "enabled": true
+      }
+    ],
+    "pairConfigurations": {
+      "stablecoin": {
+        "minSpreadPercent": 0.01,
+        "targetFlashLoanSize": 5000000,
+        "maxPositionSizePercent": 99.9,
+        "maxSlippageTolerance": 0.001,
+        "priorityMultiplier": 3,
+        "confidenceThreshold": 60,
+        "pairs": [
+          "USDC/USDT",
+          "USDC/USTv2",
+          "USDT/USTv2",
+          "USDC/BUSD",
+          "USDT/BUSD",
+          "USDC/DAI",
+          "USDT/DAI",
+          "USDC/PAI",
+          "USDT/PAI",
+          "USDC/FRAX",
+          "USDT/FRAX",
+          "USDC/USDH",
+          "USDT/USDH",
+          "DAI/FRAX",
+          "DAI/BUSD",
+          "FRAX/BUSD",
+          "USDC/sUSDC",
+          "USDT/sUSDT"
+        ]
+      },
+      "major": {
+        "minSpreadPercent": 0.025,
+        "targetFlashLoanSize": 500000,
+        "maxPositionSizePercent": 99,
+        "maxSlippageTolerance": 0.002,
+        "priorityMultiplier": 2,
+        "confidenceThreshold": 70,
+        "pairs": [
+          "SOL/USDC",
+          "SOL/USDT",
+          "ETH/USDC",
+          "ETH/USDT",
+          "BTC/USDC",
+          "BTC/USDT",
+          "SOL/ETH",
+          "BTC/ETH",
+          "SOL/BTC"
+        ]
+      },
+      "mid": {
+        "minSpreadPercent": 0.05,
+        "targetFlashLoanSize": 100000,
+        "maxPositionSizePercent": 95,
+        "maxSlippageTolerance": 0.003,
+        "priorityMultiplier": 1.5,
+        "confidenceThreshold": 75,
+        "pairs": [
+          "JUP/USDC",
+          "RAY/USDC",
+          "BONK/USDC",
+          "MSOL/USDC",
+          "JTO/USDC",
+          "MNGO/USDC",
+          "JUP/SOL",
+          "RAY/SOL",
+          "BONK/SOL"
+        ]
+      }
+    },
+    "techniques": {
+      "recursiveFlashLoans": {
+        "enabled": true,
+        "maxDepth": 3,
+        "scalingFactor": [
+          1,
+          5,
+          25
+        ],
+        "minProfitThresholdMultiplier": 3
+      },
+      "parallelExecution": {
+        "enabled": true,
+        "maxParallelTransactions": 8,
+        "priorityBasedExecution": true,
+        "staggerIntervalMs": 100
+      },
+      "atomicMegaBundle": {
+        "enabled": true,
+        "maxBundleSize": 4,
+        "minTotalProfitThresholdUSD": 0.001
+      },
+      "mempool": {
+        "enabled": true,
+        "backrunningEnabled": true,
+        "frontrunningEnabled": false,
+        "sandwichingEnabled": false,
+        "targetBlockDistance": 0
+      },
+      "liquiditySniper": {
+        "enabled": true,
+        "minLiquidityUSD": 1000,
+        "maxAgeSec": 300,
+        "whitelistedTokens": [
+          "USDC",
+          "USDT",
+          "SOL",
+          "ETH",
+          "BTC"
+        ]
+      }
+    },
+    "execution": {
+      "transactionPriority": "max",
+      "timeoutMs": 15000,
+      "maxRetries": 3,
+      "gasMultiplier": 1.2,
+      "batchingEnabled": true,
+      "usePrecomputedAddresses": true,
+      "preSignTransactions": true,
+      "simulationEnabled": true,
+      "fallbackRpcEnabled": true,
+      "orcaPriorityFeeEnabled": true
+    },
+    "safety": {
+      "emergencyShutdownEnabled": true,
+      "maxLossPerTransactionPercent": 1,
+      "maxDailyLossPercent": 5,
+      "maxDailyCapitalUsagePercent": 1000,
+      "alertsEnabled": true,
+      "realTimeDashboardEnabled": true,
+      "autoRestartOnFailure": true,
+      "revertTransactionOnSlippage": true
+    },
+    "capital": {
+      "leveragedFlashLoans": true,
+      "maxLeverage": 15,
+      "autoReinvestment": true,
+      "reinvestmentRate": 99,
+      "autoCompounding": true,
+      "compoundingFrequency": "instant",
+      "withdrawalThresholdSOL": 0.25,
+      "retainedCapitalPercent": 80
+    }
+  },
+  "performance": {
+    "totalExecutions": 0,
+    "successfulExecutions": 0,
+    "failedExecutions": 0,
+    "totalProfitSOL": 0,
+    "totalProfitUSD": 0,
+    "averageProfitPerTradeSOL": 0,
+    "averageProfitPerTradeUSD": 0,
+    "largestProfitSOL": 0,
+    "largestProfitUSD": 0
+  }
+}
