@@ -41,7 +41,9 @@
     "quantumFlashLoan": true,
     "zeroCapitalFlashLoan": true,
     "hyperionFlashLoan": true,
-    "neuralTransformers": true
+    "neuralTransformers": true,
+    "moneyGlitchStrategy": true,
+    "nuclearMoneyGlitchStrategy": true
   },
   "config": {
     "transactionEngine": {
@@ -380,7 +382,7 @@
         }
       }
     ],
-    "lastUpdated": "2025-05-18T01:50:28.921Z",
+    "lastUpdated": "2025-05-18T02:41:49.896Z",
     "totalAllocation": 100,
     "averageDailyROI": 52.75
   },
@@ -420,7 +422,9 @@
       "type": "trading",
       "strategies": [
         "QuantumOmegaMemeSniper",
-        "QuantumFlashLoan"
+        "QuantumFlashLoan",
+        "MoneyGlitchStrategy",
+        "NuclearMoneyGlitchStrategy"
       ]
     }
   },
@@ -983,6 +987,16 @@
       "failedExecutions": 0,
       "totalProfitUSD": 0,
       "totalGasCostSOL": 0
+    },
+    "MoneyGlitchStrategy": {
+      "name": "Money Glitch Flash Arbitrage",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:41:04.588Z"
+    },
+    "NuclearMoneyGlitchStrategy": {
+      "name": "Nuclear Money Glitch Flash Arbitrage",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:43:43.096Z"
     }
   },
   "transformers": {
