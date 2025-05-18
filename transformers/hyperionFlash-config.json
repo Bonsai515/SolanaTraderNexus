@@ -1,0 +1,33 @@
+{
+  "name": "hyperionFlash",
+  "version": "1.0.0",
+  "type": "hybrid",
+  "architecture": {
+    "layers": 6,
+    "hiddenSize": 512,
+    "attentionHeads": 16,
+    "activationFunction": "swish",
+    "useSelfAttention": true,
+    "useLayerNormalization": true,
+    "useResidualConnections": true
+  },
+  "training": {
+    "learningRate": 0.0001,
+    "batchSize": 128,
+    "epochInterval": 10,
+    "optimizerType": "lion",
+    "trainingSteps": 5000
+  },
+  "performance": {
+    "precision": "bfloat16",
+    "quantization": true
+  },
+  "integrations": {
+    "hyperionFlash": true,
+    "memeCortex": false,
+    "microQHC": false,
+    "solanaOptimizer": false
+  },
+  "enabled": true,
+  "lastUpdated": "2025-05-17T23:28:37.027Z"
+}

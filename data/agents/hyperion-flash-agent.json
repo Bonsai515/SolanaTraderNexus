@@ -1,0 +1,73 @@
+{
+  "id": "hyperion-flash-agent",
+  "name": "Hyperion Flash Loan Agent",
+  "type": "trading",
+  "description": "Advanced flash loan agent with neural transformer optimization",
+  "version": "1.0.0",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+  },
+  "params": {
+    "maxPositionSizePercent": 0.9,
+    "minProfitThresholdUSD": 0.02,
+    "maxSlippageTolerance": 0.004,
+    "loanProtocols": [
+      "solend",
+      "port-finance",
+      "kamino",
+      "marginfi"
+    ],
+    "maxDailyTransactions": 1000,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BTC",
+      "BONK",
+      "JUP",
+      "RAY",
+      "ORCA",
+      "MSOL"
+    ],
+    "transformerLayers": 4,
+    "quantumFiltering": true,
+    "neuralOptimization": true,
+    "parallelExecution": true,
+    "adaptiveRiskManagement": true,
+    "executionPriorities": [
+      10,
+      8,
+      6,
+      4,
+      2
+    ],
+    "optimizationInterval": 500,
+    "useIntegratedDex": true,
+    "transactionTimeoutMs": 25000,
+    "useMemoryGraph": true,
+    "transformerModels": [
+      "microQHC",
+      "memeCortex",
+      "hyperionFlash",
+      "solanaOptimizer"
+    ],
+    "requireVerification": true,
+    "maxGasFeeBudgetSOL": 0.05
+  },
+  "transformers": [
+    "microQHC",
+    "memeCortex",
+    "hyperionFlash",
+    "solanaOptimizer"
+  ],
+  "routes": [
+    "HyperSOL-USDC",
+    "HyperUSDC-SOL-USDT",
+    "HyperETH-SOL",
+    "HyperJUP-USDC",
+    "HyperTriSOL-JUP-BONK"
+  ],
+  "active": true,
+  "lastUpdated": "2025-05-17T23:28:37.025Z"
+}

@@ -1,0 +1,33 @@
+{
+  "name": "microQHC",
+  "version": "1.0.0",
+  "type": "attention",
+  "architecture": {
+    "layers": 4,
+    "hiddenSize": 256,
+    "attentionHeads": 8,
+    "activationFunction": "gelu",
+    "useSelfAttention": true,
+    "useLayerNormalization": true,
+    "useResidualConnections": true
+  },
+  "training": {
+    "learningRate": 0.0003,
+    "batchSize": 64,
+    "epochInterval": 5,
+    "optimizerType": "adam",
+    "trainingSteps": 2000
+  },
+  "performance": {
+    "precision": "fp16",
+    "quantization": true
+  },
+  "integrations": {
+    "hyperionFlash": true,
+    "memeCortex": false,
+    "microQHC": true,
+    "solanaOptimizer": false
+  },
+  "enabled": true,
+  "lastUpdated": "2025-05-17T23:28:37.026Z"
+}
