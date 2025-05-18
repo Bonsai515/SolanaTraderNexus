@@ -1,0 +1,118 @@
+[
+  {
+    "name": "Jupiter -> Orca Arbitrage",
+    "path": [
+      "Jupiter",
+      "Orca"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "SOL"
+      },
+      {
+        "input": "SOL",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.000475,
+    "priority": 1,
+    "minSize": 5,
+    "maxSize": 50000
+  },
+  {
+    "name": "Raydium -> Jupiter Arbitrage",
+    "path": [
+      "Raydium",
+      "Jupiter"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "ETH"
+      },
+      {
+        "input": "ETH",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.000525,
+    "priority": 2,
+    "minSize": 10,
+    "maxSize": 100000
+  },
+  {
+    "name": "Orca -> Raydium Arbitrage",
+    "path": [
+      "Orca",
+      "Raydium"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "SOL"
+      },
+      {
+        "input": "SOL",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.000475,
+    "priority": 1,
+    "minSize": 5,
+    "maxSize": 50000
+  },
+  {
+    "name": "Jupiter -> Raydium -> Orca Triangle",
+    "path": [
+      "Jupiter",
+      "Raydium",
+      "Orca"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "SOL"
+      },
+      {
+        "input": "SOL",
+        "output": "ETH"
+      },
+      {
+        "input": "ETH",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.000875,
+    "priority": 3,
+    "minSize": 20,
+    "maxSize": 200000
+  },
+  {
+    "name": "USDT -> USDC Loop",
+    "path": [
+      "Jupiter",
+      "Mercurial",
+      "Saber",
+      "Jupiter"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDT",
+        "output": "USDC"
+      },
+      {
+        "input": "USDC",
+        "output": "PAI"
+      },
+      {
+        "input": "PAI",
+        "output": "USDT"
+      }
+    ],
+    "estimatedFee": 0.000325,
+    "priority": 1,
+    "minSize": 100,
+    "maxSize": 1000000
+  }
+]
