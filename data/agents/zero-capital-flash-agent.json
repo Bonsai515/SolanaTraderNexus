@@ -1,0 +1,206 @@
+{
+  "id": "zero-capital-flash-agent",
+  "name": "Zero Capital Flash Loan Agent",
+  "type": "trading",
+  "description": "Flash loan arbitrage agent that operates without upfront capital requirements",
+  "version": "1.0.0",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+  },
+  "params": {
+    "minProfitThresholdUSD": 0.05,
+    "maxSlippageTolerance": 0.005,
+    "maxDailyTransactions": 500,
+    "minSuccessRate": 0.8,
+    "loanProtocols": [
+      "solend",
+      "port-finance",
+      "kamino",
+      "marginfi",
+      "uxd-protocol"
+    ],
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BONK",
+      "JUP",
+      "RAY",
+      "MSOL",
+      "MNGO",
+      "SAMO"
+    ],
+    "transactionTimeoutMs": 30000,
+    "maxGasFeeBudgetSOL": 0.05,
+    "routingOptimization": true,
+    "useRpcFailover": true,
+    "useFlashBundling": true,
+    "usePriceImpactProtection": true,
+    "maxLoanSizeUSDC": 10000,
+    "loanSizeTiers": [
+      100,
+      500,
+      1000,
+      5000,
+      10000
+    ],
+    "permissionlessMode": false,
+    "useStaticCallSimulation": true,
+    "executeWithCallback": true,
+    "requireOnChainVerification": true,
+    "enableMEVProtection": true,
+    "useMarginOfSafety": 10
+  },
+  "routes": [
+    {
+      "name": "SOL-USDC Triangle",
+      "path": [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.0009,
+      "estimatedGas": 0.00007,
+      "priority": 10,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-SOL-USDT Triangle",
+      "path": [
+        "USDC",
+        "SOL",
+        "USDT",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter",
+        "raydium"
+      ],
+      "estimatedFee": 0.0012,
+      "estimatedGas": 0.00009,
+      "priority": 9,
+      "minimumProfit": 0.07,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "ETH-USDC-SOL Triangle",
+      "path": [
+        "ETH",
+        "USDC",
+        "SOL",
+        "ETH"
+      ],
+      "protocols": [
+        "port-finance"
+      ],
+      "exchanges": [
+        "jupiter",
+        "orca"
+      ],
+      "estimatedFee": 0.0015,
+      "estimatedGas": 0.0001,
+      "priority": 8,
+      "minimumProfit": 0.1,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-JUP-USDC Direct",
+      "path": [
+        "USDC",
+        "JUP",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00006,
+      "priority": 7,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "SOL-BONK-SOL Direct",
+      "path": [
+        "SOL",
+        "BONK",
+        "SOL"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00007,
+      "priority": 6,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-RAY-JUP-USDC Complex",
+      "path": [
+        "USDC",
+        "RAY",
+        "JUP",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "raydium",
+        "jupiter"
+      ],
+      "estimatedFee": 0.0018,
+      "estimatedGas": 0.0001,
+      "priority": 5,
+      "minimumProfit": 0.1,
+      "directSwaps": false,
+      "enabled": true
+    },
+    {
+      "name": "SOL-MSOL-SOL LSD",
+      "path": [
+        "SOL",
+        "MSOL",
+        "SOL"
+      ],
+      "protocols": [
+        "marginfi"
+      ],
+      "exchanges": [
+        "jupiter",
+        "marinade"
+      ],
+      "estimatedFee": 0.0008,
+      "estimatedGas": 0.00008,
+      "priority": 8,
+      "minimumProfit": 0.03,
+      "directSwaps": true,
+      "enabled": true
+    }
+  ],
+  "active": true,
+  "lastUpdated": "2025-05-17T23:26:23.469Z"
+}

@@ -1,0 +1,140 @@
+{
+  "id": "quantum-flash-agent",
+  "name": "Quantum Flash Loan",
+  "type": "trading",
+  "description": "Flash loan arbitrage agent optimized for small capital operations",
+  "version": "1.2.0",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+  },
+  "params": {
+    "maxPositionSizePercent": 0.8,
+    "minProfitThresholdUSD": 0.001,
+    "maxSlippageTolerance": 0.005,
+    "maxActiveLoans": 2,
+    "maxDailyTransactions": 1000,
+    "loanProtocols": [
+      "solend",
+      "kamino",
+      "port-finance",
+      "apricot",
+      "tulip"
+    ],
+    "routingOptimization": true,
+    "maxGasFeeSOL": 0.00005,
+    "timeoutMs": 30000,
+    "useFeeDiscounting": true,
+    "minLiquidityPoolSize": 10000,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BTC",
+      "BONK",
+      "JUP",
+      "RAY",
+      "ORCA",
+      "MNGO"
+    ],
+    "usePriceImpactProtection": true,
+    "useMetaTransactions": false,
+    "crossExchangeArbitrage": true,
+    "useHangingOrderStrategy": false,
+    "profitSplitPercent": 80,
+    "useAdvancedRateLimit": true,
+    "useRbsProtection": true
+  },
+  "routes": [
+    {
+      "name": "SOL-USDC-SOL",
+      "path": [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      "protocol": "solend",
+      "exchanges": [
+        "Jupiter",
+        "Orca"
+      ],
+      "estimatedFee": 0.0005,
+      "priority": 10,
+      "minimumSize": 0.05,
+      "maximumSize": 100,
+      "enabled": true
+    },
+    {
+      "name": "SOL-USDT-SOL",
+      "path": [
+        "SOL",
+        "USDT",
+        "SOL"
+      ],
+      "protocol": "solend",
+      "exchanges": [
+        "Jupiter",
+        "Raydium"
+      ],
+      "estimatedFee": 0.0006,
+      "priority": 9,
+      "minimumSize": 0.05,
+      "maximumSize": 100,
+      "enabled": true
+    },
+    {
+      "name": "USDC-SOL-USDC",
+      "path": [
+        "USDC",
+        "SOL",
+        "USDC"
+      ],
+      "protocol": "port-finance",
+      "exchanges": [
+        "Jupiter"
+      ],
+      "estimatedFee": 0.0005,
+      "priority": 8,
+      "minimumSize": 10,
+      "maximumSize": 10000,
+      "enabled": true
+    },
+    {
+      "name": "SOL-BONK-SOL",
+      "path": [
+        "SOL",
+        "BONK",
+        "SOL"
+      ],
+      "protocol": "solend",
+      "exchanges": [
+        "Jupiter",
+        "Raydium"
+      ],
+      "estimatedFee": 0.001,
+      "priority": 7,
+      "minimumSize": 0.05,
+      "maximumSize": 50,
+      "enabled": true
+    },
+    {
+      "name": "SOL-ETH-SOL",
+      "path": [
+        "SOL",
+        "ETH",
+        "SOL"
+      ],
+      "protocol": "kamino",
+      "exchanges": [
+        "Jupiter"
+      ],
+      "estimatedFee": 0.0007,
+      "priority": 6,
+      "minimumSize": 0.1,
+      "maximumSize": 100,
+      "enabled": true
+    }
+  ],
+  "active": true,
+  "lastUpdated": "2025-05-17T23:33:46.543Z"
+}

@@ -1,0 +1,257 @@
+{
+  "version": "1.0.0",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "strategy": "HyperionFlashLoan",
+  "params": {
+    "maxPositionSizePercent": 0.9,
+    "minProfitThresholdUSD": 0.02,
+    "maxSlippageTolerance": 0.004,
+    "loanProtocols": [
+      "solend",
+      "port-finance",
+      "kamino",
+      "marginfi"
+    ],
+    "maxDailyTransactions": 1000,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BTC",
+      "BONK",
+      "JUP",
+      "RAY",
+      "ORCA",
+      "MSOL"
+    ],
+    "transformerLayers": 4,
+    "quantumFiltering": true,
+    "neuralOptimization": true,
+    "parallelExecution": true,
+    "adaptiveRiskManagement": true,
+    "executionPriorities": [
+      10,
+      8,
+      6,
+      4,
+      2
+    ],
+    "optimizationInterval": 500,
+    "useIntegratedDex": true,
+    "transactionTimeoutMs": 25000,
+    "useMemoryGraph": true,
+    "transformerModels": [
+      "microQHC",
+      "memeCortex",
+      "hyperionFlash",
+      "solanaOptimizer"
+    ],
+    "requireVerification": true,
+    "maxGasFeeBudgetSOL": 0.05
+  },
+  "transformers": [
+    {
+      "name": "microQHC",
+      "type": "attention",
+      "layers": 4,
+      "hiddenSize": 256,
+      "attentionHeads": 8,
+      "activationFunction": "gelu",
+      "learningRate": 0.0003,
+      "useSelfAttention": true,
+      "useLayerNormalization": true,
+      "useResidualConnections": true,
+      "trainingSteps": 2000,
+      "batchSize": 64,
+      "epochInterval": 5,
+      "optimizerType": "adam",
+      "precision": "fp16",
+      "quantization": true,
+      "enabled": true
+    },
+    {
+      "name": "memeCortex",
+      "type": "feedforward",
+      "layers": 3,
+      "hiddenSize": 128,
+      "attentionHeads": 4,
+      "activationFunction": "relu",
+      "learningRate": 0.0005,
+      "useSelfAttention": false,
+      "useLayerNormalization": true,
+      "useResidualConnections": false,
+      "trainingSteps": 1000,
+      "batchSize": 32,
+      "epochInterval": 3,
+      "optimizerType": "adamw",
+      "precision": "fp32",
+      "quantization": false,
+      "enabled": true
+    },
+    {
+      "name": "hyperionFlash",
+      "type": "hybrid",
+      "layers": 6,
+      "hiddenSize": 512,
+      "attentionHeads": 16,
+      "activationFunction": "swish",
+      "learningRate": 0.0001,
+      "useSelfAttention": true,
+      "useLayerNormalization": true,
+      "useResidualConnections": true,
+      "trainingSteps": 5000,
+      "batchSize": 128,
+      "epochInterval": 10,
+      "optimizerType": "lion",
+      "precision": "bfloat16",
+      "quantization": true,
+      "enabled": true
+    },
+    {
+      "name": "solanaOptimizer",
+      "type": "recurrent",
+      "layers": 2,
+      "hiddenSize": 64,
+      "attentionHeads": 2,
+      "activationFunction": "tanh",
+      "learningRate": 0.001,
+      "useSelfAttention": false,
+      "useLayerNormalization": false,
+      "useResidualConnections": true,
+      "trainingSteps": 500,
+      "batchSize": 16,
+      "epochInterval": 2,
+      "optimizerType": "sgd",
+      "precision": "fp32",
+      "quantization": false,
+      "enabled": true
+    }
+  ],
+  "routes": [
+    {
+      "name": "HyperSOL-USDC",
+      "path": [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "transformers": [
+        "microQHC",
+        "hyperionFlash"
+      ],
+      "estimatedFee": 0.0008,
+      "estimatedGas": 0.00006,
+      "priority": 10,
+      "minimumProfit": 0.02,
+      "enabled": true
+    },
+    {
+      "name": "HyperUSDC-SOL-USDT",
+      "path": [
+        "USDC",
+        "SOL",
+        "USDT",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "transformers": [
+        "microQHC",
+        "hyperionFlash",
+        "solanaOptimizer"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00008,
+      "priority": 9,
+      "minimumProfit": 0.03,
+      "enabled": true
+    },
+    {
+      "name": "HyperETH-SOL",
+      "path": [
+        "ETH",
+        "SOL",
+        "ETH"
+      ],
+      "protocols": [
+        "port-finance"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "transformers": [
+        "hyperionFlash",
+        "solanaOptimizer"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00007,
+      "priority": 8,
+      "minimumProfit": 0.04,
+      "enabled": true
+    },
+    {
+      "name": "HyperJUP-USDC",
+      "path": [
+        "JUP",
+        "USDC",
+        "JUP"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "transformers": [
+        "memeCortex",
+        "hyperionFlash"
+      ],
+      "estimatedFee": 0.0009,
+      "estimatedGas": 0.00006,
+      "priority": 7,
+      "minimumProfit": 0.02,
+      "enabled": true
+    },
+    {
+      "name": "HyperTriSOL-JUP-BONK",
+      "path": [
+        "SOL",
+        "JUP",
+        "BONK",
+        "SOL"
+      ],
+      "protocols": [
+        "kamino"
+      ],
+      "exchanges": [
+        "jupiter",
+        "raydium"
+      ],
+      "transformers": [
+        "microQHC",
+        "memeCortex",
+        "hyperionFlash",
+        "solanaOptimizer"
+      ],
+      "estimatedFee": 0.0015,
+      "estimatedGas": 0.0001,
+      "priority": 6,
+      "minimumProfit": 0.05,
+      "enabled": true
+    }
+  ],
+  "minimumSOLRequired": 0.000355,
+  "active": true,
+  "lastUpdated": "2025-05-17T23:28:37.022Z"
+}

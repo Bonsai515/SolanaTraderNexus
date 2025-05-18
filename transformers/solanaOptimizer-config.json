@@ -1,0 +1,33 @@
+{
+  "name": "solanaOptimizer",
+  "version": "1.0.0",
+  "type": "recurrent",
+  "architecture": {
+    "layers": 2,
+    "hiddenSize": 64,
+    "attentionHeads": 2,
+    "activationFunction": "tanh",
+    "useSelfAttention": false,
+    "useLayerNormalization": false,
+    "useResidualConnections": true
+  },
+  "training": {
+    "learningRate": 0.001,
+    "batchSize": 16,
+    "epochInterval": 2,
+    "optimizerType": "sgd",
+    "trainingSteps": 500
+  },
+  "performance": {
+    "precision": "fp32",
+    "quantization": false
+  },
+  "integrations": {
+    "hyperionFlash": true,
+    "memeCortex": false,
+    "microQHC": false,
+    "solanaOptimizer": true
+  },
+  "enabled": true,
+  "lastUpdated": "2025-05-17T23:28:37.028Z"
+}

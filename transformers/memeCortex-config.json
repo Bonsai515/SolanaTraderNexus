@@ -1,0 +1,33 @@
+{
+  "name": "memeCortex",
+  "version": "1.0.0",
+  "type": "feedforward",
+  "architecture": {
+    "layers": 3,
+    "hiddenSize": 128,
+    "attentionHeads": 4,
+    "activationFunction": "relu",
+    "useSelfAttention": false,
+    "useLayerNormalization": true,
+    "useResidualConnections": false
+  },
+  "training": {
+    "learningRate": 0.0005,
+    "batchSize": 32,
+    "epochInterval": 3,
+    "optimizerType": "adamw",
+    "trainingSteps": 1000
+  },
+  "performance": {
+    "precision": "fp32",
+    "quantization": false
+  },
+  "integrations": {
+    "hyperionFlash": true,
+    "memeCortex": true,
+    "microQHC": false,
+    "solanaOptimizer": false
+  },
+  "enabled": true,
+  "lastUpdated": "2025-05-17T23:28:37.027Z"
+}
