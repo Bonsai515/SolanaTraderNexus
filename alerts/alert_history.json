@@ -1,0 +1,12 @@
+{
+  "alerts": [],
+  "lastCheck": "2025-05-18T00:26:40.358Z",
+  "totalProfitSOL": 0,
+  "totalProfitUSD": 0,
+  "tradeCounts": {
+    "quantumOmega": 0,
+    "quantumFlash": 0,
+    "zeroCapital": 0,
+    "hyperion": 0
+  }
+}

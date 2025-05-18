@@ -1,0 +1,84 @@
+{
+  "version": "2.1.0",
+  "primarySources": [
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 2,
+      "refreshIntervalMs": 1500
+    },
+    {
+      "name": "DexScreener",
+      "url": "https://api.dexscreener.com",
+      "priority": 3,
+      "refreshIntervalMs": 2000
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "SolScan",
+      "url": "https://api.solscan.io",
+      "priority": 1,
+      "refreshIntervalMs": 3000
+    },
+    {
+      "name": "SolanaFM",
+      "url": "https://api.solana.fm",
+      "priority": 2,
+      "refreshIntervalMs": 3000
+    }
+  ],
+  "specializedSources": [
+    {
+      "name": "pumpfun",
+      "url": "https://api.pump.fun",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "gmgn",
+      "url": "https://api.gmgn.ai",
+      "priority": 2,
+      "refreshIntervalMs": 1500
+    },
+    {
+      "name": "proton",
+      "url": "https://protonai.xyz/api",
+      "priority": 3,
+      "refreshIntervalMs": 2000
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "BONK": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    },
+    "WIF": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    },
+    "MEME": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    },
+    "CAT": {
+      "primarySource": "pumpfun",
+      "minRefreshIntervalMs": 750
+    },
+    "PNUT": {
+      "primarySource": "pumpfun",
+      "minRefreshIntervalMs": 750
+    }
+  },
+  "backupStrategies": {
+    "failoverEnabled": true,
+    "rotationEnabled": true,
+    "cacheTimeMs": 20000
+  }
+}

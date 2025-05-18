@@ -1,0 +1,15 @@
+{
+  "priceFeed": {
+    "useCoinGecko": false,
+    "useEnhancedFeeds": true,
+    "useJupiter": true,
+    "useBirdeye": true,
+    "usePyth": true,
+    "registryPath": "config/price-feed-registry.json",
+    "lastUpdated": "2025-05-18T00:31:38.090Z"
+  },
+  "features": {
+    "enhancedPriceFeeds": true,
+    "coinGecko": false
+  }
+}
