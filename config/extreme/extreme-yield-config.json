@@ -118,11 +118,11 @@
     ],
     "pairConfigurations": {
       "stablecoin": {
-        "minSpreadPercent": 0.005,
-        "targetFlashLoanSize": 10000000,
+        "minSpreadPercent": 0.004,
+        "targetFlashLoanSize": 40000000,
         "maxPositionSizePercent": 99.9,
         "maxSlippageTolerance": 0.001,
-        "priorityMultiplier": 3,
+        "priorityMultiplier": 5,
         "confidenceThreshold": 60,
         "pairs": [
           "USDC/USDT",
@@ -237,7 +237,12 @@
       "preSignTransactions": true,
       "simulationEnabled": true,
       "fallbackRpcEnabled": true,
-      "orcaPriorityFeeEnabled": true
+      "orcaPriorityFeeEnabled": true,
+      "priorityLevel": "maximum+",
+      "dedicatedOctaHopExecution": true,
+      "octaHopTimeoutMs": 10000,
+      "octaHopMaxRetries": 2,
+      "octaHopGasMultiplier": 1.25
     },
     "safety": {
       "emergencyShutdownEnabled": true,
@@ -270,5 +275,19 @@
     "averageProfitPerTradeUSD": 0,
     "largestProfitSOL": 0,
     "largestProfitUSD": 0
+  },
+  "octaHopOptimization": {
+    "dedicatedExecutor": true,
+    "priorityLevel": "maximum",
+    "specialRouting": true,
+    "customGasSettings": true,
+    "skipSimulation": false,
+    "precomputeRoutes": true,
+    "preloadTokenAccounts": true,
+    "reuseSolanaConnections": true,
+    "batchTransactions": true,
+    "dedicatedRpcNode": true,
+    "alternatePathFinding": true,
+    "supercharged": true
   }
 }

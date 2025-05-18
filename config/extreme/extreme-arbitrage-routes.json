@@ -155,7 +155,7 @@
   {
     "name": "Octa-Hop Ultimate",
     "type": "complex",
-    "profitLevel": "beyond_godlike",
+    "profitLevel": "transcendent",
     "description": "Eight sequential trades across multiple stablecoins",
     "paths": [
       {
@@ -180,19 +180,30 @@
           "PAI/USDC"
         ],
         "estimatedFee": 0.00072,
-        "estimatedSpreadPercent": 0.09,
-        "flashLoanSize": 30000000,
-        "minimumProfit": 0.0002,
+        "estimatedSpreadPercent": 0.098,
+        "flashLoanSize": 40000000,
+        "minimumProfit": 0.00015,
         "confidence": 80,
-        "priority": 0,
-        "executionFrequency": "maximum"
+        "priority": -1,
+        "executionFrequency": "maximum+",
+        "superOptimized": true
       }
     ],
-    "executionStrategy": "ultra-atomic",
+    "executionStrategy": "hyper-atomic",
     "recursionDepth": 1,
-    "capitalRequirement": 0.05,
+    "capitalRequirement": 0.01,
     "riskLevel": "high",
-    "priority": 0
+    "priority": -1,
+    "maxExecutionsPerHour": 8,
+    "superOptimized": true,
+    "specialParameters": {
+      "precompute": true,
+      "superHighBids": true,
+      "extraGasBudget": true,
+      "priorityFees": true,
+      "frontPosition": true,
+      "dedicatedRoute": true
+    }
   },
   {
     "name": "Token Tsunami",
@@ -289,7 +300,7 @@
   {
     "name": "Alternative Octa-Hop",
     "type": "complex",
-    "profitLevel": "beyond_godlike",
+    "profitLevel": "transcendent",
     "description": "Alternative 8-hop route through different exchanges",
     "paths": [
       {
@@ -315,20 +326,23 @@
         ],
         "estimatedFee": 0.00074,
         "estimatedSpreadPercent": 0.088,
-        "flashLoanSize": 30000000,
-        "minimumProfit": 0.0002,
+        "flashLoanSize": 40000000,
+        "minimumProfit": 0.00015,
         "confidence": 78,
-        "priority": 0,
-        "executionFrequency": "maximum"
+        "priority": -1,
+        "executionFrequency": "maximum+",
+        "superOptimized": true
       }
     ],
-    "executionStrategy": "ultra-atomic",
+    "executionStrategy": "hyper-atomic",
     "recursionDepth": 3,
-    "capitalRequirement": 0.05,
+    "capitalRequirement": 0.01,
     "riskLevel": "high",
     "frequency": "maximum",
     "executionMode": "aggressive",
-    "priority": null
+    "priority": -1,
+    "maxExecutionsPerHour": 8,
+    "superOptimized": true
   },
   {
     "name": "Ultra-Frequency USDC-USDT",
@@ -364,7 +378,7 @@
   {
     "name": "Alternative Octa-Hop",
     "type": "complex",
-    "profitLevel": "beyond_godlike",
+    "profitLevel": "transcendent",
     "description": "Alternative 8-hop route through different exchanges",
     "paths": [
       {
@@ -390,19 +404,23 @@
         ],
         "estimatedFee": 0.00074,
         "estimatedSpreadPercent": 0.088,
-        "flashLoanSize": 30000000,
-        "minimumProfit": 0.0002,
+        "flashLoanSize": 40000000,
+        "minimumProfit": 0.00015,
         "confidence": 78,
-        "priority": 0,
-        "executionFrequency": "maximum"
+        "priority": -1,
+        "executionFrequency": "maximum+",
+        "superOptimized": true
       }
     ],
-    "executionStrategy": "ultra-atomic",
+    "executionStrategy": "hyper-atomic",
     "recursionDepth": 3,
-    "capitalRequirement": 0.05,
+    "capitalRequirement": 0.01,
     "riskLevel": "high",
     "frequency": "maximum",
-    "executionMode": "aggressive"
+    "executionMode": "aggressive",
+    "priority": -1,
+    "maxExecutionsPerHour": 8,
+    "superOptimized": true
   },
   {
     "name": "Ultra-Frequency USDC-USDT",
