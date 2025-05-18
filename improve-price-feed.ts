@@ -1,4 +1,195 @@
 /**
+ * Improve Price Feed With Better Rate Limit Handling
+ * 
+ * This script updates the price feed service to better handle rate limits
+ * and implement exponential backoff and source rotation.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Configuration Constants
+const CONFIG_DIR = './config';
+const DATA_DIR = './data';
+const PRICE_FEED_CONFIG_PATH = path.join(DATA_DIR, 'enhanced-price-feeds.json');
+
+/**
+ * Helper function to log messages
+ */
+function log(message: string): void {
+  console.log(message);
+  
+  // Also log to file
+  const logDir = './logs';
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  fs.appendFileSync(path.join(logDir, 'price-feed-improvement.log'), logMessage);
+}
+
+/**
+ * Improve the price feed configuration with better rate limit handling
+ */
+function improvePriceFeedConfig(): boolean {
+  try {
+    log('Updating price feed configuration with better rate limit handling...');
+    
+    // Check if price feed config exists
+    if (!fs.existsSync(PRICE_FEED_CONFIG_PATH)) {
+      log('⚠️ Price feed configuration file not found. Creating default config...');
+      
+      // Ensure directory exists
+      const parentDir = path.dirname(PRICE_FEED_CONFIG_PATH);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+      
+      // Create default config
+      const defaultConfig = {
+        version: "2.0.0",
+        primarySources: [
+          {
+            name: "Jupiter",
+            url: "https://price.jup.ag/v4/price",
+            priority: 1,
+            refreshIntervalMs: 2000
+          },
+          {
+            name: "Birdeye",
+            url: "https://public-api.birdeye.so/public",
+            priority: 2,
+            refreshIntervalMs: 3000
+          }
+        ],
+        secondarySources: [
+          {
+            name: "Pyth",
+            url: "https://xc-mainnet.pyth.network/api",
+            priority: 3,
+            refreshIntervalMs: 5000
+          },
+          {
+            name: "PumpFun",
+            url: "https://api.pump.fun/solana/tokens",
+            priority: 4,
+            refreshIntervalMs: 10000
+          }
+        ],
+        specializedSources: [
+          {
+            name: "SolanaFM",
+            url: "https://api.solana.fm/v0/tokens",
+            priority: 5,
+            refreshIntervalMs: 15000
+          }
+        ],
+        tokenSpecificOverrides: {
+          "SOL": {
+            primarySource: "Jupiter",
+            minRefreshIntervalMs: 2000
+          },
+          "USDC": {
+            primarySource: "Jupiter",
+            minRefreshIntervalMs: 3000
+          },
+          "BONK": {
+            primarySource: "Birdeye",
+            minRefreshIntervalMs: 5000
+          }
+        },
+        backupStrategies: {
+          failoverEnabled: true,
+          rotationEnabled: true,
+          cacheTimeMs: 60000
+        }
+      };
+      
+      fs.writeFileSync(PRICE_FEED_CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
+      log('✅ Created default price feed configuration');
+    }
+    
+    // Read current configuration
+    const currentConfig = JSON.parse(fs.readFileSync(PRICE_FEED_CONFIG_PATH, 'utf-8'));
+    
+    // Update config with improved rate limit handling
+    const improvedConfig = {
+      ...currentConfig,
+      version: "2.1.0", // Increment version for improved rate limit handling
+      rateLimitHandling: {
+        enabled: true,
+        strategies: [
+          "exponential_backoff",
+          "source_rotation",
+          "cache_fallback",
+          "adaptive_intervals"
+        ],
+        maxRetries: 5,
+        initialBackoffMs: 500,
+        maxBackoffMs: 10000,
+        backoffMultiplier: 2,
+        adaptiveRefreshEnabled: true
+      },
+      sourceRotation: {
+        enabled: true,
+        rotationIntervalMs: 120000, // Rotate sources every 2 minutes
+        priorityWeighting: true // Higher priority sources used more frequently
+      },
+      resilienceOptions: {
+        cacheStaleDataTimeoutMs: 300000, // Use data up to 5 minutes old if needed
+        allowPartialFailures: true, // Continue with partial data if some sources fail
+        healthCheckIntervalMs: 60000, // Check source health every minute
+        circuitBreakerThreshold: 3, // Disable sources that fail 3 times in a row
+        circuitBreakerResetTimeMs: 1800000 // Reset circuit breaker after 30 minutes
+      }
+    };
+    
+    // Increase intervals for rate-limited sources
+    if (improvedConfig.secondarySources) {
+      improvedConfig.secondarySources = improvedConfig.secondarySources.map(source => {
+        if (source.name === "PumpFun") {
+          return {
+            ...source,
+            refreshIntervalMs: 30000, // Increase to 30 seconds
+            rateLimit: {
+              requestsPerMinute: 15,
+              cooldownAfterLimitMs: 60000
+            }
+          };
+        }
+        return source;
+      });
+    }
+    
+    // Save updated configuration
+    fs.writeFileSync(PRICE_FEED_CONFIG_PATH, JSON.stringify(improvedConfig, null, 2));
+    log('✅ Updated price feed configuration with improved rate limit handling');
+    
+    return true;
+  } catch (error) {
+    log(`⚠️ Error updating price feed configuration: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Create improved price feed integration code
+ */
+function createImprovedPriceFeedIntegration(): boolean {
+  try {
+    log('Creating improved price feed integration code...');
+    
+    const priceFeedIntegrationPath = path.join('./src', 'price-feed-integration.ts');
+    
+    // Create src directory if it doesn't exist
+    if (!fs.existsSync('./src')) {
+      fs.mkdirSync('./src', { recursive: true });
+    }
+    
+    // Create improved price feed integration
+    const improvedIntegrationCode = `/**
  * Enhanced Price Feed Integration with Improved Rate Limit Handling
  * 
  * This module provides an enhanced price feed integration with proper
@@ -294,7 +485,7 @@ async function fetchWithExponentialBackoff(
     if (rateLimitHandling && rateLimitHandling.enabled) {
       // Check if we've exceeded max retries
       if (attempt >= rateLimitHandling.maxRetries) {
-        console.warn(`Exceeded max retries (${rateLimitHandling.maxRetries}) for source ${source.name}. Using fallback.`);
+        console.warn(\`Exceeded max retries (${rateLimitHandling.maxRetries}) for source \${source.name}. Using fallback.\`);
         
         // Disable this source temporarily if it's a rate limit error
         if (isRateLimitError) {
@@ -302,7 +493,7 @@ async function fetchWithExponentialBackoff(
           disableSource(source.name, cooldownTime);
         }
         
-        throw new Error(`Rate limit exceeded for source ${source.name}`);
+        throw new Error(\`Rate limit exceeded for source \${source.name}\`);
       }
       
       // Calculate backoff time
@@ -311,7 +502,7 @@ async function fetchWithExponentialBackoff(
         rateLimitHandling.maxBackoffMs
       );
       
-      console.warn(`Server responded with ${error.response?.status || 'error'}. Retrying after ${backoffTime}ms delay...`);
+      console.warn(\`Server responded with \${error.response?.status || 'error'}. Retrying after \${backoffTime}ms delay...\`);
       
       // Wait for backoff time
       await new Promise(resolve => setTimeout(resolve, backoffTime));
@@ -376,7 +567,7 @@ function disableSource(sourceName: string, disableDurationMs: number): void {
   status.disabled = true;
   status.disabledUntil = Date.now() + disableDurationMs;
   
-  console.warn(`Source ${sourceName} has been disabled until ${new Date(status.disabledUntil).toLocaleTimeString()}`);
+  console.warn(\`Source \${sourceName} has been disabled until \${new Date(status.disabledUntil).toLocaleTimeString()}\`);
 }
 
 // Format the URL for a specific token and source
@@ -386,17 +577,17 @@ function formatUrlForToken(source: PriceSource, token: string): string {
   // Handle different API formats
   switch (source.name) {
     case 'Jupiter':
-      return `${url}?ids=${token}`;
+      return \`\${url}?ids=\${token}\`;
     case 'Birdeye':
-      return `${url}/price?address=${token}`;
+      return \`\${url}/price?address=\${token}\`;
     case 'Pyth':
-      return `${url}/price?symbol=${token}`;
+      return \`\${url}/price?symbol=\${token}\`;
     case 'PumpFun':
-      return `${url}/token/${token}`;
+      return \`\${url}/token/\${token}\`;
     case 'SolanaFM':
-      return `${url}/${token}`;
+      return \`\${url}/\${token}\`;
     default:
-      return `${url}?token=${token}`;
+      return \`\${url}?token=\${token}\`;
   }
 }
 
@@ -419,7 +610,7 @@ function parsePriceData(data: any, source: PriceSource, token: string): number |
         return data.price || data.data?.price || data.result?.price || data.value || null;
     }
   } catch (error) {
-    console.error(`Error parsing price data from ${source.name}:`, error);
+    console.error(\`Error parsing price data from \${source.name}:\`, error);
     return null;
   }
 }
@@ -445,7 +636,7 @@ export async function getTokenPrice(token: string): Promise<TokenPrice | null> {
     // If cache is available but stale, still return it as last resort
     if (cachedPrice && config.resilienceOptions && 
         (now - cachedPrice.lastUpdated < config.resilienceOptions.cacheStaleDataTimeoutMs)) {
-      console.warn(`Using stale cache data for ${token} from ${cachedPrice.source} (${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)`);
+      console.warn(\`Using stale cache data for \${token} from \${cachedPrice.source} (\${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)\`);
       return {
         ...cachedPrice,
         confidence: Math.max(0.1, cachedPrice.confidence * 0.5) // Reduce confidence for stale data
@@ -480,9 +671,9 @@ export async function getTokenPrice(token: string): Promise<TokenPrice | null> {
       return tokenPrice;
     }
     
-    throw new Error(`Could not parse price data for ${token} from ${source.name}`);
+    throw new Error(\`Could not parse price data for \${token} from \${source.name}\`);
   } catch (error) {
-    console.error(`Error fetching price for ${token} from ${source.name}:`, error);
+    console.error(\`Error fetching price for \${token} from \${source.name}:\`, error);
     
     // Try fallback sources if enabled
     if (config.backupStrategies.failoverEnabled) {
@@ -492,7 +683,7 @@ export async function getTokenPrice(token: string): Promise<TokenPrice | null> {
     // Return cached data as last resort if available
     if (cachedPrice && config.resilienceOptions && 
         (now - cachedPrice.lastUpdated < config.resilienceOptions.cacheStaleDataTimeoutMs)) {
-      console.warn(`Using stale cache data for ${token} from ${cachedPrice.source} (${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)`);
+      console.warn(\`Using stale cache data for \${token} from \${cachedPrice.source} (\${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)\`);
       return {
         ...cachedPrice,
         confidence: Math.max(0.1, cachedPrice.confidence * 0.5) // Reduce confidence for stale data
@@ -541,11 +732,11 @@ async function fallbackToAlternativeSource(
         // Update cache
         priceCache[token] = tokenPrice;
         
-        console.log(`Successfully fetched ${token} price from fallback source ${source.name}: ${price}`);
+        console.log(\`Successfully fetched \${token} price from fallback source \${source.name}: \${price}\`);
         return tokenPrice;
       }
     } catch (error) {
-      console.warn(`Fallback source ${source.name} failed for ${token}:`, error);
+      console.warn(\`Fallback source \${source.name} failed for \${token}:\`, error);
       // Continue to next fallback
     }
   }
@@ -556,7 +747,7 @@ async function fallbackToAlternativeSource(
   
   if (cachedPrice && config.resilienceOptions && 
       (now - cachedPrice.lastUpdated < config.resilienceOptions.cacheStaleDataTimeoutMs)) {
-    console.warn(`All sources failed. Using stale cache data for ${token} from ${cachedPrice.source} (${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)`);
+    console.warn(\`All sources failed. Using stale cache data for \${token} from \${cachedPrice.source} (\${Math.round((now - cachedPrice.lastUpdated) / 1000)}s old)\`);
     return {
       ...cachedPrice,
       confidence: Math.max(0.1, cachedPrice.confidence * 0.3) // Significantly reduce confidence for stale data after all fallbacks failed
@@ -694,8 +885,254 @@ export function initializePriceFeeds(): void {
     }
   }
   
-  console.log(`Initialized price feeds with ${allSources.length} sources:`);
+  console.log(\`Initialized price feeds with \${allSources.length} sources:\`);
   allSources.forEach(source => {
-    console.log(`- ${source.name} (priority: ${source.priority}, refresh: ${source.refreshIntervalMs}ms)`);
+    console.log(\`- \${source.name} (priority: \${source.priority}, refresh: \${source.refreshIntervalMs}ms)\`);
   });
 }
+`;
+    
+    fs.writeFileSync(priceFeedIntegrationPath, improvedIntegrationCode);
+    log('✅ Created improved price feed integration code');
+    
+    return true;
+  } catch (error) {
+    log(`⚠️ Error creating price feed integration: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Create an example usage script
+ */
+function createExampleUsage(): boolean {
+  try {
+    log('Creating example usage script...');
+    
+    const exampleUsagePath = path.join('./src', 'price-feed-example.ts');
+    
+    // Create example usage script
+    const exampleUsageCode = `/**
+ * Example usage of the improved price feed integration
+ */
+
+import { getTokenPrice, getTokenPrices, initializePriceFeeds, getPriceSourcesStatus } from './price-feed-integration';
+
+// Initialize price feeds
+initializePriceFeeds();
+
+// Example of checking price sources status
+async function checkSourceStatus() {
+  const status = getPriceSourcesStatus();
+  console.log('\\nPrice Sources Status:');
+  console.log(JSON.stringify(status, null, 2));
+}
+
+// Example of getting a single token price
+async function getSingleTokenPrice() {
+  console.log('\\nGetting SOL price...');
+  const solPrice = await getTokenPrice('SOL');
+  console.log('SOL Price:', solPrice);
+}
+
+// Example of getting multiple token prices
+async function getMultipleTokenPrices() {
+  console.log('\\nGetting multiple token prices...');
+  const tokens = ['SOL', 'BONK', 'JUP', 'PYTH'];
+  const prices = await getTokenPrices(tokens);
+  
+  console.log('Token Prices:');
+  for (const [token, price] of Object.entries(prices)) {
+    console.log(\`\${token}: \${price ? \`\${price.price} USD (source: \${price.source}, confidence: \${price.confidence})\` : 'Not available'}\`);
+  }
+}
+
+// Run the examples
+async function runExamples() {
+  try {
+    await checkSourceStatus();
+    await getSingleTokenPrice();
+    await getMultipleTokenPrices();
+  } catch (error) {
+    console.error('Error running examples:', error);
+  }
+}
+
+runExamples();
+`;
+    
+    fs.writeFileSync(exampleUsagePath, exampleUsageCode);
+    log('✅ Created example usage script');
+    
+    return true;
+  } catch (error) {
+    log(`⚠️ Error creating example usage: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Update system memory with improved price feed integration
+ */
+function updateSystemMemory(): boolean {
+  try {
+    log('Updating system memory with improved price feed integration...');
+    
+    // Create system memory directory if it doesn't exist
+    const systemMemoryDir = path.join(DATA_DIR, 'system-memory');
+    if (!fs.existsSync(systemMemoryDir)) {
+      fs.mkdirSync(systemMemoryDir, { recursive: true });
+    }
+    
+    // Read current system memory if it exists
+    let systemMemory: any = {};
+    const systemMemoryPath = path.join(systemMemoryDir, 'system-memory.json');
+    
+    if (fs.existsSync(systemMemoryPath)) {
+      try {
+        const systemMemoryData = fs.readFileSync(systemMemoryPath, 'utf-8');
+        systemMemory = JSON.parse(systemMemoryData);
+      } catch (error) {
+        console.warn('Error reading system memory, creating new one:', error);
+      }
+    }
+    
+    // Update price feed configuration in system memory
+    systemMemory.priceFeed = {
+      ...systemMemory.priceFeed,
+      version: "2.1.0", // Increment version for improved rate limit handling
+      improvedRateLimitHandling: true,
+      adaptiveRefresh: true,
+      sourceRotation: true,
+      exponentialBackoff: true,
+      cacheFallback: true,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // Save updated system memory
+    fs.writeFileSync(systemMemoryPath, JSON.stringify(systemMemory, null, 2));
+    log('✅ Updated system memory with improved price feed integration');
+    
+    return true;
+  } catch (error) {
+    log(`⚠️ Error updating system memory: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Create script to restart price feed service
+ */
+function createRestartScript(): boolean {
+  try {
+    log('Creating restart script for price feed service...');
+    
+    const restartScriptPath = path.join('./', 'restart-price-feed.sh');
+    
+    // Create restart script
+    const restartScript = `#!/bin/bash
+
+# Restart Price Feed Service with Improved Rate Limit Handling
+
+echo "=========================================="
+echo "🚀 RESTARTING PRICE FEED SERVICE"
+echo "=========================================="
+
+# Kill any running price feed service
+pkill -f "node.*price-feed" || true
+
+# Wait for processes to terminate
+sleep 2
+
+# Start the improved price feed service
+npx tsx src/price-feed-example.ts &
+
+echo "✅ Price feed service restarted with improved rate limit handling"
+echo "=========================================="
+`;
+    
+    fs.writeFileSync(restartScriptPath, restartScript);
+    fs.chmodSync(restartScriptPath, 0o755); // Make executable
+    log('✅ Created restart script for price feed service');
+    
+    return true;
+  } catch (error) {
+    log(`⚠️ Error creating restart script: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Main function to improve price feed
+ */
+function improvePriceFeed(): void {
+  log('\n=======================================================');
+  log('🚀 IMPROVING PRICE FEED WITH BETTER RATE LIMIT HANDLING');
+  log('=======================================================');
+  
+  // Ensure config directory exists
+  if (!fs.existsSync(CONFIG_DIR)) {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  
+  // Ensure data directory exists
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  
+  let completedTasks = 0;
+  
+  // Update price feed configuration
+  if (improvePriceFeedConfig()) {
+    log('✅ Successfully updated price feed configuration');
+    completedTasks++;
+  }
+  
+  // Create improved price feed integration
+  if (createImprovedPriceFeedIntegration()) {
+    log('✅ Successfully created improved price feed integration');
+    completedTasks++;
+  }
+  
+  // Create example usage
+  if (createExampleUsage()) {
+    log('✅ Successfully created example usage script');
+    completedTasks++;
+  }
+  
+  // Update system memory
+  if (updateSystemMemory()) {
+    log('✅ Successfully updated system memory');
+    completedTasks++;
+  }
+  
+  // Create restart script
+  if (createRestartScript()) {
+    log('✅ Successfully created restart script');
+    completedTasks++;
+  }
+  
+  // Summary
+  log('\n=======================================================');
+  log(`✅ Successfully completed ${completedTasks}/5 tasks`);
+  log('=======================================================');
+  log('\nImprovements made:');
+  log('1. Added exponential backoff for rate-limited sources');
+  log('2. Implemented automatic source rotation');
+  log('3. Enhanced fallback mechanisms with better caching');
+  log('4. Added circuit breaker for repeatedly failing sources');
+  log('5. Created easy restart mechanism for price feed service');
+  
+  if (completedTasks === 5) {
+    log('\nYour price feed service is now more resilient to rate limits!');
+    log('To restart the price feed service with these improvements, run:');
+    log('./restart-price-feed.sh');
+  } else {
+    log('\n⚠️ Some tasks failed. Please check the logs and try again.');
+  }
+  
+  log('=======================================================');
+}
+
+// Execute the improvement process
+improvePriceFeed();

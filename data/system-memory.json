@@ -380,7 +380,7 @@
         }
       }
     ],
-    "lastUpdated": "2025-05-18T00:46:05.878Z",
+    "lastUpdated": "2025-05-18T01:43:38.184Z",
     "totalAllocation": 100,
     "averageDailyROI": 52.75
   },
@@ -420,8 +420,6 @@
       "type": "trading",
       "strategies": [
         "QuantumOmegaMemeSniper",
-        "ZeroCapitalFlashLoan",
-        "HyperionFlashLoan",
         "QuantumFlashLoan"
       ]
     }
