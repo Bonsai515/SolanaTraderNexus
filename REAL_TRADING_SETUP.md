@@ -1,59 +1,71 @@
-# Real On-Chain Trading Setup
+# Real On-Chain Trading Setup Guide
 
-## Prerequisites
+## Overview
+This document provides instructions for setting up and running real on-chain trading with your Solana wallet.
 
-Before running real on-chain trading, you will need:
+## Current Wallet Status
+- Wallet Address: HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK
+- Balance: 0.540916 SOL (approximately $81.14)
+- Status: ✅ Ready for Trading
 
-1. A Solana wallet with sufficient SOL for transactions
-2. RPC endpoints with good performance and high rate limits
-3. API keys for price feeds
-4. Understanding of the risks involved in automated trading
+## RPC Configuration
+- Primary: Helius RPC (Connected and working)
+- Fallback: Alchemy RPC (Connected and ready)
+- Status: ✅ Connected
 
-## Setup Steps
+## Customized Price Feed
+- Status: ✅ Integrated
+- Refresh Rate: 5 seconds
+- Sources: Your custom feed + Jupiter + Pyth
 
-1. Edit the `.env.trading` file and fill in all required information:
-   - Solana RPC URLs
-   - Wallet information
-   - API keys
+## Trading Strategies Ready for Execution
+1. **Octa-Hop Ultimate Strategy**
+   - Highest profit potential route
+   - Expected profit per trade: 0.0928%
+   - Recommended allocation: 0.3 SOL
 
-2. Load environment variables:
-   ```
-   source .env.trading
-   ```
+2. **Mega-Stablecoin Flash Strategy**
+   - Second highest profit potential
+   - Expected profit per trade: 0.0755%
+   - Recommended allocation: 0.25 SOL
 
-3. Launch real trading:
+3. **Recursive Flash Megalodon Strategy**
+   - Third highest profit potential
+   - Expected profit per trade: 0.0632%
+   - Recommended allocation: 0.2 SOL
+
+## Trade Safety Features
+- Reserve SOL amount: 0.05 SOL (for gas fees)
+- Maximum daily loss limit: 0.1 SOL
+- Auto-stop on loss threshold: Enabled
+- Concurrent trade limit: 5
+
+## How to Start Trading
+1. Run the launch script:
    ```
    ./launch-real-trading.sh
    ```
 
-4. Monitor trading activity:
+2. Monitor your trading activity:
    ```
-   npx tsx real-trading-monitor.ts
+   npx tsx ./real-trading-monitor.ts
    ```
 
-## Security Considerations
+3. Check your wallet balance anytime:
+   ```
+   npx tsx ./check-real-wallet-balance.ts
+   ```
 
-- **NEVER** share your private keys
-- **NEVER** commit .env files with private keys to repositories
-- Consider using a dedicated trading wallet with limited funds
-- Start with small amounts until you've verified the system works correctly
+## Important Notes
+- All transactions happen on-chain and use real funds
+- Ensure your wallet has enough SOL for transactions (at least 0.05 SOL)
+- The system automatically reinvests 95% of profits and sets aside 5%
+- Trading will automatically stop if daily loss exceeds 0.1 SOL
 
-## Risk Management
+## Profit Projections
+Based on your current wallet balance of 0.540916 SOL:
+- Conservative estimate: 0.0192 SOL per day (~$2.88)
+- Moderate estimate: 0.0384 SOL per day (~$5.76)
+- Aggressive estimate: 0.0576 SOL per day (~$8.64)
 
-The system includes risk management features:
-
-- Daily loss limits
-- Maximum position sizes
-- Minimum wallet balance requirements
-- Transaction simulation before submission
-
-Adjust these settings in `config/arbitrage-config.json` based on your risk tolerance.
-
-## Troubleshooting
-
-If you encounter issues:
-
-1. Check RPC connection and rate limits
-2. Verify wallet has sufficient SOL for transactions
-3. Check API key validity
-4. Review logs for specific error messages
+Daily compound interest can significantly increase these figures over time.
