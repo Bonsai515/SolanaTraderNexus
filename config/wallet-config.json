@@ -1,0 +1,30 @@
+{
+  "tradingWallet": {
+    "publicKey": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "usePrivateKeyEnv": true,
+    "source": "env"
+  },
+  "profitWallet": {
+    "publicKey": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "isSameAsTradingWallet": true
+  },
+  "tradingSettings": {
+    "maxPositionSizePercent": 95,
+    "reserveSOL": 0.05,
+    "maxConcurrentTrades": 5,
+    "priorityFeeEnabled": true,
+    "priorityFeeLamports": 1000,
+    "dynamicFeeAdjustment": true
+  },
+  "profitCollectionSettings": {
+    "autoCollect": true,
+    "minAmountToCollectSOL": 0.05,
+    "profitSplitPercent": 95
+  },
+  "safetySettings": {
+    "maxDailyLossSOL": 0.1,
+    "stopTradingOnLoss": true,
+    "emergencyWithdrawalAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "maxGasPerTransactionSOL": 0.005
+  }
+}

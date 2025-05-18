@@ -1,0 +1,31 @@
+{
+  "primary": {
+    "url": "https://rpc.helius.xyz/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "wsUrl": "wss://rpc.helius.xyz/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f"
+  },
+  "fallbacks": [
+    {
+      "url": "PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "wsUrl": "wss://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR"
+    },
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "wsUrl": "wss://api.mainnet-beta.solana.com"
+    }
+  ],
+  "rateLimit": {
+    "maxRequestsPerSecond": 50,
+    "maxRequestsPerMinute": 3000
+  },
+  "retrySettings": {
+    "maxRetries": 3,
+    "baseDelayMs": 250,
+    "maxDelayMs": 3000
+  },
+  "enhancedRpcSettings": {
+    "preflight": false,
+    "preflightCommitment": "processed",
+    "commitment": "confirmed",
+    "disableRetryOnRateLimit": false
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "strategies": {
+    "octa_hop": {
+      "enabled": true,
+      "minProfitPercentage": 0.05,
+      "maxPositionSizePercent": 95,
+      "maxSlippageBps": 50,
+      "maxGasSpendPerTxSOL": 0.002,
+      "pairs": [
+        "USDC/USDT",
+        "USDT/USTv2",
+        "USTv2/BUSD",
+        "BUSD/DAI",
+        "DAI/FRAX",
+        "FRAX/USDH",
+        "USDH/USDC"
+      ],
+      "maxHops": 8,
+      "executionsPerHour": 8
+    },
+    "stablecoin_flash": {
+      "enabled": true,
+      "minProfitPercentage": 0.03,
+      "maxPositionSizePercent": 98,
+      "maxSlippageBps": 30,
+      "maxGasSpendPerTxSOL": 0.002,
+      "pairs": [
+        "USDC/USDT",
+        "USDC/BUSD",
+        "USDT/BUSD",
+        "USDC/DAI",
+        "USDT/DAI"
+      ],
+      "maxHops": 6,
+      "executionsPerHour": 6
+    },
+    "triangle_arbitrage": {
+      "enabled": true,
+      "minProfitPercentage": 0.1,
+      "maxPositionSizePercent": 90,
+      "maxSlippageBps": 80,
+      "maxGasSpendPerTxSOL": 0.002,
+      "pairs": [
+        "SOL/USDC/USDT/SOL",
+        "SOL/ETH/USDC/SOL",
+        "BTC/ETH/USDC/BTC"
+      ],
+      "executionsPerHour": 4
+    },
+    "high_frequency": {
+      "enabled": true,
+      "minProfitPercentage": 0.01,
+      "maxPositionSizePercent": 80,
+      "maxSlippageBps": 20,
+      "maxGasSpendPerTxSOL": 0.001,
+      "pairs": [
+        "USDC/USDT"
+      ],
+      "executionsPerHour": 60
+    }
+  },
+  "riskManagement": {
+    "maxDailyLossPercent": 3,
+    "maxPositionSizeSOL": 0.5,
+    "maxConcurrentPositions": 3,
+    "minWalletBalanceSOL": 0.05
+  },
+  "execution": {
+    "simulateBeforeSubmit": true,
+    "confirmationStrategy": "confirmed",
+    "maxSignatureWaitTimeMs": 45000,
+    "priorityFee": {
+      "enabled": true,
+      "microLamports": 1000
+    }
+  }
+}
