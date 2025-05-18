@@ -32,12 +32,17 @@
     "hyperRiskAdjustedExecution",
     "octaHopSpecialization",
     "dedicatedOctaHopExecution",
-    "superchargedStablecoinArbitrage"
+    "superchargedStablecoinArbitrage",
+    "stablecoinOptimizedArbitrage",
+    "parallelExecutionArbitrage",
+    "recursiveFlashLoanManagement",
+    "majorTokenTriangleArbitrage",
+    "ultraHighFrequencyTrading"
   ],
   "configuration": {
-    "scanIntervalMs": 150,
+    "scanIntervalMs": 100,
     "executionTimeoutMs": 12000,
-    "maxConcurrentOperations": 12,
+    "maxConcurrentOperations": 15,
     "retryAttempts": 4,
     "useReattemptLogic": true,
     "logLevel": "info",
@@ -82,5 +87,32 @@
     "maxRetries": 2,
     "customGasSettings": true,
     "useHyperPriority": true
+  },
+  "specializationSettings": {
+    "stablecoinOptimized": {
+      "enabled": true,
+      "dedicatedScanner": true,
+      "specialGasSettings": true
+    },
+    "parallelExecution": {
+      "enabled": true,
+      "maxParallelism": 3,
+      "combinedGasOptimization": true
+    },
+    "recursiveFlash": {
+      "enabled": true,
+      "maxRecursionDepth": 3,
+      "specializedErrorHandling": true
+    },
+    "majorToken": {
+      "enabled": true,
+      "enhancedSlippageProtection": true
+    },
+    "ultraFrequency": {
+      "enabled": true,
+      "minScanInterval": 100,
+      "maxFrequencyPerMinute": 120,
+      "minimalValidation": true
+    }
   }
 }

@@ -451,5 +451,505 @@
     "capitalRequirement": 0.005,
     "riskLevel": "low",
     "maxFrequencyPerMinute": 60
+  },
+  {
+    "name": "Mega-Stablecoin Flash",
+    "type": "stablecoin-optimized",
+    "profitLevel": "transcendent",
+    "description": "High-volume stablecoin arbitrage route focused on tiny spreads at massive volume",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial",
+          "Saber",
+          "Orca",
+          "Raydium"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/BUSD",
+          "BUSD/DAI",
+          "DAI/USDC",
+          "USDC/USDT"
+        ],
+        "estimatedFee": 0.00052,
+        "estimatedSpreadPercent": 0.055,
+        "flashLoanSize": 50000000,
+        "minimumProfit": 0.00012,
+        "confidence": 93,
+        "priority": -2,
+        "executionFrequency": "maximum+",
+        "superOptimized": true
+      }
+    ],
+    "executionStrategy": "atomic-guaranteed",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.01,
+    "riskLevel": "low",
+    "maxExecutionsPerHour": 6,
+    "specialParameters": {
+      "precompute": true,
+      "superHighBids": true,
+      "extraGasBudget": true,
+      "priorityFees": true,
+      "frontPosition": true,
+      "dedicatedRoute": true,
+      "specialGasCalculation": true
+    }
+  },
+  {
+    "name": "Triple-Decker Stablecoin",
+    "type": "parallel-execution",
+    "profitLevel": "godlike",
+    "description": "Three simultaneous stablecoin arbitrage paths executed in parallel",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00022,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.00009,
+        "confidence": 98,
+        "priority": 0,
+        "executionTimeMs": 1600
+      },
+      {
+        "sequence": [
+          "Orca",
+          "Saber"
+        ],
+        "pairs": [
+          "USDC/BUSD",
+          "BUSD/USDC"
+        ],
+        "estimatedFee": 0.00024,
+        "estimatedSpreadPercent": 0.018,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.00011,
+        "confidence": 97,
+        "priority": 0,
+        "executionTimeMs": 1650
+      },
+      {
+        "sequence": [
+          "Raydium",
+          "Aldrin"
+        ],
+        "pairs": [
+          "USDC/DAI",
+          "DAI/USDC"
+        ],
+        "estimatedFee": 0.00023,
+        "estimatedSpreadPercent": 0.016,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.0001,
+        "confidence": 97,
+        "priority": 0,
+        "executionTimeMs": 1700
+      }
+    ],
+    "executionStrategy": "parallel-atomic",
+    "recursionDepth": 2,
+    "capitalRequirement": 0.02,
+    "riskLevel": "low",
+    "maxExecutionsPerHour": 12,
+    "parallelism": 3,
+    "specialParameters": {
+      "combinedExecution": true,
+      "sharedGasOptimization": true,
+      "batchedTransactions": true
+    }
+  },
+  {
+    "name": "Recursive Flash Megalodon",
+    "type": "recursive-flash",
+    "profitLevel": "beyond_comprehension",
+    "description": "Deep recursive flash loan strategy using flash loans within flash loans",
+    "paths": [
+      {
+        "sequence": [
+          "Solend",
+          "Jupiter",
+          "Orca"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00034,
+        "estimatedSpreadPercent": 0.022,
+        "flashLoanSize": 10000000,
+        "recursiveLevels": [
+          {
+            "sequence": [
+              "Mango",
+              "Mercurial",
+              "Saber"
+            ],
+            "pairs": [
+              "USDT/BUSD",
+              "BUSD/USDT"
+            ],
+            "flashLoanSize": 50000000,
+            "estimatedSpreadPercent": 0.018
+          },
+          {
+            "sequence": [
+              "Port",
+              "Raydium",
+              "Aldrin"
+            ],
+            "pairs": [
+              "USDT/DAI",
+              "DAI/USDT"
+            ],
+            "flashLoanSize": 100000000,
+            "estimatedSpreadPercent": 0.014
+          }
+        ],
+        "minimumProfit": 0.03545,
+        "confidence": 85,
+        "priority": 0,
+        "executionTimeMs": 5000
+      }
+    ],
+    "executionStrategy": "deep-recursive",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.05,
+    "riskLevel": "medium-high",
+    "maxExecutionsPerHour": 2,
+    "specialParameters": {
+      "recursiveFlashLoans": true,
+      "depthFirstExecution": true,
+      "rollbackProtection": true,
+      "nestedTransactionHandling": true
+    }
+  },
+  {
+    "name": "BTC-ETH-SOL Triangle",
+    "type": "major-token",
+    "profitLevel": "high",
+    "description": "Triangle arbitrage between major tokens",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Orca",
+          "Raydium",
+          "Jupiter"
+        ],
+        "pairs": [
+          "SOL/BTC",
+          "BTC/ETH",
+          "ETH/SOL"
+        ],
+        "estimatedFee": 0.00062,
+        "estimatedSpreadPercent": 0.068,
+        "flashLoanSize": 200000,
+        "minimumProfit": 0.00045,
+        "confidence": 92,
+        "priority": 1,
+        "executionTimeMs": 2200
+      }
+    ],
+    "executionStrategy": "standard",
+    "recursionDepth": 1,
+    "capitalRequirement": 0.03,
+    "riskLevel": "medium",
+    "maxExecutionsPerHour": 4
+  },
+  {
+    "name": "Hyper-Stablecoin Lightning",
+    "type": "ultra-frequency",
+    "profitLevel": "high",
+    "description": "Ultra-high frequency stablecoin arbitrage",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00018,
+        "estimatedSpreadPercent": 0.011,
+        "flashLoanSize": 1500000,
+        "minimumProfit": 0.00004,
+        "confidence": 99,
+        "priority": 0,
+        "executionTimeMs": 1400
+      }
+    ],
+    "executionStrategy": "lightning-fast",
+    "recursionDepth": 10,
+    "capitalRequirement": 0.005,
+    "riskLevel": "very-low",
+    "maxExecutionsPerHour": 120,
+    "specialParameters": {
+      "ultraFastGas": true,
+      "preSignedTransactions": true,
+      "autoRetry": true,
+      "minimalVerification": true
+    }
+  },
+  {
+    "name": "Mega-Stablecoin Flash",
+    "type": "stablecoin-optimized",
+    "profitLevel": "transcendent",
+    "description": "High-volume stablecoin arbitrage route focused on tiny spreads at massive volume",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial",
+          "Saber",
+          "Orca",
+          "Raydium"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/BUSD",
+          "BUSD/DAI",
+          "DAI/USDC",
+          "USDC/USDT"
+        ],
+        "estimatedFee": 0.00052,
+        "estimatedSpreadPercent": 0.055,
+        "flashLoanSize": 50000000,
+        "minimumProfit": 0.00012,
+        "confidence": 93,
+        "priority": -2,
+        "executionFrequency": "maximum+",
+        "superOptimized": true
+      }
+    ],
+    "executionStrategy": "atomic-guaranteed",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.01,
+    "riskLevel": "low",
+    "maxExecutionsPerHour": 6,
+    "specialParameters": {
+      "precompute": true,
+      "superHighBids": true,
+      "extraGasBudget": true,
+      "priorityFees": true,
+      "frontPosition": true,
+      "dedicatedRoute": true,
+      "specialGasCalculation": true
+    }
+  },
+  {
+    "name": "Triple-Decker Stablecoin",
+    "type": "parallel-execution",
+    "profitLevel": "godlike",
+    "description": "Three simultaneous stablecoin arbitrage paths executed in parallel",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00022,
+        "estimatedSpreadPercent": 0.015,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.00009,
+        "confidence": 98,
+        "priority": 0,
+        "executionTimeMs": 1600
+      },
+      {
+        "sequence": [
+          "Orca",
+          "Saber"
+        ],
+        "pairs": [
+          "USDC/BUSD",
+          "BUSD/USDC"
+        ],
+        "estimatedFee": 0.00024,
+        "estimatedSpreadPercent": 0.018,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.00011,
+        "confidence": 97,
+        "priority": 0,
+        "executionTimeMs": 1650
+      },
+      {
+        "sequence": [
+          "Raydium",
+          "Aldrin"
+        ],
+        "pairs": [
+          "USDC/DAI",
+          "DAI/USDC"
+        ],
+        "estimatedFee": 0.00023,
+        "estimatedSpreadPercent": 0.016,
+        "flashLoanSize": 3000000,
+        "minimumProfit": 0.0001,
+        "confidence": 97,
+        "priority": 0,
+        "executionTimeMs": 1700
+      }
+    ],
+    "executionStrategy": "parallel-atomic",
+    "recursionDepth": 2,
+    "capitalRequirement": 0.02,
+    "riskLevel": "low",
+    "maxExecutionsPerHour": 12,
+    "parallelism": 3,
+    "specialParameters": {
+      "combinedExecution": true,
+      "sharedGasOptimization": true,
+      "batchedTransactions": true
+    }
+  },
+  {
+    "name": "Recursive Flash Megalodon",
+    "type": "recursive-flash",
+    "profitLevel": "beyond_comprehension",
+    "description": "Deep recursive flash loan strategy using flash loans within flash loans",
+    "paths": [
+      {
+        "sequence": [
+          "Solend",
+          "Jupiter",
+          "Orca"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00034,
+        "estimatedSpreadPercent": 0.022,
+        "flashLoanSize": 10000000,
+        "recursiveLevels": [
+          {
+            "sequence": [
+              "Mango",
+              "Mercurial",
+              "Saber"
+            ],
+            "pairs": [
+              "USDT/BUSD",
+              "BUSD/USDT"
+            ],
+            "flashLoanSize": 50000000,
+            "estimatedSpreadPercent": 0.018
+          },
+          {
+            "sequence": [
+              "Port",
+              "Raydium",
+              "Aldrin"
+            ],
+            "pairs": [
+              "USDT/DAI",
+              "DAI/USDT"
+            ],
+            "flashLoanSize": 100000000,
+            "estimatedSpreadPercent": 0.014
+          }
+        ],
+        "minimumProfit": 0.03545,
+        "confidence": 85,
+        "priority": 0,
+        "executionTimeMs": 5000
+      }
+    ],
+    "executionStrategy": "deep-recursive",
+    "recursionDepth": 3,
+    "capitalRequirement": 0.05,
+    "riskLevel": "medium-high",
+    "maxExecutionsPerHour": 2,
+    "specialParameters": {
+      "recursiveFlashLoans": true,
+      "depthFirstExecution": true,
+      "rollbackProtection": true,
+      "nestedTransactionHandling": true
+    }
+  },
+  {
+    "name": "BTC-ETH-SOL Triangle",
+    "type": "major-token",
+    "profitLevel": "high",
+    "description": "Triangle arbitrage between major tokens",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Orca",
+          "Raydium",
+          "Jupiter"
+        ],
+        "pairs": [
+          "SOL/BTC",
+          "BTC/ETH",
+          "ETH/SOL"
+        ],
+        "estimatedFee": 0.00062,
+        "estimatedSpreadPercent": 0.068,
+        "flashLoanSize": 200000,
+        "minimumProfit": 0.00045,
+        "confidence": 92,
+        "priority": 1,
+        "executionTimeMs": 2200
+      }
+    ],
+    "executionStrategy": "standard",
+    "recursionDepth": 1,
+    "capitalRequirement": 0.03,
+    "riskLevel": "medium",
+    "maxExecutionsPerHour": 4
+  },
+  {
+    "name": "Hyper-Stablecoin Lightning",
+    "type": "ultra-frequency",
+    "profitLevel": "high",
+    "description": "Ultra-high frequency stablecoin arbitrage",
+    "paths": [
+      {
+        "sequence": [
+          "Jupiter",
+          "Mercurial"
+        ],
+        "pairs": [
+          "USDC/USDT",
+          "USDT/USDC"
+        ],
+        "estimatedFee": 0.00018,
+        "estimatedSpreadPercent": 0.011,
+        "flashLoanSize": 1500000,
+        "minimumProfit": 0.00004,
+        "confidence": 99,
+        "priority": 0,
+        "executionTimeMs": 1400
+      }
+    ],
+    "executionStrategy": "lightning-fast",
+    "recursionDepth": 10,
+    "capitalRequirement": 0.005,
+    "riskLevel": "very-low",
+    "maxExecutionsPerHour": 120,
+    "specialParameters": {
+      "ultraFastGas": true,
+      "preSignedTransactions": true,
+      "autoRetry": true,
+      "minimalVerification": true
+    }
   }
 ]

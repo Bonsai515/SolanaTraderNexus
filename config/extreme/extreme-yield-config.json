@@ -289,5 +289,41 @@
     "dedicatedRpcNode": true,
     "alternatePathFinding": true,
     "supercharged": true
+  },
+  "extendedRouteSupport": {
+    "stablecoinOptimized": true,
+    "parallelExecution": true,
+    "recursiveFlash": true,
+    "majorToken": true,
+    "ultraFrequency": true
+  },
+  "routeSpecificConfig": {
+    "Mega-Stablecoin Flash": {
+      "priorityExecutionLevel": "maximum",
+      "dedicatedResources": true,
+      "specialGasSettings": {
+        "gasMultiplier": 1.3,
+        "priorityFee": true
+      }
+    },
+    "Triple-Decker Stablecoin": {
+      "parallelismLevel": 3,
+      "batchProcessing": true,
+      "combinedGasOptimization": true
+    },
+    "Recursive Flash Megalodon": {
+      "recursionHandling": "specialized",
+      "rollbackProtection": true,
+      "extraTimeoutBuffer": 2000
+    },
+    "BTC-ETH-SOL Triangle": {
+      "optimizedForMajorTokens": true,
+      "slippageProtection": "enhanced"
+    },
+    "Hyper-Stablecoin Lightning": {
+      "ultraHighFrequency": true,
+      "minimalVerification": true,
+      "precompiledTransactions": true
+    }
   }
 }
