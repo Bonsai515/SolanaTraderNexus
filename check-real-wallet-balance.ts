@@ -15,7 +15,7 @@ const WALLET_PUBLIC_KEY = process.env.TRADING_WALLET_PUBLIC_KEY || 'HPNd8RHNATnN
 
 // Helius RPC URL
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
-const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://rpc.helius.xyz/?api-key=${HELIUS_API_KEY}`;
+const HELIUS_RPC_URL = `https://rpc.helius.xyz/?api-key=${HELIUS_API_KEY}`;
 
 // Check wallet balance
 async function checkWalletBalance() {
