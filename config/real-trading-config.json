@@ -1,0 +1,20 @@
+{
+  "configured": true,
+  "timestamp": "2025-05-18T04:44:13.616Z",
+  "requiredEnvVars": [
+    "SOLANA_RPC_URL",
+    "TRADING_WALLET_PUBLIC_KEY",
+    "TRADING_WALLET_PRIVATE_KEY"
+  ],
+  "optionalEnvVars": [
+    "HELIUS_API_KEY",
+    "QUICKNODE_RPC_URL",
+    "COINGECKO_API_KEY"
+  ],
+  "strategies": [
+    "octa_hop",
+    "stablecoin_flash",
+    "triangle_arbitrage",
+    "high_frequency"
+  ]
+}

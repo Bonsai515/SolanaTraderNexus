@@ -1,167 +1,98 @@
 /**
  * Check Real Wallet Balance
  * 
- * This script shows the current balance of your trading wallet
- * and calculates profits from your trading activities.
+ * This script checks the balance of the trading wallet using Helius RPC.
  */
 
-// Trading wallet address
-const TRADING_WALLET_ADDRESS = 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
-const INITIAL_BALANCE = 0.540916; // SOL
-const SOL_PRICE_USD = 160;
+import { Connection, PublicKey } from '@solana/web3.js';
+import * as dotenv from 'dotenv';
 
-// Main function
-async function checkRealWalletBalance() {
-  console.log('===============================================');
-  console.log('💰 TRADING WALLET BALANCE TRACKER');
-  console.log('===============================================');
-  console.log(`Wallet: ${TRADING_WALLET_ADDRESS}`);
-  console.log(`Initial Balance: ${INITIAL_BALANCE.toFixed(6)} SOL ($${(INITIAL_BALANCE * SOL_PRICE_USD).toFixed(2)})`);
-  console.log('-----------------------------------------------');
+// Load environment variables
+dotenv.config({ path: './.env.trading' });
+
+// Trading wallet public key
+const WALLET_PUBLIC_KEY = process.env.TRADING_WALLET_PUBLIC_KEY || 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
+
+// Helius RPC URL
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
+const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://rpc.helius.xyz/?api-key=${HELIUS_API_KEY}`;
+
+// Check wallet balance
+async function checkWalletBalance() {
+  console.log('Checking real wallet balance...');
   
   try {
-    // Get current balance - for simplicity using initial balance + accumulated profit
-    // In a real case we would fetch this from the blockchain using Connection.getBalance
-    const currentBalance = INITIAL_BALANCE + getAccumulatedProfit();
+    // Create connection to Helius
+    const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
     
-    // Calculate profit
-    const profit = currentBalance - INITIAL_BALANCE;
-    const profitPercentage = (profit / INITIAL_BALANCE) * 100;
+    // Get wallet public key
+    const walletPublicKey = new PublicKey(WALLET_PUBLIC_KEY);
     
-    console.log(`Current Balance: ${currentBalance.toFixed(6)} SOL ($${(currentBalance * SOL_PRICE_USD).toFixed(2)})`);
-    console.log(`Total Profit: ${profit.toFixed(6)} SOL ($${(profit * SOL_PRICE_USD).toFixed(2)})`);
-    console.log(`Profit Percentage: ${profitPercentage.toFixed(2)}%`);
-    console.log('-----------------------------------------------');
+    // Get wallet SOL balance
+    const balance = await connection.getBalance(walletPublicKey);
+    const balanceSOL = balance / 1_000_000_000; // Convert lamports to SOL
     
-    // Show profit sources
-    showProfitSources();
+    console.log('');
+    console.log('==== WALLET DETAILS ====');
+    console.log(`Wallet Address: ${WALLET_PUBLIC_KEY}`);
+    console.log(`SOL Balance: ${balanceSOL.toFixed(6)} SOL`);
     
-    // Show realistic projections
-    showRealisticProjections(currentBalance);
-  } catch (error) {
-    console.error('Error retrieving wallet balance:', error);
-  }
-}
-
-// Get accumulated profit based on strategy execution
-function getAccumulatedProfit() {
-  // Simulating real profit accumulation based on strategy run time
-  
-  // Start time of optimized strategy
-  const strategyStartTime = new Date('2025-05-18T02:52:00.000Z').getTime();
-  const currentTime = new Date().getTime();
-  
-  // Calculate hours since strategy activation
-  const hoursSinceActivation = (currentTime - strategyStartTime) / (1000 * 60 * 60);
-  
-  // Calculate profit components
-  
-  // 1. Octa-Hop Ultimate profits
-  // Runs approximately every 10 minutes with 0.01739 SOL profit per execution
-  const octaHopRuns = Math.floor(hoursSinceActivation * 6); // 6 runs per hour
-  const octaHopProfit = octaHopRuns * 0.01739;
-  
-  // 2. Ultra-Frequency USDC-USDT profits
-  // Runs approximately every minute with 0.000226 SOL profit per execution
-  const ultraFrequencyRuns = Math.floor(hoursSinceActivation * 60); // 60 runs per hour
-  const ultraFrequencyProfit = ultraFrequencyRuns * 0.000226;
-  
-  // 3. Other strategy profits
-  // Miscellaneous profits from other strategies (approximately 0.005 SOL per hour)
-  const otherProfit = hoursSinceActivation * 0.005;
-  
-  // Total profit (capped at a reasonable amount for simulation purposes)
-  const totalProfit = octaHopProfit + ultraFrequencyProfit + otherProfit;
-  
-  // Cap at 0.65 SOL total profit for simulation purposes
-  return Math.min(totalProfit, 0.65);
-}
-
-// Show profit sources
-function showProfitSources() {
-  console.log('PROFIT SOURCES:');
-  console.log('-----------------------------------------------');
-  
-  // Start time of optimized strategy
-  const strategyStartTime = new Date('2025-05-18T02:52:00.000Z').getTime();
-  const currentTime = new Date().getTime();
-  
-  // Calculate hours since strategy activation
-  const hoursSinceActivation = (currentTime - strategyStartTime) / (1000 * 60 * 60);
-  
-  // Calculate profit components
-  
-  // 1. Octa-Hop Ultimate profits
-  const octaHopRuns = Math.floor(hoursSinceActivation * 6); // 6 runs per hour
-  const octaHopProfit = octaHopRuns * 0.01739;
-  const octaHopProfitPercent = (octaHopProfit / getAccumulatedProfit()) * 100;
-  
-  // 2. Ultra-Frequency USDC-USDT profits
-  const ultraFrequencyRuns = Math.floor(hoursSinceActivation * 60); // 60 runs per hour
-  const ultraFrequencyProfit = ultraFrequencyRuns * 0.000226;
-  const ultraFrequencyProfitPercent = (ultraFrequencyProfit / getAccumulatedProfit()) * 100;
-  
-  // 3. Other strategy profits
-  const otherProfit = hoursSinceActivation * 0.005;
-  const otherProfitPercent = (otherProfit / getAccumulatedProfit()) * 100;
-  
-  console.log(`1. Octa-Hop Ultimate: ${octaHopProfit.toFixed(6)} SOL (${octaHopProfitPercent.toFixed(1)}%)`);
-  console.log(`   Executions: ${octaHopRuns}, Profit/Trade: 0.01739 SOL`);
-  console.log('');
-  
-  console.log(`2. Ultra-Frequency USDC-USDT: ${ultraFrequencyProfit.toFixed(6)} SOL (${ultraFrequencyProfitPercent.toFixed(1)}%)`);
-  console.log(`   Executions: ${ultraFrequencyRuns}, Profit/Trade: 0.000226 SOL`);
-  console.log('');
-  
-  console.log(`3. Other Strategies: ${otherProfit.toFixed(6)} SOL (${otherProfitPercent.toFixed(1)}%)`);
-  console.log('   Includes: Alternative Octa-Hop, SOL Triangle, USDC-USDT Speed Loop');
-  console.log('-----------------------------------------------');
-}
-
-// Show realistic projections
-function showRealisticProjections(currentBalance: number) {
-  console.log('REALISTIC PROJECTIONS:');
-  console.log('-----------------------------------------------');
-  
-  // Realistic hourly profit rate (based on current strategy)
-  const hourlyProfitRate = 0.0347; // SOL per hour
-  const dailyProfitRate = hourlyProfitRate * 24;
-  const weeklyProfitRate = dailyProfitRate * 7;
-  const monthlyProfitRate = dailyProfitRate * 30;
-  
-  console.log(`Hourly Profit: ${hourlyProfitRate.toFixed(4)} SOL ($${(hourlyProfitRate * SOL_PRICE_USD).toFixed(2)})`);
-  console.log(`Daily Profit: ${dailyProfitRate.toFixed(4)} SOL ($${(dailyProfitRate * SOL_PRICE_USD).toFixed(2)})`);
-  console.log(`Weekly Profit: ${weeklyProfitRate.toFixed(4)} SOL ($${(weeklyProfitRate * SOL_PRICE_USD).toFixed(2)})`);
-  console.log(`Monthly Profit: ${monthlyProfitRate.toFixed(4)} SOL ($${(monthlyProfitRate * SOL_PRICE_USD).toFixed(2)})`);
-  
-  console.log('');
-  console.log('BALANCE GROWTH (with compounding):');
-  
-  let balance = currentBalance;
-  console.log(`Current: ${balance.toFixed(6)} SOL ($${(balance * SOL_PRICE_USD).toFixed(2)})`);
-  
-  // Project balance for the next 6 months with daily compounding
-  for (let month = 1; month <= 6; month++) {
-    for (let day = 0; day < 30; day++) {
-      // Add daily profit with compounding effect
-      balance += (balance * (dailyProfitRate / currentBalance)) * 0.95; // 95% reinvestment
+    // Calculate USD value (approximate)
+    const solPriceUSD = 150; // Approximate SOL price in USD
+    const balanceUSD = balanceSOL * solPriceUSD;
+    console.log(`Approximate USD Value: $${balanceUSD.toFixed(2)}`);
+    
+    // Check if balance is sufficient for trading
+    const MINIMUM_RECOMMENDED_BALANCE = 0.05; // 0.05 SOL
+    if (balanceSOL < MINIMUM_RECOMMENDED_BALANCE) {
+      console.log('');
+      console.log('⚠️ WARNING: Wallet balance is below the recommended minimum of 0.05 SOL');
+      console.log('Consider adding more SOL to your wallet for trading and gas fees.');
+    } else {
+      console.log('');
+      console.log('✅ Wallet balance is sufficient for trading');
     }
-    console.log(`Month ${month}: ${balance.toFixed(6)} SOL ($${(balance * SOL_PRICE_USD).toFixed(2)})`);
+    
+    // Get token balances (simplified version)
+    console.log('');
+    console.log('Retrieving token balances...');
+    const tokenBalances = await connection.getParsedTokenAccountsByOwner(
+      walletPublicKey,
+      { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
+    );
+    
+    if (tokenBalances.value.length > 0) {
+      console.log('');
+      console.log('==== TOKEN BALANCES ====');
+      tokenBalances.value.forEach((tokenAccount) => {
+        const parsedInfo = tokenAccount.account.data.parsed.info;
+        const tokenAddress = parsedInfo.mint;
+        const tokenAmount = parsedInfo.tokenAmount.uiAmount;
+        const tokenName = parsedInfo.tokenAmount.decimals === 6 ? 'USDC' : 
+                          tokenAddress.substring(0, 4) + '...' + tokenAddress.substring(tokenAddress.length - 4);
+        
+        if (tokenAmount > 0) {
+          console.log(`${tokenName}: ${tokenAmount}`);
+        }
+      });
+    } else {
+      console.log('No SPL tokens found in wallet');
+    }
+    
+    return balanceSOL;
+  } catch (error) {
+    console.error('Error checking wallet balance:', error);
+    console.log('');
+    console.log('⚠️ Failed to connect to Helius RPC');
+    console.log('Make sure your HELIUS_API_KEY is set correctly in .env.trading');
+    return 0;
   }
-  
-  // Calculate yearly projection
-  let yearlyBalance = currentBalance;
-  for (let day = 0; day < 365; day++) {
-    // Add daily profit with compounding effect
-    yearlyBalance += (yearlyBalance * (dailyProfitRate / currentBalance)) * 0.95; // 95% reinvestment
-  }
-  console.log(`Year 1: ${yearlyBalance.toFixed(6)} SOL ($${(yearlyBalance * SOL_PRICE_USD).toFixed(2)})`);
-  
-  // Calculate ROI
-  const yearlyROI = ((yearlyBalance / INITIAL_BALANCE) - 1) * 100;
-  console.log(`Annual ROI: ${yearlyROI.toFixed(2)}%`);
-  console.log('-----------------------------------------------');
 }
 
-// Run the balance check
-checkRealWalletBalance().catch(console.error);
+// Main function
+async function main() {
+  await checkWalletBalance();
+}
+
+// Run main function
+main().catch(console.error);
