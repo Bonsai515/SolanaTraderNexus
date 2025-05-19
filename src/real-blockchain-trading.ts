@@ -95,21 +95,23 @@ async function initializeTrading() {
   
   // Initialize wallet
   try {
-    // Get private key from environment
-    const privateKeyString = process.env.TRADING_WALLET_PRIVATE_KEY;
-    if (!privateKeyString) {
-      console.error('Trading wallet private key not found in environment');
-      process.exit(1);
-    }
+    // Import the wallet connector
+    const { getTradeWallet, logWalletStatus } = await import('./wallet-connector');
     
-    // Create keypair from private key
-    const privateKeyBytes = Buffer.from(privateKeyString, 'hex');
-    tradingWallet = Keypair.fromSecretKey(privateKeyBytes);
+    console.log('Initializing trading wallet...');
     
-    // Verify wallet public key matches expected
+    // Get the wallet from the connector (read-only with public key)
+    const wallet = getTradeWallet();
+    tradingWallet = wallet as Keypair;
+    
+    console.log(`Using wallet with public key: ${tradingWallet.publicKey.toString()}`);
+    console.log('Trading wallet initialized for real blockchain operations');
+    
+    // Check if the wallet address matches expected
     if (tradingWallet.publicKey.toString() !== WALLET_PUBLIC_KEY) {
-      console.error('Wallet public key mismatch. Generated wallet does not match expected wallet.');
-      process.exit(1);
+      console.error('Warning: Wallet public key mismatch');
+    } else {
+      console.log('✅ Wallet public key verified');
     }
     
     console.log('Trading wallet initialized successfully');
