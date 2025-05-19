@@ -2,7 +2,6 @@
   "tradingEnabled": true,
   "useRealFunds": true,
   "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
-  "walletBalanceSOL": 0.540916306,
   "minProfitThreshold": 0.2,
   "maxTradesPerHour": 14,
   "minTimeBetweenTrades": 300,
@@ -30,7 +29,5 @@
       "priority": 1
     }
   ],
-  "lastActivated": "2025-05-19T16:52:05.365Z",
-  "executeRealTrades": true,
-  "lastUpdated": "2025-05-19T18:16:11.598Z"
+  "lastActivated": "2025-05-19T18:35:06.997Z"
 }
