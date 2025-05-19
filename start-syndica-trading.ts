@@ -73,7 +73,7 @@ async function startMonitoring(): Promise<void> {
   console.log('=== STARTING OPTIMIZED TRADING SYSTEM WITH SYNDICA ===');
   console.log(`Rate limit: 1 req/sec, 12 req/min`);
   console.log(`Trade frequency: 3 per hour, min 1200s between trades`);
-  console.log(`Min profit threshold: 1.0%`);
+  console.log(`Min profit threshold: 0.25%`);
   console.log(`Max slippage: 1.0%`);
   
   // Create report on what's using the most API requests

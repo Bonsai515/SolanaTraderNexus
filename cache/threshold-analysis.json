@@ -1,0 +1,14 @@
+{
+  "minSpreadFound": 0.1,
+  "averageSpread": null,
+  "medianSpread": null,
+  "transactionCosts": {
+    "average": 0.00075,
+    "min": 0.00075,
+    "max": 0.00075
+  },
+  "recommendedThreshold": 0.15,
+  "updated": 1747669393597,
+  "confidence": 0.85,
+  "sampleSize": 0
+}
