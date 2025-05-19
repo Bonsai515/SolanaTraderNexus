@@ -7,6 +7,11 @@
   "profitReinvestmentPercent": 95,
   "profitCollectionPercent": 5,
   "activeStrategies": [
+    "ultimate-nuclear-money",
+    "nuclear-flash-loan",
+    "mev-protection-flash",
+    "borrow-flash-arbitrage",
+    "zero-capital-flash",
     "temporal-block-arbitrage",
     "flash-loan-arbitrage",
     "layered-megalodon-prime"
@@ -21,5 +26,41 @@
   "priorityFeeLevel": "medium",
   "defaultSlippageBps": 50,
   "transactionTimeout": 60000,
-  "lastUpdated": "2025-05-19T18:47:29.455Z"
+  "lastUpdated": "2025-05-19T18:50:15.528Z",
+  "rpcProviders": [
+    {
+      "name": "syndica",
+      "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
+      "wsUrl": "wss://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
+      "priority": 1,
+      "usageLimit": "strategies",
+      "maxRequestsPerSecond": 10
+    },
+    {
+      "name": "alchemy",
+      "url": "https://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "wsUrl": "wss://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "priority": 2,
+      "usageLimit": "transformers",
+      "maxRequestsPerSecond": 15
+    },
+    {
+      "name": "helius",
+      "url": "https://rpc.helius.xyz/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "priority": 2.5,
+      "usageLimit": "special-functions",
+      "maxRequestsPerSecond": 5
+    }
+  ],
+  "features": {
+    "nucleaRTransformerPrediction": true,
+    "quantumFlashArbitrage": true,
+    "hyperionLayeredPositions": true,
+    "mevProtection": true,
+    "advancedRbsProtection": true,
+    "adaptiveSlippage": true,
+    "neuralGasOptimization": true,
+    "jupiterApiV6Integration": true,
+    "oraclePriceVerification": true
+  }
 }
