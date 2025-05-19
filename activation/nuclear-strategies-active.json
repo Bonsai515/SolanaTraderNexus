@@ -1,0 +1,12 @@
+{
+  "activated": true,
+  "timestamp": "2025-05-19T13:15:52.735Z",
+  "strategies": [
+    "singularityBlackHole",
+    "hyperionMoneyGlitch",
+    "megalodonFlashNova",
+    "quantumOmegaEclipse"
+  ],
+  "riskLevel": "NUCLEAR",
+  "warningAccepted": true
+}
