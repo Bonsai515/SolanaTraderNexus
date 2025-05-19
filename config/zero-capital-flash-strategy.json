@@ -1,0 +1,55 @@
+{
+  "name": "Zero Capital Flash Arbitrage",
+  "enabled": true,
+  "priority": 10,
+  "expectedProfitPercent": 2.95,
+  "maxPositionSizePercent": 25,
+  "minProfitThresholdPercent": 0.2,
+  "maxSlippageBps": 35,
+  "maxActiveLoans": 2,
+  "rpcProvider": "syndica",
+  "transformerProvider": "alchemy",
+  "loanProtocols": [
+    "Solend",
+    "Kamino",
+    "Marinade",
+    "Meteora"
+  ],
+  "tokens": [
+    "SOL",
+    "USDC",
+    "ETH",
+    "mSOL",
+    "BONK",
+    "JUP"
+  ],
+  "exchanges": [
+    "Jupiter",
+    "Raydium",
+    "Orca",
+    "Meteora"
+  ],
+  "features": {
+    "oraclePriceVerification": true,
+    "transformerPrediction": true,
+    "multihopRouting": true,
+    "rbsProtection": true,
+    "priorityFeeOptimization": true,
+    "zeroCapitalOptimization": true,
+    "liquitySweeping": true,
+    "multicallExecution": true,
+    "atomicTransactions": true,
+    "onchainPriceVerification": true
+  },
+  "riskLevel": "medium-high",
+  "minLoanSizeSOL": 0.1,
+  "maxLoanSizeSOL": 15,
+  "gasOptimization": true,
+  "priorityFeeInLamports": 250000,
+  "simulateBeforeExecution": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "submitTransactions": true,
+  "monitoringInterval": 1000,
+  "logLevel": "info",
+  "lastUpdated": "2025-05-19T18:50:15.523Z"
+}
