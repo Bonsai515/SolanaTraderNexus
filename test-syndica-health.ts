@@ -33,9 +33,10 @@ async function testSyndicaHealth() {
     console.log('Sending health check request...');
     
     // Make the POST request to Syndica API
-    const response = await axios.post(SYNDICA_RPC_URL, payload, {
+    const response = await axios.post('https://solana-mainnet.api.syndica.io/', payload, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Syndica-Api-Key': SYNDICA_API_KEY
       }
     });
 
