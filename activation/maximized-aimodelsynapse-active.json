@@ -1,0 +1,9 @@
+{
+  "activated": true,
+  "timestamp": "2025-05-19T13:47:44.098Z",
+  "strategies": [
+    "databaseFlashUltimate",
+    "temporalArbitrageUltimate"
+  ],
+  "reinvestmentRate": 0.95
+}
