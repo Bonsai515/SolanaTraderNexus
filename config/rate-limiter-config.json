@@ -1,0 +1,146 @@
+{
+  "enabled": true,
+  "defaultStrategy": "adaptive",
+  "strategies": {
+    "token": {
+      "type": "token",
+      "refillRatePerSecond": 1,
+      "bucketSize": 10,
+      "initialTokens": 10
+    },
+    "adaptive": {
+      "type": "adaptive",
+      "initialLimit": 10,
+      "minLimit": 1,
+      "maxLimit": 20,
+      "decreaseFactor": 0.5,
+      "increaseFactor": 0.1,
+      "successThreshold": 10
+    },
+    "exponentialBackoff": {
+      "type": "exponentialBackoff",
+      "initialDelay": 500,
+      "maxDelay": 32000,
+      "factor": 2,
+      "jitter": 0.1
+    }
+  },
+  "providers": {
+    "coingecko": {
+      "strategy": "exponentialBackoff",
+      "maxRequestsPerMinute": 10,
+      "maxConcurrentRequests": 1,
+      "minTimeBetweenRequestsMs": 6000,
+      "healthCheckIntervalMs": 60000,
+      "useCaching": true,
+      "cacheTimeMs": 60000
+    },
+    "instantnodes": {
+      "strategy": "adaptive",
+      "maxRequestsPerMinute": 20,
+      "maxConcurrentRequests": 2,
+      "minTimeBetweenRequestsMs": 3000,
+      "healthCheckIntervalMs": 30000,
+      "useCaching": true,
+      "cacheTimeMs": 30000
+    },
+    "syndica": {
+      "strategy": "token",
+      "maxRequestsPerMinute": 30,
+      "maxConcurrentRequests": 3,
+      "minTimeBetweenRequestsMs": 2000,
+      "healthCheckIntervalMs": 30000,
+      "useCaching": true,
+      "cacheTimeMs": 20000
+    },
+    "helius": {
+      "strategy": "adaptive",
+      "maxRequestsPerMinute": 20,
+      "maxConcurrentRequests": 2,
+      "minTimeBetweenRequestsMs": 3000,
+      "healthCheckIntervalMs": 30000,
+      "useCaching": true,
+      "cacheTimeMs": 30000
+    },
+    "chainstream": {
+      "strategy": "token",
+      "maxRequestsPerMinute": 15,
+      "maxConcurrentRequests": 1,
+      "minTimeBetweenRequestsMs": 4000,
+      "healthCheckIntervalMs": 60000,
+      "useCaching": true,
+      "cacheTimeMs": 40000
+    },
+    "pump": {
+      "strategy": "exponentialBackoff",
+      "maxRequestsPerMinute": 10,
+      "maxConcurrentRequests": 1,
+      "minTimeBetweenRequestsMs": 6000,
+      "healthCheckIntervalMs": 60000,
+      "useCaching": true,
+      "cacheTimeMs": 60000
+    }
+  },
+  "resourceCategories": {
+    "prices": {
+      "maxRequestsPerMinute": 10,
+      "cachePriority": "high",
+      "cacheTimeMs": 60000,
+      "providers": [
+        "coingecko",
+        "pump"
+      ]
+    },
+    "transactions": {
+      "maxRequestsPerMinute": 20,
+      "cachePriority": "medium",
+      "cacheTimeMs": 20000,
+      "providers": [
+        "syndica",
+        "helius",
+        "instantnodes",
+        "chainstream"
+      ]
+    },
+    "accounts": {
+      "maxRequestsPerMinute": 15,
+      "cachePriority": "medium",
+      "cacheTimeMs": 30000,
+      "providers": [
+        "syndica",
+        "helius",
+        "instantnodes",
+        "chainstream"
+      ]
+    },
+    "programs": {
+      "maxRequestsPerMinute": 5,
+      "cachePriority": "low",
+      "cacheTimeMs": 120000,
+      "providers": [
+        "syndica",
+        "helius"
+      ]
+    }
+  },
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 5,
+    "resetTimeoutMs": 30000,
+    "halfOpenRequests": 1
+  },
+  "globalSettings": {
+    "useAggressiveCaching": true,
+    "useSmartRetries": true,
+    "useCircuitBreakers": true,
+    "maxRetryAttempts": 5,
+    "retryStatusCodes": [
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
+    "logRateLimiting": true
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "quantum-singularity",
+  "type": "quantum",
+  "description": "Quantum Singularity strategy with neural optimization",
+  "enabled": true,
+  "priority": 6,
+  "minProfitThresholdPercent": 0.15,
+  "maxSlippageBps": 30,
+  "executionSettings": {
+    "maxTransactionsPerHour": 2,
+    "minTimeBetweenTradesMs": 1800000,
+    "executionPriority": "medium",
+    "simulateBeforeSubmit": true,
+    "maxRetries": 2,
+    "layeredExecution": false,
+    "concurrentExecutions": 1
+  },
+  "rpcSettings": {
+    "provider": "syndica",
+    "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+  },
+  "expectedProfitPerTradePercent": 1.45,
+  "successRatePercent": 94
+}

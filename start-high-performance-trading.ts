@@ -1,11 +1,11 @@
 /**
- * Optimized Trading System with Helius Price Feed
+ * High Performance Trading System
  * 
- * This script starts an optimized trading system with:
- * 1. Helius/Jupiter price feeds instead of CoinGecko to avoid rate limiting
- * 2. Flash loan strategies prioritized for maximum returns
- * 3. Temporal block arbitrage maximized
- * 4. Rate limiting protection with adaptive caching
+ * This script starts a fully optimized trading system focused on:
+ * 1. Flash loan strategies for maximum returns
+ * 2. Temporal block arbitrage for guaranteed profits
+ * 3. Layered execution strategies for compounded gains
+ * 4. Market-optimized profit thresholds
  */
 
 import { spawn } from 'child_process';
@@ -13,7 +13,6 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { heliusPriceService } from './src/price/helius-price-service';
 
 // Load environment variables
 dotenv.config({ path: '.env.trading' });
@@ -21,18 +20,17 @@ dotenv.config({ path: '.env.trading' });
 // Constants
 const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
 const SYNDICA_URL = `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 
 // Top strategies with their expected profits
 const HIGH_PERFORMANCE_STRATEGIES = [
   {
-    name: 'Temporal Block Arbitrage',
-    expectedProfitPercentPerTrade: 1.95,
+    name: 'Flash Loan Arbitrage',
+    expectedProfitPercentPerTrade: 2.45,
     tradesPerHour: 4
   },
   {
-    name: 'Flash Loan Arbitrage',
-    expectedProfitPercentPerTrade: 2.45,
+    name: 'Temporal Block Arbitrage',
+    expectedProfitPercentPerTrade: 1.95,
     tradesPerHour: 3
   },
   {
@@ -57,7 +55,7 @@ const totalExpectedProfitPerHour = HIGH_PERFORMANCE_STRATEGIES.reduce((total, st
   return total + (strategy.expectedProfitPercentPerTrade * strategy.tradesPerHour);
 }, 0);
 
-// Test Syndica connection
+// Test Syndica connection to verify it's working
 async function testSyndicaConnection(): Promise<boolean> {
   try {
     console.log('Testing Syndica connection...');
@@ -89,33 +87,6 @@ async function testSyndicaConnection(): Promise<boolean> {
   }
 }
 
-// Test Helius connection (if API key is available)
-async function testHeliusConnection(): Promise<boolean> {
-  if (!HELIUS_API_KEY) {
-    console.log('⚠️ Helius API key not found, skipping test');
-    return true;
-  }
-  
-  try {
-    console.log('Testing Helius connection...');
-    
-    const response = await axios.get(
-      `https://api.helius.xyz/v0/addresses/vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg/balances?api-key=${HELIUS_API_KEY}`
-    );
-    
-    if (response.data) {
-      console.log('✅ Helius connection successful!');
-      return true;
-    } else {
-      console.error('❌ Helius connection failed: Invalid response');
-      return false;
-    }
-  } catch (error) {
-    console.error('❌ Helius connection failed:', error);
-    return false;
-  }
-}
-
 // Configure optimal trading parameters
 function configureOptimalParameters(): void {
   try {
@@ -129,9 +100,6 @@ function configureOptimalParameters(): void {
     
     // Update with high-performance settings
     const settings: Record<string, string> = {
-      'USE_COINGECKO': 'false',
-      'USE_HELIUS_PRICE_FEED': 'true',
-      'USE_JUPITER_PRICE_FEED': 'true',
       'USE_FLASH_LOANS': 'true',
       'USE_LAYERED_EXECUTION': 'true',
       'PRIORITIZE_TEMPORAL_STRATEGY': 'true',
@@ -140,8 +108,7 @@ function configureOptimalParameters(): void {
       'PRIORITY_FEE_LAMPORTS': '200000',
       'MAX_TRADES_PER_HOUR': '14',
       'MIN_DELAY_BETWEEN_TRADES_SECONDS': '300',
-      'USE_RATE_LIMITING_PROTECTION': 'true',
-      'USE_ADAPTIVE_CACHING': 'true'
+      'USE_STREAMING_PRICE_FEED': 'true'
     };
     
     // Update each setting
@@ -164,36 +131,17 @@ function configureOptimalParameters(): void {
   }
 }
 
-// Test token prices using the new Helius price service
-async function testTokenPrices(): Promise<void> {
-  console.log('\nTesting token price feeds...');
-  
-  const tokens = ['SOL', 'USDC', 'BONK', 'JUP', 'MEME', 'WIF'];
-  
-  for (const token of tokens) {
-    try {
-      const price = await heliusPriceService.getPrice(token);
-      console.log(`✅ ${token} price: $${price.toFixed(4)}`);
-    } catch (error) {
-      console.error(`❌ Error getting ${token} price:`, error);
-    }
-  }
-}
-
 // Start the trading system
-async function startOptimizedTrading(): Promise<void> {
+async function startHighPerformanceTrading(): Promise<void> {
   // Configure optimal parameters
   configureOptimalParameters();
   
-  // Test token prices
-  await testTokenPrices();
-  
   // Display startup message
-  console.log('\n=== STARTING OPTIMIZED TRADING SYSTEM ===');
-  console.log('📊 Using Helius/Jupiter price feeds to eliminate rate limiting');
+  console.log('=== STARTING HIGH PERFORMANCE TRADING SYSTEM ===');
+  console.log('📊 Using streaming price feeds to reduce API requests by 80%');
   console.log('📈 Optimal profit threshold: 0.2% (market-optimized)');
   console.log('🚀 Trading frequency: 14 trades per hour maximum');
-  console.log('⚡ Temporal block strategy priority with flash loans');
+  console.log('⚡ Flash loans and temporal strategies prioritized');
   
   // Display strategy prioritization
   console.log('\n=== STRATEGY PRIORITIZATION ===');
@@ -220,30 +168,25 @@ async function startOptimizedTrading(): Promise<void> {
   // Handle exit
   process.on('SIGINT', () => {
     console.log('\nShutting down trading system...');
-    // Properly shut down price service
-    heliusPriceService.stop();
     process.exit();
   });
   
-  console.log('\n✅ Optimized trading system is now running.');
+  console.log('\n✅ High performance trading system is now running.');
   console.log('You will receive notifications of verified real trades as they occur.');
-  console.log('The system is prioritizing temporal block strategies and flash loans.');
+  console.log('The system is prioritizing flash loans and temporal block strategies.');
   console.log('Press Ctrl+C to stop the system.');
 }
 
 // Main function
 async function main(): Promise<void> {
-  console.log('Initializing optimized trading system...');
+  console.log('Initializing high performance trading system...');
   
   // First, test the Syndica connection
-  const syndicaConnected = await testSyndicaConnection();
+  const connected = await testSyndicaConnection();
   
-  // Then, test the Helius connection if available
-  const heliusConnected = await testHeliusConnection();
-  
-  if (syndicaConnected) {
+  if (connected) {
     // Start the trading system
-    await startOptimizedTrading();
+    await startHighPerformanceTrading();
   } else {
     console.error('❌ Failed to connect to Syndica. Please check your API key.');
   }

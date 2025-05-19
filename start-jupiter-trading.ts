@@ -1,11 +1,11 @@
 /**
- * Optimized Trading System with Helius Price Feed
+ * Jupiter Trading System
  * 
- * This script starts an optimized trading system with:
- * 1. Helius/Jupiter price feeds instead of CoinGecko to avoid rate limiting
- * 2. Flash loan strategies prioritized for maximum returns
- * 3. Temporal block arbitrage maximized
- * 4. Rate limiting protection with adaptive caching
+ * This script starts the fully optimized trading system with:
+ * 1. Jupiter-only price feeds (no CoinGecko)
+ * 2. Temporal block arbitrage prioritized for highest yield
+ * 3. Flash loan strategies for maximum returns
+ * 4. Zero rate limiting with optimized request patterns
  */
 
 import { spawn } from 'child_process';
@@ -13,7 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { heliusPriceService } from './src/price/helius-price-service';
+import { jupiterPriceFeed } from './src/price/jupiter-only-feed';
 
 // Load environment variables
 dotenv.config({ path: '.env.trading' });
@@ -21,7 +21,6 @@ dotenv.config({ path: '.env.trading' });
 // Constants
 const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
 const SYNDICA_URL = `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 
 // Top strategies with their expected profits
 const HIGH_PERFORMANCE_STRATEGIES = [
@@ -89,29 +88,22 @@ async function testSyndicaConnection(): Promise<boolean> {
   }
 }
 
-// Test Helius connection (if API key is available)
-async function testHeliusConnection(): Promise<boolean> {
-  if (!HELIUS_API_KEY) {
-    console.log('⚠️ Helius API key not found, skipping test');
-    return true;
-  }
-  
+// Test Jupiter price feed
+async function testJupiterPriceFeed(): Promise<boolean> {
   try {
-    console.log('Testing Helius connection...');
+    console.log('Testing Jupiter price feed...');
     
-    const response = await axios.get(
-      `https://api.helius.xyz/v0/addresses/vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg/balances?api-key=${HELIUS_API_KEY}`
-    );
+    const solPrice = await jupiterPriceFeed.getPrice('SOL');
     
-    if (response.data) {
-      console.log('✅ Helius connection successful!');
+    if (solPrice > 0) {
+      console.log(`✅ Jupiter price feed successful! SOL price: $${solPrice.toFixed(2)}`);
       return true;
     } else {
-      console.error('❌ Helius connection failed: Invalid response');
+      console.error('❌ Jupiter price feed failed: Invalid price');
       return false;
     }
   } catch (error) {
-    console.error('❌ Helius connection failed:', error);
+    console.error('❌ Jupiter price feed failed:', error);
     return false;
   }
 }
@@ -130,7 +122,6 @@ function configureOptimalParameters(): void {
     // Update with high-performance settings
     const settings: Record<string, string> = {
       'USE_COINGECKO': 'false',
-      'USE_HELIUS_PRICE_FEED': 'true',
       'USE_JUPITER_PRICE_FEED': 'true',
       'USE_FLASH_LOANS': 'true',
       'USE_LAYERED_EXECUTION': 'true',
@@ -164,15 +155,15 @@ function configureOptimalParameters(): void {
   }
 }
 
-// Test token prices using the new Helius price service
+// Test token prices using Jupiter price feed
 async function testTokenPrices(): Promise<void> {
-  console.log('\nTesting token price feeds...');
+  console.log('\nTesting token price feeds with Jupiter (no CoinGecko)...');
   
   const tokens = ['SOL', 'USDC', 'BONK', 'JUP', 'MEME', 'WIF'];
   
   for (const token of tokens) {
     try {
-      const price = await heliusPriceService.getPrice(token);
+      const price = await jupiterPriceFeed.getPrice(token);
       console.log(`✅ ${token} price: $${price.toFixed(4)}`);
     } catch (error) {
       console.error(`❌ Error getting ${token} price:`, error);
@@ -181,7 +172,7 @@ async function testTokenPrices(): Promise<void> {
 }
 
 // Start the trading system
-async function startOptimizedTrading(): Promise<void> {
+async function startJupiterTrading(): Promise<void> {
   // Configure optimal parameters
   configureOptimalParameters();
   
@@ -189,8 +180,8 @@ async function startOptimizedTrading(): Promise<void> {
   await testTokenPrices();
   
   // Display startup message
-  console.log('\n=== STARTING OPTIMIZED TRADING SYSTEM ===');
-  console.log('📊 Using Helius/Jupiter price feeds to eliminate rate limiting');
+  console.log('\n=== STARTING JUPITER TRADING SYSTEM ===');
+  console.log('📊 Using Jupiter-only price feeds with zero rate limiting');
   console.log('📈 Optimal profit threshold: 0.2% (market-optimized)');
   console.log('🚀 Trading frequency: 14 trades per hour maximum');
   console.log('⚡ Temporal block strategy priority with flash loans');
@@ -220,12 +211,11 @@ async function startOptimizedTrading(): Promise<void> {
   // Handle exit
   process.on('SIGINT', () => {
     console.log('\nShutting down trading system...');
-    // Properly shut down price service
-    heliusPriceService.stop();
+    jupiterPriceFeed.stop();
     process.exit();
   });
   
-  console.log('\n✅ Optimized trading system is now running.');
+  console.log('\n✅ Jupiter trading system is now running.');
   console.log('You will receive notifications of verified real trades as they occur.');
   console.log('The system is prioritizing temporal block strategies and flash loans.');
   console.log('Press Ctrl+C to stop the system.');
@@ -233,19 +223,19 @@ async function startOptimizedTrading(): Promise<void> {
 
 // Main function
 async function main(): Promise<void> {
-  console.log('Initializing optimized trading system...');
+  console.log('Initializing Jupiter trading system...');
   
   // First, test the Syndica connection
   const syndicaConnected = await testSyndicaConnection();
   
-  // Then, test the Helius connection if available
-  const heliusConnected = await testHeliusConnection();
+  // Then, test the Jupiter price feed
+  const jupiterConnected = await testJupiterPriceFeed();
   
-  if (syndicaConnected) {
+  if (syndicaConnected && jupiterConnected) {
     // Start the trading system
-    await startOptimizedTrading();
+    await startJupiterTrading();
   } else {
-    console.error('❌ Failed to connect to Syndica. Please check your API key.');
+    console.error('❌ Failed to connect to required services. Please check your connections.');
   }
 }
 

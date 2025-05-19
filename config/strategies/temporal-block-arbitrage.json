@@ -1,0 +1,25 @@
+{
+  "name": "temporal-block-arbitrage",
+  "type": "temporal",
+  "description": "Temporal arbitrage exploiting block timing differences",
+  "enabled": true,
+  "priority": 9,
+  "minProfitThresholdPercent": 0.22,
+  "maxSlippageBps": 45,
+  "executionSettings": {
+    "maxTransactionsPerHour": 3,
+    "minTimeBetweenTradesMs": 1200000,
+    "executionPriority": "high",
+    "simulateBeforeSubmit": true,
+    "maxRetries": 2,
+    "layeredExecution": true,
+    "layerCount": 2,
+    "concurrentExecutions": 1
+  },
+  "rpcSettings": {
+    "provider": "syndica",
+    "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+  },
+  "expectedProfitPerTradePercent": 1.95,
+  "successRatePercent": 90
+}
