@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "minSOLRequired": 0.00001,
+  "maxTradesPerHour": 14,
+  "minTimeBetweenTrades": 300,
+  "profitReinvestmentPercent": 95,
+  "profitCollectionPercent": 5,
+  "activeStrategies": [
+    "temporal-block-arbitrage",
+    "flash-loan-arbitrage",
+    "layered-megalodon-prime"
+  ],
+  "priceFeed": "jupiter",
+  "realTrading": true,
+  "submitTransactions": true,
+  "verifyTransactions": true,
+  "logTransactions": true,
+  "simulateBeforeExecution": true,
+  "priorityTransactions": true,
+  "priorityFeeLevel": "medium",
+  "defaultSlippageBps": 50,
+  "transactionTimeout": 60000,
+  "lastUpdated": "2025-05-19T18:47:29.455Z"
+}
