@@ -28,6 +28,9 @@ dotenv.config({ path: './.env.trading' });
 const WALLET_PUBLIC_KEY = process.env.TRADING_WALLET_PUBLIC_KEY || 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || `https://rpc.helius.xyz/?api-key=${HELIUS_API_KEY}`;
+const SYNDICA_WS_URL = process.env.SYNDICA_WS_URL || '';
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || '';
+const ALCHEMY_RPC_URL = process.env.ALCHEMY_RPC_URL || `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
 // Trading parameters
 const MAX_POSITION_SIZE_PERCENT = parseInt(process.env.MAX_POSITION_SIZE_PERCENT || '95');
@@ -54,13 +57,39 @@ let successfulTradeCount = 0;
 async function initializeTrading() {
   console.log('Initializing real blockchain trading engine...');
   
-  // Initialize connection to Helius
+  // Initialize connection to Solana blockchain
   try {
-    connection = new Connection(HELIUS_RPC_URL, 'confirmed');
-    console.log('Connected to Solana blockchain via Helius');
+    // Try Syndica WebSocket first (for real-time data)
+    if (SYNDICA_WS_URL) {
+      try {
+        console.log('Attempting to connect to Syndica WebSocket...');
+        connection = new Connection(SYNDICA_WS_URL, 'confirmed');
+        
+        // Test the connection
+        const blockHeight = await connection.getBlockHeight();
+        console.log(`✅ Connected to Solana blockchain via Syndica WebSocket (block height: ${blockHeight})`);
+      } catch (syndaErr) {
+        console.error('Failed to connect to Syndica WebSocket, falling back to Helius:', syndaErr);
+        connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+        console.log('Connected to Solana blockchain via Helius');
+      }
+    } else {
+      // Default to Helius if Syndica is not available
+      connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      console.log('Connected to Solana blockchain via Helius');
+    }
   } catch (error) {
-    console.error('Failed to connect to Helius RPC:', error);
-    process.exit(1);
+    console.error('Failed to connect to Solana blockchain:', error);
+    
+    // Try Alchemy as last resort
+    try {
+      console.log('Trying Alchemy as a fallback...');
+      connection = new Connection(ALCHEMY_RPC_URL, 'confirmed');
+      console.log('Connected to Solana blockchain via Alchemy');
+    } catch (alchemyError) {
+      console.error('All connection attempts failed. Cannot proceed with trading.', alchemyError);
+      process.exit(1);
+    }
   }
   
   // Initialize wallet
