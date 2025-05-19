@@ -24,6 +24,7 @@ const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAW
 const SYNDICA_URL = `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
 const SYNDICA_WS_URL = `wss://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
 // Create connection to Solana
 const connection = new Connection(SYNDICA_URL, 'confirmed');
@@ -71,6 +72,13 @@ async function initializeTradingSystem(): Promise<boolean> {
           url: SYNDICA_URL,
           wsUrl: SYNDICA_WS_URL,
           priority: 1
+        },
+        {
+          name: 'Alchemy',
+          url: `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+          wsUrl: `wss://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+          priority: 2,
+          forTransformers: true
         }
       ],
       minSOLRequired: 0.00001,
