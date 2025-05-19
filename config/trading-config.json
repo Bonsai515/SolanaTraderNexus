@@ -1,0 +1,34 @@
+{
+  "tradingEnabled": true,
+  "useRealFunds": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "walletBalanceSOL": 0.540916306,
+  "minProfitThreshold": 0.2,
+  "maxTradesPerHour": 14,
+  "minTimeBetweenTrades": 300,
+  "prioritizedStrategies": [
+    {
+      "name": "temporal-block-arbitrage",
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "name": "flash-loan-arbitrage",
+      "priority": 9,
+      "enabled": true
+    },
+    {
+      "name": "layered-megalodon-prime",
+      "priority": 8,
+      "enabled": true
+    }
+  ],
+  "rpcProviders": [
+    {
+      "name": "Syndica",
+      "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
+      "priority": 1
+    }
+  ],
+  "lastActivated": "2025-05-19T16:52:05.365Z"
+}
