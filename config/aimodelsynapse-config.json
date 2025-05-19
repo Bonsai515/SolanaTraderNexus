@@ -1,0 +1,19 @@
+{
+  "rpcSettings": {
+    "provider": "helius",
+    "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "maxRequestsPerMinute": 10
+  },
+  "tradingSettings": {
+    "maxTransactionsPerHour": 2,
+    "minTimeBetweenTradesMs": 1800000,
+    "executionPriority": "medium",
+    "useRandomDelay": true
+  },
+  "minProfitThresholdPercent": 1,
+  "maxSlippageBps": 100,
+  "requestThrottling": {
+    "enabled": true,
+    "maxRequestsPerMinute": 10
+  }
+}

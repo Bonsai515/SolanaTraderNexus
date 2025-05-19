@@ -1,377 +1,359 @@
 /**
- * Enhanced RPC Manager
+ * Enhanced RPC Management System
  * 
- * This module manages connections to multiple RPC providers with optimal
- * fallback, load balancing, and performance monitoring.
+ * This module provides an advanced system for managing RPC connections
+ * with proper header-based authentication and fallback mechanisms.
  */
 
-import { Connection, ConnectionConfig, Commitment } from '@solana/web3.js';
-import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+const { Connection, ConnectionConfig, Commitment } = require('@solana/web3.js');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ path: '.env.trading' });
 
-// Load environment variables
-dotenv.config({ path: '.env.trading' });
+// Constants
+const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
+const SYNDICA_URL = 'https://solana-api.syndica.io/rpc';
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const HELIUS_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
+const ALCHEMY_URL = `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
-// RPC Provider Configuration
-interface RpcProvider {
-  name: string;
-  url: string;
-  apiKey?: string;
-  priority: number;  // Lower number = higher priority
-  headerAuth?: boolean;
-  headerName?: string;
-  status: 'healthy' | 'degraded' | 'down';
-  latency: number;
-  reliability: number;
-  usageCount: number;
-  rateLimited: boolean;
-  lastRateLimitTime: number;
-  cooldownMs: number;
-  connection?: Connection;
-}
-
-// Initialize providers from environment variables
-const RPC_PROVIDERS: RpcProvider[] = [
-  // Syndica (primary provider)
+// RPC Providers with priority levels
+const RPC_PROVIDERS = [
   {
     name: 'Syndica',
-    url: 'https://solana-api.syndica.io/rpc',
-    apiKey: process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk',
+    url: SYNDICA_URL,
+    headerAuth: true,
+    headerName: 'X-API-Key',
+    apiKey: SYNDICA_API_KEY,
     priority: 1,
-    headerAuth: true,
-    headerName: 'X-API-Key',
-    status: 'healthy',
-    latency: 0,
-    reliability: 0.99,
-    usageCount: 0,
-    rateLimited: false,
-    lastRateLimitTime: 0,
-    cooldownMs: 5000
+    maxRateLimit: 250, // Rate limit: 250 requests per second
+    enabled: true
   },
-  
-  // Chainstream (new)
-  {
-    name: 'Chainstream',
-    url: process.env.CHAINSTREAM_RPC_URL || 'https://solana.chainstream.com/rpc',
-    apiKey: process.env.CHAINSTREAM_API_KEY,
-    priority: 2,
-    headerAuth: true,
-    headerName: 'X-API-Key',
-    status: 'healthy',
-    latency: 0,
-    reliability: 0.98,
-    usageCount: 0,
-    rateLimited: false,
-    lastRateLimitTime: 0,
-    cooldownMs: 4000
-  },
-  
-  // Helius (backup)
   {
     name: 'Helius',
-    url: process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
-    priority: 3,
-    status: 'healthy',
-    latency: 0,
-    reliability: 0.97,
-    usageCount: 0,
-    rateLimited: false,
-    lastRateLimitTime: 0,
-    cooldownMs: 3000
+    url: HELIUS_URL,
+    headerAuth: false,
+    priority: 2,
+    maxRateLimit: 120, // Rate limit: 120 requests per second
+    enabled: true
   },
-  
-  // Alchemy (backup)
   {
     name: 'Alchemy',
-    url: process.env.ALCHEMY_RPC_URL || `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-    priority: 4,
-    status: 'healthy',
-    latency: 0,
-    reliability: 0.96,
-    usageCount: 0,
-    rateLimited: false,
-    lastRateLimitTime: 0,
-    cooldownMs: 3000
+    url: ALCHEMY_URL,
+    headerAuth: false,
+    priority: 3,
+    maxRateLimit: 100, // Rate limit: 100 requests per second
+    enabled: true
   }
 ];
 
-class EnhancedRpcManager {
-  private providers: RpcProvider[];
-  private currentProviderIndex: number = 0;
-  private healthCheckInterval: NodeJS.Timeout | null = null;
-  private rateLimitCooldowns: Map<string, number> = new Map();
-  private requestLog: Array<{timestamp: number, provider: string, success: boolean}> = [];
+// Track rate limits
+const rpcUsage = {};
+RPC_PROVIDERS.forEach(provider => {
+  rpcUsage[provider.name] = {
+    count: 0,
+    lastReset: Date.now(),
+    consecutiveFailures: 0
+  };
+});
+
+// Track health status
+let providerHealth = {};
+RPC_PROVIDERS.forEach(provider => {
+  providerHealth[provider.name] = {
+    healthy: true,
+    lastCheck: Date.now(),
+    lastFailure: null,
+    responseTime: 0
+  };
+});
+
+/**
+ * Update rate limit counter for a provider
+ */
+function updateRateLimit(providerName) {
+  const now = Date.now();
+  const usage = rpcUsage[providerName];
   
-  constructor() {
-    this.providers = [...RPC_PROVIDERS];
-    // Sort by priority
-    this.providers.sort((a, b) => a.priority - b.priority);
-    this.initConnections();
+  // Reset counter if more than 1 second has passed
+  if (now - usage.lastReset > 1000) {
+    usage.count = 0;
+    usage.lastReset = now;
   }
   
-  /**
-   * Initialize connections for all providers
-   */
-  private initConnections(): void {
-    console.log('Initializing RPC connections...');
-    
-    this.providers.forEach(provider => {
-      try {
-        // Create connection config
-        const config: ConnectionConfig = {
-          commitment: 'confirmed',
-          disableRetryOnRateLimit: false,
-          confirmTransactionInitialTimeout: 60000,
-        };
-        
-        // Add header auth if needed
-        if (provider.headerAuth && provider.apiKey && provider.headerName) {
-          config.httpHeaders = {
-            [provider.headerName]: provider.apiKey
-          };
-        }
-        
-        // Create connection
-        provider.connection = new Connection(provider.url, config);
-        console.log(`✅ Initialized ${provider.name} RPC connection`);
-      } catch (error) {
-        console.error(`❌ Failed to initialize ${provider.name} RPC connection:`, error);
-        provider.status = 'down';
-      }
-    });
-  }
+  // Increment counter
+  usage.count++;
+}
+
+/**
+ * Check if a provider is rate limited
+ */
+function isRateLimited(providerName) {
+  const provider = RPC_PROVIDERS.find(p => p.name === providerName);
+  const usage = rpcUsage[providerName];
   
-  /**
-   * Start health checks for all providers
-   */
-  public startHealthChecks(intervalMs: number = 30000): void {
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-    }
-    
-    this.healthCheckInterval = setInterval(() => this.checkAllProviders(), intervalMs);
-    console.log(`Started RPC provider health checks every ${intervalMs}ms`);
-    
-    // Run an immediate health check
-    this.checkAllProviders();
-  }
+  if (!provider) return true;
   
-  /**
-   * Check health of all providers
-   */
-  private async checkAllProviders(): Promise<void> {
-    console.log('Running health check on all RPC providers...');
-    
-    for (const provider of this.providers) {
-      try {
-        const startTime = Date.now();
-        const connection = provider.connection;
-        
-        if (!connection) {
-          provider.status = 'down';
-          continue;
-        }
-        
-        // Get current block height as health check
-        const blockHeight = await connection.getBlockHeight();
-        
-        // Calculate latency
-        const endTime = Date.now();
-        provider.latency = endTime - startTime;
-        
-        // Update status
-        provider.status = provider.latency < 500 ? 'healthy' : 'degraded';
-        
-        console.log(`✅ ${provider.name} health check: ${provider.status} (${provider.latency}ms) - Block height: ${blockHeight}`);
-      } catch (error) {
-        console.error(`❌ ${provider.name} health check failed:`, error);
-        provider.status = 'down';
-      }
-    }
-    
-    // Re-sort providers by status then priority
-    this.providers.sort((a, b) => {
-      if (a.status === 'healthy' && b.status !== 'healthy') return -1;
-      if (a.status !== 'healthy' && b.status === 'healthy') return 1;
-      return a.priority - b.priority;
-    });
-    
-    // Reset current provider to the healthiest one
-    this.currentProviderIndex = 0;
-  }
+  return usage.count >= provider.maxRateLimit;
+}
+
+/**
+ * Mark a provider as unhealthy
+ */
+function markUnhealthy(providerName, error) {
+  providerHealth[providerName] = {
+    healthy: false,
+    lastCheck: Date.now(),
+    lastFailure: Date.now(),
+    responseTime: 0,
+    error: error?.toString() || 'Unknown error'
+  };
   
-  /**
-   * Get the best available connection
-   */
-  public getBestConnection(): Connection {
-    // Check if current provider is rate limited
-    const currentProvider = this.providers[this.currentProviderIndex];
-    
-    if (currentProvider.rateLimited) {
-      const now = Date.now();
-      if (now - currentProvider.lastRateLimitTime > currentProvider.cooldownMs) {
-        // Reset rate limit status after cooldown
-        currentProvider.rateLimited = false;
-      } else {
-        // Find next non-rate-limited provider
-        const nextProviderIndex = this.providers.findIndex(
-          (provider, index) => !provider.rateLimited && provider.status !== 'down' && index !== this.currentProviderIndex
-        );
-        
-        if (nextProviderIndex !== -1) {
-          this.currentProviderIndex = nextProviderIndex;
-          console.log(`Switched to ${this.providers[this.currentProviderIndex].name} due to rate limiting`);
-        }
-      }
-    }
-    
-    // Increment usage count
-    this.providers[this.currentProviderIndex].usageCount++;
-    
-    // Return the best connection
-    return this.providers[this.currentProviderIndex].connection!;
-  }
+  rpcUsage[providerName].consecutiveFailures++;
   
-  /**
-   * Report a rate limit for the current provider
-   */
-  public reportRateLimit(providerName: string): void {
-    const providerIndex = this.providers.findIndex(p => p.name === providerName);
-    
-    if (providerIndex !== -1) {
-      const provider = this.providers[providerIndex];
-      provider.rateLimited = true;
-      provider.lastRateLimitTime = Date.now();
-      
-      console.log(`⚠️ ${provider.name} is rate limited, cooling down for ${provider.cooldownMs}ms`);
-      
-      // Switch to next best provider
-      this.switchToNextProvider();
-    }
-  }
+  console.log(`⚠️ Marked ${providerName} as unhealthy: ${error?.toString() || 'Unknown error'}`);
+}
+
+/**
+ * Mark a provider as healthy
+ */
+function markHealthy(providerName, responseTime) {
+  providerHealth[providerName] = {
+    healthy: true,
+    lastCheck: Date.now(),
+    lastFailure: null,
+    responseTime
+  };
   
-  /**
-   * Switch to the next best provider
-   */
-  private switchToNextProvider(): void {
-    // Find the next healthy, non-rate-limited provider
-    for (let i = 0; i < this.providers.length; i++) {
-      const nextIndex = (this.currentProviderIndex + i + 1) % this.providers.length;
-      const nextProvider = this.providers[nextIndex];
-      
-      if (nextProvider.status !== 'down' && !nextProvider.rateLimited) {
-        this.currentProviderIndex = nextIndex;
-        console.log(`Switched to ${nextProvider.name} as fallback RPC provider`);
-        return;
-      }
-    }
+  rpcUsage[providerName].consecutiveFailures = 0;
+}
+
+/**
+ * Check health of all providers
+ */
+async function checkProvidersHealth() {
+  for (const provider of RPC_PROVIDERS) {
+    if (!provider.enabled) continue;
     
-    // If all providers are down or rate limited, use the one with highest reliability
-    this.providers.sort((a, b) => b.reliability - a.reliability);
-    this.currentProviderIndex = 0;
-    console.log(`All providers are problematic, using ${this.providers[0].name} as best option`);
-  }
-  
-  /**
-   * Log RPC request results for analytics
-   */
-  public logRequest(providerName: string, success: boolean): void {
-    this.requestLog.push({
-      timestamp: Date.now(),
-      provider: providerName,
-      success
-    });
-    
-    // Keep only the last 1000 requests
-    if (this.requestLog.length > 1000) {
-      this.requestLog.shift();
-    }
-    
-    // Update reliability metrics
-    const provider = this.providers.find(p => p.name === providerName);
-    if (provider) {
-      // Calculate reliability based on last 100 requests
-      const providerLogs = this.requestLog.filter(log => log.provider === providerName);
-      const lastHundred = providerLogs.slice(-100);
-      
-      if (lastHundred.length > 10) {
-        const successCount = lastHundred.filter(log => log.success).length;
-        provider.reliability = successCount / lastHundred.length;
-      }
-    }
-  }
-  
-  /**
-   * Get statistics and status of all providers
-   */
-  public getProviderStats(): any {
-    return this.providers.map(provider => ({
-      name: provider.name,
-      status: provider.status,
-      latency: provider.latency,
-      reliability: provider.reliability,
-      usageCount: provider.usageCount,
-      rateLimited: provider.rateLimited,
-      priority: provider.priority
-    }));
-  }
-  
-  /**
-   * Save provider stats to a log file
-   */
-  public saveStatsToLog(): void {
     try {
-      const logDir = path.join(process.cwd(), 'logs');
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
+      const startTime = Date.now();
       
-      const stats = {
-        timestamp: new Date().toISOString(),
-        providers: this.getProviderStats(),
-        currentProvider: this.providers[this.currentProviderIndex].name
+      const requestConfig = {
+        method: 'post',
+        url: provider.url,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(provider.headerAuth ? { [provider.headerName]: provider.apiKey } : {})
+        },
+        data: {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getBlockHeight',
+          params: []
+        },
+        timeout: 5000 // 5 second timeout
       };
       
-      const logPath = path.join(logDir, 'rpc-stats.json');
-      fs.writeFileSync(logPath, JSON.stringify(stats, null, 2));
+      const response = await axios(requestConfig);
+      
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+      
+      if (response.data && response.data.result !== undefined) {
+        markHealthy(provider.name, responseTime);
+        console.log(`✅ ${provider.name} health check passed in ${responseTime}ms`);
+      } else {
+        markUnhealthy(provider.name, 'Invalid response');
+      }
     } catch (error) {
-      console.error('Error saving RPC stats:', error);
+      markUnhealthy(provider.name, error);
     }
   }
 }
 
-// Create singleton instance
-export const rpcManager = new EnhancedRpcManager();
-
-// Start health checks
-rpcManager.startHealthChecks(30000);
-
 /**
- * Get the best available connection
+ * Get optimal provider based on health and rate limits
  */
-export function getOptimalConnection(): Connection {
-  return rpcManager.getBestConnection();
+function getOptimalProvider() {
+  // Filter out unhealthy or rate-limited providers
+  const availableProviders = RPC_PROVIDERS.filter(provider => {
+    const health = providerHealth[provider.name];
+    const isHealthy = health?.healthy || false;
+    const notRateLimited = !isRateLimited(provider.name);
+    return provider.enabled && isHealthy && notRateLimited;
+  });
+  
+  if (availableProviders.length === 0) {
+    // All providers are unhealthy or rate-limited, use the one with lowest consecutive failures
+    const leastFailedProvider = RPC_PROVIDERS
+      .filter(p => p.enabled)
+      .sort((a, b) => rpcUsage[a.name].consecutiveFailures - rpcUsage[b.name].consecutiveFailures)[0];
+    
+    console.log(`⚠️ All providers are unhealthy or rate-limited. Using ${leastFailedProvider.name} as fallback.`);
+    return leastFailedProvider;
+  }
+  
+  // Sort by priority (lowest number is highest priority)
+  return availableProviders.sort((a, b) => a.priority - b.priority)[0];
 }
 
 /**
- * Report a rate limit
+ * Create a connection with the optimal provider
  */
-export function reportRateLimit(providerName: string): void {
-  rpcManager.reportRateLimit(providerName);
+function getOptimalConnection(commitment = 'confirmed') {
+  const provider = getOptimalProvider();
+  
+  console.log(`Using ${provider.name} as RPC provider`);
+  
+  // Update rate limit counter
+  updateRateLimit(provider.name);
+  
+  // Configure connection
+  const config = {
+    commitment,
+    confirmTransactionInitialTimeout: 60000
+  };
+  
+  // Add headers if needed
+  if (provider.headerAuth) {
+    config.httpHeaders = {
+      [provider.headerName]: provider.apiKey
+    };
+  }
+  
+  return new Connection(provider.url, config);
 }
 
 /**
- * Get current provider stats
+ * Set up fallback mechanisms for DEXes
  */
-export function getProviderStats(): any {
-  return rpcManager.getProviderStats();
+function setupDexFallbackMechanisms() {
+  const dexConfigs = {
+    'jupiter': {
+      rpcProviders: [
+        { name: 'Syndica', headerAuth: true, headerName: 'X-API-Key', apiKey: SYNDICA_API_KEY },
+        { name: 'Helius', url: HELIUS_URL }
+      ]
+    },
+    'raydium': {
+      rpcProviders: [
+        { name: 'Syndica', headerAuth: true, headerName: 'X-API-Key', apiKey: SYNDICA_API_KEY },
+        { name: 'Helius', url: HELIUS_URL }
+      ]
+    },
+    'orca': {
+      rpcProviders: [
+        { name: 'Syndica', headerAuth: true, headerName: 'X-API-Key', apiKey: SYNDICA_API_KEY },
+        { name: 'Helius', url: HELIUS_URL }
+      ]
+    },
+    'marinade': {
+      rpcProviders: [
+        { name: 'Syndica', headerAuth: true, headerName: 'X-API-Key', apiKey: SYNDICA_API_KEY },
+        { name: 'Helius', url: HELIUS_URL }
+      ]
+    }
+  };
+  
+  // Save to config file
+  const configPath = path.join(process.cwd(), 'config', 'dex-rpc-config.json');
+  const configDir = path.dirname(configPath);
+  
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+  
+  fs.writeFileSync(configPath, JSON.stringify(dexConfigs, null, 2));
+  console.log('✅ Set up DEX fallback mechanisms');
+  
+  return dexConfigs;
 }
 
 /**
- * Log a request result
+ * Test the Syndica connection with proper header authentication
  */
-export function logRequestResult(providerName: string, success: boolean): void {
-  rpcManager.logRequest(providerName, success);
+async function testSyndicaConnection() {
+  try {
+    console.log('Testing Syndica connection with header authentication...');
+    
+    const requestConfig = {
+      method: 'post',
+      url: SYNDICA_URL,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': SYNDICA_API_KEY
+      },
+      data: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getBlockHeight',
+        params: []
+      },
+      timeout: 5000
+    };
+    
+    const response = await axios(requestConfig);
+    
+    if (response.data && response.data.result !== undefined) {
+      console.log(`✅ Syndica connection successful! Block height: ${response.data.result}`);
+      return true;
+    } else {
+      console.error('❌ Syndica connection failed: Invalid response');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Syndica connection failed:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Initialize the enhanced RPC manager
+ */
+async function initializeRpcManager() {
+  console.log('Initializing Enhanced RPC Manager...');
+  
+  // Test Syndica connection
+  const syndicaWorking = await testSyndicaConnection();
+  
+  if (!syndicaWorking) {
+    console.warn('Syndica connection failed. Using fallback providers.');
+    
+    // Disable Syndica if not working
+    const syndicaProvider = RPC_PROVIDERS.find(p => p.name === 'Syndica');
+    if (syndicaProvider) {
+      syndicaProvider.enabled = false;
+    }
+  }
+  
+  // Check health of all providers
+  await checkProvidersHealth();
+  
+  // Set up DEX fallback mechanisms
+  setupDexFallbackMechanisms();
+  
+  // Create optimal connection
+  const connection = getOptimalConnection();
+  
+  // Start health check interval (every 30 seconds)
+  setInterval(checkProvidersHealth, 30000);
+  
+  console.log('✅ Enhanced RPC Manager initialized');
+  return { connection, providers: RPC_PROVIDERS };
+}
+
+// Export functions
+module.exports = {
+  initializeRpcManager,
+  getOptimalConnection,
+  testSyndicaConnection,
+  checkProvidersHealth,
+  setupDexFallbackMechanisms
+};
+
+// Start the manager when directly executed
+if (require.main === module) {
+  initializeRpcManager();
 }

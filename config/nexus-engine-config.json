@@ -1,0 +1,19 @@
+{
+  "rpcProvider": {
+    "name": "Helius",
+    "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+    "priority": 1
+  },
+  "executionSettings": {
+    "maxConcurrentTransactions": 3,
+    "simulateBeforeSubmit": true,
+    "priorityFeeInLamports": 100000,
+    "maxRetries": 3,
+    "retryDelayMs": 500
+  },
+  "profitThresholds": {
+    "minProfitBps": 50,
+    "targetProfitBps": 100,
+    "maxSlippageBps": 50
+  }
+}

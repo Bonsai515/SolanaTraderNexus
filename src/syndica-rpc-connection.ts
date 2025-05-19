@@ -1,6 +1,7 @@
 import { Connection, ConnectionConfig, Commitment } from '@solana/web3.js';
 
 const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
+// Make sure to use the correct Syndica URL format with proper HTTPS
 const SYNDICA_URL = 'https://solana-api.syndica.io/rpc';
 
 /**
