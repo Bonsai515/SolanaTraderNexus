@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Syndica API key
 const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
-const SYNDICA_WS_URL = `wss://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}/`;
+const SYNDICA_WS_URL = `wss://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk`;
 
 // Types
 interface RpcRequest {
