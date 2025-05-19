@@ -59,37 +59,38 @@ async function initializeTrading() {
   
   // Initialize connection to Solana blockchain
   try {
-    // Try Syndica WebSocket first (for real-time data)
-    if (SYNDICA_WS_URL) {
-      try {
-        console.log('Attempting to connect to Syndica WebSocket...');
-        connection = new Connection(SYNDICA_WS_URL, 'confirmed');
-        
-        // Test the connection
-        const blockHeight = await connection.getBlockHeight();
-        console.log(`✅ Connected to Solana blockchain via Syndica WebSocket (block height: ${blockHeight})`);
-      } catch (syndaErr) {
-        console.error('Failed to connect to Syndica WebSocket, falling back to Helius:', syndaErr);
-        connection = new Connection(HELIUS_RPC_URL, 'confirmed');
-        console.log('Connected to Solana blockchain via Helius');
-      }
+    // Import the Syndica connection module
+    const { getSyndicaConnection, testSyndicaConnection } = await import('./syndica-rpc-connection');
+    
+    // Try Syndica RPC first (best performance)
+    console.log('Attempting to connect to Syndica RPC...');
+    const syndicaSuccess = await testSyndicaConnection();
+    
+    if (syndicaSuccess) {
+      // Use the Syndica connection with header auth
+      connection = getSyndicaConnection('confirmed');
+      console.log('✅ Using Syndica RPC as primary connection');
     } else {
-      // Default to Helius if Syndica is not available
+      // Fall back to Helius if Syndica fails
+      console.log('Falling back to Helius RPC...');
       connection = new Connection(HELIUS_RPC_URL, 'confirmed');
-      console.log('Connected to Solana blockchain via Helius');
+      
+      // Test Helius connection
+      try {
+        const blockHeight = await connection.getBlockHeight();
+        console.log(`✅ Connected to Solana blockchain via Helius (block height: ${blockHeight})`);
+      } catch (heliusErr) {
+        console.error('Failed to connect to Helius, trying Alchemy as final fallback:', heliusErr);
+        
+        // Try Alchemy as last resort
+        connection = new Connection(ALCHEMY_RPC_URL, 'confirmed');
+        const blockHeight = await connection.getBlockHeight();
+        console.log(`✅ Connected to Solana blockchain via Alchemy (block height: ${blockHeight})`);
+      }
     }
   } catch (error) {
-    console.error('Failed to connect to Solana blockchain:', error);
-    
-    // Try Alchemy as last resort
-    try {
-      console.log('Trying Alchemy as a fallback...');
-      connection = new Connection(ALCHEMY_RPC_URL, 'confirmed');
-      console.log('Connected to Solana blockchain via Alchemy');
-    } catch (alchemyError) {
-      console.error('All connection attempts failed. Cannot proceed with trading.', alchemyError);
-      process.exit(1);
-    }
+    console.error('All connection attempts failed. Cannot proceed with trading:', error);
+    process.exit(1);
   }
   
   // Initialize wallet
