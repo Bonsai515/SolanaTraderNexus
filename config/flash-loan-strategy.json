@@ -1,0 +1,42 @@
+{
+  "name": "Flash Loan Arbitrage",
+  "enabled": true,
+  "priority": 9,
+  "expectedProfitPercent": 2.45,
+  "maxPositionSizePercent": 25,
+  "minProfitThresholdPercent": 0.2,
+  "maxSlippageBps": 50,
+  "maxActiveLoans": 2,
+  "rpcProvider": "syndica",
+  "loanProtocols": [
+    "Solend",
+    "Kamino",
+    "Marinade"
+  ],
+  "tokens": [
+    "SOL",
+    "USDC",
+    "ETH",
+    "mSOL",
+    "BONK",
+    "JUP"
+  ],
+  "exchanges": [
+    "Jupiter",
+    "Raydium",
+    "Orca",
+    "Meteora"
+  ],
+  "riskLevel": "medium-high",
+  "minLoanSizeSOL": 0.1,
+  "maxLoanSizeSOL": 10,
+  "gasOptimization": true,
+  "multicallExecution": true,
+  "minSpreadPercent": 0.25,
+  "priorityFeeInLamports": 250000,
+  "simulateBeforeExecution": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "submitTransactions": true,
+  "logLevel": "info",
+  "lastUpdated": "2025-05-19T18:47:29.454Z"
+}
