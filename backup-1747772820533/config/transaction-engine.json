@@ -7,7 +7,7 @@
     "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
     "priority": 1
   },
-  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "walletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
   "minProfitThresholdPercent": 0.2,
   "maxSlippageBps": 50,
   "maxTransactionsPerHour": 14,

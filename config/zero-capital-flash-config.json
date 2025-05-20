@@ -297,7 +297,7 @@
     "maxGasFeeSOL": 0.0012,
     "profitReinvestmentRate": 70
   },
-  "minProfitThresholdUSD": 0.4,
+  "minProfitThresholdUSD": 0.25,
   "maxDailyTransactions": 32,
   "targetedTokens": [
     "SOL",
