@@ -1,0 +1,63 @@
+{
+  "name": "10-Day Quantum Flash Strategy",
+  "enabled": true,
+  "maxProfitPercentPerTrade": 0.48,
+  "maxPositionSizePercent": 99.5,
+  "maxTradesPerDay": 35,
+  "slippageTolerance": 0.04,
+  "riskLevel": "MAXIMUM",
+  "compoundingEnabled": true,
+  "compoundingFrequency": "CONTINUOUS",
+  "primaryPairs": [
+    {
+      "base": "SOL",
+      "quote": "USDC"
+    },
+    {
+      "base": "BONK",
+      "quote": "USDC"
+    },
+    {
+      "base": "BERN",
+      "quote": "USDC"
+    },
+    {
+      "base": "JUP",
+      "quote": "USDC"
+    },
+    {
+      "base": "WIF",
+      "quote": "USDC"
+    }
+  ],
+  "executionTechniques": [
+    "SPREAD_CAPTURE",
+    "FLASH_ARBITRAGE",
+    "CROSS_EXCHANGE_ROUTING",
+    "SANDWICH_OPTIMIZATION",
+    "MEMPOOL_ANALYSIS"
+  ],
+  "neuralSettings": {
+    "transformer": "QUANTUM_NEURAL_V2",
+    "layers": 8,
+    "optimizationLevel": "MAXIMUM",
+    "predictionConfidenceThreshold": 0.85,
+    "adaptiveParameterTuning": true,
+    "selfLearningEnabled": true
+  },
+  "priorityLevel": 0,
+  "executionEngine": "HYPER_QUANTUM_V2",
+  "securityMeasures": [
+    "REVERT_PROTECTION",
+    "SLIPPAGE_PROTECTION",
+    "MEV_PROTECTION",
+    "FALLBACK_ROUTING"
+  ],
+  "tenDayProjection": {
+    "startBalance": 0.530916306,
+    "dailyCompoundRate": 16.715999999999998,
+    "projectedEndBalance": 2.4907493025586596,
+    "projectedProfit": 1.9598329965586596,
+    "profitPercentage": 369.14160940437563
+  }
+}

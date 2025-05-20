@@ -1,0 +1,13 @@
+{
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "tradingWalletBalanceSol": 0.540916,
+  "profitThresholds": {
+    "minProfitToCollectSol": 0.01,
+    "profitReinvestmentRate": 0.95
+  },
+  "riskManagement": {
+    "maxPositionSizePercent": 25,
+    "maxDailyLossPercent": 5,
+    "gradualScalingEnabled": true
+  }
+}

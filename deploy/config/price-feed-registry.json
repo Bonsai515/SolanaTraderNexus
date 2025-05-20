@@ -1,0 +1,39 @@
+{
+  "version": "2.1.0",
+  "strategyMappings": {
+    "quantum-flash": "quantum-flash-price-feed.json",
+    "quantum-omega": "meme-token-price-feed.json",
+    "zero-capital": "quantum-flash-price-feed.json",
+    "hyperion": "hyperion-neural-price-feed.json",
+    "default": "core-price-feed.json"
+  },
+  "cachePolicy": {
+    "enabled": true,
+    "defaultTtlMs": 20000,
+    "strategySpecificTtl": {
+      "quantum-flash": 5000,
+      "quantum-omega": 30000,
+      "zero-capital": 5000,
+      "hyperion": 10000
+    }
+  },
+  "rateLimitPolicy": {
+    "enabled": true,
+    "defaultRequestsPerMinute": 60,
+    "sourceSpecificLimits": {
+      "Jupiter": 120,
+      "Birdeye": 100,
+      "Pyth": 150,
+      "geyser": 200,
+      "pumpfun": 30,
+      "gmgn": 30,
+      "proton": 30
+    }
+  },
+  "failoverPolicy": {
+    "enabled": true,
+    "maxFailuresBeforeSwitch": 3,
+    "blacklistTimeMs": 120000,
+    "rotationIntervalMs": 300000
+  }
+}

@@ -1,0 +1,464 @@
+{
+  "transformerModels": [
+    {
+      "name": "price-transformer-v1",
+      "type": "price-prediction",
+      "architecture": "transformer",
+      "layers": 12,
+      "hiddenSize": 768,
+      "attentionHeads": 12,
+      "parameters": 125000000,
+      "inputFeatures": [
+        "price_history",
+        "volume",
+        "market_cap",
+        "volatility"
+      ],
+      "outputFeatures": [
+        "price_prediction",
+        "confidence"
+      ],
+      "trainingEpochs": 100,
+      "learningRate": 0.0001,
+      "batchSize": 64,
+      "activationFunction": "gelu",
+      "optimizerType": "adam",
+      "preprocessingSteps": [
+        "normalization",
+        "moving_average",
+        "volatility_calculation"
+      ],
+      "finetunedOn": [
+        "solana_market_data",
+        "eth_market_data"
+      ],
+      "lastUpdated": 1747749960622,
+      "inferenceTimeMs": 15,
+      "accuracyMetrics": {
+        "mae": 0.015,
+        "rmse": 0.025,
+        "r2": 0.87
+      },
+      "enabled": true
+    },
+    {
+      "name": "sentiment-transformer-v1",
+      "type": "sentiment-analysis",
+      "architecture": "hybrid",
+      "layers": 8,
+      "hiddenSize": 512,
+      "attentionHeads": 8,
+      "parameters": 60000000,
+      "inputFeatures": [
+        "social_media",
+        "news",
+        "github_activity",
+        "developer_activity"
+      ],
+      "outputFeatures": [
+        "sentiment_score",
+        "trend_direction",
+        "confidence"
+      ],
+      "trainingEpochs": 75,
+      "learningRate": 0.0002,
+      "batchSize": 32,
+      "activationFunction": "relu",
+      "optimizerType": "adamw",
+      "preprocessingSteps": [
+        "text_cleaning",
+        "tokenization",
+        "embedding"
+      ],
+      "finetunedOn": [
+        "twitter_data",
+        "reddit_data",
+        "crypto_news"
+      ],
+      "lastUpdated": 1747749960622,
+      "inferenceTimeMs": 20,
+      "accuracyMetrics": {
+        "mae": 0.08,
+        "rmse": 0.12,
+        "r2": 0.82
+      },
+      "enabled": true
+    },
+    {
+      "name": "volume-transformer-v1",
+      "type": "volume-prediction",
+      "architecture": "lstm",
+      "layers": 6,
+      "hiddenSize": 384,
+      "attentionHeads": 6,
+      "parameters": 30000000,
+      "inputFeatures": [
+        "volume_history",
+        "price_change",
+        "market_events"
+      ],
+      "outputFeatures": [
+        "volume_prediction",
+        "confidence"
+      ],
+      "trainingEpochs": 50,
+      "learningRate": 0.0003,
+      "batchSize": 48,
+      "activationFunction": "tanh",
+      "optimizerType": "rmsprop",
+      "preprocessingSteps": [
+        "log_transform",
+        "differencing",
+        "normalization"
+      ],
+      "finetunedOn": [
+        "dex_volume_data",
+        "cex_volume_data"
+      ],
+      "lastUpdated": 1747749960622,
+      "inferenceTimeMs": 10,
+      "accuracyMetrics": {
+        "mae": 0.09,
+        "rmse": 0.15,
+        "r2": 0.79
+      },
+      "enabled": true
+    },
+    {
+      "name": "volatility-transformer-v1",
+      "type": "volatility-prediction",
+      "architecture": "cnn",
+      "layers": 5,
+      "hiddenSize": 256,
+      "attentionHeads": 4,
+      "parameters": 15000000,
+      "inputFeatures": [
+        "price_changes",
+        "trading_ranges",
+        "candle_patterns"
+      ],
+      "outputFeatures": [
+        "volatility_prediction",
+        "spike_probability"
+      ],
+      "trainingEpochs": 60,
+      "learningRate": 0.0005,
+      "batchSize": 24,
+      "activationFunction": "leaky_relu",
+      "optimizerType": "sgd",
+      "preprocessingSteps": [
+        "scaling",
+        "rolling_window",
+        "feature_extraction"
+      ],
+      "finetunedOn": [
+        "historical_volatility",
+        "options_data"
+      ],
+      "lastUpdated": 1747749960622,
+      "inferenceTimeMs": 8,
+      "accuracyMetrics": {
+        "mae": 0.07,
+        "rmse": 0.11,
+        "r2": 0.81
+      },
+      "enabled": true
+    },
+    {
+      "name": "correlation-transformer-v1",
+      "type": "correlation-detection",
+      "architecture": "transformer",
+      "layers": 10,
+      "hiddenSize": 640,
+      "attentionHeads": 10,
+      "parameters": 95000000,
+      "inputFeatures": [
+        "asset_prices",
+        "volume_relationships",
+        "market_sectors"
+      ],
+      "outputFeatures": [
+        "correlation_matrix",
+        "causation_probability"
+      ],
+      "trainingEpochs": 80,
+      "learningRate": 0.0001,
+      "batchSize": 56,
+      "activationFunction": "gelu",
+      "optimizerType": "adam",
+      "preprocessingSteps": [
+        "correlation_calculation",
+        "normalization",
+        "dimension_reduction"
+      ],
+      "finetunedOn": [
+        "multi_asset_data",
+        "cross_market_data"
+      ],
+      "lastUpdated": 1747749960622,
+      "inferenceTimeMs": 25,
+      "accuracyMetrics": {
+        "mae": 0.06,
+        "rmse": 0.09,
+        "r2": 0.85
+      },
+      "enabled": true
+    }
+  ],
+  "priceFeedCache": {
+    "cacheTimeMs": 10000,
+    "batchRequestSize": 20,
+    "preferredSources": [
+      "Helius",
+      "Syndica",
+      "CoinGecko",
+      "Jupiter"
+    ],
+    "backupSources": [
+      "CryptoCompare",
+      "Coinbase",
+      "Binance"
+    ],
+    "refreshIntervalMs": 5000,
+    "forcedRefreshIntervalMs": 30000,
+    "volatilityBasedRefresh": true,
+    "volatilityThreshold": 0.01,
+    "volumeBasedRefresh": true,
+    "volumeThreshold": 1000000,
+    "tokensToMonitor": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BTC",
+      "RAY",
+      "BONK",
+      "JUP",
+      "ORCA",
+      "SRM",
+      "MSOL"
+    ],
+    "pairBasedRefresh": {
+      "SOL-USDC": 2000,
+      "SOL-USDT": 2000,
+      "ETH-USDC": 3000,
+      "BTC-USDC": 3000
+    },
+    "retryStrategy": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "backoffFactor": 2
+    }
+  },
+  "streamCache": {
+    "cacheTimeMs": 60000,
+    "blockCacheSize": 100,
+    "txCacheSize": 1000,
+    "accountUpdateCacheSize": 500,
+    "slotCacheSize": 1000,
+    "subscriptionRefreshIntervalMs": 3600000,
+    "reconnectIntervalMs": 5000,
+    "persistToDiskInterval": 300000,
+    "compactCacheInterval": 900000,
+    "redundantConnections": 2,
+    "priorityAccounts": [],
+    "priorityPrograms": []
+  },
+  "onChainPrograms": [
+    {
+      "programId": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "label": "FlashLoanExecutor",
+      "version": "1.0.0",
+      "features": [
+        "flash_loans",
+        "arbitrage",
+        "atomic_swaps"
+      ],
+      "requiredAccounts": [
+        "vault",
+        "config",
+        "stats"
+      ],
+      "transactionTypes": [
+        "flashLoan",
+        "swap",
+        "deposit",
+        "withdraw"
+      ],
+      "estimatedFees": 0.000085,
+      "enabled": true
+    },
+    {
+      "programId": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "label": "QuantumOptimizerV2",
+      "version": "2.0.0",
+      "features": [
+        "routing_optimization",
+        "multi_hop_swaps",
+        "fee_minimization"
+      ],
+      "requiredAccounts": [
+        "routerState",
+        "feeConfig",
+        "vaults"
+      ],
+      "transactionTypes": [
+        "optimize",
+        "execute",
+        "rebalance"
+      ],
+      "estimatedFees": 0.000075,
+      "enabled": true
+    },
+    {
+      "programId": "hFL7t5iAUiTroyWt385mGNbWGYim5Fj2jfXJ9D4AWN7",
+      "label": "HyperionNeuralEngine",
+      "version": "1.5.0",
+      "features": [
+        "neural_inference",
+        "predictive_execution",
+        "multi_strategy"
+      ],
+      "requiredAccounts": [
+        "modelState",
+        "predictionState",
+        "executionParams"
+      ],
+      "transactionTypes": [
+        "predict",
+        "execute",
+        "train",
+        "update"
+      ],
+      "estimatedFees": 0.00012,
+      "enabled": true
+    }
+  ],
+  "aiAgents": [
+    {
+      "name": "MarketSentimentAgent",
+      "role": "sentiment_analysis",
+      "models": [
+        "sentiment-transformer-v1"
+      ],
+      "updateFrequencyMs": 60000,
+      "taskTypes": [
+        "social_media_sentiment",
+        "news_sentiment",
+        "trend_detection"
+      ],
+      "dependencies": [],
+      "priority": 3,
+      "enabled": true
+    },
+    {
+      "name": "PricePredictionAgent",
+      "role": "price_prediction",
+      "models": [
+        "price-transformer-v1"
+      ],
+      "updateFrequencyMs": 30000,
+      "taskTypes": [
+        "price_forecasting",
+        "support_resistance",
+        "breakout_detection"
+      ],
+      "dependencies": [
+        "MarketSentimentAgent"
+      ],
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "name": "VolumeAnalysisAgent",
+      "role": "volume_analysis",
+      "models": [
+        "volume-transformer-v1"
+      ],
+      "updateFrequencyMs": 45000,
+      "taskTypes": [
+        "volume_prediction",
+        "liquidity_analysis",
+        "unusual_activity"
+      ],
+      "dependencies": [],
+      "priority": 4,
+      "enabled": true
+    },
+    {
+      "name": "VolatilityPredictionAgent",
+      "role": "volatility_prediction",
+      "models": [
+        "volatility-transformer-v1"
+      ],
+      "updateFrequencyMs": 40000,
+      "taskTypes": [
+        "volatility_forecasting",
+        "risk_assessment",
+        "opportunity_detection"
+      ],
+      "dependencies": [
+        "PricePredictionAgent"
+      ],
+      "priority": 2,
+      "enabled": true
+    },
+    {
+      "name": "CorrelationAnalysisAgent",
+      "role": "correlation_analysis",
+      "models": [
+        "correlation-transformer-v1"
+      ],
+      "updateFrequencyMs": 120000,
+      "taskTypes": [
+        "cross_asset_correlation",
+        "rotation_detection",
+        "divergence_analysis"
+      ],
+      "dependencies": [
+        "PricePredictionAgent",
+        "VolumeAnalysisAgent"
+      ],
+      "priority": 5,
+      "enabled": true
+    },
+    {
+      "name": "StrategyCoordinatorAgent",
+      "role": "strategy_coordination",
+      "models": [
+        "price-transformer-v1",
+        "correlation-transformer-v1"
+      ],
+      "updateFrequencyMs": 15000,
+      "taskTypes": [
+        "strategy_selection",
+        "parameter_optimization",
+        "risk_management"
+      ],
+      "dependencies": [
+        "PricePredictionAgent",
+        "VolatilityPredictionAgent",
+        "MarketSentimentAgent"
+      ],
+      "priority": 1,
+      "enabled": true
+    }
+  ],
+  "systemWideSettings": {
+    "maxConcurrentInferences": 10,
+    "maxConcurrentTransactions": 5,
+    "maxMemoryUsageMb": 2048,
+    "cpuUsageLimit": 0.8,
+    "enabledFeatures": [
+      "transformer_inference",
+      "price_feed_caching",
+      "stream_caching",
+      "onchain_integration",
+      "ai_coordination"
+    ],
+    "logLevel": "info",
+    "telemetryEnabled": true,
+    "autoScaling": true,
+    "emergencyShutdownThreshold": 0.95
+  }
+}

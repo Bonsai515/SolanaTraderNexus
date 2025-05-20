@@ -1,0 +1,12 @@
+{
+  "rpcConnection": {
+    "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f"
+  },
+  "requestSettings": {
+    "maxRequestsPerSecond": 3,
+    "maxConcurrentRequests": 2
+  },
+  "slippageBps": 75,
+  "priorityFeeInLamports": 200000,
+  "maxRetries": 2
+}

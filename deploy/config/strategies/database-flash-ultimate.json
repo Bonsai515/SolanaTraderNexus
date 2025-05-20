@@ -1,0 +1,30 @@
+{
+  "name": "database-flash-ultimate",
+  "type": "flash-loan",
+  "description": "Database Flash Ultimate with AIModelSynapse enhanced execution",
+  "enabled": true,
+  "priority": 7,
+  "minProfitThresholdPercent": 0.18,
+  "maxSlippageBps": 35,
+  "executionSettings": {
+    "maxTransactionsPerHour": 2,
+    "minTimeBetweenTradesMs": 1800000,
+    "executionPriority": "high",
+    "simulateBeforeSubmit": true,
+    "maxRetries": 2,
+    "useFlashLoans": true,
+    "flashLoanSources": [
+      "solend",
+      "port"
+    ],
+    "layeredExecution": true,
+    "layerCount": 2,
+    "concurrentExecutions": 1
+  },
+  "rpcSettings": {
+    "provider": "syndica",
+    "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+  },
+  "expectedProfitPerTradePercent": 1.75,
+  "successRatePercent": 92
+}

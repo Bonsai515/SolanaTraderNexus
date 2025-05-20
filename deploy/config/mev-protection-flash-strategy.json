@@ -1,0 +1,58 @@
+{
+  "name": "MEV Protection Flash Loans",
+  "enabled": true,
+  "priority": 11,
+  "expectedProfitPercent": 3.25,
+  "maxPositionSizePercent": 28,
+  "minProfitThresholdPercent": 0.22,
+  "maxSlippageBps": 40,
+  "maxActiveLoans": 2,
+  "rpcProvider": "syndica",
+  "transformerProvider": "alchemy",
+  "loanProtocols": [
+    "Solend",
+    "Kamino",
+    "Marinade"
+  ],
+  "tokens": [
+    "SOL",
+    "USDC",
+    "ETH",
+    "mSOL",
+    "BONK",
+    "JUP"
+  ],
+  "exchanges": [
+    "Jupiter",
+    "Raydium",
+    "Orca",
+    "Meteora"
+  ],
+  "features": {
+    "oraclePriceVerification": true,
+    "transformerPrediction": true,
+    "multihopRouting": true,
+    "mevProtection": true,
+    "advancedMevDefense": true,
+    "blockCapture": true,
+    "jitBundling": true,
+    "privateTxPool": true,
+    "rbsProtection": true,
+    "priorityFeeOptimization": true,
+    "layeredPositions": true,
+    "multicallExecution": true,
+    "atomicTransactions": true,
+    "onchainPriceVerification": true
+  },
+  "riskLevel": "high",
+  "minLoanSizeSOL": 0.1,
+  "maxLoanSizeSOL": 18,
+  "gasOptimization": true,
+  "priorityFeeInLamports": 350000,
+  "simulateBeforeExecution": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "submitTransactions": true,
+  "monitoringInterval": 750,
+  "logLevel": "info",
+  "lastUpdated": "2025-05-19T18:50:15.524Z"
+}

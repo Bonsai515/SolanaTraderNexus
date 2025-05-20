@@ -1,0 +1,14 @@
+{
+  "heapSizeMB": 2048,
+  "enableGarbageCollection": true,
+  "gcIntervalMs": 60000,
+  "optimizeFor": "replit",
+  "limitConcurrentRequests": true,
+  "maxConcurrentRpcRequests": 3,
+  "mainWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqb",
+  "replitSpecific": {
+    "enableMemoryTracking": true,
+    "reducedLogging": true,
+    "optimizeConnections": true
+  }
+}

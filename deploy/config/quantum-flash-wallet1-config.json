@@ -1,0 +1,11 @@
+{
+  "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "name": "Trading Wallet 1",
+  "strategy": "quantum_flash",
+  "maxPositionSizePercent": 25,
+  "maxDailyTrades": 14,
+  "minTradeIntervalSec": 300,
+  "tradingEnabled": true,
+  "privateKeyEnvVar": "WALLET1_PRIVATE_KEY",
+  "created": "2025-05-20T00:57:38.065Z"
+}

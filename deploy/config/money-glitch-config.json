@@ -1,0 +1,92 @@
+{
+  "name": "Money Glitch Flash Arbitrage",
+  "version": "1.0.0",
+  "description": "Advanced flash loan strategy exploiting cross-exchange price differences",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "active": true,
+  "createdAt": "2025-05-18T02:41:04.577Z",
+  "lastUpdated": "2025-05-18T02:41:04.578Z",
+  "params": {
+    "maxPositionSizePercent": 95,
+    "minProfitThresholdUSD": 0.0005,
+    "maxSlippageTolerance": 0.0025,
+    "maxActiveLoans": 3,
+    "maxDailyTransactions": 2400,
+    "loanProtocols": [
+      "Solend",
+      "Mango",
+      "Port"
+    ],
+    "routingOptimization": true,
+    "maxGasFeeSOL": 0.0015,
+    "timeoutMs": 25000,
+    "dexes": [
+      "Jupiter",
+      "Orca",
+      "Raydium",
+      "Serum",
+      "Saber",
+      "Mercurial",
+      "Aldrin"
+    ],
+    "pairBlacklist": [
+      "SAMO/USDC",
+      "CUSD/USDC",
+      "USDT/PAI"
+    ],
+    "pairWhitelist": [
+      "SOL/USDC",
+      "SOL/USDT",
+      "ETH/USDT",
+      "ETH/USDC",
+      "SOL/ETH",
+      "BTC/USDC",
+      "BTC/USDT",
+      "RAY/USDC",
+      "RAY/SOL",
+      "SRM/SOL",
+      "JUP/USDC",
+      "JUP/SOL",
+      "USDC/USDT",
+      "BONK/USDC"
+    ],
+    "minSpreadPercent": 0.08,
+    "spreadCalculationMethod": "midpoint",
+    "triangularArbitrage": true,
+    "sandwichAttackProtection": true,
+    "multicallExecution": true,
+    "atomicExecution": true,
+    "mevProtection": true,
+    "flashLoanSourcePriority": [
+      "Solend",
+      "Mango",
+      "Port"
+    ],
+    "bridgeIntegration": false,
+    "profitSplitPercent": 90,
+    "useRbsProtection": true,
+    "simulateBeforeSend": true,
+    "useAdvancedRouting": true,
+    "revertProtection": true,
+    "gasPriceStrategy": "aggressive",
+    "balancerIntegration": false,
+    "jupiterIntegration": true,
+    "orcaIntegration": true,
+    "raydiumIntegration": true,
+    "loopDetection": true,
+    "maxLoopLength": 4,
+    "minConfidenceScore": 90,
+    "autoAdjustThresholds": true
+  },
+  "performance": {
+    "totalExecutions": 0,
+    "successfulExecutions": 0,
+    "failedExecutions": 0,
+    "totalProfitSOL": 0,
+    "totalProfitUSD": 0,
+    "averageProfitPerTradeSOL": 0,
+    "averageProfitPerTradeUSD": 0,
+    "largestProfitSOL": 0,
+    "largestProfitUSD": 0
+  }
+}
