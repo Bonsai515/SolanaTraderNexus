@@ -1,0 +1,14 @@
+{
+  "id": "signal_1747484409147_kjbkcnnq",
+  "timestamp": 1747484409147,
+  "transformer": "MicroQHC",
+  "type": "entry",
+  "confidence": 0.87,
+  "strength": "high",
+  "timeframe": "immediate",
+  "action": "swap",
+  "sourceToken": "USDC",
+  "targetToken": "BONK",
+  "sourceAmount": 250,
+  "description": "MicroQHC detected high buy pressure on BONK"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "signal_1747504443802_zp3iy6ci",
+  "timestamp": 1747504443802,
+  "transformer": "MemeCortexRemix",
+  "type": "entry",
+  "confidence": 0.79,
+  "strength": "medium",
+  "timeframe": "short",
+  "action": "swap",
+  "sourceToken": "USDC",
+  "targetToken": "JUP",
+  "sourceAmount": 200,
+  "description": "MemeCortexRemix detected JUP uptrend beginning"
+}

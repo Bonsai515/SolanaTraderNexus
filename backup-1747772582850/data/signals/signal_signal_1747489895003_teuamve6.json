@@ -1,0 +1,14 @@
+{
+  "id": "signal_1747489895003_teuamve6",
+  "timestamp": 1747489895003,
+  "transformer": "MemeCortex",
+  "type": "entry",
+  "confidence": 0.81,
+  "strength": "high",
+  "timeframe": "short",
+  "action": "swap",
+  "sourceToken": "USDC",
+  "targetToken": "MEME",
+  "sourceAmount": 125,
+  "description": "MemeCortex identified bullish pattern on MEME"
+}

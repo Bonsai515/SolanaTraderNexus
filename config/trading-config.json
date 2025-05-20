@@ -1,7 +1,7 @@
 {
   "tradingEnabled": true,
   "useRealFunds": true,
-  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "walletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
   "minProfitThreshold": 0.2,
   "maxTradesPerHour": 14,
   "minTimeBetweenTrades": 300,

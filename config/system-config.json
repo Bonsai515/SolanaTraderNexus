@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "walletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
   "minSOLRequired": 0.00001,
   "maxTradesPerHour": 14,
   "minTimeBetweenTrades": 300,

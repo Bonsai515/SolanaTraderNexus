@@ -1,0 +1,313 @@
+{
+  "version": "1.0.0",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "strategy": "ZeroCapitalFlashLoan",
+  "params": {
+    "minProfitThresholdUSD": 0.05,
+    "maxSlippageTolerance": 0.005,
+    "maxDailyTransactions": 500,
+    "minSuccessRate": 0.8,
+    "loanProtocols": [
+      "solend",
+      "port-finance",
+      "kamino",
+      "marginfi",
+      "uxd-protocol"
+    ],
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "USDT",
+      "ETH",
+      "BONK",
+      "JUP",
+      "RAY",
+      "MSOL",
+      "MNGO",
+      "SAMO"
+    ],
+    "transactionTimeoutMs": 30000,
+    "maxGasFeeBudgetSOL": 0.05,
+    "routingOptimization": true,
+    "useRpcFailover": true,
+    "useFlashBundling": true,
+    "usePriceImpactProtection": true,
+    "maxLoanSizeUSDC": 10000,
+    "loanSizeTiers": [
+      100,
+      500,
+      1000,
+      5000,
+      10000
+    ],
+    "permissionlessMode": false,
+    "useStaticCallSimulation": true,
+    "executeWithCallback": true,
+    "requireOnChainVerification": true,
+    "enableMEVProtection": true,
+    "useMarginOfSafety": 10
+  },
+  "routes": [
+    {
+      "name": "SOL-USDC Triangle",
+      "path": [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.0009,
+      "estimatedGas": 0.00007,
+      "priority": 10,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-SOL-USDT Triangle",
+      "path": [
+        "USDC",
+        "SOL",
+        "USDT",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter",
+        "raydium"
+      ],
+      "estimatedFee": 0.0012,
+      "estimatedGas": 0.00009,
+      "priority": 9,
+      "minimumProfit": 0.07,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "ETH-USDC-SOL Triangle",
+      "path": [
+        "ETH",
+        "USDC",
+        "SOL",
+        "ETH"
+      ],
+      "protocols": [
+        "port-finance"
+      ],
+      "exchanges": [
+        "jupiter",
+        "orca"
+      ],
+      "estimatedFee": 0.0015,
+      "estimatedGas": 0.0001,
+      "priority": 8,
+      "minimumProfit": 0.1,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-JUP-USDC Direct",
+      "path": [
+        "USDC",
+        "JUP",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00006,
+      "priority": 7,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "SOL-BONK-SOL Direct",
+      "path": [
+        "SOL",
+        "BONK",
+        "SOL"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "jupiter"
+      ],
+      "estimatedFee": 0.001,
+      "estimatedGas": 0.00007,
+      "priority": 6,
+      "minimumProfit": 0.05,
+      "directSwaps": true,
+      "enabled": true
+    },
+    {
+      "name": "USDC-RAY-JUP-USDC Complex",
+      "path": [
+        "USDC",
+        "RAY",
+        "JUP",
+        "USDC"
+      ],
+      "protocols": [
+        "solend"
+      ],
+      "exchanges": [
+        "raydium",
+        "jupiter"
+      ],
+      "estimatedFee": 0.0018,
+      "estimatedGas": 0.0001,
+      "priority": 5,
+      "minimumProfit": 0.1,
+      "directSwaps": false,
+      "enabled": true
+    },
+    {
+      "name": "SOL-MSOL-SOL LSD",
+      "path": [
+        "SOL",
+        "MSOL",
+        "SOL"
+      ],
+      "protocols": [
+        "marginfi"
+      ],
+      "exchanges": [
+        "jupiter",
+        "marinade"
+      ],
+      "estimatedFee": 0.0008,
+      "estimatedGas": 0.00008,
+      "priority": 8,
+      "minimumProfit": 0.03,
+      "directSwaps": true,
+      "enabled": true
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "Jupiter",
+      "type": "aggregator",
+      "url": "https://quote-api.jup.ag/v6",
+      "priority": 10,
+      "requiresAuth": false,
+      "feeBps": 10,
+      "avgSlippageBps": 20,
+      "enabled": true
+    },
+    {
+      "name": "Raydium",
+      "type": "dex",
+      "url": "https://api.raydium.io",
+      "priority": 9,
+      "requiresAuth": false,
+      "feeBps": 30,
+      "avgSlippageBps": 25,
+      "enabled": true
+    },
+    {
+      "name": "Orca",
+      "type": "dex",
+      "url": "https://api.orca.so",
+      "priority": 8,
+      "requiresAuth": false,
+      "feeBps": 30,
+      "avgSlippageBps": 25,
+      "enabled": true
+    },
+    {
+      "name": "Marinade",
+      "type": "lsd-pool",
+      "url": "https://api.marinade.finance",
+      "priority": 7,
+      "requiresAuth": false,
+      "feeBps": 10,
+      "avgSlippageBps": 15,
+      "enabled": true
+    }
+  ],
+  "protocols": [
+    {
+      "name": "Solend",
+      "type": "lending",
+      "maxLoanSizeUSDC": 100000,
+      "flashFeePercent": 0.0009,
+      "gasEstimateSOL": 0.000025,
+      "programId": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo",
+      "enabled": true
+    },
+    {
+      "name": "Port Finance",
+      "type": "lending",
+      "maxLoanSizeUSDC": 50000,
+      "flashFeePercent": 0.0009,
+      "gasEstimateSOL": 0.000028,
+      "programId": "Port7uDYB3wk6GJAw4KT1WpTeMtSu9bTcChBHkX2LfR",
+      "enabled": true
+    },
+    {
+      "name": "Kamino Finance",
+      "type": "concentrated-liquidity",
+      "maxLoanSizeUSDC": 75000,
+      "flashFeePercent": 0.001,
+      "gasEstimateSOL": 0.000026,
+      "programId": "KLend2g3cP87fffoy8q1mQqGKPm5pFDCZaHLgLPS6p",
+      "enabled": true
+    },
+    {
+      "name": "MarginFi",
+      "type": "margin-trading",
+      "maxLoanSizeUSDC": 30000,
+      "flashFeePercent": 0.001,
+      "gasEstimateSOL": 0.00003,
+      "programId": "MRGNNQdFP1b6MxNNQJ9bG3CqJ2cNBFpMX326pUNrNxV",
+      "enabled": true
+    },
+    {
+      "name": "UXD Protocol",
+      "type": "stablecoin",
+      "maxLoanSizeUSDC": 25000,
+      "flashFeePercent": 0.0008,
+      "gasEstimateSOL": 0.000024,
+      "programId": "UXD8m9cvwk4RcSxnX2HZ9VudQCEeDH6fRnB4CAP57Dr",
+      "enabled": true
+    }
+  ],
+  "minimumSOLRequired": 0.000165,
+  "active": true,
+  "lastUpdated": "2025-05-17T23:26:23.466Z",
+  "zeroCapitalParams": {
+    "collateralUtilizationPercent": 70,
+    "minProfitThresholdUSD": 0.06,
+    "maxSlippageTolerance": 0.45,
+    "maxDailyTransactions": 12,
+    "useAdvancedCollateralization": true,
+    "maxGasFeeSOL": 0.0012,
+    "profitReinvestmentRate": 70
+  },
+  "minProfitThresholdUSD": 0.4,
+  "maxDailyTransactions": 32,
+  "targetedTokens": [
+    "SOL",
+    "USDC",
+    "USDT",
+    "ETH",
+    "BTC"
+  ],
+  "checkIntervalMs": 6000,
+  "minTimeBetweenTradesMs": 340000,
+  "loanAmount": 120,
+  "simulateBeforeExecute": true
+}

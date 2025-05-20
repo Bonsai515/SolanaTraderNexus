@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "primarySources": [
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 1,
+      "refreshIntervalMs": 500
+    },
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 2,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "Orca",
+      "url": "https://api.orca.so",
+      "priority": 3,
+      "refreshIntervalMs": 750
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "Pyth",
+      "url": "https://api.pyth.network",
+      "priority": 1,
+      "refreshIntervalMs": 500
+    },
+    {
+      "name": "Switchboard",
+      "url": "https://api.switchboard.xyz",
+      "priority": 2,
+      "refreshIntervalMs": 750
+    }
+  ],
+  "zeroCapitalSpecificSources": [
+    {
+      "name": "DexScreener",
+      "url": "https://api.dexscreener.com",
+      "priority": 3,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "SolanaFM",
+      "url": "https://api.solana.fm",
+      "priority": 4,
+      "refreshIntervalMs": 1500
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "SOL": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "USDC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "JUP": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    }
+  }
+}

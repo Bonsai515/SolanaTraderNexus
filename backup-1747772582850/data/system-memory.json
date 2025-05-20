@@ -1,0 +1,1051 @@
+{
+  "features": {
+    "realFundsTrading": true,
+    "optimizedRpc": true,
+    "nuclearStrategies": true,
+    "profitCollection": true,
+    "transactionVerification": true,
+    "awsIntegration": true,
+    "solscanVerification": true,
+    "hyperion": true,
+    "quantumOmega": true,
+    "singularity": true,
+    "onChainIntegration": true,
+    "advancedRiskManagement": true,
+    "flashLoans": true,
+    "enhancedArbitrage": true,
+    "quantumMEV": true,
+    "multiChain": true,
+    "enhancedPriceFeeds": true,
+    "realtimeMarketMonitoring": true,
+    "mevProtection": true,
+    "geyserIntegration": true,
+    "realTrading": true,
+    "simulation": false,
+    "testMode": false,
+    "simulateTransactions": false,
+    "liveMode": true,
+    "forceRealTransactions": true,
+    "autonomousTrading": true,
+    "compoundInterest": true,
+    "profitAnalytics": true,
+    "multiDex": true,
+    "dexAggregator": true,
+    "jupiterIntegration": true,
+    "raydiumIntegration": true,
+    "orcaIntegration": true,
+    "solendLiquidator": true,
+    "liquidationMonitoring": true,
+    "defiIntegration": true,
+    "quantumOmegaMemeSniper": true,
+    "quantumFlashLoan": true,
+    "zeroCapitalFlashLoan": true,
+    "hyperionFlashLoan": true,
+    "neuralTransformers": true,
+    "moneyGlitchStrategy": true,
+    "nuclearMoneyGlitchStrategy": true,
+    "extremeYieldStrategy": true
+  },
+  "config": {
+    "transactionEngine": {
+      "useRealFunds": true,
+      "mode": "LIVE",
+      "priorityFee": "HIGH",
+      "maxSlippageBps": 100,
+      "mevProtection": true,
+      "walletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    "walletManager": {
+      "primaryWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "autoFunding": false,
+      "hasPrivateKey": false
+    },
+    "profitCollection": {
+      "enabled": true,
+      "captureIntervalMinutes": 4,
+      "autoCapture": true,
+      "minProfitThreshold": 0.001,
+      "reinvestmentRate": 95,
+      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    "rpcConfig": {
+      "primaryProvider": "instantnodes",
+      "backupProviders": [
+        "mainnet-beta"
+      ],
+      "connectionMode": "multi-connection",
+      "webSocketEnabled": true,
+      "grpcEnabled": false,
+      "maxRequestsPerMinute": 60
+    },
+    "lastUpdated": "2025-05-16T02:35:29.294Z",
+    "rateLimit": {
+      "requestsPerMinute": 60,
+      "enabled": true
+    },
+    "trading": {
+      "maxLeverageMultiplier": 3,
+      "useFlashLoans": true,
+      "useCrossChainBridges": true,
+      "minSlippageTolerance": 0.5,
+      "maxSlippageTolerance": 1,
+      "priorityFee": "HIGH",
+      "riskLevel": "AGGRESSIVE",
+      "tradingStyle": "QUANTUM_NUCLEAR",
+      "enableTurboMode": true,
+      "enhancedLiquidityRouting": true,
+      "useRealFunds": true,
+      "simulationMode": false,
+      "testMode": false,
+      "walletUpdate": true,
+      "confirmations": 3,
+      "dryRun": false,
+      "forceLiveTransactions": true,
+      "forceRealTransactions": true,
+      "executeOnChain": true,
+      "skipSimulation": true
+    },
+    "profitProjection": {
+      "targetDailyROI": 1.37,
+      "compoundingEnabled": true,
+      "reinvestmentRate": 0.95,
+      "riskToleranceLevel": "VERY_HIGH"
+    },
+    "priceFeed": {
+      "enabled": true,
+      "gmgn": true,
+      "pumpfun": true,
+      "dexscreener": true,
+      "moonshot": true,
+      "proton": true,
+      "birdeye": true,
+      "geyser": true,
+      "updateFrequencyMs": 15000,
+      "useNeuralWeightedAggregation": true,
+      "useGeyserForRealtime": true
+    },
+    "wallet": {
+      "mainWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "prophetWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "useRealWallet": true
+    },
+    "onChainPrograms": {
+      "enabled": true,
+      "programIds": {
+        "hyperion": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg",
+        "quantumMEV": "6LSbYXjP1vj63rUPbz9KLvE3JewHaMdRPdDZZRYoTPCV",
+        "memeCortex": "MEMExRx4QEz4fYdLqfhQZ8kCGmrHMjxyf6MDQPSyffAg",
+        "flashArb": "FlsH1zBxXz3ib9uqgHNtV6uqzGMcnTgoAutozBXH8Zff",
+        "priceOracle": "PrCxxvRiPhxM2z9uFaCehLYj7i9s8xqvVXrF8fY6nmT"
+      }
+    },
+    "autonomousTrading": {
+      "enabled": true,
+      "requireOnChainValidation": true,
+      "profitThreshold": 0.5,
+      "riskManagement": {
+        "stopLoss": true,
+        "stopLossThreshold": 5,
+        "maxDaily": 200
+      }
+    },
+    "dex": {
+      "enabled": true,
+      "smartRouting": true,
+      "checkMultipleRoutes": true,
+      "allowCrossDexArbitrage": true,
+      "scanIntervalSeconds": 30
+    },
+    "solend": {
+      "enabled": true,
+      "liquidationMonitoring": true,
+      "autoLiquidate": true,
+      "minProfitThreshold": 0.5,
+      "pollIntervalSeconds": 10
+    }
+  },
+  "lastUpdated": "2025-05-16T16:42:32.854Z",
+  "useRealFunds": true,
+  "nuclearStrategies": {
+    "enabled": true,
+    "strategies": [
+      {
+        "id": "quantum-nuclear-flash-arbitrage",
+        "name": "Quantum Nuclear Flash Arbitrage",
+        "description": "Ultra-high-frequency flash loan arbitrage across multiple DEXes with quantum-enhanced timing",
+        "dailyROI": 45,
+        "allocation": 30,
+        "risk": "Very High",
+        "requires": [
+          "flash-loans",
+          "quantum-timing",
+          "multi-dex"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 512,
+          "cpuRequirement": 50,
+          "timeframeMs": 500,
+          "maxSlippageBps": 20,
+          "fallbackOptions": [
+            "raydium-direct-route",
+            "jupiter-aggregation",
+            "orca-whirlpools"
+          ]
+        },
+        "config": {
+          "maxAmount": 100000,
+          "minProfitThreshold": 0.5,
+          "useFlashLoans": true,
+          "flashLoanProviders": [
+            "Solend",
+            "Mango",
+            "Kamino"
+          ],
+          "slippageTolerance": 1,
+          "gasMultiplier": 1.5,
+          "priorityFee": "VERY_HIGH",
+          "profitTarget": {
+            "daily": 1.45,
+            "monthly": 50,
+            "yearly": 500
+          },
+          "integrations": {
+            "useMEV": true,
+            "useJupiter": true,
+            "useOnChainProgram": true,
+            "programId": "HRQERBQQpjuXu68qEMzkY1nZ3VJpsfGJXnidHdYUPZxg"
+          }
+        }
+      },
+      {
+        "id": "singularity-black-hole",
+        "name": "Singularity Black Hole",
+        "description": "Cross-chain multi-token arbitrage with wormhole integration and gravitational-slingshot effect",
+        "dailyROI": 55,
+        "allocation": 20,
+        "risk": "Extreme",
+        "requires": [
+          "wormhole",
+          "cross-chain",
+          "time-warp"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 768,
+          "cpuRequirement": 75,
+          "timeframeMs": 2000,
+          "maxSlippageBps": 50,
+          "fallbackOptions": [
+            "direct-bridge-v2",
+            "allbridge-route",
+            "portal-backup"
+          ]
+        },
+        "config": {
+          "crossChainPairs": [
+            {
+              "source": "SOL/USDC",
+              "target": "ETH/USDC",
+              "chain": "Ethereum"
+            },
+            {
+              "source": "SOL/USDC",
+              "target": "AVAX/USDC",
+              "chain": "Avalanche"
+            },
+            {
+              "source": "SOL/USDC",
+              "target": "MATIC/USDC",
+              "chain": "Polygon"
+            }
+          ],
+          "bridgeParams": {
+            "useWormhole": true,
+            "useAllbridge": true,
+            "usePortal": true,
+            "maxBridgeTime": 120,
+            "maxFeeBps": 50
+          },
+          "executionParams": {
+            "maxConcurrentBridges": 3,
+            "minProfitThresholdUsd": 50,
+            "priorityFee": "VERY_HIGH"
+          }
+        }
+      },
+      {
+        "id": "memecortex-supernova",
+        "name": "MemeCortex Supernova",
+        "description": "Neural prediction of meme token price explosions with pre-liquidity detection and MEV protection",
+        "dailyROI": 75,
+        "allocation": 25,
+        "risk": "Extreme",
+        "requires": [
+          "neural-prediction",
+          "mev-protection",
+          "pre-liquidity"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 1024,
+          "cpuRequirement": 90,
+          "timeframeMs": 200,
+          "maxSlippageBps": 100,
+          "fallbackOptions": [
+            "immediate-sell",
+            "partial-position",
+            "extended-hold"
+          ]
+        },
+        "config": {
+          "memeDetection": {
+            "usePreLiquidity": true,
+            "useSocialSentiment": true,
+            "useWhaleTracking": true,
+            "confidenceThreshold": 0.85
+          },
+          "executionParams": {
+            "maxAllocation": 0.25,
+            "initialBuySize": 0.05,
+            "scaleInThresholds": [
+              0.1,
+              0.2,
+              0.5
+            ],
+            "takeProfitLevels": [
+              0.5,
+              1,
+              2,
+              5,
+              10
+            ],
+            "stopLossPercent": 0.15,
+            "useTrailingStop": true,
+            "trailingStopDistance": 0.25
+          },
+          "priorityFee": "VERY_HIGH"
+        }
+      },
+      {
+        "id": "hyperion-money-loop",
+        "name": "Hyperion Money Loop",
+        "description": "Perpetual borrow/lend/swap loop with flash loans and multi-DEX routing for continuous profit harvesting",
+        "dailyROI": 38,
+        "allocation": 25,
+        "risk": "Very High",
+        "requires": [
+          "flash-loans",
+          "lending-protocols",
+          "multi-dex"
+        ],
+        "active": true,
+        "errorChecks": {
+          "memoryRequirement": 512,
+          "cpuRequirement": 60,
+          "timeframeMs": 800,
+          "maxSlippageBps": 30,
+          "fallbackOptions": [
+            "single-hop-route",
+            "direct-swap",
+            "lending-only"
+          ]
+        },
+        "config": {
+          "lendingParams": {
+            "platforms": [
+              "Solend",
+              "Mango",
+              "Kamino",
+              "Larix"
+            ],
+            "maxLeverageMultiplier": 3,
+            "targetUtilizationRate": 0.8,
+            "rebalanceThresholdBps": 50
+          },
+          "routingParams": {
+            "maxHops": 3,
+            "dexes": [
+              "Jupiter",
+              "Raydium",
+              "Orca",
+              "Meteora"
+            ],
+            "maxPriceImpactBps": 30,
+            "minProfitThresholdBps": 10
+          },
+          "executionFrequency": {
+            "loops": 12,
+            "minIntervalMinutes": 30,
+            "maxDuration": 20
+          }
+        }
+      }
+    ],
+    "lastUpdated": "2025-05-20T19:27:47.760Z",
+    "totalAllocation": 100,
+    "averageDailyROI": 52.75
+  },
+  "trading": {
+    "minimumCapital": 0.01,
+    "preferredWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+  },
+  "flashLoans": {
+    "enabled": true,
+    "maxLoanSize": 0.5,
+    "provider": "solend",
+    "minProfitThreshold": 0.0001,
+    "preferredProtocol": "solend",
+    "maxLoanAmount": 500,
+    "maxBorrowSizeUSD": 1000,
+    "minProfitThresholdUSD": 0.001,
+    "useEnhancedDataFeeds": true
+  },
+  "safety": {
+    "maxSlippageBps": 200,
+    "minSuccessRate": 70
+  },
+  "memeTokens": {
+    "enabled": true,
+    "minInvestmentAmount": 0.01,
+    "maxLossPercentage": 10
+  },
+  "dataSources": {
+    "priceFeeds": "enhanced-price-feeds.json",
+    "flashLoanProtocols": "flash-loan-protocols.json",
+    "dexIntegrations": "dex-integrations.json"
+  },
+  "wallets": {
+    "tradingWallet1": {
+      "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+      "balance": 0.097506,
+      "type": "trading",
+      "strategies": [
+        "QuantumOmegaMemeSniper",
+        "QuantumFlashLoan",
+        "MoneyGlitchStrategy",
+        "NuclearMoneyGlitchStrategy",
+        "ExtremeYieldStrategy"
+      ]
+    }
+  },
+  "strategies": {
+    "QuantumOmegaMemeSniper": {
+      "active": true,
+      "wallets": [
+        "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      ],
+      "config": {
+        "maxPositionSizePercent": 0.05,
+        "entryConfidenceThreshold": 0.75,
+        "takeProfit": 0.3,
+        "stopLoss": 0.15,
+        "maxActivePositions": 4,
+        "minLiquiditySOL": 10,
+        "maxBuyTax": 5,
+        "maxSellTax": 7,
+        "requireLiquidityLock": true,
+        "minimumLaunchTimeMinutes": 0,
+        "multiPositionStrategy": false,
+        "transactionTimeoutSeconds": 45,
+        "slippageTolerance": 0.03,
+        "prioritizeEarlyLaunches": true,
+        "useSmartSizing": true,
+        "useMemeCortexIntegration": true,
+        "maxGasFeeSOL": 0.000025,
+        "detectionListeners": [
+          "jupiter-memelist",
+          "birdeye-launches",
+          "dexscreener-trending",
+          "memecortex",
+          "telegram-signals"
+        ]
+      }
+    },
+    "QuantumFlashLoan": {
+      "active": true,
+      "wallets": [
+        "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      ],
+      "config": {
+        "maxPositionSizePercent": 0.8,
+        "minProfitThresholdUSD": 0.001,
+        "maxSlippageTolerance": 0.005,
+        "maxActiveLoans": 2,
+        "maxDailyTransactions": 1000,
+        "loanProtocols": [
+          "solend",
+          "kamino",
+          "port-finance",
+          "apricot",
+          "tulip"
+        ],
+        "routingOptimization": true,
+        "maxGasFeeSOL": 0.00005,
+        "timeoutMs": 30000,
+        "useFeeDiscounting": true,
+        "minLiquidityPoolSize": 10000,
+        "targetedTokens": [
+          "SOL",
+          "USDC",
+          "USDT",
+          "ETH",
+          "BTC",
+          "BONK",
+          "JUP",
+          "RAY",
+          "ORCA",
+          "MNGO"
+        ],
+        "usePriceImpactProtection": true,
+        "useMetaTransactions": false,
+        "crossExchangeArbitrage": true,
+        "useHangingOrderStrategy": false,
+        "profitSplitPercent": 80,
+        "useAdvancedRateLimit": true,
+        "useRbsProtection": true
+      },
+      "routes": [
+        {
+          "name": "SOL-USDC-SOL",
+          "path": [
+            "SOL",
+            "USDC",
+            "SOL"
+          ],
+          "protocol": "solend",
+          "exchanges": [
+            "Jupiter",
+            "Orca"
+          ],
+          "estimatedFee": 0.0005,
+          "priority": 10,
+          "minimumSize": 0.05,
+          "maximumSize": 100,
+          "enabled": true
+        },
+        {
+          "name": "SOL-USDT-SOL",
+          "path": [
+            "SOL",
+            "USDT",
+            "SOL"
+          ],
+          "protocol": "solend",
+          "exchanges": [
+            "Jupiter",
+            "Raydium"
+          ],
+          "estimatedFee": 0.0006,
+          "priority": 9,
+          "minimumSize": 0.05,
+          "maximumSize": 100,
+          "enabled": true
+        },
+        {
+          "name": "USDC-SOL-USDC",
+          "path": [
+            "USDC",
+            "SOL",
+            "USDC"
+          ],
+          "protocol": "port-finance",
+          "exchanges": [
+            "Jupiter"
+          ],
+          "estimatedFee": 0.0005,
+          "priority": 8,
+          "minimumSize": 10,
+          "maximumSize": 10000,
+          "enabled": true
+        },
+        {
+          "name": "SOL-BONK-SOL",
+          "path": [
+            "SOL",
+            "BONK",
+            "SOL"
+          ],
+          "protocol": "solend",
+          "exchanges": [
+            "Jupiter",
+            "Raydium"
+          ],
+          "estimatedFee": 0.001,
+          "priority": 7,
+          "minimumSize": 0.05,
+          "maximumSize": 50,
+          "enabled": true
+        },
+        {
+          "name": "SOL-ETH-SOL",
+          "path": [
+            "SOL",
+            "ETH",
+            "SOL"
+          ],
+          "protocol": "kamino",
+          "exchanges": [
+            "Jupiter"
+          ],
+          "estimatedFee": 0.0007,
+          "priority": 6,
+          "minimumSize": 0.1,
+          "maximumSize": 100,
+          "enabled": true
+        }
+      ]
+    },
+    "ZeroCapitalFlashLoan": {
+      "active": true,
+      "wallets": [
+        "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      ],
+      "config": {
+        "minProfitThresholdUSD": 0.05,
+        "maxSlippageTolerance": 0.005,
+        "maxDailyTransactions": 500,
+        "minSuccessRate": 0.8,
+        "loanProtocols": [
+          "solend",
+          "port-finance",
+          "kamino",
+          "marginfi",
+          "uxd-protocol"
+        ],
+        "targetedTokens": [
+          "SOL",
+          "USDC",
+          "USDT",
+          "ETH",
+          "BONK",
+          "JUP",
+          "RAY",
+          "MSOL",
+          "MNGO",
+          "SAMO"
+        ],
+        "transactionTimeoutMs": 30000,
+        "maxGasFeeBudgetSOL": 0.05,
+        "routingOptimization": true,
+        "useRpcFailover": true,
+        "useFlashBundling": true,
+        "usePriceImpactProtection": true,
+        "maxLoanSizeUSDC": 10000,
+        "loanSizeTiers": [
+          100,
+          500,
+          1000,
+          5000,
+          10000
+        ],
+        "permissionlessMode": false,
+        "useStaticCallSimulation": true,
+        "executeWithCallback": true,
+        "requireOnChainVerification": true,
+        "enableMEVProtection": true,
+        "useMarginOfSafety": 10
+      },
+      "routes": [
+        {
+          "name": "SOL-USDC Triangle",
+          "path": [
+            "SOL",
+            "USDC",
+            "SOL"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "estimatedFee": 0.0009,
+          "estimatedGas": 0.00007,
+          "priority": 10,
+          "minimumProfit": 0.05,
+          "directSwaps": true,
+          "enabled": true
+        },
+        {
+          "name": "USDC-SOL-USDT Triangle",
+          "path": [
+            "USDC",
+            "SOL",
+            "USDT",
+            "USDC"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter",
+            "raydium"
+          ],
+          "estimatedFee": 0.0012,
+          "estimatedGas": 0.00009,
+          "priority": 9,
+          "minimumProfit": 0.07,
+          "directSwaps": true,
+          "enabled": true
+        },
+        {
+          "name": "ETH-USDC-SOL Triangle",
+          "path": [
+            "ETH",
+            "USDC",
+            "SOL",
+            "ETH"
+          ],
+          "protocols": [
+            "port-finance"
+          ],
+          "exchanges": [
+            "jupiter",
+            "orca"
+          ],
+          "estimatedFee": 0.0015,
+          "estimatedGas": 0.0001,
+          "priority": 8,
+          "minimumProfit": 0.1,
+          "directSwaps": true,
+          "enabled": true
+        },
+        {
+          "name": "USDC-JUP-USDC Direct",
+          "path": [
+            "USDC",
+            "JUP",
+            "USDC"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "estimatedFee": 0.001,
+          "estimatedGas": 0.00006,
+          "priority": 7,
+          "minimumProfit": 0.05,
+          "directSwaps": true,
+          "enabled": true
+        },
+        {
+          "name": "SOL-BONK-SOL Direct",
+          "path": [
+            "SOL",
+            "BONK",
+            "SOL"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "estimatedFee": 0.001,
+          "estimatedGas": 0.00007,
+          "priority": 6,
+          "minimumProfit": 0.05,
+          "directSwaps": true,
+          "enabled": true
+        },
+        {
+          "name": "USDC-RAY-JUP-USDC Complex",
+          "path": [
+            "USDC",
+            "RAY",
+            "JUP",
+            "USDC"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "raydium",
+            "jupiter"
+          ],
+          "estimatedFee": 0.0018,
+          "estimatedGas": 0.0001,
+          "priority": 5,
+          "minimumProfit": 0.1,
+          "directSwaps": false,
+          "enabled": true
+        },
+        {
+          "name": "SOL-MSOL-SOL LSD",
+          "path": [
+            "SOL",
+            "MSOL",
+            "SOL"
+          ],
+          "protocols": [
+            "marginfi"
+          ],
+          "exchanges": [
+            "jupiter",
+            "marinade"
+          ],
+          "estimatedFee": 0.0008,
+          "estimatedGas": 0.00008,
+          "priority": 8,
+          "minimumProfit": 0.03,
+          "directSwaps": true,
+          "enabled": true
+        }
+      ],
+      "totalExecutions": 0,
+      "successfulExecutions": 0,
+      "failedExecutions": 0,
+      "totalProfitUSD": 0,
+      "totalGasCostSOL": 0
+    },
+    "HyperionFlashLoan": {
+      "active": true,
+      "wallets": [
+        "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      ],
+      "config": {
+        "maxPositionSizePercent": 0.9,
+        "minProfitThresholdUSD": 0.02,
+        "maxSlippageTolerance": 0.004,
+        "loanProtocols": [
+          "solend",
+          "port-finance",
+          "kamino",
+          "marginfi"
+        ],
+        "maxDailyTransactions": 1000,
+        "targetedTokens": [
+          "SOL",
+          "USDC",
+          "USDT",
+          "ETH",
+          "BTC",
+          "BONK",
+          "JUP",
+          "RAY",
+          "ORCA",
+          "MSOL"
+        ],
+        "transformerLayers": 4,
+        "quantumFiltering": true,
+        "neuralOptimization": true,
+        "parallelExecution": true,
+        "adaptiveRiskManagement": true,
+        "executionPriorities": [
+          10,
+          8,
+          6,
+          4,
+          2
+        ],
+        "optimizationInterval": 500,
+        "useIntegratedDex": true,
+        "transactionTimeoutMs": 25000,
+        "useMemoryGraph": true,
+        "transformerModels": [
+          "microQHC",
+          "memeCortex",
+          "hyperionFlash",
+          "solanaOptimizer"
+        ],
+        "requireVerification": true,
+        "maxGasFeeBudgetSOL": 0.05
+      },
+      "routes": [
+        {
+          "name": "HyperSOL-USDC",
+          "path": [
+            "SOL",
+            "USDC",
+            "SOL"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "transformers": [
+            "microQHC",
+            "hyperionFlash"
+          ],
+          "estimatedFee": 0.0008,
+          "estimatedGas": 0.00006,
+          "priority": 10,
+          "minimumProfit": 0.02,
+          "enabled": true
+        },
+        {
+          "name": "HyperUSDC-SOL-USDT",
+          "path": [
+            "USDC",
+            "SOL",
+            "USDT",
+            "USDC"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "transformers": [
+            "microQHC",
+            "hyperionFlash",
+            "solanaOptimizer"
+          ],
+          "estimatedFee": 0.001,
+          "estimatedGas": 0.00008,
+          "priority": 9,
+          "minimumProfit": 0.03,
+          "enabled": true
+        },
+        {
+          "name": "HyperETH-SOL",
+          "path": [
+            "ETH",
+            "SOL",
+            "ETH"
+          ],
+          "protocols": [
+            "port-finance"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "transformers": [
+            "hyperionFlash",
+            "solanaOptimizer"
+          ],
+          "estimatedFee": 0.001,
+          "estimatedGas": 0.00007,
+          "priority": 8,
+          "minimumProfit": 0.04,
+          "enabled": true
+        },
+        {
+          "name": "HyperJUP-USDC",
+          "path": [
+            "JUP",
+            "USDC",
+            "JUP"
+          ],
+          "protocols": [
+            "solend"
+          ],
+          "exchanges": [
+            "jupiter"
+          ],
+          "transformers": [
+            "memeCortex",
+            "hyperionFlash"
+          ],
+          "estimatedFee": 0.0009,
+          "estimatedGas": 0.00006,
+          "priority": 7,
+          "minimumProfit": 0.02,
+          "enabled": true
+        },
+        {
+          "name": "HyperTriSOL-JUP-BONK",
+          "path": [
+            "SOL",
+            "JUP",
+            "BONK",
+            "SOL"
+          ],
+          "protocols": [
+            "kamino"
+          ],
+          "exchanges": [
+            "jupiter",
+            "raydium"
+          ],
+          "transformers": [
+            "microQHC",
+            "memeCortex",
+            "hyperionFlash",
+            "solanaOptimizer"
+          ],
+          "estimatedFee": 0.0015,
+          "estimatedGas": 0.0001,
+          "priority": 6,
+          "minimumProfit": 0.05,
+          "enabled": true
+        }
+      ],
+      "transformers": [
+        "microQHC",
+        "memeCortex",
+        "hyperionFlash",
+        "solanaOptimizer"
+      ],
+      "totalExecutions": 0,
+      "successfulExecutions": 0,
+      "failedExecutions": 0,
+      "totalProfitUSD": 0,
+      "totalGasCostSOL": 0
+    },
+    "MoneyGlitchStrategy": {
+      "name": "Money Glitch Flash Arbitrage",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:41:04.588Z"
+    },
+    "NuclearMoneyGlitchStrategy": {
+      "name": "Nuclear Money Glitch Flash Arbitrage",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:43:43.096Z"
+    },
+    "ExtremeYieldStrategy": {
+      "name": "Extreme Yield Strategy",
+      "active": true,
+      "lastUpdated": "2025-05-18T02:50:33.034Z"
+    }
+  },
+  "transformers": {
+    "microQHC": {
+      "active": true,
+      "type": "attention",
+      "layers": 4,
+      "precision": "fp16",
+      "quantization": true,
+      "lastTraining": "2025-05-17T23:28:37.024Z",
+      "trainingIterations": 0,
+      "accuracy": 0.8753629894878211
+    },
+    "memeCortex": {
+      "active": true,
+      "type": "feedforward",
+      "layers": 3,
+      "precision": "fp32",
+      "quantization": false,
+      "lastTraining": "2025-05-17T23:28:37.024Z",
+      "trainingIterations": 0,
+      "accuracy": 0.8869324590641405
+    },
+    "hyperionFlash": {
+      "active": true,
+      "type": "hybrid",
+      "layers": 6,
+      "precision": "bfloat16",
+      "quantization": true,
+      "lastTraining": "2025-05-17T23:28:37.024Z",
+      "trainingIterations": 0,
+      "accuracy": 0.8882124125817428
+    },
+    "solanaOptimizer": {
+      "active": true,
+      "type": "recurrent",
+      "layers": 2,
+      "precision": "fp32",
+      "quantization": false,
+      "lastTraining": "2025-05-17T23:28:37.024Z",
+      "trainingIterations": 0,
+      "accuracy": 0.9285351629518563
+    }
+  }
+}

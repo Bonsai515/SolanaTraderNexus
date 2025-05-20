@@ -1,0 +1,42 @@
+{
+  "version": "2.0",
+  "enabled": true,
+  "defaultDex": "jupiter",
+  "dexes": [
+    {
+      "name": "jupiter",
+      "type": "aggregator",
+      "enabled": true,
+      "priority": 1,
+      "config": {
+        "endpoint": "https://quote-api.jup.ag/v6",
+        "timeout": 5000,
+        "slippageBps": 50,
+        "maxRetries": 3
+      }
+    },
+    {
+      "name": "orca",
+      "type": "dex",
+      "enabled": true,
+      "priority": 2,
+      "config": {
+        "timeout": 3000,
+        "slippageBps": 50,
+        "maxRetries": 2,
+        "whirlpoolsOnly": true
+      }
+    },
+    {
+      "name": "raydium",
+      "type": "dex",
+      "enabled": true,
+      "priority": 3,
+      "config": {
+        "timeout": 3000,
+        "slippageBps": 50,
+        "maxRetries": 2
+      }
+    }
+  ]
+}

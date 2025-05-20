@@ -1,0 +1,104 @@
+{
+  "strategies": [
+    {
+      "id": "quantum-nuclear-flash-arbitrage",
+      "name": "Quantum Nuclear Flash Arbitrage",
+      "description": "Ultra-high-frequency flash loan arbitrage across multiple DEXes with quantum-enhanced timing",
+      "dailyROI": 850,
+      "allocation": 30,
+      "risk": "Very High",
+      "active": true,
+      "transformer": "MicroQHC",
+      "programAddress": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+      "safetyFeatures": {
+        "stopLossPercent": 0.5,
+        "maxSlippageBps": 50,
+        "autoHedging": true,
+        "failsafeCircuitBreaker": true
+      }
+    },
+    {
+      "id": "singularity-black-hole",
+      "name": "Singularity Black Hole",
+      "description": "Cross-chain multi-token arbitrage with wormhole integration and gravitational-slingshot effect",
+      "dailyROI": 1200,
+      "allocation": 20,
+      "risk": "Extreme",
+      "active": true,
+      "transformer": "CrossChain",
+      "programAddress": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+      "safetyFeatures": {
+        "stopLossPercent": 0.65,
+        "maxSlippageBps": 75,
+        "autoHedging": true,
+        "failsafeCircuitBreaker": true
+      }
+    },
+    {
+      "id": "memecortex-supernova",
+      "name": "MemeCortex Supernova",
+      "description": "Neural prediction of meme token price explosions with pre-liquidity detection and MEV protection",
+      "dailyROI": 1500,
+      "allocation": 25,
+      "risk": "Extreme",
+      "active": true,
+      "transformer": "MemeCortexRemix",
+      "programAddress": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+      "safetyFeatures": {
+        "stopLossPercent": 0.75,
+        "maxSlippageBps": 100,
+        "autoHedging": true,
+        "failsafeCircuitBreaker": true
+      }
+    },
+    {
+      "id": "hyperion-money-loop",
+      "name": "Hyperion Money Loop",
+      "description": "Perpetual borrow/lend/swap loop with flash loans and multi-DEX routing for continuous profit harvesting",
+      "dailyROI": 800,
+      "allocation": 25,
+      "risk": "Very High",
+      "active": true,
+      "transformer": "Security",
+      "programAddress": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL",
+      "safetyFeatures": {
+        "stopLossPercent": 0.5,
+        "maxSlippageBps": 50,
+        "autoHedging": true,
+        "failsafeCircuitBreaker": true
+      }
+    }
+  ],
+  "updated": "2025-05-16T02:20:20.150Z",
+  "settings": {
+    "reinvestmentRate": 0.95,
+    "profitCapture": 0.05,
+    "useOnChainPrograms": true,
+    "maxDrawdownPercent": 2,
+    "rebalancingEnabled": true,
+    "aggressivePositionSizing": true
+  },
+  "safetyMechanisms": {
+    "stopLossEnabled": true,
+    "quickExitOnVolatility": true,
+    "hedgingEnabled": true,
+    "failsafeCircuitBreaker": true,
+    "manualOverrideAvailable": true
+  },
+  "wallet": {
+    "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "privateKeySet": true,
+    "balance": null
+  },
+  "liveTrading": true,
+  "rpc": {
+    "primary": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+    "websocket": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+    "grpc": "solana-grpc-geyser.instantnodes.io:443",
+    "backup": [
+      "https://api.mainnet-beta.solana.com",
+      "https://solana-mainnet.rpc.extrnode.com"
+    ]
+  },
+  "lastUpdated": "2025-05-16T02:35:29.297Z"
+}

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "wallets": {
+    "main": {
+      "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+      "privateKey": "b2f40c191bcafb0ad45a2574da2a16a586a59736e1d7c208b1c96965d478f94af37637bb9e234b8aad9427aba01b590669aee952bb312ac1b670c341389053da",
+      "type": "main",
+      "active": true,
+      "description": "Trading Wallet 1 for flash loan operations",
+      "useForTrading": true
+    }
+  },
+  "config": {
+    "useRealWallet": true,
+    "updateBalanceAfterTrades": true,
+    "verifyTransactions": true,
+    "recordTransactions": true,
+    "transactionSigningMethod": "local"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "maxSlippageTolerance": 0.45,
+  "maxDailyTransactions": 14,
+  "loanProtocols": [
+    "Solend",
+    "Tulip",
+    "Larix",
+    "Marinade"
+  ],
+  "crossExchangeArbitrage": true,
+  "timeoutMs": 28000,
+  "checkIntervalMs": 4000,
+  "minTimeBetweenTradesMs": 280000,
+  "profitSplitPercent": 95
+}

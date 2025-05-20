@@ -1,0 +1,76 @@
+{
+  "id": "quantum-flash-loan-strategy",
+  "name": "Quantum Flash Loan Strategy",
+  "description": "Optimized strategy for flash loan arbitrage with minimal capital requirements",
+  "type": "flash-loan",
+  "enabled": true,
+  "settings": {
+    "maxFlashLoanAmountUSD": 1000,
+    "minProfitThresholdUSD": 0.05,
+    "maxSlippageBps": 100,
+    "preferredDEXs": [
+      "jupiter",
+      "orca",
+      "raydium"
+    ],
+    "backoffMultiplier": 1.5,
+    "maxExecutionsPerHour": 3,
+    "gasOptimized": true
+  },
+  "protocols": [
+    {
+      "name": "solend",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "name": "mango",
+      "priority": 2,
+      "enabled": false
+    }
+  ],
+  "routes": [
+    {
+      "path": [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "path": [
+        "USDC",
+        "ETH",
+        "USDC"
+      ],
+      "enabled": true,
+      "priority": 2
+    },
+    {
+      "path": [
+        "SOL",
+        "BONK",
+        "SOL"
+      ],
+      "enabled": true,
+      "priority": 3
+    },
+    {
+      "path": [
+        "USDC",
+        "JUP",
+        "USDC"
+      ],
+      "enabled": true,
+      "priority": 4
+    }
+  ],
+  "safety": {
+    "maxPercentOfWalletBalance": 90,
+    "stopExecOnError": true,
+    "maxConsecutiveErrors": 3,
+    "cooldownAfterErrorSec": 60
+  }
+}

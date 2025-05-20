@@ -1,0 +1,35 @@
+{
+  "global": {
+    "enabled": true,
+    "requestsPerSecond": 1,
+    "requestsPerMinute": 10,
+    "cooldownPeriodMs": 15000
+  },
+  "providers": {
+    "helius": {
+      "enabled": true,
+      "requestsPerSecond": 1,
+      "requestsPerMinute": 10,
+      "maxConcurrentRequests": 2,
+      "cooldownPeriodMs": 15000
+    }
+  },
+  "priorities": {
+    "trade": {
+      "enabled": true,
+      "requestsPerMinute": 2,
+      "requestsPerHour": 10
+    },
+    "price": {
+      "enabled": true,
+      "requestsPerMinute": 3,
+      "requestsPerHour": 25
+    },
+    "market": {
+      "enabled": true,
+      "requestsPerMinute": 1,
+      "requestsPerHour": 15
+    }
+  },
+  "adaptiveThrottling": true
+}

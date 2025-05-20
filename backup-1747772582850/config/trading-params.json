@@ -1,0 +1,15 @@
+{
+  "minProfitThresholdPercent": 1,
+  "highPriorityThresholdPercent": 1.5,
+  "maxSlippageBps": 100,
+  "maxFeeUsd": 1.5,
+  "priorityFeeMultiplier": 1.5,
+  "tradeFrequency": {
+    "tradesPerHour": 3,
+    "minDelaySecs": 300
+  },
+  "retrySettings": {
+    "maxRetries": 2,
+    "retryDelayMs": 2000
+  }
+}

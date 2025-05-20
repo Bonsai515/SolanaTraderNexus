@@ -1,0 +1,38 @@
+{
+  "id": "quantum-omega-agent",
+  "name": "Quantum Omega Meme Sniper",
+  "type": "trading",
+  "description": "Intelligent meme token sniping agent optimized for micro-cap trading",
+  "version": "1.2.0",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+  },
+  "params": {
+    "maxPositionSizePercent": 0.05,
+    "entryConfidenceThreshold": 0.75,
+    "takeProfit": 0.3,
+    "stopLoss": 0.15,
+    "maxActivePositions": 4,
+    "minLiquiditySOL": 10,
+    "maxBuyTax": 5,
+    "maxSellTax": 7,
+    "requireLiquidityLock": true,
+    "minimumLaunchTimeMinutes": 0,
+    "multiPositionStrategy": false,
+    "transactionTimeoutSeconds": 45,
+    "slippageTolerance": 0.03,
+    "prioritizeEarlyLaunches": true,
+    "useSmartSizing": true,
+    "useMemeCortexIntegration": true,
+    "maxGasFeeSOL": 0.000025,
+    "detectionListeners": [
+      "jupiter-memelist",
+      "birdeye-launches",
+      "dexscreener-trending",
+      "memecortex",
+      "telegram-signals"
+    ]
+  },
+  "active": true,
+  "lastUpdated": "2025-05-18T01:42:14.252Z"
+}

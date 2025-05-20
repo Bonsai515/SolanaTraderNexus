@@ -1,0 +1,62 @@
+{
+  "features": {
+    "flashLoans": true,
+    "memeSniper": true,
+    "crossChainArbitrage": true,
+    "nuclearStrategies": true,
+    "profitCollection": true,
+    "realTrading": true,
+    "realBlockchainTransactions": true
+  },
+  "config": {
+    "flashLoans": {
+      "enabled": true,
+      "minProfitUsd": 5,
+      "maxSizeUsd": 10000,
+      "maxSlippageBps": 30
+    },
+    "memeSniper": {
+      "enabled": true,
+      "maxBuyUsd": 100,
+      "minLiquidityUsd": 5000,
+      "maxSlippageBps": 100,
+      "profitTarget": 30,
+      "stopLoss": 15
+    },
+    "profitCollection": {
+      "enabled": true,
+      "captureIntervalMinutes": 30,
+      "autoCapture": true,
+      "minProfitThreshold": 0.01,
+      "reinvestmentRate": 0.95,
+      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+    },
+    "transaction": {
+      "useRealFunds": true,
+      "simulationMode": false,
+      "verifyTransactions": true,
+      "maxRetries": 3,
+      "priorityFee": 10000
+    },
+    "trading": {
+      "useRealFunds": true,
+      "useRealBlockchain": true,
+      "verifyTransactions": true,
+      "rpcProvider": "INSTANT_NODES",
+      "maxSlippageBps": 100,
+      "priorityFee": "MEDIUM",
+      "mainWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "secondaryWalletAddress": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "prophetWalletAddress": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "tradingWalletAddress": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm",
+      "forceRealMode": true,
+      "rpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9"
+    }
+  },
+  "useRealFunds": true,
+  "simulationMode": false,
+  "rpcProvider": "INSTANT_NODES",
+  "forceRealFunds": true,
+  "forceLiveMode": true,
+  "instantNodesRpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9"
+}

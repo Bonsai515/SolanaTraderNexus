@@ -1,0 +1,92 @@
+{
+  "octaHopUltimate": {
+    "name": "Octa-Hop Ultimate",
+    "enabled": true,
+    "maxProfitPercentPerTrade": 0.138,
+    "maxPositionSizePercent": 95,
+    "maxTradesPerDay": 12,
+    "slippageTolerance": 0.2,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "BONK",
+      "JUP",
+      "MSOL",
+      "WBTC",
+      "mSOL",
+      "jitoSOL"
+    ],
+    "priorityLevel": 1,
+    "useAdvancedRouting": true,
+    "memoryOptimized": true,
+    "description": "Advanced 8-hop arbitrage strategy with transformer optimization"
+  },
+  "megaStablecoinFlash": {
+    "name": "Mega-Stablecoin Flash",
+    "enabled": true,
+    "maxProfitPercentPerTrade": 0.112,
+    "maxPositionSizePercent": 92,
+    "maxTradesPerDay": 15,
+    "slippageTolerance": 0.1,
+    "targetedTokens": [
+      "USDC",
+      "USDT",
+      "USDH",
+      "UXD",
+      "USDR",
+      "DAI",
+      "BUSD",
+      "PYUSD"
+    ],
+    "priorityLevel": 2,
+    "useAdvancedRouting": true,
+    "memoryOptimized": true,
+    "description": "Maximized stablecoin arbitrage across 8 different stablecoin pairs"
+  },
+  "recursiveFlashMegalodon": {
+    "name": "Recursive Flash Megalodon",
+    "enabled": true,
+    "maxProfitPercentPerTrade": 0.095,
+    "maxPositionSizePercent": 90,
+    "maxTradesPerDay": 18,
+    "slippageTolerance": 0.15,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "RAY",
+      "MSOL",
+      "BONK",
+      "JUP",
+      "WIF",
+      "ORCA"
+    ],
+    "priorityLevel": 3,
+    "useAdvancedRouting": true,
+    "memoryOptimized": true,
+    "description": "Recursive flash loan strategy that compounds profits across multiple DEXes"
+  },
+  "quantumHyperFlash": {
+    "name": "Quantum Hyper-Flash",
+    "enabled": true,
+    "maxProfitPercentPerTrade": 0.165,
+    "maxPositionSizePercent": 98,
+    "maxTradesPerDay": 20,
+    "slippageTolerance": 0.08,
+    "targetedTokens": [
+      "SOL",
+      "USDC",
+      "BONK",
+      "JUP",
+      "WIF",
+      "MEME",
+      "PYTH",
+      "MNGO"
+    ],
+    "priorityLevel": 0,
+    "useAdvancedRouting": true,
+    "memoryOptimized": true,
+    "useQuantumOptimization": true,
+    "useParallelExecution": true,
+    "description": "Ultra-high frequency quantum-optimized flash strategy with neural network price prediction"
+  }
+}

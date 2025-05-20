@@ -1,0 +1,37 @@
+{
+  "systemWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "rpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "programs": [
+    {
+      "name": "HYPERION_FLASH_LOAN",
+      "address": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+      "active": true,
+      "lastVerified": "2025-05-16T02:05:03.593Z"
+    },
+    {
+      "name": "QUANTUM_VAULT",
+      "address": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL",
+      "active": true,
+      "lastVerified": "2025-05-16T02:05:03.594Z"
+    },
+    {
+      "name": "MEMECORTEX",
+      "address": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+      "active": true,
+      "lastVerified": "2025-05-16T02:05:03.594Z"
+    },
+    {
+      "name": "SINGULARITY_BRIDGE",
+      "address": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+      "active": true,
+      "lastVerified": "2025-05-16T02:05:03.594Z"
+    },
+    {
+      "name": "NEXUS_ENGINE",
+      "address": "NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx",
+      "active": true,
+      "lastVerified": "2025-05-16T02:05:03.594Z"
+    }
+  ],
+  "updatedAt": "2025-05-16T02:05:03.594Z"
+}

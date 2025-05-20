@@ -1,0 +1,38 @@
+{
+  "useRealFunds": true,
+  "rpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "websocketUrl": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "systemWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "backupRpcUrls": [
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-api.projectserum.com",
+    "https://rpc.ankr.com/solana"
+  ],
+  "defaultExecutionMode": "LIVE",
+  "defaultPriority": "MEDIUM",
+  "defaultConfirmations": 1,
+  "maxConcurrentTransactions": 3,
+  "defaultTimeoutMs": 60000,
+  "defaultMaxRetries": 5,
+  "maxSlippageBps": 100,
+  "priorityFeeCalculator": {
+    "LOW": 5000,
+    "MEDIUM": 10000,
+    "HIGH": 100000,
+    "VERY_HIGH": 500000
+  },
+  "mevProtection": false,
+  "rateLimitSettings": {
+    "enabled": true,
+    "maxRequestsPerSecond": 5,
+    "maxConcurrentRequests": 3,
+    "cooldownBetweenRequestsMs": 200,
+    "retryStrategy": {
+      "initialBackoffMs": 500,
+      "maxBackoffMs": 8000,
+      "maxRetries": 5,
+      "backoffMultiplier": 2
+    }
+  },
+  "forceLiveMode": true
+}

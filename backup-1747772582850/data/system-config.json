@@ -1,0 +1,12 @@
+{
+  "useThreadPool": true,
+  "threadPoolSize": 8,
+  "enableGcOptimization": true,
+  "memoryLimitPercent": 80,
+  "compressionEnabled": true,
+  "enableBuffering": true,
+  "logLevel": "info",
+  "profileCpuHotspots": true,
+  "watchMemoryUsage": true,
+  "optimizedAt": "2025-05-16T02:29:48.072Z"
+}

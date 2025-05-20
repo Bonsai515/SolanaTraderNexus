@@ -1,0 +1,33 @@
+{
+  "id": "money-glitch-agent",
+  "name": "Money Glitch Flash Arbitrage Agent",
+  "type": "trading",
+  "status": "active",
+  "createdAt": "2025-05-18T02:41:04.581Z",
+  "lastUpdated": "2025-05-18T02:41:04.581Z",
+  "description": "Agent responsible for executing money glitch flash arbitrage strategies",
+  "capabilities": [
+    "flashLoanExecution",
+    "crossExchangeArbitrage",
+    "triangularArbitrage",
+    "multiPathRouting",
+    "priceMonitoring",
+    "spreadCalculation",
+    "atomicExecution",
+    "mevProtection"
+  ],
+  "dependencies": [
+    "priceFeeds",
+    "walletManager",
+    "flashLoanProvider",
+    "transactionEngine"
+  ],
+  "configuration": {
+    "scanIntervalMs": 1000,
+    "executionTimeoutMs": 25000,
+    "maxConcurrentOperations": 3,
+    "retryAttempts": 2,
+    "useReattemptLogic": true,
+    "logLevel": "info"
+  }
+}

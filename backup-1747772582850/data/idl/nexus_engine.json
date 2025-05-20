@@ -1,0 +1,30 @@
+{
+  "version": "0.1.0",
+  "name": "nexus_engine",
+  "instructions": [
+    {
+      "name": "execute",
+      "accounts": [
+        {
+          "name": "signer",
+          "isSigner": true,
+          "isWritable": true
+        },
+        {
+          "name": "systemProgram",
+          "isSigner": false,
+          "isWritable": false
+        }
+      ],
+      "args": [
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "address": "NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx"
+  }
+}

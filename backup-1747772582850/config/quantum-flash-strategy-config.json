@@ -1,0 +1,15 @@
+{
+  "name": "quantum_flash",
+  "version": "1.0.0",
+  "profitTarget": 0.0025,
+  "maxSlippageBps": 50,
+  "maxPositionSizePercent": 25,
+  "tradingEnabled": true,
+  "maxDailyTrades": 14,
+  "minTradeIntervalSec": 300,
+  "profitThresholdPercent": 0.2,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "enabled": true,
+  "created": "2025-05-20T00:57:38.074Z",
+  "lastUpdated": "2025-05-20T00:57:38.074Z"
+}

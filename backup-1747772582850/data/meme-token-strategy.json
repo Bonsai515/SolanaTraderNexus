@@ -1,0 +1,47 @@
+{
+  "id": "meme-token-strategy",
+  "name": "Meme Token Trading Strategy",
+  "description": "Strategy focused on trading new and trending meme tokens with small capital",
+  "type": "spot-trading",
+  "enabled": true,
+  "settings": {
+    "maxPositionSizeSOL": 0.05,
+    "minProfitThreshold": 3,
+    "maxSlippageBps": 300,
+    "preferredDEXs": [
+      "jupiter",
+      "raydium"
+    ],
+    "backoffMultiplier": 1.5,
+    "maxExecutionsPerHour": 2,
+    "gasOptimized": true
+  },
+  "tokens": [
+    {
+      "symbol": "BONK",
+      "minAmount": 10000,
+      "maxAmount": 1000000
+    },
+    {
+      "symbol": "WIF",
+      "minAmount": 1,
+      "maxAmount": 100
+    },
+    {
+      "symbol": "MEME",
+      "minAmount": 1,
+      "maxAmount": 100
+    },
+    {
+      "symbol": "POPCAT",
+      "minAmount": 100,
+      "maxAmount": 10000
+    }
+  ],
+  "safety": {
+    "maxPercentOfWalletBalance": 90,
+    "stopLossPercentage": 15,
+    "takeProfit": true,
+    "takeProfitThreshold": 20
+  }
+}

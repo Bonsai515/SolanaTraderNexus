@@ -1,0 +1,16 @@
+{
+  "timestamp": 1747706547557,
+  "events": {
+    "evt_1747706247557_pzhp4sa": {
+      "id": "evt_1747706247557_pzhp4sa",
+      "timestamp": 1747706247557,
+      "type": "SYSTEM_START",
+      "component": "SYSTEM",
+      "severity": "INFO",
+      "message": "System Memory initialized"
+    }
+  },
+  "components": {},
+  "processes": {},
+  "metrics": {}
+}

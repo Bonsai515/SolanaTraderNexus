@@ -1,0 +1,247 @@
+[
+  {
+    "name": "USDC/USDT Jupiter-Mercurial-Saber Loop",
+    "path": [
+      "Jupiter",
+      "Mercurial",
+      "Saber",
+      "Jupiter"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "USTv2"
+      },
+      {
+        "input": "USTv2",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.00023,
+    "priority": 1,
+    "minSize": 1000,
+    "maxSize": 5000000,
+    "profitability": "high",
+    "complexity": "medium",
+    "confidence": 95
+  },
+  {
+    "name": "Parallel USDC Routes",
+    "path": [
+      "Jupiter:USDC->USDT",
+      "Mercurial:USDC->USTv2",
+      "Saber:USDC->BUSD"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDC",
+        "output": "USTv2"
+      },
+      {
+        "input": "USDC",
+        "output": "BUSD"
+      }
+    ],
+    "estimatedFee": 0.00032,
+    "priority": 1,
+    "minSize": 500,
+    "maxSize": 2000000,
+    "profitability": "very_high",
+    "complexity": "high",
+    "confidence": 90
+  },
+  {
+    "name": "SOL Triple Route",
+    "path": [
+      "Jupiter",
+      "Orca",
+      "Raydium",
+      "Jupiter"
+    ],
+    "exchangePairs": [
+      {
+        "input": "SOL",
+        "output": "USDC"
+      },
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "SOL"
+      }
+    ],
+    "estimatedFee": 0.00036,
+    "priority": 2,
+    "minSize": 0.5,
+    "maxSize": 1000,
+    "profitability": "medium",
+    "complexity": "medium",
+    "confidence": 85
+  },
+  {
+    "name": "Six-Hop Stablecoin Complex",
+    "path": [
+      "Jupiter",
+      "Mercurial",
+      "Saber",
+      "Orca",
+      "Raydium",
+      "Meteora"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "USTv2"
+      },
+      {
+        "input": "USTv2",
+        "output": "BUSD"
+      },
+      {
+        "input": "BUSD",
+        "output": "DAI"
+      },
+      {
+        "input": "DAI",
+        "output": "PAI"
+      },
+      {
+        "input": "PAI",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.00058,
+    "priority": 3,
+    "minSize": 10000,
+    "maxSize": 10000000,
+    "profitability": "extreme",
+    "complexity": "very_high",
+    "confidence": 75
+  },
+  {
+    "name": "ETH Wormhole Arbitrage",
+    "path": [
+      "Jupiter:wETH",
+      "Orca:wETH",
+      "Raydium:wETH"
+    ],
+    "exchangePairs": [
+      {
+        "input": "wETH",
+        "output": "USDC"
+      },
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "wETH"
+      }
+    ],
+    "estimatedFee": 0.00042,
+    "priority": 2,
+    "minSize": 0.1,
+    "maxSize": 100,
+    "profitability": "high",
+    "complexity": "medium",
+    "confidence": 88
+  },
+  {
+    "name": "BTC Lightning Route",
+    "path": [
+      "Jupiter:wBTC",
+      "Raydium:wBTC",
+      "Orca:wBTC"
+    ],
+    "exchangePairs": [
+      {
+        "input": "wBTC",
+        "output": "USDC"
+      },
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "wBTC"
+      }
+    ],
+    "estimatedFee": 0.00038,
+    "priority": 2,
+    "minSize": 0.005,
+    "maxSize": 10,
+    "profitability": "high",
+    "complexity": "medium",
+    "confidence": 87
+  },
+  {
+    "name": "Quantum Stablecoin Cycle",
+    "path": [
+      "Jupiter",
+      "Mercurial",
+      "Saber",
+      "Orca",
+      "Jupiter",
+      "Mercurial",
+      "Saber",
+      "Orca"
+    ],
+    "exchangePairs": [
+      {
+        "input": "USDC",
+        "output": "USDT"
+      },
+      {
+        "input": "USDT",
+        "output": "USTv2"
+      },
+      {
+        "input": "USTv2",
+        "output": "PAI"
+      },
+      {
+        "input": "PAI",
+        "output": "BUSD"
+      },
+      {
+        "input": "BUSD",
+        "output": "DAI"
+      },
+      {
+        "input": "DAI",
+        "output": "FRAX"
+      },
+      {
+        "input": "FRAX",
+        "output": "USDH"
+      },
+      {
+        "input": "USDH",
+        "output": "USDC"
+      }
+    ],
+    "estimatedFee": 0.00078,
+    "priority": 4,
+    "minSize": 25000,
+    "maxSize": 25000000,
+    "profitability": "nuclear",
+    "complexity": "extreme",
+    "confidence": 70
+  }
+]

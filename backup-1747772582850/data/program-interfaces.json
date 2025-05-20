@@ -1,0 +1,74 @@
+[
+  {
+    "id": "quantum-nuclear-flash-arbitrage",
+    "programId": "HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa",
+    "name": "Quantum Nuclear Flash Arbitrage",
+    "accounts": [
+      {
+        "name": "systemWallet",
+        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+        "isSigner": true
+      },
+      {
+        "name": "profitWallet",
+        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+        "isSigner": false
+      }
+    ],
+    "interface": "IDL"
+  },
+  {
+    "id": "singularity-black-hole",
+    "programId": "SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H",
+    "name": "Singularity Black Hole",
+    "accounts": [
+      {
+        "name": "systemWallet",
+        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+        "isSigner": true
+      },
+      {
+        "name": "profitWallet",
+        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+        "isSigner": false
+      }
+    ],
+    "interface": "IDL"
+  },
+  {
+    "id": "memecortex-supernova",
+    "programId": "MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV",
+    "name": "MemeCortex Supernova",
+    "accounts": [
+      {
+        "name": "systemWallet",
+        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+        "isSigner": true
+      },
+      {
+        "name": "profitWallet",
+        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+        "isSigner": false
+      }
+    ],
+    "interface": "IDL"
+  },
+  {
+    "id": "hyperion-money-loop",
+    "programId": "QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL",
+    "name": "Hyperion Money Loop",
+    "accounts": [
+      {
+        "name": "systemWallet",
+        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+        "isSigner": true
+      },
+      {
+        "name": "profitWallet",
+        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+        "isSigner": false
+      }
+    ],
+    "interface": "IDL"
+  }
+]
