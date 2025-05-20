@@ -1,0 +1,32 @@
+{
+  "enabled": true,
+  "baseIntervalSeconds": 60,
+  "minIntervalSeconds": 30,
+  "maxIntervalSeconds": 300,
+  "adaptiveScaling": true,
+  "rpcErrorBackoffSeconds": 120,
+  "strategies": {
+    "quantum-flash": {
+      "minFrequencySeconds": 60,
+      "maxFrequencySeconds": 300,
+      "ratePerDay": 14
+    },
+    "zero-capital-flash": {
+      "minFrequencySeconds": 60,
+      "maxFrequencySeconds": 360,
+      "ratePerDay": 10
+    },
+    "hyperion-cascade": {
+      "minFrequencySeconds": 120,
+      "maxFrequencySeconds": 600,
+      "ratePerDay": 8
+    }
+  },
+  "replitOptimization": {
+    "enabled": true,
+    "memoryOptimized": true,
+    "connectionPooling": true,
+    "requestBatching": true,
+    "cacheAggressively": true
+  }
+}

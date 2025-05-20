@@ -1,0 +1,42 @@
+{
+  "timestamp": 1747773988028,
+  "connections": [
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "requestCount": 0,
+      "errorCount": 0,
+      "consecutiveErrors": 0,
+      "requestsLastMinute": 0,
+      "score": -40,
+      "cooldownUntil": null
+    },
+    {
+      "url": "https://solana-api.projectserum.com",
+      "requestCount": 0,
+      "errorCount": 0,
+      "consecutiveErrors": 0,
+      "requestsLastMinute": 0,
+      "score": -40,
+      "cooldownUntil": null
+    },
+    {
+      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "requestCount": 0,
+      "errorCount": 0,
+      "consecutiveErrors": 0,
+      "requestsLastMinute": 0,
+      "score": -80,
+      "cooldownUntil": null
+    },
+    {
+      "url": "https://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "requestCount": 0,
+      "errorCount": 0,
+      "consecutiveErrors": 0,
+      "requestsLastMinute": 0,
+      "score": -80,
+      "cooldownUntil": null
+    }
+  ],
+  "testBalance": 0.540916306
+}
