@@ -1,9 +1,9 @@
 #!/bin/bash
-# Restart trading system with Syndica RPC
+# Restart trading system with optimized Syndica RPC
 
 echo "========================================"
 echo "    RESTARTING TRADING SYSTEM          "
-echo "       WITH SYNDICA RPC                "
+echo "    WITH OPTIMIZED SYNDICA RPC         "
 echo "========================================"
 echo
 
@@ -15,15 +15,19 @@ pkill -f "strategy.ts" || true
 sleep 2
 
 # Clean RPC cache
-echo "Clearing old RPC cache..."
+echo "Clearing stale cache data..."
 find ./data/rpc_cache -name "*.json" -mmin +60 -delete 2>/dev/null || true
 
-# Export Syndica as RPC_URL
+# Export environment variables
 export RPC_URL="https://solana-api.syndica.io/rpc"
+export SOLANA_RPC="https://solana-api.syndica.io/rpc"
+export USE_STREAMING_RPC="true"
+export OPTIMIZE_RPC_USAGE="true"
+export BATCH_RPC_REQUESTS="true"
 
-# Start with Syndica configuration
-echo "Starting trading system with Syndica RPC..."
+# Start system
+echo "Starting trading system with optimized Syndica RPC..."
 ./launch-enhanced-system.sh &
 
-echo "System restarted with Syndica as primary RPC"
+echo "System restarted with optimized Syndica RPC configuration"
 echo "========================================"
