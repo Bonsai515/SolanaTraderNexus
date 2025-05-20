@@ -1,21 +1,5 @@
 [
   {
-    "timestamp": "2025-05-16T22:12:31.970Z",
-    "wallets": [
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      },
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
     "timestamp": "2025-05-16T22:12:41.762Z",
     "wallets": [
       {
@@ -6206,6 +6190,11 @@
   },
   {
     "timestamp": "2025-05-20T02:16:14.183Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T03:19:09.160Z",
     "wallets": [],
     "totalBalanceSOL": 0
   }
