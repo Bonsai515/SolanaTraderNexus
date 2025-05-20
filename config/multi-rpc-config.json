@@ -54,26 +54,15 @@
         "requestsPerMinute": 40
       },
       "inUse": true
-    },
-    {
-      "name": "Instant Nodes",
-      "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
-      "websocketUrl": "",
-      "priority": 10,
-      "weight": 0,
-      "rateLimit": {
-        "requestsPerMinute": 0
-      },
-      "inUse": false
     }
   ],
   "caching": {
     "enabled": true,
-    "accountInfoTtlMs": 60000,
-    "balanceTtlMs": 60000,
-    "transactionTtlMs": 7200000,
-    "blockTtlMs": 120000,
-    "slotTtlMs": 20000
+    "accountInfoTtlMs": 300000,
+    "balanceTtlMs": 300000,
+    "transactionTtlMs": 86400000,
+    "blockTtlMs": 600000,
+    "slotTtlMs": 60000
   },
   "fallback": {
     "enabled": true,
@@ -93,7 +82,10 @@
   },
   "rateLimit": {
     "enabled": true,
-    "strategy": "provider-specific"
+    "strategy": "fixed",
+    "maxRequestsPerSecond": 3,
+    "maxRequestsPerMinute": 120,
+    "maxRequestsPerHour": 3000
   },
   "mainWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
   "batching": {
