@@ -1,133 +1,5 @@
 [
   {
-    "timestamp": "2025-05-16T22:35:37.688Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:35:47.949Z",
-    "wallets": [
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      },
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:39:40.593Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:39:50.556Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:41:28.594Z",
-    "wallets": [
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      },
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:41:38.467Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:44:56.151Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
-    "timestamp": "2025-05-16T22:45:06.096Z",
-    "wallets": [
-      {
-        "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-        "name": "Trading Wallet",
-        "balanceSOL": 1.53442
-      },
-      {
-        "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
-        "name": "Prophet Wallet",
-        "balanceSOL": 0
-      }
-    ],
-    "totalBalanceSOL": 1.53442
-  },
-  {
     "timestamp": "2025-05-16T22:51:08.356Z",
     "wallets": [
       {
@@ -6085,6 +5957,46 @@
   },
   {
     "timestamp": "2025-05-20T14:15:38.974Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:26:19.270Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:27:19.609Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:28:20.064Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:29:19.674Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:30:19.665Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:31:19.744Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:32:19.668Z",
+    "wallets": [],
+    "totalBalanceSOL": 0
+  },
+  {
+    "timestamp": "2025-05-20T19:33:19.349Z",
     "wallets": [],
     "totalBalanceSOL": 0
   }
