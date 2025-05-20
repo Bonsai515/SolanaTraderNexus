@@ -1,5 +1,5 @@
 {
-  "maxPositionSizePercent": 40,
+  "maxPositionSizePercent": 30,
   "timeoutMs": 35000,
   "targetedTokens": [
     "SOL",

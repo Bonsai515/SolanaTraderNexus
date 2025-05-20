@@ -3,7 +3,7 @@
   "enabled": true,
   "priority": 10,
   "expectedProfitPercent": 1.95,
-  "maxPositionSizePercent": 20,
+  "maxPositionSizePercent": 30,
   "minProfitThresholdPercent": 0.2,
   "maxSlippageBps": 50,
   "maxActivePositions": 3,
