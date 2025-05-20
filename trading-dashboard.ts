@@ -15,7 +15,7 @@ config();
 
 // Initialize Express app
 const app = express();
-const PORT = 3500;
+const PORT = 3000; // Changed to 3000 to match Replit's default port
 
 // Middleware
 app.use(express.json());
