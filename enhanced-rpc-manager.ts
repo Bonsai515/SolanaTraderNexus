@@ -1,390 +1,351 @@
 /**
- * Enhanced RPC Manager
+ * Enhanced RPC Management System
  * 
- * Intelligent RPC connection management with automatic fallback
- * between Syndica, Helius, and Alchemy.
+ * Manages multiple RPC connections for Solana blockchain with intelligent 
+ * fallback, load balancing, and health monitoring features.
  */
 
 import { Connection, ConnectionConfig } from '@solana/web3.js';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config({ path: '.env.trading' });
-
-// RPC URLs
-const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '5d0d1d98-4695-4a7d-b8a0-d4f9836da17f';
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
-
-// RPC configuration
-const RPC_CONFIG = {
-  syndica: {
-    name: 'Syndica',
-    url: SYNDICA_API_KEY ? `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}` : null,
-    priority: 1,
-    rateLimitPerSecond: 50,
-    timeoutMs: 30000,
-    maxRetries: 3,
-    enabled: !!SYNDICA_API_KEY,
-    errorCount: 0,
-    lastErrorTime: 0,
-    consecutiveErrors: 0,
-    backoffDurationMs: 0,
-    isRateLimited: false,
-    rateLimitEndTime: 0
-  },
-  helius: {
-    name: 'Helius',
-    url: `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
-    priority: 2,
-    rateLimitPerSecond: 40,
-    timeoutMs: 30000,
-    maxRetries: 3,
-    enabled: true,
-    errorCount: 0,
-    lastErrorTime: 0,
-    consecutiveErrors: 0,
-    backoffDurationMs: 0,
-    isRateLimited: false,
-    rateLimitEndTime: 0
-  },
-  alchemy: {
-    name: 'Alchemy',
-    url: ALCHEMY_API_KEY ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null,
-    priority: 3,
-    rateLimitPerSecond: 30,
-    timeoutMs: 30000,
-    maxRetries: 3,
-    enabled: !!ALCHEMY_API_KEY,
-    errorCount: 0,
-    lastErrorTime: 0,
-    consecutiveErrors: 0,
-    backoffDurationMs: 0,
-    isRateLimited: false,
-    rateLimitEndTime: 0
-  },
-  public: {
-    name: 'Solana Public RPC',
-    url: 'https://api.mainnet-beta.solana.com',
-    priority: 4,
-    rateLimitPerSecond: 10,
-    timeoutMs: 60000,
-    maxRetries: 2,
-    enabled: true,
-    errorCount: 0,
-    lastErrorTime: 0,
-    consecutiveErrors: 0,
-    backoffDurationMs: 0,
-    isRateLimited: false,
-    rateLimitEndTime: 0
-  }
-};
-
-// Cache configuration
-const CACHE_CONFIG = {
-  enabled: true,
-  maxSize: 1000,
-  ttlMs: 10000, // 10 seconds TTL
-  pruneIntervalMs: 60000 // 1 minute
-};
-
-// RPC connection cache
-interface CacheItem {
-  connection: Connection;
-  expiresAt: number;
+// RPC Provider interface
+interface RpcProvider {
+  name: string;
+  url: string;
+  priority: number;
+  isHealthy: boolean;
+  lastResponseTime: number;
+  failCount: number;
+  activeConnections: number;
+  lastHealthCheck: number;
+  maxConnections: number;
+  features: string[];
+  websocketUrl?: string;
 }
 
-// Class for Enhanced RPC Management
-class EnhancedRpcManager {
-  private connections: Map<string, CacheItem> = new Map();
-  private defaultProvider: string = 'helius';
-  private lastProviderSwitch: number = 0;
-  private minProviderSwitchIntervalMs: number = 5000; // 5 seconds
-  private useCache: boolean = CACHE_CONFIG.enabled;
-  private cacheTtlMs: number = CACHE_CONFIG.ttlMs;
-  private maxCacheSize: number = CACHE_CONFIG.maxSize;
-  private logger: (message: string, level?: string) => void;
-  
-  constructor() {
-    this.logger = this.createLogger();
-    
-    // Initialize connection cache
-    this.pruneCache();
-    
-    // Set default provider based on available APIs
-    if (RPC_CONFIG.syndica.enabled) {
-      this.defaultProvider = 'syndica';
-    } else if (RPC_CONFIG.helius.enabled) {
-      this.defaultProvider = 'helius';
-    } else if (RPC_CONFIG.alchemy.enabled) {
-      this.defaultProvider = 'alchemy';
-    } else {
-      this.defaultProvider = 'public';
-    }
-    
-    this.logger(`Enhanced RPC Manager initialized with default provider: ${this.defaultProvider}`);
-  }
-  
-  /**
-   * Create a logger function
-   */
-  private createLogger(): (message: string, level?: string) => void {
-    return (message: string, level: string = 'INFO') => {
-      const timestamp = new Date().toISOString();
-      console.log(`${timestamp} [${level}] [EnhancedRPC] ${message}`);
+interface RpcManagerConfig {
+  providers: RpcProvider[];
+  healthCheckIntervalMs: number;
+  maxConsecutiveFailures: number;
+  defaultConnectionConfig: ConnectionConfig;
+  loadBalancingStrategy: 'priority' | 'response-time' | 'round-robin';
+  logConnections: boolean;
+  logHealthChecks: boolean;
+  automaticFailover: boolean;
+  proactiveConnectionTesting: boolean;
+}
+
+export class EnhancedRpcManager {
+  private config: RpcManagerConfig;
+  private connections: Map<string, Connection> = new Map();
+  private activeConnection: Connection | null = null;
+  private activeProviderName: string | null = null;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private logPath: string;
+
+  constructor(configPath?: string) {
+    // Default configuration
+    this.config = {
+      providers: [
+        {
+          name: 'Syndica',
+          url: 'https://solana-api.syndica.io/access-token/TpbvgGcJAqDFevn54UJdGxEeY2LuJsB5RucHdnXxxFzQkGeP9f1XSxk',
+          priority: 1, // Highest priority
+          isHealthy: true,
+          lastResponseTime: 0,
+          failCount: 0,
+          activeConnections: 0,
+          lastHealthCheck: 0,
+          maxConnections: 100,
+          features: ['transactions', 'accounts', 'blocks', 'voting'],
+          websocketUrl: 'wss://solana-api.syndica.io/access-token/rpc-websockets'
+        },
+        {
+          name: 'Helius',
+          url: 'https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f',
+          priority: 2,
+          isHealthy: true,
+          lastResponseTime: 0,
+          failCount: 0,
+          activeConnections: 0,
+          lastHealthCheck: 0,
+          maxConnections: 100,
+          features: ['transactions', 'accounts', 'blocks', 'enhanced-logs'],
+          websocketUrl: 'wss://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f'
+        },
+        {
+          name: 'Alchemy',
+          url: 'https://solana-mainnet.g.alchemy.com/v2/oXHrwSQrOlSxcPBMvEO9AXkJRlHES4u7',
+          priority: 3,
+          isHealthy: true,
+          lastResponseTime: 0,
+          failCount: 0,
+          activeConnections: 0,
+          lastHealthCheck: 0,
+          maxConnections: 50,
+          features: ['transactions', 'accounts', 'enhanced-logs', 'transformers'],
+          websocketUrl: 'wss://solana-mainnet.g.alchemy.com/v2/oXHrwSQrOlSxcPBMvEO9AXkJRlHES4u7'
+        }
+      ],
+      healthCheckIntervalMs: 60000, // 1 minute
+      maxConsecutiveFailures: 3,
+      defaultConnectionConfig: {
+        commitment: 'confirmed',
+        confirmTransactionInitialTimeout: 60000,
+        disableRetryOnRateLimit: false
+      },
+      loadBalancingStrategy: 'priority',
+      logConnections: true,
+      logHealthChecks: true,
+      automaticFailover: true,
+      proactiveConnectionTesting: true
     };
-  }
-  
-  /**
-   * Get the best available RPC provider
-   */
-  private getBestProvider(): string {
-    const now = Date.now();
-    
-    // Filter out rate limited or error providers
-    const availableProviders = Object.entries(RPC_CONFIG)
-      .filter(([_, config]) => config.enabled && 
-                              config.url && 
-                              (!config.isRateLimited || now > config.rateLimitEndTime) &&
-                              config.consecutiveErrors < config.maxRetries)
-      .sort(([_, a], [__, b]) => a.priority - b.priority);
-    
-    if (availableProviders.length === 0) {
-      this.logger('No RPC providers available! Falling back to public RPC', 'WARN');
-      return 'public';
-    }
-    
-    return availableProviders[0][0];
-  }
-  
-  /**
-   * Mark a provider as rate limited
-   */
-  private markProviderRateLimited(provider: string, durationMs: number = 30000): void {
-    const config = RPC_CONFIG[provider];
-    if (!config) return;
-    
-    config.isRateLimited = true;
-    config.rateLimitEndTime = Date.now() + durationMs;
-    this.logger(`Provider ${provider} marked as rate limited for ${durationMs}ms`, 'WARN');
-  }
-  
-  /**
-   * Mark a provider error
-   */
-  private markProviderError(provider: string): void {
-    const config = RPC_CONFIG[provider];
-    if (!config) return;
-    
-    const now = Date.now();
-    
-    // If the last error was more than 10 minutes ago, reset consecutive errors
-    if (now - config.lastErrorTime > 600000) {
-      config.consecutiveErrors = 0;
-    }
-    
-    config.errorCount++;
-    config.consecutiveErrors++;
-    config.lastErrorTime = now;
-    
-    // Apply exponential backoff for consecutive errors
-    config.backoffDurationMs = Math.min(30000, Math.pow(2, config.consecutiveErrors) * 1000);
-    
-    this.logger(`Provider ${provider} error #${config.errorCount} (consecutive: ${config.consecutiveErrors})`, 'ERROR');
-  }
-  
-  /**
-   * Reset provider errors
-   */
-  private resetProviderErrors(provider: string): void {
-    const config = RPC_CONFIG[provider];
-    if (!config) return;
-    
-    config.consecutiveErrors = 0;
-    config.backoffDurationMs = 0;
-  }
-  
-  /**
-   * Prune expired items from the connection cache
-   */
-  private pruneCache(): void {
-    const now = Date.now();
-    
-    // Remove expired items
-    for (const [key, item] of this.connections.entries()) {
-      if (now > item.expiresAt) {
-        this.connections.delete(key);
-      }
-    }
-    
-    // Schedule next pruning
-    setTimeout(() => this.pruneCache(), CACHE_CONFIG.pruneIntervalMs);
-  }
-  
-  /**
-   * Get a connection to the Solana blockchain
-   */
-  public getConnection(commitment: string = 'confirmed', forceProvider?: string): Connection {
-    // Determine which provider to use
-    const provider = forceProvider || this.getBestProvider();
-    const cacheKey = `${provider}-${commitment}`;
-    
-    // Check if we have a cached connection
-    if (this.useCache && this.connections.has(cacheKey)) {
-      const cachedItem = this.connections.get(cacheKey);
-      if (cachedItem && cachedItem.expiresAt > Date.now()) {
-        return cachedItem.connection;
-      }
-    }
-    
-    // Get provider config
-    const config = RPC_CONFIG[provider];
-    if (!config || !config.url) {
-      this.logger(`Provider ${provider} not configured, falling back to public RPC`, 'WARN');
-      return this.getConnection(commitment, 'public');
-    }
-    
-    // Create connection configuration
-    const connectionConfig: ConnectionConfig = {
-      commitment: commitment as any,
-      confirmTransactionInitialTimeout: config.timeoutMs,
-      disableRetryOnRateLimit: false
-    };
-    
-    // Create connection
-    const connection = new Connection(config.url, connectionConfig);
-    
-    // Cache the connection
-    if (this.useCache) {
-      // Ensure cache doesn't grow too large
-      if (this.connections.size >= this.maxCacheSize) {
-        // Remove oldest item
-        const oldestKey = this.connections.keys().next().value;
-        this.connections.delete(oldestKey);
-      }
-      
-      this.connections.set(cacheKey, {
-        connection,
-        expiresAt: Date.now() + this.cacheTtlMs
-      });
-    }
-    
-    this.logger(`Created new connection to ${config.name}`);
-    return connection;
-  }
-  
-  /**
-   * Get a connection with fallback capability
-   */
-  public getFallbackConnection(commitment: string = 'confirmed'): Connection {
-    return this.getConnection(commitment);
-  }
-  
-  /**
-   * Handle RPC request error
-   */
-  public handleRequestError(error: any, provider: string): void {
-    // Check for rate limiting errors
-    if (error.message && (
-        error.message.includes('429') || 
-        error.message.includes('Too Many Requests') ||
-        error.message.includes('exceeded') ||
-        error.message.includes('rate limit')
-      )) {
-      this.markProviderRateLimited(provider);
-    } else {
-      this.markProviderError(provider);
-    }
-  }
-  
-  /**
-   * Execute a request with automatic fallback
-   */
-  public async executeWithFallback<T>(
-    requestFn: (connection: Connection) => Promise<T>,
-    commitment: string = 'confirmed'
-  ): Promise<T> {
-    // Get the list of providers in priority order
-    const providers = Object.keys(RPC_CONFIG)
-      .filter(key => RPC_CONFIG[key].enabled && RPC_CONFIG[key].url)
-      .sort((a, b) => RPC_CONFIG[a].priority - RPC_CONFIG[b].priority);
-    
-    // Try each provider in sequence
-    for (const provider of providers) {
+
+    // Override default config with file config if provided
+    if (configPath && fs.existsSync(configPath)) {
       try {
-        const connection = this.getConnection(commitment, provider);
-        const result = await requestFn(connection);
-        
-        // Reset errors on success
-        this.resetProviderErrors(provider);
-        
-        return result;
+        const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        this.config = { ...this.config, ...fileConfig };
+        console.log(`Loaded RPC configuration from ${configPath}`);
       } catch (error) {
-        this.handleRequestError(error, provider);
-        this.logger(`Request failed on ${provider}, trying next provider...`, 'WARN');
+        console.error(`Error loading RPC configuration from ${configPath}:`, error);
+      }
+    }
+
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync('logs')) {
+      fs.mkdirSync('logs');
+    }
+    this.logPath = path.join('logs', 'rpc-manager.log');
+
+    // Initialize the RPC manager
+    this.initialize();
+  }
+
+  private initialize(): void {
+    this.log('Initializing Enhanced RPC Manager');
+    
+    // Initialize connections for all providers
+    for (const provider of this.config.providers) {
+      this.connections.set(
+        provider.name,
+        new Connection(provider.url, this.config.defaultConnectionConfig)
+      );
+    }
+
+    // Set the initial active connection to the highest priority provider
+    const initialProvider = this.getProviderByPriority();
+    if (initialProvider) {
+      this.activeConnection = this.connections.get(initialProvider.name) || null;
+      this.activeProviderName = initialProvider.name;
+      this.log(`Initial active RPC provider: ${initialProvider.name}`);
+    } else {
+      this.log('ERROR: No RPC providers available');
+    }
+
+    // Start health checks
+    this.startHealthChecks();
+  }
+
+  private getProviderByPriority(): RpcProvider | null {
+    const healthyProviders = this.config.providers
+      .filter(provider => provider.isHealthy)
+      .sort((a, b) => a.priority - b.priority);
+    
+    return healthyProviders.length > 0 ? healthyProviders[0] : null;
+  }
+
+  private getProviderByResponseTime(): RpcProvider | null {
+    const healthyProviders = this.config.providers
+      .filter(provider => provider.isHealthy)
+      .sort((a, b) => a.lastResponseTime - b.lastResponseTime);
+    
+    return healthyProviders.length > 0 ? healthyProviders[0] : null;
+  }
+
+  private startHealthChecks(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    this.healthCheckInterval = setInterval(
+      async () => this.checkAllProvidersHealth(),
+      this.config.healthCheckIntervalMs
+    );
+
+    // Run an immediate health check
+    this.checkAllProvidersHealth();
+  }
+
+  private async checkAllProvidersHealth(): Promise<void> {
+    this.log('[RPC] Running periodic health check for all RPC endpoints', 'INFO');
+
+    for (const provider of this.config.providers) {
+      try {
+        const startTime = Date.now();
+        const connection = this.connections.get(provider.name);
         
-        // If this is the last provider, rethrow the error
-        if (provider === providers[providers.length - 1]) {
-          throw error;
+        if (!connection) {
+          this.log(`[RPC] No connection found for provider ${provider.name}`, 'WARN');
+          continue;
+        }
+
+        // Check if the RPC is responsive
+        const blockHeight = await connection.getBlockHeight();
+        const responseTime = Date.now() - startTime;
+
+        // Update provider health status
+        provider.isHealthy = true;
+        provider.lastResponseTime = responseTime;
+        provider.failCount = 0;
+        provider.lastHealthCheck = Date.now();
+
+        this.log(`[RPC] Health check passed for ${provider.name}: blockHeight=${blockHeight}, responseTime=${responseTime}ms`, 'INFO');
+      } catch (error) {
+        provider.failCount += 1;
+        
+        if (provider.failCount >= this.config.maxConsecutiveFailures) {
+          provider.isHealthy = false;
+          this.log(`[RPC] Health check failed for ${provider.url}: ${error}`, 'WARN');
+          
+          // If the current active provider is unhealthy, switch to a backup
+          if (this.activeProviderName === provider.name && this.config.automaticFailover) {
+            this.switchToHealthyProvider();
+          }
         }
       }
     }
-    
-    throw new Error('All RPC providers failed');
+
+    // After health checks, ensure we're using the optimal provider
+    if (this.config.loadBalancingStrategy === 'response-time') {
+      this.optimizeProviderByResponseTime();
+    }
   }
-  
-  /**
-   * Test all RPC connections
-   */
-  public async testConnections(): Promise<Record<string, boolean>> {
-    const results: Record<string, boolean> = {};
+
+  private switchToHealthyProvider(): void {
+    let newProvider: RpcProvider | null = null;
     
-    for (const [provider, config] of Object.entries(RPC_CONFIG)) {
-      if (!config.enabled || !config.url) {
-        results[provider] = false;
-        continue;
+    if (this.config.loadBalancingStrategy === 'priority') {
+      newProvider = this.getProviderByPriority();
+    } else if (this.config.loadBalancingStrategy === 'response-time') {
+      newProvider = this.getProviderByResponseTime();
+    } else {
+      // Round-robin or other strategies could be implemented here
+      newProvider = this.getProviderByPriority();
+    }
+
+    if (newProvider && newProvider.name !== this.activeProviderName) {
+      const newConnection = this.connections.get(newProvider.name);
+      if (newConnection) {
+        this.activeConnection = newConnection;
+        this.activeProviderName = newProvider.name;
+        this.log(`[RPC] Switched to backup provider: ${newProvider.name}`, 'INFO');
       }
-      
-      try {
-        const connection = this.getConnection('confirmed', provider);
-        const slot = await connection.getSlot();
-        results[provider] = true;
-        this.logger(`Successfully tested ${config.name}: current slot ${slot}`);
-      } catch (error) {
-        results[provider] = false;
-        this.logger(`Failed to test ${config.name}: ${error.message}`, 'ERROR');
+    }
+  }
+
+  private optimizeProviderByResponseTime(): void {
+    const fastestProvider = this.getProviderByResponseTime();
+    if (fastestProvider && 
+        this.activeProviderName !== fastestProvider.name && 
+        fastestProvider.isHealthy) {
+      const newConnection = this.connections.get(fastestProvider.name);
+      if (newConnection) {
+        this.activeConnection = newConnection;
+        this.activeProviderName = fastestProvider.name;
+        this.log(`[RPC] Optimized provider selection to ${fastestProvider.name} based on response time: ${fastestProvider.lastResponseTime}ms`, 'INFO');
+      }
+    }
+  }
+
+  private log(message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO'): void {
+    const timestamp = new Date().toISOString();
+    const logMessage = `${timestamp} [${level}] ${message}`;
+    
+    console.log(logMessage);
+    
+    // Append to log file
+    try {
+      fs.appendFileSync(this.logPath, logMessage + '\n');
+    } catch (error) {
+      console.error('Error writing to log file:', error);
+    }
+  }
+
+  // Public methods
+  public getConnection(): Connection {
+    if (!this.activeConnection) {
+      this.switchToHealthyProvider();
+      if (!this.activeConnection) {
+        throw new Error('No healthy RPC connection available');
       }
     }
     
-    return results;
+    // Track active connection count for the current provider
+    if (this.activeProviderName) {
+      const provider = this.config.providers.find(p => p.name === this.activeProviderName);
+      if (provider) {
+        provider.activeConnections += 1;
+      }
+    }
+
+    return this.activeConnection;
   }
-  
-  /**
-   * Get RPC status
-   */
-  public getStatus(): Record<string, any> {
-    const status: Record<string, any> = {};
+
+  public getWebsocketUrl(): string | undefined {
+    if (!this.activeProviderName) {
+      this.switchToHealthyProvider();
+      if (!this.activeProviderName) {
+        throw new Error('No healthy RPC connection available');
+      }
+    }
     
-    for (const [provider, config] of Object.entries(RPC_CONFIG)) {
-      status[provider] = {
-        name: config.name,
-        enabled: config.enabled,
-        priority: config.priority,
-        errorCount: config.errorCount,
-        consecutiveErrors: config.consecutiveErrors,
-        isRateLimited: config.isRateLimited,
-        rateLimitEndTime: config.rateLimitEndTime
+    const provider = this.config.providers.find(p => p.name === this.activeProviderName);
+    return provider?.websocketUrl;
+  }
+
+  public getActiveProviderName(): string | null {
+    return this.activeProviderName;
+  }
+
+  public getProviderStatus(): { [key: string]: { isHealthy: boolean, lastResponseTime: number, activeConnections: number } } {
+    const status: { [key: string]: { isHealthy: boolean, lastResponseTime: number, activeConnections: number } } = {};
+    
+    for (const provider of this.config.providers) {
+      status[provider.name] = {
+        isHealthy: provider.isHealthy,
+        lastResponseTime: provider.lastResponseTime,
+        activeConnections: provider.activeConnections
       };
     }
     
     return status;
   }
+
+  public forceProviderSwitch(providerName: string): boolean {
+    const provider = this.config.providers.find(p => p.name === providerName);
+    if (provider && provider.isHealthy) {
+      const newConnection = this.connections.get(providerName);
+      if (newConnection) {
+        this.activeConnection = newConnection;
+        this.activeProviderName = providerName;
+        this.log(`[RPC] Manually switched to provider: ${providerName}`, 'INFO');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public shutdown(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+    this.log('Enhanced RPC Manager shutdown', 'INFO');
+  }
 }
 
-// Singleton instance
-const rpcManager = new EnhancedRpcManager();
-
-export default rpcManager;
+// Export a singleton instance
+export const rpcManager = new EnhancedRpcManager();
