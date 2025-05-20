@@ -1,0 +1,37 @@
+{
+  "primaryRpc": "https://solana-api.syndica.io/rpc",
+  "useStreamingRpc": true,
+  "streamingRpcConfig": {
+    "url": "wss://solana-api.syndica.io/rpc",
+    "reconnectOnError": true,
+    "reconnectInterval": 1000,
+    "maxReconnectAttempts": 5
+  },
+  "caching": {
+    "enabled": true,
+    "accountTtlMs": 30000,
+    "blockTtlMs": 60000,
+    "signatureTtlMs": 3600000,
+    "transactionTtlMs": 86400000
+  },
+  "fallbackProviders": [
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "priority": 2
+    },
+    {
+      "url": "https://solana-api.projectserum.com",
+      "priority": 2
+    }
+  ],
+  "rateLimit": {
+    "maxRequestsPerSecond": 10,
+    "maxRequestsPerMinute": 500,
+    "maxWebsocketSubscriptions": 20
+  },
+  "optimizations": {
+    "batchRequests": true,
+    "deduplicate": true,
+    "prioritizeByType": true
+  }
+}
