@@ -48,7 +48,7 @@ async function activateTransactionEngine(): Promise<boolean> {
       'wss://solana-api.instantnodes.io';
     
     // System wallet for profit collection
-    const systemWalletAddress: string = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+    const systemWalletAddress: string = 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
     
     // Use TypeScript interface for config
     interface EngineConfig {
@@ -107,7 +107,7 @@ async function activateTransactionEngine(): Promise<boolean> {
 async function enableRealFundTrading(): Promise<boolean> {
   log('💰 Enabling trading with REAL FUNDS...');
   log('⚠️ WARNING: THIS WILL USE ACTUAL BLOCKCHAIN TRANSACTIONS WITH REAL FUNDS');
-  log('⚠️ System wallet HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb will be used');
+  log('⚠️ System wallet HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK will be used');
   
   try {
     // Set the real funds flag in the transaction engine
@@ -146,7 +146,7 @@ async function enableRealFundTrading(): Promise<boolean> {
     const tradingConfigPath = path.join(__dirname, 'server', 'config', 'trading.json');
     const tradingConfig = {
       useRealFunds: true,
-      mainWallet: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
+      mainWallet: 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK',
       timestamp: new Date().toISOString()
     };
     
@@ -230,7 +230,7 @@ async function activateLiveTrading(): Promise<boolean> {
     if (engineActivated) {
       log('✅ Live trading activation completed successfully');
       log('🚨 THE SYSTEM IS NOW TRADING WITH REAL FUNDS 🚨');
-      log('💸 Using main wallet: HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb');
+      log('💸 Using main wallet: HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK');
       
       // Verify Nexus engine status
       try {
@@ -265,7 +265,7 @@ if (isMainModule()) {
       if (success) {
         log('✅ Live trading successfully activated!');
         log('✅ All agents and Nexus engine configured to use REAL FUNDS');
-        log('✅ Trading wallet HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb connected with 0.54442 SOL');
+        log('✅ Trading wallet HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK connected with 0.54442 SOL');
         log('📊 Neural quantum entanglement operational at 99% with full MEV protection');
       } else {
         log('❌ Failed to activate live trading');
