@@ -1,41 +1,8 @@
 {
-  "providers": [
-    {
-      "name": "Syndica",
-      "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
-      "headerAuth": false,
-      "priority": 1,
-      "enabled": true,
-      "maxRequestsPerSecond": 1,
-      "maxRequestsPerMinute": 12
-    },
-    {
-      "name": "Helius",
-      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
-      "priority": 2,
-      "enabled": true,
-      "headerAuth": false,
-      "maxRequestsPerSecond": 1,
-      "maxRequestsPerMinute": 15
-    }
-  ],
-  "requestSettings": {
-    "maxRetries": 2,
-    "retryDelayMs": 3000,
-    "priorityRequests": [
-      "getTransaction",
-      "sendTransaction"
-    ],
-    "lowPriorityRequests": [
-      "getAccountInfo",
-      "getTokenAccountsByOwner"
-    ],
-    "batchRequests": true,
-    "requestTimeoutMs": 15000
-  },
-  "rateLimiting": {
-    "enabled": true,
-    "cooldownPeriodMs": 12000,
-    "adaptiveThrottling": true
-  }
+  "primaryProvider": "Syndica",
+  "secondaryProvider": "Helius",
+  "tertiaryProvider": "Triton",
+  "healthCheckIntervalMs": 45000,
+  "maxConsecutiveFailures": 2,
+  "loadBalancingStrategy": "priority"
 }

@@ -296,5 +296,18 @@
     "useAdvancedCollateralization": true,
     "maxGasFeeSOL": 0.0012,
     "profitReinvestmentRate": 70
-  }
+  },
+  "minProfitThresholdUSD": 0.4,
+  "maxDailyTransactions": 32,
+  "targetedTokens": [
+    "SOL",
+    "USDC",
+    "USDT",
+    "ETH",
+    "BTC"
+  ],
+  "checkIntervalMs": 6000,
+  "minTimeBetweenTradesMs": 340000,
+  "loanAmount": 120,
+  "simulateBeforeExecute": true
 }
