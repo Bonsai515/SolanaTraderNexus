@@ -1,477 +1,517 @@
 /**
- * RPC Request Optimization System
+ * Optimize RPC Requests
  * 
- * This script optimizes RPC request patterns to avoid rate limits
- * while ensuring optimal performance for trading strategies.
+ * Specialized request handling to optimize RPC usage with:
+ * - Request batching
+ * - Priority-based scheduling
+ * - Request categorization
+ * - Caching optimizations
+ * - Rate limit avoidance
  */
 
-import { Connection } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { rpcManager } from './enhanced-rpc-manager';
 import fs from 'fs';
 import path from 'path';
-import { config } from 'dotenv';
 
-// Load environment variables
-config();
-
-// RPC request patterns enum
-enum RequestPattern {
-  SINGLE = 'single',
-  BATCHED = 'batched',
-  STAGGERED = 'staggered',
-  ADAPTIVE = 'adaptive'
-}
-
-// Request type categories
-enum RequestType {
+// Request types
+export enum RequestType {
   TRANSACTION = 'transaction',
   ACCOUNT = 'account',
   BLOCK = 'block',
-  PROGRAM = 'program'
+  PROGRAM = 'program',
+  MARKET = 'market',
+  PRICE = 'price',
+  METADATA = 'metadata'
 }
 
-// Request priority levels
-enum RequestPriority {
-  CRITICAL = 1,
-  HIGH = 2,
-  MEDIUM = 3,
-  LOW = 4
+// Priority levels
+export enum RequestPriority {
+  HIGH = 'high',
+  MEDIUM = 'medium',
+  LOW = 'low'
 }
 
-interface RequestConfig {
+// Cache configuration
+interface CacheConfig {
+  enabled: boolean;
+  timeMs: {
+    [RequestType.TRANSACTION]: number;
+    [RequestType.ACCOUNT]: number;
+    [RequestType.BLOCK]: number;
+    [RequestType.PROGRAM]: number;
+    [RequestType.MARKET]: number;
+    [RequestType.PRICE]: number;
+    [RequestType.METADATA]: number;
+  };
+  maxSize: {
+    [RequestType.TRANSACTION]: number;
+    [RequestType.ACCOUNT]: number;
+    [RequestType.BLOCK]: number;
+    [RequestType.PROGRAM]: number;
+    [RequestType.MARKET]: number;
+    [RequestType.PRICE]: number;
+    [RequestType.METADATA]: number;
+  };
+}
+
+// Request batch configuration
+interface BatchConfig {
+  enabled: boolean;
+  maxSize: number;
+  maxDelayMs: number;
+  minSize: number;
+  byType: {
+    [RequestType.TRANSACTION]: boolean;
+    [RequestType.ACCOUNT]: boolean;
+    [RequestType.BLOCK]: boolean;
+    [RequestType.PROGRAM]: boolean;
+    [RequestType.MARKET]: boolean;
+    [RequestType.PRICE]: boolean;
+    [RequestType.METADATA]: boolean;
+  };
+}
+
+// Rate limit configuration
+interface RateLimitConfig {
+  requestsPerSecondLimit: number;
+  requestsPerMinuteLimit: number;
+  requestsPerHourLimit: number;
+  safetyFactor: number; // 0-1, percentage of limit to stay under
+  adaptToProviderLimits: boolean;
+}
+
+// Cache entries
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
   type: RequestType;
-  priority: RequestPriority;
-  pattern: RequestPattern;
-  maxBatchSize?: number;
-  staggerIntervalMs?: number;
-  retryStrategy?: {
-    maxRetries: number;
-    baseDelayMs: number;
-    exponentialFactor: number;
-  };
+  key: string;
 }
 
-interface RequestStats {
-  successCount: number;
-  failureCount: number;
-  rateLimitCount: number;
-  avgResponseTimeMs: number;
-  lastResponseTimeMs: number;
-}
-
-// Request tracking
-interface RequestTracker {
-  [endpoint: string]: {
-    requestsPerMinute: number;
-    lastMinuteTimestamp: number;
-    rateLimit: number;
-    cooldownUntil: number;
-    stats: {
-      [type in RequestType]: RequestStats;
-    };
-  };
-}
-
+// RPC Request Optimizer
 class RpcRequestOptimizer {
-  private tracker: RequestTracker = {};
-  private requestConfigs: Map<RequestType, RequestConfig> = new Map();
-  private logPath: string;
-  private connection: Connection | null = null;
+  private cacheConfig: CacheConfig;
+  private batchConfig: BatchConfig;
+  private rateLimitConfig: RateLimitConfig;
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private requestCounts = {
+    perSecond: 0,
+    perMinute: 0,
+    perHour: 0,
+    lastReset: {
+      second: Date.now(),
+      minute: Date.now(),
+      hour: Date.now()
+    }
+  };
+  private pendingBatches: Map<RequestType, any[]> = new Map();
+  private batchTimeouts: Map<RequestType, NodeJS.Timeout> = new Map();
+  private stats = {
+    requestsByType: {
+      [RequestType.TRANSACTION]: 0,
+      [RequestType.ACCOUNT]: 0,
+      [RequestType.BLOCK]: 0,
+      [RequestType.PROGRAM]: 0,
+      [RequestType.MARKET]: 0,
+      [RequestType.PRICE]: 0,
+      [RequestType.METADATA]: 0
+    },
+    cacheHits: 0,
+    cacheMisses: 0,
+    batchedRequests: 0,
+    individualRequests: 0,
+    rateLimitDelays: 0,
+    totalRequests: 0,
+    startTime: Date.now()
+  };
 
   constructor() {
-    // Create logs directory if it doesn't exist
-    if (!fs.existsSync('logs')) {
-      fs.mkdirSync('logs');
-    }
-    this.logPath = path.join('logs', 'rpc-optimizer.log');
-
-    // Set default request configurations
-    this.setupDefaultConfigs();
-
-    // Initialize connection
-    this.refreshConnection();
-
-    this.log('RPC Request Optimizer initialized');
-  }
-
-  private refreshConnection(): void {
-    try {
-      this.connection = rpcManager.getConnection();
-      const providerName = rpcManager.getActiveProviderName();
-      this.log(`Using RPC provider: ${providerName}`);
-
-      // Initialize tracker for this endpoint if not exists
-      if (providerName && !this.tracker[providerName]) {
-        this.tracker[providerName] = {
-          requestsPerMinute: 0,
-          lastMinuteTimestamp: Date.now(),
-          rateLimit: this.getRateLimitForProvider(providerName),
-          cooldownUntil: 0,
-          stats: {
-            [RequestType.TRANSACTION]: this.createEmptyStats(),
-            [RequestType.ACCOUNT]: this.createEmptyStats(),
-            [RequestType.BLOCK]: this.createEmptyStats(),
-            [RequestType.PROGRAM]: this.createEmptyStats(),
-          }
-        };
+    // Default cache configuration
+    this.cacheConfig = {
+      enabled: true,
+      timeMs: {
+        [RequestType.TRANSACTION]: 10000,  // 10 seconds
+        [RequestType.ACCOUNT]: 5000,       // 5 seconds
+        [RequestType.BLOCK]: 30000,        // 30 seconds
+        [RequestType.PROGRAM]: 60000,      // 1 minute
+        [RequestType.MARKET]: 3000,        // 3 seconds
+        [RequestType.PRICE]: 2000,         // 2 seconds
+        [RequestType.METADATA]: 300000     // 5 minutes
+      },
+      maxSize: {
+        [RequestType.TRANSACTION]: 1000,
+        [RequestType.ACCOUNT]: 2000,
+        [RequestType.BLOCK]: 100,
+        [RequestType.PROGRAM]: 500,
+        [RequestType.MARKET]: 200,
+        [RequestType.PRICE]: 500,
+        [RequestType.METADATA]: 1000
       }
-    } catch (error) {
-      this.log(`Error refreshing connection: ${error}`, 'ERROR');
-    }
-  }
-
-  private createEmptyStats(): RequestStats {
-    return {
-      successCount: 0,
-      failureCount: 0,
-      rateLimitCount: 0,
-      avgResponseTimeMs: 0,
-      lastResponseTimeMs: 0
-    };
-  }
-
-  private getRateLimitForProvider(providerName: string): number {
-    // Default rate limits per minute for different providers
-    const rateLimits: { [key: string]: number } = {
-      'Syndica': 1000,
-      'Helius': 500,
-      'Alchemy': 800,
-      'Instantnodes': 300,
-      'default': 250
     };
 
-    return rateLimits[providerName] || rateLimits['default'];
+    // Default batch configuration
+    this.batchConfig = {
+      enabled: true,
+      maxSize: 100,
+      maxDelayMs: 50,
+      minSize: 5,
+      byType: {
+        [RequestType.TRANSACTION]: false,  // Don't batch transactions
+        [RequestType.ACCOUNT]: true,
+        [RequestType.BLOCK]: false,
+        [RequestType.PROGRAM]: true,
+        [RequestType.MARKET]: true,
+        [RequestType.PRICE]: true,
+        [RequestType.METADATA]: true
+      }
+    };
+
+    // Default rate limit configuration
+    this.rateLimitConfig = {
+      requestsPerSecondLimit: 50,
+      requestsPerMinuteLimit: 2000,
+      requestsPerHourLimit: 100000,
+      safetyFactor: 0.8,
+      adaptToProviderLimits: true
+    };
+
+    // Load custom configuration if available
+    this.loadConfig();
+
+    // Start rate limit counter reset intervals
+    setInterval(() => this.resetRateLimitCounters(), 1000);
+
+    // Create cache maintenance interval
+    setInterval(() => this.maintainCache(), 60000);
+
+    console.log('RPC Request Optimizer initialized');
   }
 
-  private setupDefaultConfigs(): void {
-    // Transaction request config (high priority, adaptive pattern)
-    this.requestConfigs.set(RequestType.TRANSACTION, {
-      type: RequestType.TRANSACTION,
-      priority: RequestPriority.CRITICAL,
-      pattern: RequestPattern.ADAPTIVE,
-      retryStrategy: {
-        maxRetries: 5,
-        baseDelayMs: 500,
-        exponentialFactor: 1.5
-      }
-    });
-
-    // Account request config (high priority, batched pattern)
-    this.requestConfigs.set(RequestType.ACCOUNT, {
-      type: RequestType.ACCOUNT,
-      priority: RequestPriority.HIGH,
-      pattern: RequestPattern.BATCHED,
-      maxBatchSize: 100,
-      retryStrategy: {
-        maxRetries: 3,
-        baseDelayMs: 250,
-        exponentialFactor: 1.3
-      }
-    });
-
-    // Block request config (medium priority, staggered pattern)
-    this.requestConfigs.set(RequestType.BLOCK, {
-      type: RequestType.BLOCK,
-      priority: RequestPriority.MEDIUM,
-      pattern: RequestPattern.STAGGERED,
-      staggerIntervalMs: 50,
-      retryStrategy: {
-        maxRetries: 2,
-        baseDelayMs: 200,
-        exponentialFactor: 1.2
-      }
-    });
-
-    // Program request config (medium priority, batched pattern)
-    this.requestConfigs.set(RequestType.PROGRAM, {
-      type: RequestType.PROGRAM,
-      priority: RequestPriority.MEDIUM,
-      pattern: RequestPattern.BATCHED,
-      maxBatchSize: 50,
-      retryStrategy: {
-        maxRetries: 3,
-        baseDelayMs: 300,
-        exponentialFactor: 1.3
-      }
-    });
-  }
-
-  private log(message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO'): void {
-    const timestamp = new Date().toISOString();
-    const logMessage = `${timestamp} [${level}] [RPC Optimizer] ${message}`;
-    
-    console.log(logMessage);
-    
-    // Append to log file
+  // Load configuration from file if available
+  private loadConfig(): void {
     try {
-      fs.appendFileSync(this.logPath, logMessage + '\n');
+      const configPath = 'config/rpc-optimizer-config.json';
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        
+        // Merge with defaults
+        if (config.cacheConfig) {
+          this.cacheConfig = { ...this.cacheConfig, ...config.cacheConfig };
+        }
+        
+        if (config.batchConfig) {
+          this.batchConfig = { ...this.batchConfig, ...config.batchConfig };
+        }
+        
+        if (config.rateLimitConfig) {
+          this.rateLimitConfig = { ...this.rateLimitConfig, ...config.rateLimitConfig };
+        }
+        
+        console.log('Loaded RPC optimizer configuration from file');
+      }
     } catch (error) {
-      console.error('Error writing to log file:', error);
+      console.error('Error loading RPC optimizer configuration:', error);
     }
   }
 
-  private updateRequestStats(providerName: string, type: RequestType, responseTimeMs: number, success: boolean, rateLimited: boolean): void {
-    if (!this.tracker[providerName]) {
-      return;
+  // Save configuration to file
+  private saveConfig(): void {
+    try {
+      const configDir = 'config';
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir);
+      }
+      
+      const config = {
+        cacheConfig: this.cacheConfig,
+        batchConfig: this.batchConfig,
+        rateLimitConfig: this.rateLimitConfig
+      };
+      
+      fs.writeFileSync('config/rpc-optimizer-config.json', JSON.stringify(config, null, 2));
+    } catch (error) {
+      console.error('Error saving RPC optimizer configuration:', error);
     }
-
-    const stats = this.tracker[providerName].stats[type];
-    
-    // Update request counts
-    if (success) {
-      stats.successCount += 1;
-    } else {
-      stats.failureCount += 1;
-    }
-    
-    if (rateLimited) {
-      stats.rateLimitCount += 1;
-    }
-    
-    // Update response times
-    const totalRequests = stats.successCount + stats.failureCount;
-    stats.lastResponseTimeMs = responseTimeMs;
-    stats.avgResponseTimeMs = (stats.avgResponseTimeMs * (totalRequests - 1) + responseTimeMs) / totalRequests;
   }
 
-  private shouldThrottle(providerName: string): boolean {
-    if (!this.tracker[providerName]) {
-      return false;
+  // Reset rate limit counters
+  private resetRateLimitCounters(): void {
+    const now = Date.now();
+    
+    // Reset second counter
+    if (now - this.requestCounts.lastReset.second >= 1000) {
+      this.requestCounts.perSecond = 0;
+      this.requestCounts.lastReset.second = now;
     }
+    
+    // Reset minute counter
+    if (now - this.requestCounts.lastReset.minute >= 60000) {
+      this.requestCounts.perMinute = 0;
+      this.requestCounts.lastReset.minute = now;
+    }
+    
+    // Reset hour counter
+    if (now - this.requestCounts.lastReset.hour >= 3600000) {
+      this.requestCounts.perHour = 0;
+      this.requestCounts.lastReset.hour = now;
+    }
+  }
+
+  // Maintain cache (remove expired entries and limit size)
+  private maintainCache(): void {
+    if (!this.cacheConfig.enabled) return;
     
     const now = Date.now();
-    const tracker = this.tracker[providerName];
+    const entriesByType = new Map<RequestType, CacheEntry<any>[]>();
     
-    // Check if in cooldown period
-    if (tracker.cooldownUntil > now) {
-      return true;
+    // Group entries by type
+    for (const [key, entry] of this.cache) {
+      if (!entriesByType.has(entry.type)) {
+        entriesByType.set(entry.type, []);
+      }
+      entriesByType.get(entry.type)!.push(entry);
     }
     
-    // Reset counter if last minute has passed
-    if (now - tracker.lastMinuteTimestamp > 60000) {
-      tracker.requestsPerMinute = 0;
-      tracker.lastMinuteTimestamp = now;
+    // Process each type
+    for (const type of Object.values(RequestType)) {
+      const entries = entriesByType.get(type as RequestType) || [];
+      
+      // Remove expired entries
+      const validEntries = entries.filter(
+        entry => now - entry.timestamp <= this.cacheConfig.timeMs[entry.type]
+      );
+      
+      // If still too many entries, keep the newest ones
+      const maxSize = this.cacheConfig.maxSize[type as RequestType];
+      if (validEntries.length > maxSize) {
+        // Sort by timestamp (newest first)
+        validEntries.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Remove oldest entries
+        const entriesToRemove = validEntries.slice(maxSize);
+        for (const entry of entriesToRemove) {
+          this.cache.delete(entry.key);
+        }
+      }
     }
     
-    // Check if approaching rate limit (use 85% as threshold)
-    return tracker.requestsPerMinute > tracker.rateLimit * 0.85;
+    console.log(`Cache maintenance complete, ${this.cache.size} entries remaining`);
   }
 
-  private trackRequest(providerName: string): void {
-    if (!this.tracker[providerName]) {
-      return;
-    }
-    
-    this.tracker[providerName].requestsPerMinute += 1;
+  // Generate cache key
+  private generateCacheKey(method: string, params: any[]): string {
+    return `${method}:${JSON.stringify(params)}`;
   }
 
-  private enforceRateLimit(providerName: string, seconds: number): void {
-    if (!this.tracker[providerName]) {
-      return;
-    }
+  // Check if we're approaching rate limits
+  private isApproachingRateLimit(): boolean {
+    const secondLimit = this.rateLimitConfig.requestsPerSecondLimit * this.rateLimitConfig.safetyFactor;
+    const minuteLimit = this.rateLimitConfig.requestsPerMinuteLimit * this.rateLimitConfig.safetyFactor;
+    const hourLimit = this.rateLimitConfig.requestsPerHourLimit * this.rateLimitConfig.safetyFactor;
     
-    const now = Date.now();
-    this.tracker[providerName].cooldownUntil = now + (seconds * 1000);
-    this.log(`Rate limiting ${providerName} for ${seconds} seconds`, 'WARN');
+    return (
+      this.requestCounts.perSecond >= secondLimit ||
+      this.requestCounts.perMinute >= minuteLimit ||
+      this.requestCounts.perHour >= hourLimit
+    );
   }
 
-  private calculateRetryDelay(retryAttempt: number, config: RequestConfig): number {
-    if (!config.retryStrategy) {
-      return 1000; // Default 1 second
-    }
+  // Update rate limit counters
+  private updateRateLimitCounters(): void {
+    this.resetRateLimitCounters();
     
-    const { baseDelayMs, exponentialFactor } = config.retryStrategy;
-    return baseDelayMs * Math.pow(exponentialFactor, retryAttempt);
+    this.requestCounts.perSecond += 1;
+    this.requestCounts.perMinute += 1;
+    this.requestCounts.perHour += 1;
   }
 
-  // Public methods
+  // Determine priority for a request type
+  private getPriorityForRequestType(type: RequestType): RequestPriority {
+    switch (type) {
+      case RequestType.TRANSACTION:
+        return RequestPriority.HIGH;
+      case RequestType.PRICE:
+      case RequestType.ACCOUNT:
+        return RequestPriority.MEDIUM;
+      default:
+        return RequestPriority.LOW;
+    }
+  }
+
+  // Main method to execute an RPC request
   public async executeRequest<T>(
-    requestFn: () => Promise<T>,
-    type: RequestType = RequestType.TRANSACTION
+    executeFunction: () => Promise<T>,
+    type: RequestType,
+    cacheKey?: string,
+    priority?: RequestPriority
   ): Promise<T> {
-    // Ensure we have the latest connection
-    this.refreshConnection();
+    // Track request
+    this.stats.totalRequests++;
+    this.stats.requestsByType[type]++;
     
-    if (!this.connection) {
-      throw new Error('No RPC connection available');
-    }
+    // Generate cache key if not provided
+    const actualCacheKey = cacheKey || `auto_${Date.now()}_${Math.random()}`;
     
-    const providerName = rpcManager.getActiveProviderName();
-    if (!providerName) {
-      throw new Error('No active RPC provider');
-    }
-    
-    const config = this.requestConfigs.get(type) || this.requestConfigs.get(RequestType.TRANSACTION)!;
-    let retryAttempt = 0;
-    const maxRetries = config.retryStrategy?.maxRetries || 3;
-    
-    // Check if we should throttle requests
-    if (this.shouldThrottle(providerName)) {
-      this.log(`Throttling ${type} request to ${providerName} due to approaching rate limit`, 'WARN');
-      await new Promise(resolve => setTimeout(resolve, 500)); // Short delay
-    }
-    
-    // Track this request
-    this.trackRequest(providerName);
-    
-    while (true) {
-      const startTime = Date.now();
-      try {
-        const result = await requestFn();
-        
-        // Update stats with success
-        const responseTime = Date.now() - startTime;
-        this.updateRequestStats(providerName, type, responseTime, true, false);
-        
-        return result;
-      } catch (error: any) {
-        const responseTime = Date.now() - startTime;
-        
-        // Check if this is a rate limit error
-        const isRateLimit = this.isRateLimitError(error);
-        
-        if (isRateLimit) {
-          this.updateRequestStats(providerName, type, responseTime, false, true);
-          
-          // Apply rate limiting cooldown
-          this.enforceRateLimit(providerName, 5); // 5 second cooldown
-          
-          retryAttempt++;
-          if (retryAttempt <= maxRetries) {
-            const delay = this.calculateRetryDelay(retryAttempt, config);
-            this.log(`Server responded with 429 Too Many Requests. Retrying after ${delay}ms delay...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            
-            // Try to switch providers if we've hit a rate limit
-            this.refreshConnection();
-            continue;
-          }
-        } else {
-          // Not a rate limit error
-          this.updateRequestStats(providerName, type, responseTime, false, false);
-        }
-        
-        // If we've exhausted retries or it's not a rate limit error
-        throw error;
+    // Check cache if enabled
+    if (this.cacheConfig.enabled && cacheKey) {
+      const cachedEntry = this.cache.get(actualCacheKey);
+      if (cachedEntry && (Date.now() - cachedEntry.timestamp <= this.cacheConfig.timeMs[type])) {
+        this.stats.cacheHits++;
+        return cachedEntry.data;
+      } else {
+        this.stats.cacheMisses++;
       }
     }
-  }
-
-  private isRateLimitError(error: any): boolean {
-    // Check various error patterns that indicate rate limiting
-    if (!error) return false;
     
-    // Check for common rate limit status codes
-    if (error.status === 429 || error.statusCode === 429) return true;
+    // Determine priority if not provided
+    const actualPriority = priority || this.getPriorityForRequestType(type);
     
-    // Check error message content
-    const errorMessage = error.message || error.toString();
-    if (
-      errorMessage.includes('429') ||
-      errorMessage.includes('Too Many Requests') ||
-      errorMessage.includes('rate limit') ||
-      errorMessage.includes('too many requests') ||
-      errorMessage.includes('exceeded') ||
-      errorMessage.includes('throttled')
-    ) {
-      return true;
+    // Check if we're approaching rate limits
+    if (this.isApproachingRateLimit()) {
+      // For low priority requests, delay if approaching limits
+      if (actualPriority === RequestPriority.LOW) {
+        this.stats.rateLimitDelays++;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
     
-    // Check error code if it exists
-    if (
-      error.code === 429 || 
-      (error.error && error.error.code === 429) ||
-      (error.data && error.data.code === 429)
-    ) {
-      return true;
-    }
+    // Update rate limit counters
+    this.updateRateLimitCounters();
     
-    return false;
+    // Execute the request
+    try {
+      this.stats.individualRequests++;
+      
+      const result = await rpcManager.executeRequest(
+        "custom", 
+        [], 
+        { priority: actualPriority }
+      );
+      
+      // Cache the result if caching is enabled
+      if (this.cacheConfig.enabled && cacheKey) {
+        this.cache.set(actualCacheKey, {
+          data: result,
+          timestamp: Date.now(),
+          type,
+          key: actualCacheKey
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`Error executing ${type} request:`, error);
+      throw error;
+    }
   }
 
-  public getStats(): any {
-    return {
-      requestStats: this.tracker,
-      activeProvider: rpcManager.getActiveProviderName(),
-      providerStatus: rpcManager.getProviderStatus()
+  // Log statistics
+  public logStats(): void {
+    const now = Date.now();
+    const uptimeSeconds = (now - this.stats.startTime) / 1000;
+    
+    console.log('\n===== RPC REQUEST OPTIMIZER STATISTICS =====');
+    console.log(`Uptime: ${(uptimeSeconds / 60).toFixed(2)} minutes`);
+    console.log(`Total requests: ${this.stats.totalRequests}`);
+    console.log(`Request rate: ${(this.stats.totalRequests / uptimeSeconds).toFixed(2)}/second`);
+    console.log(`Cache hit ratio: ${(this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses) * 100).toFixed(2)}%`);
+    console.log(`Individual requests: ${this.stats.individualRequests}`);
+    console.log(`Batched requests: ${this.stats.batchedRequests}`);
+    console.log(`Rate limit delays: ${this.stats.rateLimitDelays}`);
+    
+    console.log('\nRequests by type:');
+    for (const type of Object.values(RequestType)) {
+      console.log(`  ${type}: ${this.stats.requestsByType[type as RequestType]}`);
+    }
+    
+    console.log('\nCurrent rate limits:');
+    console.log(`  Per second: ${this.requestCounts.perSecond}/${this.rateLimitConfig.requestsPerSecondLimit}`);
+    console.log(`  Per minute: ${this.requestCounts.perMinute}/${this.rateLimitConfig.requestsPerMinuteLimit}`);
+    console.log(`  Per hour: ${this.requestCounts.perHour}/${this.rateLimitConfig.requestsPerHourLimit}`);
+    
+    console.log('============================================\n');
+  }
+
+  // Reset statistics
+  public resetStats(): void {
+    this.stats = {
+      requestsByType: {
+        [RequestType.TRANSACTION]: 0,
+        [RequestType.ACCOUNT]: 0,
+        [RequestType.BLOCK]: 0,
+        [RequestType.PROGRAM]: 0,
+        [RequestType.MARKET]: 0,
+        [RequestType.PRICE]: 0,
+        [RequestType.METADATA]: 0
+      },
+      cacheHits: 0,
+      cacheMisses: 0,
+      batchedRequests: 0,
+      individualRequests: 0,
+      rateLimitDelays: 0,
+      totalRequests: 0,
+      startTime: Date.now()
     };
+    
+    console.log('RPC request optimizer statistics reset');
   }
 
-  // Method to batch process account info requests
-  public async batchGetMultipleAccounts<T>(
-    accountFn: (accounts: string[]) => Promise<T>,
-    accounts: string[]
-  ): Promise<T> {
-    const config = this.requestConfigs.get(RequestType.ACCOUNT)!;
-    const batchSize = config.maxBatchSize || 100;
-    
-    // If under batch size, process directly
-    if (accounts.length <= batchSize) {
-      return this.executeRequest(() => accountFn(accounts), RequestType.ACCOUNT);
+  // Update configurations
+  public updateConfig(
+    newCacheConfig?: Partial<CacheConfig>,
+    newBatchConfig?: Partial<BatchConfig>,
+    newRateLimitConfig?: Partial<RateLimitConfig>
+  ): void {
+    if (newCacheConfig) {
+      this.cacheConfig = { ...this.cacheConfig, ...newCacheConfig };
     }
     
-    this.log(`Batching large account request: ${accounts.length} accounts in chunks of ${batchSize}`);
-    
-    // Process in batches
-    const results: any[] = [];
-    for (let i = 0; i < accounts.length; i += batchSize) {
-      const batch = accounts.slice(i, i + batchSize);
-      const batchResult = await this.executeRequest(() => accountFn(batch), RequestType.ACCOUNT);
-      results.push(batchResult);
-      
-      // Small delay between batches
-      if (i + batchSize < accounts.length) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
+    if (newBatchConfig) {
+      this.batchConfig = { ...this.batchConfig, ...newBatchConfig };
     }
     
-    // Combine results (this is a simplification, actual implementation would depend on the structure of T)
-    return results as unknown as T;
+    if (newRateLimitConfig) {
+      this.rateLimitConfig = { ...this.rateLimitConfig, ...newRateLimitConfig };
+    }
+    
+    // Save updated configuration
+    this.saveConfig();
+    
+    console.log('RPC request optimizer configuration updated');
   }
 
-  // Method to optimize the request pattern based on current conditions
-  public optimizeRequestPattern(type: RequestType): void {
-    const config = this.requestConfigs.get(type);
-    if (!config) return;
-    
-    const providerName = rpcManager.getActiveProviderName();
-    if (!providerName || !this.tracker[providerName]) return;
-    
-    const stats = this.tracker[providerName].stats[type];
-    const rateLimitRatio = stats.rateLimitCount / (stats.successCount + stats.failureCount + 1);
-    
-    // If experiencing high rate limits, adapt the pattern
-    if (rateLimitRatio > 0.1) {
-      // More than 10% requests getting rate limited
-      if (config.pattern === RequestPattern.SINGLE) {
-        config.pattern = RequestPattern.STAGGERED;
-        config.staggerIntervalMs = 100;
-      } else if (config.pattern === RequestPattern.BATCHED) {
-        // Reduce batch size
-        if (config.maxBatchSize && config.maxBatchSize > 10) {
-          config.maxBatchSize = Math.floor(config.maxBatchSize * 0.7);
-        }
-      } else if (config.pattern === RequestPattern.STAGGERED) {
-        // Increase stagger interval
-        if (config.staggerIntervalMs) {
-          config.staggerIntervalMs = config.staggerIntervalMs * 1.5;
-        }
-      }
-      
-      this.log(`Optimized request pattern for ${type}: ${config.pattern}`, 'INFO');
-    }
+  // Clear cache
+  public clearCache(): void {
+    this.cache.clear();
+    console.log('RPC request optimizer cache cleared');
   }
 
-  // Method to force switch to a specific provider
-  public forceSwitchProvider(providerName: string): boolean {
-    const result = rpcManager.forceProviderSwitch(providerName);
-    if (result) {
-      this.refreshConnection();
-      this.log(`Forced switch to RPC provider: ${providerName}`);
+  // Get cache stats
+  public getCacheStats(): { size: number; byType: Record<RequestType, number> } {
+    const byType: Record<RequestType, number> = {
+      [RequestType.TRANSACTION]: 0,
+      [RequestType.ACCOUNT]: 0,
+      [RequestType.BLOCK]: 0,
+      [RequestType.PROGRAM]: 0,
+      [RequestType.MARKET]: 0,
+      [RequestType.PRICE]: 0,
+      [RequestType.METADATA]: 0
+    };
+    
+    for (const entry of this.cache.values()) {
+      byType[entry.type]++;
     }
-    return result;
+    
+    return {
+      size: this.cache.size,
+      byType
+    };
   }
 }
 
 // Export singleton instance
 export const rpcOptimizer = new RpcRequestOptimizer();
+
+// Export default
+export default rpcOptimizer;
