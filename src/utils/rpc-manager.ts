@@ -1,13 +1,13 @@
 /**
- * Multi-Provider RPC Manager
+ * Enhanced Multi-Provider RPC Manager with Rate Limit Protection
  * 
- * This module manages multiple RPC providers and handles failover,
- * load balancing, and caching.
+ * This module manages multiple RPC providers with aggressive rate limit protection.
  */
 
 import { Connection, PublicKey, VersionedTransaction, SendOptions } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { throttledRequest, getCacheStats } from './rate-limit-fixer';
 
 // Load config
 const CONFIG_PATH = path.join(__dirname, '../config/multi-rpc-config.json');
@@ -28,9 +28,6 @@ const connections = config.providers
     requestCount: 0,
     cooldownUntil: 0
   }));
-
-// Cache implementation
-const cache = new Map();
 
 // Get the best connection based on priority, errors, and load
 function getBestConnection() {
@@ -82,25 +79,14 @@ function registerError(connection) {
   
   // Apply exponential backoff for consecutive errors
   if (connection.consecutiveErrors >= 3) {
-    const cooldownMs = Math.min(30000, Math.pow(2, connection.consecutiveErrors) * 1000);
+    const cooldownMs = Math.min(60000, Math.pow(2, connection.consecutiveErrors) * 1000);
     connection.cooldownUntil = Date.now() + cooldownMs;
     console.log(`[RPC Manager] Cooling down ${connection.name} for ${cooldownMs/1000}s due to errors`);
   }
 }
 
-// Make a cached RPC request
+// Make a throttled RPC request with rate limiting
 async function makeRequest(method, params = []) {
-  // Generate cache key
-  const cacheKey = `${method}:${JSON.stringify(params)}`;
-  
-  // Check cache first
-  if (cache.has(cacheKey)) {
-    const cached = cache.get(cacheKey);
-    if (Date.now() < cached.expiry) {
-      return cached.data;
-    }
-  }
-  
   // Try each connection until success
   let lastError;
   
@@ -110,34 +96,15 @@ async function makeRequest(method, params = []) {
     try {
       console.log(`[RPC Manager] Using ${connection.name} for ${method}`);
       
-      // Make the request
-      const response = await connection.connection.rpcRequest(method, params);
+      // Make the request with throttling
+      const result = await throttledRequest(
+        () => connection.connection.rpcRequest(method, params),
+        method,
+        params
+      );
+      
       registerSuccess(connection);
-      
-      // Determine cache TTL based on method
-      let ttl = 30000; // Default: 30 seconds
-      
-      if (method.includes('getTransaction') || method.includes('getSignature')) {
-        ttl = config.caching.transactionTtlMs;
-      } else if (method.includes('getAccountInfo')) {
-        ttl = config.caching.accountInfoTtlMs;
-      } else if (method.includes('getBalance')) {
-        ttl = config.caching.balanceTtlMs;
-      } else if (method.includes('getSlot')) {
-        ttl = config.caching.slotTtlMs;
-      } else if (method.includes('getBlock')) {
-        ttl = config.caching.blockTtlMs;
-      }
-      
-      // Cache the result
-      if (config.caching.enabled) {
-        cache.set(cacheKey, {
-          data: response.result,
-          expiry: Date.now() + ttl
-        });
-      }
-      
-      return response.result;
+      return result;
     } catch (error) {
       console.error(`[RPC Manager] Error with ${connection.name}: ${error.message}`);
       registerError(connection);
@@ -159,7 +126,12 @@ function startHealthCheck() {
   setInterval(async () => {
     for (const connection of connections) {
       try {
-        await connection.connection.getSlot();
+        // Use throttled request for health checks too
+        await throttledRequest(
+          () => connection.connection.getSlot(),
+          'getSlot',
+          []
+        );
         console.log(`[RPC Manager] Health check OK: ${connection.name}`);
         
         // Reset error count on successful health check
@@ -171,6 +143,10 @@ function startHealthCheck() {
         registerError(connection);
       }
     }
+    
+    // Log cache stats
+    const stats = getCacheStats();
+    console.log(`[RPC Manager] Cache stats: ${JSON.stringify(stats)}`);
   }, config.loadBalancing.healthCheckIntervalMs);
 }
 
@@ -199,16 +175,21 @@ export async function sendTransaction(
   transaction: VersionedTransaction | Buffer | Uint8Array | string,
   options?: SendOptions
 ): Promise<string> {
-  // Try sending on all providers until one succeeds
+  // Try sending on all providers until one succeeds - but still throttled
   let lastError;
   
   for (const connection of connections) {
     try {
-      // Don't use higher level makeRequest to avoid caching and stay close to native API
-      const signature = await connection.connection.sendRawTransaction(
-        transaction instanceof VersionedTransaction ? transaction.serialize() : transaction,
-        options
+      // Use a throttled request that bypasses cache
+      const signature = await throttledRequest(
+        () => connection.connection.sendRawTransaction(
+          transaction instanceof VersionedTransaction ? transaction.serialize() : transaction,
+          options
+        ),
+        'sendTransaction', 
+        []  // Don't include tx data in cache key
       );
+      
       registerSuccess(connection);
       return signature;
     } catch (error) {
@@ -222,10 +203,14 @@ export async function sendTransaction(
 }
 
 export async function confirmTransaction(signature: string, commitment?: string): Promise<any> {
-  // Don't cache confirmations
+  // Don't cache confirmations, but still throttle
   const conn = getBestConnection();
   try {
-    const result = await conn.connection.confirmTransaction(signature, commitment);
+    const result = await throttledRequest(
+      () => conn.connection.confirmTransaction(signature, commitment),
+      'confirmTransaction',
+      [signature]
+    );
     registerSuccess(conn);
     return result;
   } catch (error) {
@@ -253,33 +238,21 @@ export async function getProgramAccounts(
 
 // Get current connection health and stats
 export function getConnectionStats() {
-  return connections.map(conn => ({
-    name: conn.name,
-    priority: conn.priority,
-    weight: conn.weight,
-    requestCount: conn.requestCount,
-    errorCount: conn.errorCount,
-    cooldownUntil: conn.cooldownUntil > Date.now() ? new Date(conn.cooldownUntil).toISOString() : null,
-    url: conn.url
-  }));
+  const cacheStats = getCacheStats();
+  
+  return {
+    connections: connections.map(conn => ({
+      name: conn.name,
+      priority: conn.priority,
+      weight: conn.weight,
+      requestCount: conn.requestCount,
+      errorCount: conn.errorCount,
+      cooldownUntil: conn.cooldownUntil > Date.now() ? new Date(conn.cooldownUntil).toISOString() : null,
+      url: conn.url
+    })),
+    cacheStats
+  };
 }
-
-// Periodically clean up cache
-setInterval(() => {
-  const now = Date.now();
-  let removedCount = 0;
-  
-  for (const [key, value] of cache.entries()) {
-    if (value.expiry < now) {
-      cache.delete(key);
-      removedCount++;
-    }
-  }
-  
-  if (removedCount > 0) {
-    console.log(`[RPC Manager] Cleaned up ${removedCount} expired cache entries`);
-  }
-}, 60000); // Every minute
 
 // Export a raw connection for cases where direct access is needed
 export function getRawConnection() {
