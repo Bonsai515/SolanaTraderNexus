@@ -2,7 +2,7 @@
   "useRealFunds": true,
   "rpcUrl": "https://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
   "websocketUrl": "wss://solana-api.instantnodes.io/token-PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
-  "systemWalletAddress": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+  "systemWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
   "backupRpcUrls": [
     "https://api.mainnet-beta.solana.com",
     "https://solana-mainnet.rpc.extrnode.com"
