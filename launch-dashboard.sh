@@ -1,60 +1,43 @@
 #!/bin/bash
+# Launch Trading Dashboard
+# This script starts the trading dashboard web interface
 
-# Hyperion Trading System Dashboard Launcher
-# This script automatically selects the best dashboard version based on system capabilities
+echo "=== LAUNCHING NUCLEAR TRADING DASHBOARD ==="
+echo "Wallet: HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+echo "Time: $(date)"
+echo
 
-echo "🚀 Hyperion Trading System Dashboard Launcher"
-echo "----------------------------------------------"
+# Create necessary directories
+mkdir -p logs
+mkdir -p public
 
-# Create logs directory if it doesn't exist
-mkdir -p ./logs
-
-# Function to check if a command exists
-command_exists() {
-  command -v "$1" &> /dev/null
-}
-
-# Check for Node.js
-if ! command_exists node; then
-  echo "❌ Error: Node.js is required but not installed"
-  echo "Please install Node.js from https://nodejs.org/"
-  exit 1
-fi
-
-# Check if the server is running
-if ! curl -s http://localhost:5000/api/health &> /dev/null; then
-  echo "⚠️ Warning: Trading server doesn't appear to be running"
-  echo "Make sure to start the trading server before using the dashboard"
+# Check wallet balance
+echo "Checking wallet status..."
+npx tsx -e "
+  const { Connection, PublicKey } = require('@solana/web3.js');
+  const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f');
+  const wallet = new PublicKey('HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK');
   
-  # Ask if user wants to continue anyway
-  read -p "Continue anyway? (y/n): " continue_answer
-  if [[ ! "$continue_answer" =~ ^[Yy]$ ]]; then
-    echo "Exiting. Start the server and try again."
-    exit 1
-  fi
-fi
+  async function main() {
+    try {
+      const balance = await connection.getBalance(wallet);
+      console.log(\`Wallet balance: \${balance/1000000000} SOL\`);
+    } catch (error) {
+      console.error('Error checking wallet:', error);
+    }
+  }
+  
+  main();
+"
 
-# Decide which dashboard to use
-if command_exists ts-node; then
-  echo "✅ TypeScript support detected - launching full dashboard"
-  echo ""
-  echo "Launching dashboard in 3 seconds (press Ctrl+C to exit)"
-  sleep 3
-  ts-node system-dashboard.ts
-elif command_exists npx; then
-  echo "✅ NPX detected - trying to use TypeScript dashboard with npx"
-  echo ""
-  echo "Launching dashboard in 3 seconds (press Ctrl+C to exit)"
-  sleep 3
-  npx ts-node system-dashboard.ts
-else
-  echo "ℹ️ TypeScript not detected - launching simplified dashboard"
-  echo ""
-  echo "Launching dashboard in 3 seconds (press Ctrl+C to exit)"
-  sleep 3
-  node simple-dashboard.js
-fi
+# Start the dashboard
+echo "Starting trading dashboard..."
+npx tsx trading-dashboard.ts > logs/dashboard-$(date +%Y%m%d%H%M%S).log 2>&1 &
+DASHBOARD_PID=$!
 
-# Show this when dashboard exits
-echo ""
-echo "Dashboard stopped. Run ./launch-dashboard.sh to restart."
+echo "Dashboard started with PID: $DASHBOARD_PID"
+echo "Access the dashboard at: http://localhost:3000"
+echo
+echo "To stop the dashboard, run: kill $DASHBOARD_PID"
+echo
+echo "Trading statistics and profits will be displayed in real-time on the dashboard."

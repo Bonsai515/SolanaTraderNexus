@@ -161,7 +161,12 @@ let strategyStats = {
     time: 0,
     route: ''
   },
-  transactions: []
+  transactions: [] as {
+    time: number;
+    signature: string;
+    profit: number;
+    route: string;
+  }[]
 };
 
 /**
