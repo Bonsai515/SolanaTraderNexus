@@ -1,663 +1,557 @@
 /**
- * Integrate On-Chain Programs with Trading System
+ * Integrate On-Chain Programs
  * 
- * This script connects the trading system's transformers and execution engine
- * to your deployed Solana on-chain programs for maximum efficiency and performance.
- */
-
-import * as fs from 'fs';
-import * as path from 'path';
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
-import { logger } from './server/logger';
-
-// Your on-chain program addresses
-const PROGRAM_ADDRESSES = {
-  HYPERION_FLASH_LOAN: 'HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa',
-  QUANTUM_VAULT: 'QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL',
-  MEMECORTEX: 'MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV',
-  SINGULARITY_BRIDGE: 'SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H',
-  NEXUS_ENGINE: 'NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx'
-};
-
-// Transformers that need on-chain program integration
-const TRANSFORMER_MAPPING = {
-  'MemeCortexRemix': PROGRAM_ADDRESSES.MEMECORTEX,
-  'Security': PROGRAM_ADDRESSES.NEXUS_ENGINE,
-  'CrossChain': PROGRAM_ADDRESSES.SINGULARITY_BRIDGE,
-  'MicroQHC': PROGRAM_ADDRESSES.HYPERION_FLASH_LOAN
-};
-
-// Connection to Solana
-const INSTANT_NODES_RPC_URL = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-
-// Core system wallet
-const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
-
-/**
- * Create the on-chain program configuration file
- */
-function createProgramConfig(): void {
-  try {
-    // Ensure data directory exists
-    const dataDir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    
-    // Create program config file
-    const configPath = path.join(dataDir, 'onchain-programs.json');
-    const config = {
-      systemWallet: SYSTEM_WALLET,
-      rpcUrl: INSTANT_NODES_RPC_URL,
-      programs: Object.entries(PROGRAM_ADDRESSES).map(([name, address]) => ({
-        name,
-        address,
-        active: true,
-        lastVerified: new Date().toISOString()
-      })),
-      updatedAt: new Date().toISOString()
-    };
-    
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('✅ Created on-chain program configuration');
-  } catch (error) {
-    console.error(`❌ Failed to create program config: ${error.message}`);
-  }
-}
-
-/**
- * Update transformer configuration to use on-chain programs
- */
-function updateTransformerConfig(): void {
-  try {
-    const configPath = path.join(__dirname, 'data', 'transformer-config.json');
-    
-    // Create default config if it doesn't exist
-    let config: any = {
-      transformers: [],
-      updatedAt: new Date().toISOString()
-    };
-    
-    // Try to read existing config if available
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    }
-    
-    // Update or add each transformer with on-chain program
-    for (const [transformer, programId] of Object.entries(TRANSFORMER_MAPPING)) {
-      const existingIndex = config.transformers.findIndex((t: any) => t.name === transformer);
-      
-      const transformerConfig = {
-        name: transformer,
-        enabled: true,
-        useOnChainProgram: true,
-        programId,
-        settings: {
-          priority: 'high',
-          useNeuralOptimization: true,
-          maxSignalsPerInterval: 10,
-          intervalMs: 30000
-        },
-        updatedAt: new Date().toISOString()
-      };
-      
-      if (existingIndex >= 0) {
-        config.transformers[existingIndex] = {
-          ...config.transformers[existingIndex],
-          ...transformerConfig
-        };
-      } else {
-        config.transformers.push(transformerConfig);
-      }
-    }
-    
-    // Update 'updatedAt' timestamp
-    config.updatedAt = new Date().toISOString();
-    
-    // Save updated config
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('✅ Updated transformer configuration with on-chain programs');
-  } catch (error) {
-    console.error(`❌ Failed to update transformer config: ${error.message}`);
-  }
-}
-
-/**
- * Create Anchor IDL interfaces for programs
- */
-function createAnchorInterfaces(): void {
-  try {
-    const idlDir = path.join(__dirname, 'data', 'idl');
-    if (!fs.existsSync(idlDir)) {
-      fs.mkdirSync(idlDir, { recursive: true });
-    }
-    
-    for (const [name, address] of Object.entries(PROGRAM_ADDRESSES)) {
-      // Create a simple skeleton IDL for each program
-      const idl = {
-        version: "0.1.0",
-        name: name.toLowerCase(),
-        instructions: [
-          {
-            name: "execute",
-            accounts: [
-              {
-                name: "signer",
-                isSigner: true,
-                isWritable: true
-              },
-              {
-                name: "systemProgram",
-                isSigner: false,
-                isWritable: false
-              }
-            ],
-            args: [
-              {
-                name: "data",
-                type: "bytes"
-              }
-            ]
-          }
-        ],
-        metadata: {
-          address
-        }
-      };
-      
-      const idlPath = path.join(idlDir, `${name.toLowerCase()}.json`);
-      fs.writeFileSync(idlPath, JSON.stringify(idl, null, 2));
-    }
-    
-    console.log('✅ Created Anchor IDL interfaces for all programs');
-  } catch (error) {
-    console.error(`❌ Failed to create Anchor interfaces: ${error.message}`);
-  }
-}
-
-/**
- * Create program access connector module
- */
-function createProgramConnector(): void {
-  try {
-    const connectorPath = path.join(__dirname, 'server', 'onchainConnector.ts');
-    
-    const connectorCode = `/**
- * On-Chain Program Connector
- * 
- * Provides direct integration with deployed Solana programs
- * for transformers and trading strategies.
+ * This script integrates your deployed Solana on-chain programs
+ * with the trading system for maximum performance and efficiency.
  */
 
 import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import { logger } from './logger';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+import * as readline from 'readline';
 
-// Program addresses from configuration
-let PROGRAM_ADDRESSES: Record<string, string> = {};
+// Load environment variables
+dotenv.config({ path: '.env.trading' });
 
-// Load program addresses from config
-try {
-  const configPath = path.join(__dirname, '..', 'data', 'onchain-programs.json');
-  if (fs.existsSync(configPath)) {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    PROGRAM_ADDRESSES = Object.fromEntries(
-      config.programs.map((p: any) => [p.name, p.address])
-    );
-    logger.info(\`[OnChainConnector] Loaded \${Object.keys(PROGRAM_ADDRESSES).length} program addresses\`);
-  } else {
-    logger.warn('[OnChainConnector] Program config not found, using defaults');
-    PROGRAM_ADDRESSES = {
-      HYPERION_FLASH_LOAN: 'HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa',
-      QUANTUM_VAULT: 'QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL',
-      MEMECORTEX: 'MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV', 
-      SINGULARITY_BRIDGE: 'SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H',
-      NEXUS_ENGINE: 'NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx'
-    };
-  }
-} catch (error) {
-  logger.error('[OnChainConnector] Error loading program addresses:', error);
-  // Default addresses in case of error
-  PROGRAM_ADDRESSES = {
-    HYPERION_FLASH_LOAN: 'HPRNAUMsdRs7XG9UBKtLwkuZbh4VJzXbsR5kPbK7ZwTa',
-    QUANTUM_VAULT: 'QVKTLwksMPTt5fQVhNPak3xYpYQNXDPrLKAxZBMTK2VL',
-    MEMECORTEX: 'MECRSRB4mQM5GpHcZKVCwvydaQn7YZ7WZPzw3G1nssrV',
-    SINGULARITY_BRIDGE: 'SNG4ARty417DcPNTQUvGBXVKPbLTzBq1XmMsJQQFC81H',
-    NEXUS_ENGINE: 'NEXSa876vaGCt8jz4Qsqdx6ZrWNUZM7JDEHvTb6im1Jx'
-  };
-}
+// Constants
+const WALLET_ADDRESS = process.env.WALLET_ADDRESS || 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
+const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
+const SYNDICA_URL = `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
-// IDL cache
-const idlCache = new Map<string, any>();
+// Create connection to Solana
+const connection = new Connection(SYNDICA_URL, 'confirmed');
 
-/**
- * On-Chain Program Connector class
- */
-export class OnChainConnector {
-  private connection: Connection;
-  private wallet: Keypair | null = null;
-  
-  /**
-   * Constructor
-   * @param rpcUrl Solana RPC URL
-   */
-  constructor(rpcUrl: string) {
-    this.connection = new Connection(rpcUrl, 'confirmed');
-    this.loadWallet();
-    logger.info(\`[OnChainConnector] Initialized with RPC URL: \${rpcUrl}\`);
-  }
-  
-  /**
-   * Load wallet for transaction signing
-   */
-  private loadWallet(): void {
-    try {
-      const walletPath = path.join(__dirname, '..', 'wallet.json');
-      
-      if (fs.existsSync(walletPath)) {
-        const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
-        const secretKey = new Uint8Array(walletData);
-        this.wallet = Keypair.fromSecretKey(secretKey);
-        logger.info(\`[OnChainConnector] Loaded wallet: \${this.wallet.publicKey.toString()}\`);
-      } else {
-        logger.error('[OnChainConnector] Wallet file not found');
-      }
-    } catch (error) {
-      logger.error('[OnChainConnector] Error loading wallet:', error);
-    }
-  }
-  
-  /**
-   * Get program pubkey
-   * @param programName Program name
-   * @returns Program public key
-   */
-  public getProgramId(programName: string): PublicKey | null {
-    try {
-      const address = PROGRAM_ADDRESSES[programName];
-      if (!address) {
-        logger.warn(\`[OnChainConnector] Program \${programName} not found\`);
-        return null;
-      }
-      
-      return new PublicKey(address);
-    } catch (error) {
-      logger.error(\`[OnChainConnector] Invalid program address for \${programName}:\`, error);
-      return null;
-    }
-  }
-  
-  /**
-   * Load IDL for a program
-   * @param programName Program name
-   * @returns Program IDL
-   */
-  public async loadIdl(programName: string): Promise<any | null> {
-    // Check cache first
-    if (idlCache.has(programName)) {
-      return idlCache.get(programName);
-    }
-    
-    try {
-      const idlPath = path.join(__dirname, '..', 'data', 'idl', \`\${programName.toLowerCase()}.json\`);
-      
-      if (fs.existsSync(idlPath)) {
-        const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
-        idlCache.set(programName, idl);
-        return idl;
-      } else {
-        logger.warn(\`[OnChainConnector] IDL for \${programName} not found\`);
-        return null;
-      }
-    } catch (error) {
-      logger.error(\`[OnChainConnector] Error loading IDL for \${programName}:\`, error);
-      return null;
-    }
-  }
-  
-  /**
-   * Verify connection to a program
-   * @param programName Program name
-   * @returns Whether connection is valid
-   */
-  public async verifyProgramConnection(programName: string): Promise<boolean> {
-    const programId = this.getProgramId(programName);
-    
-    if (!programId) {
-      return false;
-    }
-    
-    try {
-      const accountInfo = await this.connection.getAccountInfo(programId);
-      
-      if (!accountInfo) {
-        logger.error(\`[OnChainConnector] Program \${programName} not found on-chain\`);
-        return false;
-      }
-      
-      if (!accountInfo.executable) {
-        logger.error(\`[OnChainConnector] Program \${programName} is not executable\`);
-        return false;
-      }
-      
-      logger.info(\`[OnChainConnector] Successfully verified program \${programName}\`);
-      return true;
-    } catch (error) {
-      logger.error(\`[OnChainConnector] Error verifying program \${programName}:\`, error);
-      return false;
-    }
-  }
-  
-  /**
-   * Execute a program instruction
-   * @param programName Program name
-   * @param instructionData Instruction data
-   * @returns Transaction signature
-   */
-  public async executeProgramInstruction(
-    programName: string,
-    instructionData: Buffer
-  ): Promise<string | null> {
-    const programId = this.getProgramId(programName);
-    
-    if (!programId || !this.wallet) {
-      return null;
-    }
-    
-    try {
-      // Create transaction
-      const transaction = new Transaction();
-      
-      // Add instruction
-      transaction.add({
-        keys: [
-          {
-            pubkey: this.wallet.publicKey,
-            isSigner: true,
-            isWritable: true
-          }
-        ],
-        programId,
-        data: instructionData
-      });
-      
-      // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = this.wallet.publicKey;
-      
-      // Sign and send transaction
-      transaction.sign(this.wallet);
-      const signature = await this.connection.sendRawTransaction(transaction.serialize());
-      
-      // Confirm transaction
-      const confirmation = await this.connection.confirmTransaction(signature);
-      
-      if (confirmation.value.err) {
-        logger.error(\`[OnChainConnector] Transaction failed: \${JSON.stringify(confirmation.value.err)}\`);
-        return null;
-      }
-      
-      logger.info(\`[OnChainConnector] Successfully executed \${programName} instruction: \${signature}\`);
-      return signature;
-    } catch (error) {
-      logger.error(\`[OnChainConnector] Error executing \${programName} instruction:\`, error);
-      return null;
-    }
-  }
-}
-
-// Create singleton instance
-let onChainConnector: OnChainConnector | null = null;
-
-/**
- * Get the on-chain connector instance
- * @param rpcUrl RPC URL (optional, uses default if not provided)
- * @returns On-chain connector instance
- */
-export function getOnChainConnector(rpcUrl?: string): OnChainConnector {
-  if (!onChainConnector) {
-    const defaultRpcUrl = 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9';
-    onChainConnector = new OnChainConnector(rpcUrl || defaultRpcUrl);
-  }
-  
-  return onChainConnector;
-}
-
-// Transformer integration helpers
-export const transformerHelpers = {
-  /**
-   * Execute MemeCortex prediction
-   * @param tokenAddress Token address
-   * @param timeframeMinutes Timeframe in minutes
-   * @returns Prediction data
-   */
-  async executeMemePredictor(tokenAddress: string, timeframeMinutes: number): Promise<any> {
-    const connector = getOnChainConnector();
-    
-    try {
-      // Prepare instruction data
-      const instructionData = Buffer.from(
-        JSON.stringify({
-          action: 'predict',
-          token: tokenAddress,
-          timeframe: timeframeMinutes
-        })
-      );
-      
-      const signature = await connector.executeProgramInstruction(
-        'MEMECORTEX',
-        instructionData
-      );
-      
-      if (!signature) {
-        logger.warn('[OnChainConnector] Failed to execute MEMECORTEX prediction');
-        return null;
-      }
-      
-      // Simulated response for development
-      return {
-        tokenAddress,
-        prediction: 'bullish',
-        confidence: 0.87,
-        timeframe: timeframeMinutes,
-        signature
-      };
-    } catch (error) {
-      logger.error('[OnChainConnector] Error executing MEMECORTEX prediction:', error);
-      return null;
-    }
-  },
-  
-  /**
-   * Execute Hyperion flash loan arbitrage
-   * @param sourceToken Source token
-   * @param targetToken Target token
-   * @param amount Amount
-   * @returns Transaction result
-   */
-  async executeFlashArbitrage(sourceToken: string, targetToken: string, amount: number): Promise<any> {
-    const connector = getOnChainConnector();
-    
-    try {
-      // Prepare instruction data
-      const instructionData = Buffer.from(
-        JSON.stringify({
-          action: 'flashArbitrage',
-          sourceToken,
-          targetToken,
-          amount
-        })
-      );
-      
-      const signature = await connector.executeProgramInstruction(
-        'HYPERION_FLASH_LOAN',
-        instructionData
-      );
-      
-      if (!signature) {
-        logger.warn('[OnChainConnector] Failed to execute HYPERION_FLASH_LOAN arbitrage');
-        return null;
-      }
-      
-      // Simulated response for development
-      return {
-        sourceToken,
-        targetToken,
-        amount,
-        profit: amount * 0.05, // 5% profit
-        signature
-      };
-    } catch (error) {
-      logger.error('[OnChainConnector] Error executing HYPERION_FLASH_LOAN arbitrage:', error);
-      return null;
-    }
-  }
+// User on-chain program IDs
+type ProgramConfig = {
+  programId: string;
+  name: string;
+  description: string;
+  type: 'flash-loan' | 'arbitrage' | 'mev' | 'temporal' | 'nuclear';
+  initialized: boolean;
 };
+
+// Default on-chain programs to integrate
+const DEFAULT_PROGRAMS: ProgramConfig[] = [
+  {
+    programId: 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH',
+    name: 'FlashLoanArbitrageProgram',
+    description: 'Flash loan arbitrage execution program',
+    type: 'flash-loan',
+    initialized: false
+  },
+  {
+    programId: 'HZEhoqiR9EQpaiTLzdXZLQ2m5ksJMNLj6NHgT4PmXmX9',
+    name: 'TemporalBlockArbitrageProgram',
+    description: 'Temporal block arbitrage execution program',
+    type: 'temporal',
+    initialized: false
+  },
+  {
+    programId: 'NucLearMoNeyG1iTchPr0GraM6DCxHW2ePSyhNG1nLd',
+    name: 'NuclearMoneyGlitchProgram',
+    description: 'Nuclear money glitch execution program',
+    type: 'nuclear',
+    initialized: false
+  },
+  {
+    programId: 'MEVpRotecTionZqsNsQVuqXNS4mLovmjARi9ZVjzAF',
+    name: 'MevProtectionProgram',
+    description: 'MEV protection execution program',
+    type: 'mev',
+    initialized: false
+  },
+  {
+    programId: 'ZeR0CaPita1F1ASHxtrdr7MJ9zWF1dTCJP9NuHsKYs2',
+    name: 'ZeroCapitalFlashProgram',
+    description: 'Zero capital flash execution program',
+    type: 'flash-loan',
+    initialized: false
+  }
+];
+
+/**
+ * Log message with timestamp
+ */
+function log(message: string, type: 'info' | 'success' | 'warn' | 'error' = 'info'): void {
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}]`;
+  
+  switch (type) {
+    case 'info':
+      console.log(`${prefix} ${message}`);
+      break;
+    case 'success':
+      console.log(`${prefix} ✅ ${message}`);
+      break;
+    case 'warn':
+      console.warn(`${prefix} ⚠️ ${message}`);
+      break;
+    case 'error':
+      console.error(`${prefix} ❌ ${message}`);
+      break;
+  }
+}
+
+/**
+ * Check if a program exists on-chain
+ */
+async function checkProgramExists(programId: string): Promise<boolean> {
+  try {
+    const pubkey = new PublicKey(programId);
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    return accountInfo !== null && accountInfo.executable;
+  } catch (error) {
+    log(`Error checking program ${programId}: ${error}`, 'error');
+    return false;
+  }
+}
+
+/**
+ * Ask user for program IDs to integrate
+ */
+async function askForProgramIds(): Promise<ProgramConfig[]> {
+  console.log('\n=== ON-CHAIN PROGRAM INTEGRATION ===');
+  console.log('Please provide the program IDs of your on-chain programs to integrate.');
+  console.log('Press Enter to use default values or "none" to skip.');
+  
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  
+  const programs: ProgramConfig[] = [];
+  
+  // Ask for flash loan program ID
+  let flashLoanId = await new Promise<string>((resolve) => {
+    rl.question('\nFlash Loan Program ID (default: FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH): ', (answer) => {
+      resolve(answer.trim() || 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH');
+    });
+  });
+  
+  if (flashLoanId.toLowerCase() !== 'none') {
+    programs.push({
+      programId: flashLoanId,
+      name: 'FlashLoanArbitrageProgram',
+      description: 'Flash loan arbitrage execution program',
+      type: 'flash-loan',
+      initialized: false
+    });
+  }
+  
+  // Ask for temporal block program ID
+  let temporalId = await new Promise<string>((resolve) => {
+    rl.question('\nTemporal Block Program ID (default: HZEhoqiR9EQpaiTLzdXZLQ2m5ksJMNLj6NHgT4PmXmX9): ', (answer) => {
+      resolve(answer.trim() || 'HZEhoqiR9EQpaiTLzdXZLQ2m5ksJMNLj6NHgT4PmXmX9');
+    });
+  });
+  
+  if (temporalId.toLowerCase() !== 'none') {
+    programs.push({
+      programId: temporalId,
+      name: 'TemporalBlockArbitrageProgram',
+      description: 'Temporal block arbitrage execution program',
+      type: 'temporal',
+      initialized: false
+    });
+  }
+  
+  // Ask for nuclear program ID
+  let nuclearId = await new Promise<string>((resolve) => {
+    rl.question('\nNuclear Money Glitch Program ID (default: NucLearMoNeyG1iTchPr0GraM6DCxHW2ePSyhNG1nLd): ', (answer) => {
+      resolve(answer.trim() || 'NucLearMoNeyG1iTchPr0GraM6DCxHW2ePSyhNG1nLd');
+    });
+  });
+  
+  if (nuclearId.toLowerCase() !== 'none') {
+    programs.push({
+      programId: nuclearId,
+      name: 'NuclearMoneyGlitchProgram',
+      description: 'Nuclear money glitch execution program',
+      type: 'nuclear',
+      initialized: false
+    });
+  }
+  
+  // Ask for MEV protection program ID
+  let mevId = await new Promise<string>((resolve) => {
+    rl.question('\nMEV Protection Program ID (default: MEVpRotecTionZqsNsQVuqXNS4mLovmjARi9ZVjzAF): ', (answer) => {
+      resolve(answer.trim() || 'MEVpRotecTionZqsNsQVuqXNS4mLovmjARi9ZVjzAF');
+    });
+  });
+  
+  if (mevId.toLowerCase() !== 'none') {
+    programs.push({
+      programId: mevId,
+      name: 'MevProtectionProgram',
+      description: 'MEV protection execution program',
+      type: 'mev',
+      initialized: false
+    });
+  }
+  
+  // Ask for Zero Capital program ID
+  let zeroCapId = await new Promise<string>((resolve) => {
+    rl.question('\nZero Capital Flash Program ID (default: ZeR0CaPita1F1ASHxtrdr7MJ9zWF1dTCJP9NuHsKYs2): ', (answer) => {
+      resolve(answer.trim() || 'ZeR0CaPita1F1ASHxtrdr7MJ9zWF1dTCJP9NuHsKYs2');
+    });
+  });
+  
+  if (zeroCapId.toLowerCase() !== 'none') {
+    programs.push({
+      programId: zeroCapId,
+      name: 'ZeroCapitalFlashProgram',
+      description: 'Zero capital flash execution program',
+      type: 'flash-loan',
+      initialized: false
+    });
+  }
+  
+  // Ask for any additional program IDs
+  let additionalId = await new Promise<string>((resolve) => {
+    rl.question('\nAny additional Program ID (or press Enter to skip): ', (answer) => {
+      resolve(answer.trim());
+    });
+  });
+  
+  if (additionalId && additionalId.toLowerCase() !== 'none') {
+    let additionalName = await new Promise<string>((resolve) => {
+      rl.question('Name for this program: ', (answer) => {
+        resolve(answer.trim() || 'CustomProgram');
+      });
+    });
+    
+    let additionalType = await new Promise<string>((resolve) => {
+      rl.question('Type (flash-loan, arbitrage, mev, temporal, nuclear): ', (answer) => {
+        resolve(answer.trim() || 'arbitrage');
+      });
+    });
+    
+    programs.push({
+      programId: additionalId,
+      name: additionalName,
+      description: 'Custom on-chain program',
+      type: additionalType as any,
+      initialized: false
+    });
+  }
+  
+  rl.close();
+  return programs;
+}
+
+/**
+ * Verify programs on-chain
+ */
+async function verifyPrograms(programs: ProgramConfig[]): Promise<ProgramConfig[]> {
+  log('Verifying on-chain programs...');
+  
+  const verifiedPrograms: ProgramConfig[] = [];
+  
+  for (const program of programs) {
+    const exists = await checkProgramExists(program.programId);
+    if (exists) {
+      log(`Program ${program.name} (${program.programId}) exists on-chain`, 'success');
+      verifiedPrograms.push({
+        ...program,
+        initialized: true
+      });
+    } else {
+      log(`Program ${program.name} (${program.programId}) not found on-chain or is not executable`, 'warn');
+    }
+  }
+  
+  return verifiedPrograms;
+}
+
+/**
+ * Update strategy configurations with on-chain programs
+ */
+function updateStrategyConfigs(programs: ProgramConfig[]): boolean {
+  try {
+    log('Updating strategy configurations with on-chain programs...');
+    
+    const configDir = path.join(process.cwd(), 'config');
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // Map of strategy files to update
+    const strategyFiles = {
+      'flash-loan': ['nuclear-flash-loan-strategy.json', 'flash-loan-strategy.json'],
+      'temporal': ['temporal-block-strategy.json'],
+      'nuclear': ['ultimate-nuclear-money-strategy.json'],
+      'mev': ['mev-protection-flash-strategy.json'],
+      'arbitrage': ['layered-megalodon-strategy.json']
+    };
+    
+    // Update each strategy with matching program
+    for (const program of programs) {
+      const files = strategyFiles[program.type];
+      if (!files || !program.initialized) continue;
+      
+      for (const file of files) {
+        const configPath = path.join(configDir, file);
+        if (!fs.existsSync(configPath)) continue;
+        
+        // Read and update config
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        config.onChainProgram = {
+          programId: program.programId,
+          name: program.name,
+          description: program.description,
+          enabled: true,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Add on-chain execution settings
+        config.useOnChainExecution = true;
+        config.onChainExecutionPriority = 10;
+        config.simulateOnChainBeforeExecution = true;
+        
+        // Write updated config
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        log(`Updated ${file} with on-chain program ${program.name}`, 'success');
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    log(`Error updating strategy configurations: ${error}`, 'error');
+    return false;
+  }
+}
+
+/**
+ * Update system configuration with on-chain program integrations
+ */
+function updateSystemConfig(programs: ProgramConfig[]): boolean {
+  try {
+    log('Updating system configuration with on-chain programs...');
+    
+    const configDir = path.join(process.cwd(), 'config');
+    const systemConfigPath = path.join(configDir, 'system-config.json');
+    
+    // Read existing config if it exists
+    let systemConfig: any = {};
+    if (fs.existsSync(systemConfigPath)) {
+      systemConfig = JSON.parse(fs.readFileSync(systemConfigPath, 'utf8'));
+    }
+    
+    // Update or add on-chain programs section
+    systemConfig.onChainPrograms = programs.filter(p => p.initialized).map(p => ({
+      programId: p.programId,
+      name: p.name,
+      description: p.description,
+      type: p.type,
+      enabled: true
+    }));
+    
+    // Update features to include on-chain execution
+    if (!systemConfig.features) {
+      systemConfig.features = {};
+    }
+    
+    systemConfig.features.useOnChainPrograms = true;
+    systemConfig.features.preferOnChainExecution = true;
+    systemConfig.features.simulateOnChainBeforeExecution = true;
+    systemConfig.features.onChainExecutionPriority = 10;
+    
+    systemConfig.lastUpdated = new Date().toISOString();
+    
+    // Save updated config
+    fs.writeFileSync(systemConfigPath, JSON.stringify(systemConfig, null, 2));
+    
+    // Update .env.trading file
+    const envPath = path.join(process.cwd(), '.env.trading');
+    let envContent = '';
+    
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    }
+    
+    // Required settings
+    const settings: Record<string, string> = {
+      'USE_ONCHAIN_PROGRAMS': 'true',
+      'ONCHAIN_PROGRAMS_ENABLED': 'true',
+      'PREFER_ONCHAIN_EXECUTION': 'true'
+    };
+    
+    // Add program IDs to env file
+    programs.filter(p => p.initialized).forEach((program, index) => {
+      settings[`ONCHAIN_PROGRAM_${index + 1}_ID`] = program.programId;
+      settings[`ONCHAIN_PROGRAM_${index + 1}_TYPE`] = program.type;
+    });
+    
+    // Update each setting
+    for (const [key, value] of Object.entries(settings)) {
+      if (!envContent.includes(`${key}=`)) {
+        envContent += `${key}=${value}\n`;
+      } else {
+        envContent = envContent.replace(
+          new RegExp(`${key}=.*`, 'g'),
+          `${key}=${value}`
+        );
+      }
+    }
+    
+    // Save the updated env file
+    fs.writeFileSync(envPath, envContent);
+    
+    log('System configuration updated with on-chain programs', 'success');
+    return true;
+  } catch (error) {
+    log(`Error updating system configuration: ${error}`, 'error');
+    return false;
+  }
+}
+
+/**
+ * Create on-chain program integration file
+ */
+function createOnChainIntegrationFile(programs: ProgramConfig[]): boolean {
+  try {
+    log('Creating on-chain program integration file...');
+    
+    const srcDir = path.join(process.cwd(), 'src');
+    if (!fs.existsSync(srcDir)) {
+      fs.mkdirSync(srcDir, { recursive: true });
+    }
+    
+    const integrationPath = path.join(srcDir, 'onchain-program-integration.ts');
+    
+    const integrationContent = `/**
+ * On-Chain Program Integration
+ * 
+ * This file integrates on-chain Solana programs with the trading system.
+ * Generated automatically by integrate-onchain-programs.ts
+ */
+
+import { Connection, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+
+// On-chain program configurations
+export const ONCHAIN_PROGRAMS = [
+${programs.filter(p => p.initialized).map(p => `  {
+    programId: new PublicKey('${p.programId}'),
+    name: '${p.name}',
+    description: '${p.description}',
+    type: '${p.type}',
+    enabled: true
+  }`).join(',\n')}
+];
+
+/**
+ * Create a transaction instruction for the specified on-chain program
+ */
+export async function createProgramInstruction(
+  connection: Connection,
+  programId: string,
+  data: Buffer,
+  accounts: PublicKey[],
+  feePayer: PublicKey
+): Promise<TransactionInstruction> {
+  // Find the program
+  const program = ONCHAIN_PROGRAMS.find(p => p.programId.toBase58() === programId);
+  if (!program) {
+    throw new Error(\`Program \${programId} not found in on-chain programs\`);
+  }
+  
+  // Create instruction keys
+  const keys = accounts.map((pubkey, index) => ({
+    pubkey,
+    isSigner: index === 0, // First account is usually the signer
+    isWritable: index !== accounts.length - 1 // All accounts except last are usually writable
+  }));
+  
+  // Create and return instruction
+  return new TransactionInstruction({
+    programId: program.programId,
+    keys,
+    data
+  });
+}
+
+/**
+ * Execute a transaction using an on-chain program
+ */
+export async function executeOnChainTransaction(
+  connection: Connection,
+  instruction: TransactionInstruction,
+  signers: any[],
+  options: any = {}
+): Promise<string> {
+  // Create transaction
+  const transaction = new Transaction();
+  transaction.add(instruction);
+  
+  // Get recent blockhash
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = signers[0].publicKey;
+  
+  // Sign transaction
+  transaction.sign(...signers);
+  
+  // Send and confirm transaction
+  return await connection.sendRawTransaction(transaction.serialize(), options);
+}
 `;
     
-    fs.writeFileSync(connectorPath, connectorCode);
-    console.log('✅ Created on-chain program connector module');
+    fs.writeFileSync(integrationPath, integrationContent);
+    log('Created on-chain program integration file', 'success');
+    return true;
   } catch (error) {
-    console.error(`❌ Failed to create program connector: ${error.message}`);
+    log(`Error creating on-chain program integration file: ${error}`, 'error');
+    return false;
   }
 }
 
 /**
- * Update nexus engine to integrate on-chain programs
+ * Main function
  */
-function updateNexusEngine(): void {
+async function main() {
+  console.log('=== ON-CHAIN PROGRAM INTEGRATION ===');
+  console.log(`Current Time: ${new Date().toISOString()}`);
+  console.log(`Wallet Address: ${WALLET_ADDRESS}`);
+  
   try {
-    const nexusConfigPath = path.join(__dirname, 'data', 'nexus-config.json');
-    const nexusConfig = {
-      useOnChainPrograms: true,
-      programs: PROGRAM_ADDRESSES,
-      useHardwareAcceleration: true,
-      executeDirectly: true,
-      updatedAt: new Date().toISOString()
-    };
+    // Ask for program IDs
+    const programs = await askForProgramIds();
     
-    fs.writeFileSync(nexusConfigPath, JSON.stringify(nexusConfig, null, 2));
-    console.log('✅ Updated Nexus engine configuration for on-chain integration');
-  } catch (error) {
-    console.error(`❌ Failed to update Nexus engine: ${error.message}`);
-  }
-}
-
-/**
- * Update transformer modules to use on-chain programs
- */
-function updateTransformerImplementation(): void {
-  try {
-    const integrationPath = path.join(__dirname, 'server', 'transformers', 'onchainIntegration.ts');
+    // Verify programs
+    const verifiedPrograms = await verifyPrograms(programs);
     
-    // Create directory if it doesn't exist
-    const dir = path.dirname(integrationPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (verifiedPrograms.length === 0) {
+      log('No valid on-chain programs found. Please check your program IDs.', 'error');
+      return;
     }
     
-    const integrationCode = `/**
- * Transformer On-Chain Program Integration
- * 
- * Provides integrations between transformers and on-chain programs
- */
-
-import { logger } from '../logger';
-import { getOnChainConnector, transformerHelpers } from '../onchainConnector';
-
-/**
- * Initialize on-chain program integrations for transformers
- */
-export async function initializeOnChainIntegration(): Promise<boolean> {
-  logger.info('[Transformers] Initializing on-chain program integration');
-  
-  const connector = getOnChainConnector();
-  
-  // Verify connections to all programs
-  const verificationResults = await Promise.all([
-    connector.verifyProgramConnection('HYPERION_FLASH_LOAN'),
-    connector.verifyProgramConnection('MEMECORTEX'),
-    connector.verifyProgramConnection('QUANTUM_VAULT'),
-    connector.verifyProgramConnection('SINGULARITY_BRIDGE')
-  ]);
-  
-  const succeededCount = verificationResults.filter(Boolean).length;
-  const totalCount = verificationResults.length;
-  
-  logger.info(\`[Transformers] Verified \${succeededCount}/${totalCount} on-chain programs\`);
-  
-  // Load IDLs for all programs
-  await Promise.all([
-    connector.loadIdl('HYPERION_FLASH_LOAN'),
-    connector.loadIdl('MEMECORTEX'),
-    connector.loadIdl('QUANTUM_VAULT'),
-    connector.loadIdl('SINGULARITY_BRIDGE')
-  ]);
-  
-  logger.info('[Transformers] On-chain program integration initialized');
-  
-  return succeededCount > 0;
-}
-
-/**
- * Get helper functions for transformers
- */
-export function getOnChainHelpers() {
-  return transformerHelpers;
-}`;
+    // Update strategy configurations
+    updateStrategyConfigs(verifiedPrograms);
     
-    fs.writeFileSync(integrationPath, integrationCode);
-    console.log('✅ Created transformer on-chain integration module');
+    // Update system configuration
+    updateSystemConfig(verifiedPrograms);
+    
+    // Create on-chain program integration file
+    createOnChainIntegrationFile(verifiedPrograms);
+    
+    console.log('\n=== ON-CHAIN PROGRAM INTEGRATION COMPLETE ===');
+    console.log(`Integrated ${verifiedPrograms.filter(p => p.initialized).length} on-chain programs:`);
+    
+    verifiedPrograms.filter(p => p.initialized).forEach(program => {
+      console.log(`- ${program.name} (${program.programId}) - ${program.type}`);
+    });
+    
+    console.log('\nYour trading system will now use these on-chain programs for execution.');
+    console.log('To start trading with on-chain program integration:');
+    console.log('1. For standard trading: bash launch-trading.sh');
+    console.log('2. For nuclear trading: bash launch-nuclear-trading.sh');
   } catch (error) {
-    console.error(`❌ Failed to update transformer implementation: ${error.message}`);
+    console.error('Error integrating on-chain programs:', error);
   }
 }
 
-/**
- * Integrate on-chain programs with the system
- */
-async function integrateOnChainPrograms(): Promise<void> {
-  console.log('=============================================');
-  console.log('🔄 INTEGRATING ON-CHAIN PROGRAMS');
-  console.log('=============================================\n');
-  
-  // Create program configuration
-  console.log('Creating program configuration...');
-  createProgramConfig();
-  
-  // Update transformer configuration
-  console.log('Updating transformer configuration...');
-  updateTransformerConfig();
-  
-  // Create Anchor interfaces
-  console.log('Creating Anchor IDL interfaces...');
-  createAnchorInterfaces();
-  
-  // Create program connector
-  console.log('Creating on-chain program connector...');
-  createProgramConnector();
-  
-  // Update Nexus engine
-  console.log('Updating Nexus engine for on-chain execution...');
-  updateNexusEngine();
-  
-  // Update transformer implementation
-  console.log('Updating transformer implementation...');
-  updateTransformerImplementation();
-  
-  console.log('\n✅ SUCCESSFULLY INTEGRATED ON-CHAIN PROGRAMS WITH:');
-  console.log('- Transformers (MemeCortexRemix, Security, CrossChain, MicroQHC)');
-  console.log('- Nexus execution engine');
-  console.log('- Anchor program interfaces');
-  
-  console.log(`\n✅ System is now using YOUR on-chain programs for all operations`);
-  console.log(`✅ Trading system enhanced with direct blockchain execution`);
-  console.log('=============================================');
-}
-
-// Run the integration process
-integrateOnChainPrograms().catch(error => {
-  console.error(`Failed to integrate on-chain programs: ${error.message}`);
-});
+// Run the main function
+main();
