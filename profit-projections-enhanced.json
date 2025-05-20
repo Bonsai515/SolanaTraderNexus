@@ -1,0 +1,15 @@
+{
+  "baseProfit": {
+    "daily": 1.347402,
+    "monthly": 40.42206,
+    "yearly": 491.80173
+  },
+  "enhancedProfit": {
+    "daily": 1.85941476,
+    "monthly": 55.7824428,
+    "yearly": 678.6863874
+  },
+  "solPriceUSD": 150,
+  "enhancementFactor": 1.38,
+  "timestamp": 1747749960659
+}
