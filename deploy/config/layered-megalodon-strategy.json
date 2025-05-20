@@ -1,0 +1,46 @@
+{
+  "name": "Layered Megalodon Prime",
+  "enabled": true,
+  "priority": 8,
+  "expectedProfitPercent": 1.85,
+  "maxPositionSizePercent": 15,
+  "minProfitThresholdPercent": 0.2,
+  "maxSlippageBps": 50,
+  "maxActiveLayers": 3,
+  "rpcProvider": "syndica",
+  "transformerProvider": "alchemy",
+  "tokens": [
+    "SOL",
+    "USDC",
+    "ETH",
+    "BONK",
+    "JUP",
+    "RAY"
+  ],
+  "exchanges": [
+    "Jupiter",
+    "Raydium",
+    "Orca"
+  ],
+  "layers": [
+    "spot-arbitrage",
+    "meme-momentum",
+    "liquidation-frontrun"
+  ],
+  "riskLevel": "medium",
+  "layerPriorities": [
+    10,
+    8,
+    6
+  ],
+  "neuralOptimization": true,
+  "adaptiveWeights": true,
+  "rebalanceInterval": 60,
+  "gasOptimization": true,
+  "priorityFeeInLamports": 250000,
+  "simulateBeforeExecution": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "submitTransactions": true,
+  "logLevel": "info",
+  "lastUpdated": "2025-05-19T18:47:29.455Z"
+}

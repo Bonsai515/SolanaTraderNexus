@@ -1,0 +1,17 @@
+{
+  "maxPositionSizePercent": 30,
+  "timeoutMs": 35000,
+  "targetedTokens": [
+    "SOL",
+    "USDC",
+    "USDT",
+    "ETH",
+    "BTC",
+    "RAY",
+    "BONK",
+    "JUP"
+  ],
+  "profitSplitPercent": 95,
+  "checkIntervalMs": 4500,
+  "minTimeBetweenTradesMs": 330000
+}

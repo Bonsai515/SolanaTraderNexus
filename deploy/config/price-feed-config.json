@@ -1,0 +1,60 @@
+{
+  "useCustomizedFeed": true,
+  "customFeed": {
+    "enabled": true,
+    "configPath": "./src/price-feed-integration.ts",
+    "refreshIntervalMs": 5000,
+    "priorityTokens": [
+      "USDC",
+      "USDT",
+      "SOL",
+      "ETH",
+      "BTC",
+      "USTv2",
+      "BUSD",
+      "DAI",
+      "FRAX",
+      "USDH"
+    ]
+  },
+  "fallbacks": [
+    {
+      "provider": "jupiter",
+      "refreshIntervalMs": 10000
+    },
+    {
+      "provider": "pyth",
+      "refreshIntervalMs": 5000
+    }
+  ],
+  "enhancedSettings": {
+    "sourceRotation": true,
+    "exponentialBackoff": true,
+    "circuitBreakers": true,
+    "prioritizedPairs": [
+      "USDC/USDT",
+      "SOL/USDC",
+      "ETH/USDC",
+      "BTC/USDC"
+    ],
+    "spreadDetectionThresholds": {
+      "stablecoin": 0.01,
+      "major": 0.03,
+      "other": 0.05
+    }
+  },
+  "caching": {
+    "enabled": true,
+    "maxAgeMs": 30000,
+    "priorityPairsMaxAgeMs": 5000
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "trackingWindowMs": 60000,
+    "maxRequestsPerWindow": {
+      "jupiter": 500,
+      "pyth": 1000,
+      "custom": 2000
+    }
+  }
+}

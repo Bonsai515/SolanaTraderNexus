@@ -1,0 +1,29 @@
+{
+  "rpcEndpoints": [
+    {
+      "url": "https://solana-api.syndica.io/rpc",
+      "priority": 1,
+      "weight": 10,
+      "rateLimit": { "requestsPerMinute": 200 }
+    },
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "priority": 3,
+      "weight": 1,
+      "rateLimit": { "requestsPerMinute": 40 }
+    },
+    {
+      "url": "https://solana-api.projectserum.com",
+      "priority": 3,
+      "weight": 1,
+      "rateLimit": { "requestsPerMinute": 40 }
+    }
+  ],
+  "caching": {
+    "enabled": true,
+    "defaultTtlMs": 30000
+  },
+  "rateLimiting": {
+    "enabled": true
+  }
+}

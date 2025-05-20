@@ -1,0 +1,40 @@
+{
+  "enabled": true,
+  "priority": 1,
+  "refreshInterval": 30000,
+  "cacheTime": 120000,
+  "retryAttempts": 3,
+  "retryDelay": 1000,
+  "endpoints": [
+    {
+      "name": "main",
+      "url": "https://price.jup.ag/v4/price",
+      "priority": 1
+    },
+    {
+      "name": "cache",
+      "url": "https://cache.jup.ag/v4/price",
+      "priority": 2
+    }
+  ],
+  "tokenList": [
+    "SOL",
+    "USDC",
+    "BONK",
+    "JUP",
+    "MSOL",
+    "ETH",
+    "RAY",
+    "MNGO",
+    "WIF"
+  ],
+  "fallbacks": [
+    {
+      "name": "jupiter-v3",
+      "url": "https://price.jup.ag/v3/price",
+      "priority": 3
+    }
+  ],
+  "adaptiveRateLimiting": true,
+  "lastUpdated": "2025-05-19T18:47:29.446Z"
+}

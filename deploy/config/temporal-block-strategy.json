@@ -1,0 +1,37 @@
+{
+  "name": "Temporal Block Arbitrage",
+  "enabled": true,
+  "priority": 10,
+  "expectedProfitPercent": 1.95,
+  "maxPositionSizePercent": 30,
+  "minProfitThresholdPercent": 0.2,
+  "maxSlippageBps": 50,
+  "maxActivePositions": 3,
+  "rpcProvider": "syndica",
+  "tokens": [
+    "SOL",
+    "USDC",
+    "ETH",
+    "BONK",
+    "JUP",
+    "RAY",
+    "SRM",
+    "MNGO"
+  ],
+  "exchanges": [
+    "Jupiter",
+    "Raydium",
+    "Orca"
+  ],
+  "riskLevel": "medium",
+  "blockConfirmations": 1,
+  "maxBlocksToAnalyze": 3,
+  "priorityFeeStrategy": "adaptive",
+  "gasOptimization": true,
+  "priorityFeeInLamports": 250000,
+  "simulateBeforeExecution": true,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "submitTransactions": true,
+  "logLevel": "info",
+  "lastUpdated": "2025-05-19T18:47:29.453Z"
+}

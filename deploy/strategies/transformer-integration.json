@@ -1,0 +1,26 @@
+{
+  "priceCacheEnabled": true,
+  "streamCacheEnabled": true,
+  "onChainProgramsIntegrated": [
+    "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "hFL7t5iAUiTroyWt385mGNbWGYim5Fj2jfXJ9D4AWN7"
+  ],
+  "aiAgentsAvailable": [
+    "PricePredictionAgent",
+    "StrategyCoordinatorAgent",
+    "VolatilityPredictionAgent",
+    "MarketSentimentAgent",
+    "VolumeAnalysisAgent",
+    "CorrelationAnalysisAgent"
+  ],
+  "transformerModelsAvailable": [
+    "price-transformer-v1",
+    "sentiment-transformer-v1",
+    "volume-transformer-v1",
+    "volatility-transformer-v1",
+    "correlation-transformer-v1"
+  ],
+  "estimatedProfitEnhancement": 0.38,
+  "integrationTimestamp": 1747773993757
+}
