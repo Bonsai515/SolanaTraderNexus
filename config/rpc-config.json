@@ -2,7 +2,14 @@
   "primaryProvider": "Syndica",
   "secondaryProvider": "Helius",
   "tertiaryProvider": "Triton",
-  "healthCheckIntervalMs": 45000,
+  "healthCheckIntervalMs": 60000,
   "maxConsecutiveFailures": 2,
-  "loadBalancingStrategy": "priority"
+  "loadBalancingStrategy": "priority",
+  "maxRequestsPerSecond": 120,
+  "retryDelayMs": 500,
+  "maxRetries": 3,
+  "optimizedBatchSize": 20,
+  "useBatchRequests": true,
+  "cacheTimeMs": 5000,
+  "requestTimeout": 30000
 }
