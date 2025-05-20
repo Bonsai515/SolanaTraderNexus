@@ -1,0 +1,86 @@
+{
+  "version": "2.1.0",
+  "primarySources": [
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 1,
+      "refreshIntervalMs": 250
+    },
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 2,
+      "refreshIntervalMs": 500
+    },
+    {
+      "name": "Orca",
+      "url": "https://api.orca.so",
+      "priority": 3,
+      "refreshIntervalMs": 500
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "Pyth",
+      "url": "https://api.pyth.network",
+      "priority": 1,
+      "refreshIntervalMs": 250
+    },
+    {
+      "name": "Switchboard",
+      "url": "https://api.switchboard.xyz",
+      "priority": 2,
+      "refreshIntervalMs": 500
+    }
+  ],
+  "specializedSources": [
+    {
+      "name": "SolendPrices",
+      "url": "https://api.solend.fi/v1/prices",
+      "priority": 1,
+      "refreshIntervalMs": 250
+    },
+    {
+      "name": "RaydiumSnapshot",
+      "url": "https://api.raydium.io/v2/main/pool",
+      "priority": 1,
+      "refreshIntervalMs": 500
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "SOL": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 200
+    },
+    "USDC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 200
+    },
+    "USDT": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 200
+    },
+    "ETH": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 250
+    },
+    "BTC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 250
+    },
+    "BONK": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "JUP": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    }
+  },
+  "backupStrategies": {
+    "failoverEnabled": true,
+    "rotationEnabled": true,
+    "cacheTimeMs": 10000
+  }
+}

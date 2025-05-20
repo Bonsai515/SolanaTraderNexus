@@ -1,0 +1,25 @@
+{
+  "parallelExecutionLimit": 2,
+  "priorityFeeTiers": {
+    "LOW": 10000,
+    "MEDIUM": 50000,
+    "HIGH": 100000,
+    "VERY_HIGH": 200000
+  },
+  "dynamicPriorityFeeEnabled": true,
+  "precomputePriorityFee": true,
+  "useLookupTables": false,
+  "retryPolicy": {
+    "maxRetries": 10,
+    "initialBackoffMs": 5000,
+    "maxBackoffMs": 60000,
+    "backoffMultiplier": 2
+  },
+  "rateLimit": {
+    "requestsPerMinute": 225,
+    "enabled": true,
+    "strictEnforcement": true,
+    "distributedEnforcement": true
+  },
+  "optimizedAt": "2025-05-16T03:00:19.978Z"
+}

@@ -1,0 +1,58 @@
+{
+  "priceFeed": {
+    "useCoinGecko": false,
+    "useEnhancedFeeds": true,
+    "useJupiter": true,
+    "useBirdeye": true,
+    "usePyth": true,
+    "registryPath": "./config/price-feed-registry.json",
+    "lastUpdated": "2025-05-18T01:44:58.245Z",
+    "version": "2.1.0",
+    "improvedRateLimitHandling": true,
+    "adaptiveRefresh": true,
+    "sourceRotation": true,
+    "exponentialBackoff": true,
+    "cacheFallback": true
+  },
+  "features": {
+    "enhancedPriceFeeds": true,
+    "coinGecko": false
+  },
+  "capital": {
+    "initialBalance": 0.097506,
+    "additionalCapital": 0.443410306,
+    "totalBalance": 0.540916306,
+    "lastUpdated": "2025-05-18T01:39:10.725Z",
+    "currency": "SOL"
+  },
+  "allocation": {
+    "quantumOmega": 25,
+    "quantumFlash": 35,
+    "zeroCapital": 15,
+    "hyperion": 25
+  },
+  "rpcOptimization": {
+    "enabled": true,
+    "version": "2.0.0",
+    "lastUpdated": "2025-05-18T01:54:28.739Z",
+    "features": {
+      "multiProvider": true,
+      "loadBalancing": true,
+      "rateLimitHandling": true,
+      "circuitBreaker": true,
+      "exponentialBackoff": true
+    }
+  },
+  "tradeOrchestration": {
+    "enabled": true,
+    "version": "1.0.0",
+    "lastUpdated": "2025-05-18T01:54:28.739Z",
+    "features": {
+      "queueing": true,
+      "prioritization": true,
+      "retries": true,
+      "delayedExecution": true,
+      "rateControls": true
+    }
+  }
+}

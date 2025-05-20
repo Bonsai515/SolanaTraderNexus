@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "minProfitThresholdBps": 50,
+  "maxSlippageBps": 50,
+  "targetProfitBps": 100,
+  "maxFeeInSol": 0.002,
+  "priorityFeeInLamports": 100000,
+  "rpcProvider": "helius",
+  "useRealFunds": true
+}

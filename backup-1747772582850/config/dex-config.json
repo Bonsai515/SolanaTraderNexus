@@ -1,0 +1,22 @@
+{
+  "jupiter": {
+    "enabled": true,
+    "apiEndpoint": "https://quote-api.jup.ag/v6",
+    "slippageBps": 50,
+    "feeBps": 0
+  },
+  "orca": {
+    "enabled": true,
+    "defaultSlippageBps": 50
+  },
+  "raydium": {
+    "enabled": true,
+    "defaultSlippageBps": 50
+  },
+  "prioritization": [
+    "jupiter",
+    "orca",
+    "raydium"
+  ],
+  "routingStrategy": "bestPrice"
+}

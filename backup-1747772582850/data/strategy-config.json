@@ -1,0 +1,18 @@
+{
+  "parallelExecution": false,
+  "asyncSignalProcessing": true,
+  "backgroundProcessing": true,
+  "maxStrategiesPerBlock": 1,
+  "signalBufferSize": 20,
+  "preemptivePositionSizing": true,
+  "smartOrderRouting": true,
+  "memoryBufferSizeMB": 256,
+  "throttling": {
+    "enabled": true,
+    "maxSignalsPerMinute": 10,
+    "maxExecutionsPerMinute": 3,
+    "minTimeBetweenSignalsMs": 6000,
+    "minTimeBetweenExecutionsMs": 20000
+  },
+  "optimizedAt": "2025-05-16T03:00:19.979Z"
+}

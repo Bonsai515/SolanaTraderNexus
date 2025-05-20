@@ -1,0 +1,33 @@
+{
+  "useRealFunds": true,
+  "rpcUrl": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "websocketUrl": "wss://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+  "defaultExecutionMode": "LIVE",
+  "defaultPriority": "HIGH",
+  "defaultConfirmations": 1,
+  "maxConcurrentTransactions": 1,
+  "defaultTimeoutMs": 300000,
+  "defaultMaxRetries": 20,
+  "maxSlippageBps": 100,
+  "mevProtection": true,
+  "backupRpcUrls": [
+    "https://api.mainnet-beta.solana.com"
+  ],
+  "wallet": {
+    "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "privateKeySet": false
+  },
+  "rateLimitSettings": {
+    "maxRequestsPerMinute": 60,
+    "maxRequestsPerSecond": 1,
+    "initialBackoffMs": 15000,
+    "maxBackoffMs": 300000,
+    "backoffMultiplier": 2,
+    "retryOnRateLimit": true,
+    "useTokenBucket": true,
+    "enforcePerConnection": true,
+    "delayBetweenTransactionsMs": 15000,
+    "useRateLimiterMiddleware": true
+  },
+  "lastUpdated": "2025-05-16T03:09:32.783Z"
+}

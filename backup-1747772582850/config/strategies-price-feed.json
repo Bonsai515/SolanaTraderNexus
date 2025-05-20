@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "strategies": {
+    "quantum-flash": {
+      "enabled": true,
+      "tokens": [
+        "SOL",
+        "USDC",
+        "USDT",
+        "ETH",
+        "BTC",
+        "JUP",
+        "BONK",
+        "WIF"
+      ],
+      "refreshIntervalMs": 1000,
+      "useCaching": true,
+      "requireMultipleSources": true,
+      "minSources": 2
+    },
+    "quantum-omega": {
+      "enabled": true,
+      "tokens": [
+        "SOL",
+        "USDC",
+        "BONK",
+        "WIF",
+        "MEME",
+        "CAT",
+        "PNUT"
+      ],
+      "refreshIntervalMs": 2000,
+      "useCaching": true,
+      "requireMultipleSources": true,
+      "minSources": 2
+    },
+    "zero-capital": {
+      "enabled": true,
+      "tokens": [
+        "SOL",
+        "USDC",
+        "USDT",
+        "ETH",
+        "BTC",
+        "JUP"
+      ],
+      "refreshIntervalMs": 1000,
+      "useCaching": true,
+      "requireMultipleSources": true,
+      "minSources": 2
+    },
+    "hyperion": {
+      "enabled": true,
+      "tokens": [
+        "SOL",
+        "USDC",
+        "USDT",
+        "ETH",
+        "BTC",
+        "JUP",
+        "BONK",
+        "WIF"
+      ],
+      "refreshIntervalMs": 500,
+      "useCaching": true,
+      "requireMultipleSources": true,
+      "minSources": 2
+    }
+  },
+  "alertThresholds": {
+    "priceChange": {
+      "major": 5,
+      "critical": 10
+    },
+    "sourceFailure": {
+      "warning": 0.2,
+      "critical": 0.5
+    },
+    "latency": {
+      "warning": 1000,
+      "critical": 3000
+    }
+  }
+}

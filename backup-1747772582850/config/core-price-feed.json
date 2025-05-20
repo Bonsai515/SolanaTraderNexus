@@ -1,0 +1,100 @@
+{
+  "version": "2.1.0",
+  "primarySources": [
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 1,
+      "refreshIntervalMs": 500
+    },
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 2,
+      "refreshIntervalMs": 750
+    },
+    {
+      "name": "Orca",
+      "url": "https://api.orca.so",
+      "priority": 3,
+      "refreshIntervalMs": 1000
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "Pyth",
+      "url": "https://api.pyth.network",
+      "priority": 1,
+      "refreshIntervalMs": 500
+    },
+    {
+      "name": "Switchboard",
+      "url": "https://api.switchboard.xyz",
+      "priority": 2,
+      "refreshIntervalMs": 750
+    },
+    {
+      "name": "DexScreener",
+      "url": "https://api.dexscreener.com",
+      "priority": 3,
+      "refreshIntervalMs": 1500
+    }
+  ],
+  "specializedSources": [
+    {
+      "name": "geyser",
+      "url": "https://beta.geyser.gg/api/v1/prices",
+      "priority": 1,
+      "refreshIntervalMs": 250
+    },
+    {
+      "name": "SolanaFM",
+      "url": "https://api.solana.fm",
+      "priority": 3,
+      "refreshIntervalMs": 1500
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "SOL": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "USDC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "USDT": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 300
+    },
+    "ETH": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    },
+    "BTC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    },
+    "BONK": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    },
+    "WIF": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    },
+    "JUP": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    },
+    "MEME": {
+      "primarySource": "Birdeye",
+      "minRefreshIntervalMs": 500
+    }
+  },
+  "backupStrategies": {
+    "failoverEnabled": true,
+    "rotationEnabled": true,
+    "cacheTimeMs": 30000
+  }
+}

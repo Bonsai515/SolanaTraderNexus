@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "primarySources": [
+    {
+      "name": "Jupiter",
+      "url": "https://price.jup.ag/v4",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "Birdeye",
+      "url": "https://public-api.birdeye.so",
+      "priority": 2,
+      "refreshIntervalMs": 1500
+    },
+    {
+      "name": "Orca",
+      "url": "https://api.orca.so",
+      "priority": 3,
+      "refreshIntervalMs": 1000
+    }
+  ],
+  "secondarySources": [
+    {
+      "name": "CoinGecko",
+      "url": "https://api.coingecko.com/api/v3",
+      "priority": 4,
+      "refreshIntervalMs": 5000
+    },
+    {
+      "name": "Pyth",
+      "url": "https://api.pyth.network",
+      "priority": 2,
+      "refreshIntervalMs": 1000
+    }
+  ],
+  "flashLoanSpecificSources": [
+    {
+      "name": "SolendPrices",
+      "url": "https://api.solend.fi/v1/prices",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    },
+    {
+      "name": "RaydiumSnapshot",
+      "url": "https://api.raydium.io/v2/main/pool",
+      "priority": 1,
+      "refreshIntervalMs": 1000
+    }
+  ],
+  "tokenSpecificOverrides": {
+    "SOL": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    },
+    "USDC": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 500
+    },
+    "BONK": {
+      "primarySource": "Jupiter",
+      "minRefreshIntervalMs": 800
+    }
+  }
+}

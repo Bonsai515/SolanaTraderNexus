@@ -1,0 +1,90 @@
+{
+  "lastUpdated": "2025-05-20T19:32:10.024Z",
+  "topGainers": [
+    {
+      "symbol": "BONK",
+      "name": "BONK",
+      "address": "",
+      "price": 0.00001936,
+      "priceChange24h": 0,
+      "volume24h": 0,
+      "profitabilityScore": 10,
+      "timestamp": "2025-05-20T19:32:01.203Z",
+      "confidence": 0.5,
+      "gainRank": 1,
+      "profitRank": 2
+    },
+    {
+      "symbol": "Bonk",
+      "name": "Bonk",
+      "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "price": 0.00001949,
+      "priceChange24h": -0.16,
+      "priceChange1h": 0.96,
+      "volume24h": 555146.01,
+      "profitabilityScore": 31,
+      "timestamp": "2025-05-20T19:32:01.381Z",
+      "confidence": 0.8,
+      "gainRank": 2,
+      "profitRank": 1
+    }
+  ],
+  "topProfitable": [
+    {
+      "symbol": "Bonk",
+      "name": "Bonk",
+      "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "price": 0.00001949,
+      "priceChange24h": -0.16,
+      "priceChange1h": 0.96,
+      "volume24h": 555146.01,
+      "profitabilityScore": 31,
+      "timestamp": "2025-05-20T19:32:01.381Z",
+      "confidence": 0.8,
+      "gainRank": 2,
+      "profitRank": 1
+    },
+    {
+      "symbol": "BONK",
+      "name": "BONK",
+      "address": "",
+      "price": 0.00001936,
+      "priceChange24h": 0,
+      "volume24h": 0,
+      "profitabilityScore": 10,
+      "timestamp": "2025-05-20T19:32:01.203Z",
+      "confidence": 0.5,
+      "gainRank": 1,
+      "profitRank": 2
+    }
+  ],
+  "all": {
+    "BONK": {
+      "symbol": "BONK",
+      "name": "BONK",
+      "address": "",
+      "price": 0.00001936,
+      "priceChange24h": 0,
+      "volume24h": 0,
+      "profitabilityScore": 10,
+      "timestamp": "2025-05-20T19:32:01.203Z",
+      "confidence": 0.5,
+      "gainRank": 1,
+      "profitRank": 2
+    },
+    "Bonk": {
+      "symbol": "Bonk",
+      "name": "Bonk",
+      "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "price": 0.00001949,
+      "priceChange24h": -0.16,
+      "priceChange1h": 0.96,
+      "volume24h": 555146.01,
+      "profitabilityScore": 31,
+      "timestamp": "2025-05-20T19:32:01.381Z",
+      "confidence": 0.8,
+      "gainRank": 2,
+      "profitRank": 1
+    }
+  }
+}

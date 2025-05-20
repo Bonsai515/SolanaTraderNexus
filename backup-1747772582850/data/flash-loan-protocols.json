@@ -1,0 +1,37 @@
+{
+  "version": "2.0",
+  "enabled": true,
+  "protocols": [
+    {
+      "name": "solend",
+      "enabled": true,
+      "priority": 1,
+      "maxBorrowSizeUSD": 1000,
+      "fee": 0.003,
+      "reserves": [
+        "USDC",
+        "SOL",
+        "ETH",
+        "USDT"
+      ],
+      "config": {
+        "programId": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo",
+        "refreshInterval": 60000
+      }
+    },
+    {
+      "name": "flashmint",
+      "enabled": true,
+      "priority": 2,
+      "maxBorrowSizeUSD": 500,
+      "fee": 0.002,
+      "reserves": [
+        "SOL",
+        "USDC"
+      ],
+      "config": {
+        "refreshInterval": 120000
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "flash-loan-arbitrage",
+  "type": "flash-loan",
+  "description": "Advanced flash loan arbitrage across multiple DEXes",
+  "enabled": true,
+  "priority": 10,
+  "minProfitThresholdPercent": 0.25,
+  "maxSlippageBps": 50,
+  "executionSettings": {
+    "maxTransactionsPerHour": 4,
+    "minTimeBetweenTradesMs": 900000,
+    "executionPriority": "critical",
+    "simulateBeforeSubmit": true,
+    "maxRetries": 3,
+    "useFlashLoans": true,
+    "flashLoanSources": [
+      "solend",
+      "port",
+      "mango"
+    ],
+    "layeredExecution": true,
+    "layerCount": 3,
+    "concurrentExecutions": 1
+  },
+  "rpcSettings": {
+    "provider": "syndica",
+    "url": "https://solana-mainnet.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+  },
+  "expectedProfitPerTradePercent": 2.45,
+  "successRatePercent": 85
+}

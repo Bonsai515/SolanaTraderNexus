@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "rate": 0.95,
+  "compoundingEnabled": true,
+  "autoReinvest": true,
+  "reinvestmentSchedule": "after_each_trade",
+  "minimumProfitThreshold": 0.001,
+  "tradingWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "strategies": [
+    "quantumSingularity",
+    "temporalArbitrageFlash",
+    "databaseFlashHyperion",
+    "megalodonPrimeEclipse"
+  ],
+  "lastUpdated": "2025-05-19T13:38:01.696Z"
+}

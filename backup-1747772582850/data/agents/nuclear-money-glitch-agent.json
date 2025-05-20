@@ -1,0 +1,55 @@
+{
+  "id": "nuclear-money-glitch-agent",
+  "name": "Nuclear Money Glitch Flash Arbitrage Agent",
+  "type": "trading",
+  "status": "active",
+  "createdAt": "2025-05-18T02:43:43.094Z",
+  "lastUpdated": "2025-05-18T02:43:43.094Z",
+  "description": "Hyper-aggressive agent for executing nuclear money glitch strategies",
+  "capabilities": [
+    "flashLoanExecution",
+    "crossExchangeArbitrage",
+    "triangularArbitrage",
+    "multiPathRouting",
+    "priceMonitoring",
+    "spreadCalculation",
+    "atomicExecution",
+    "parallelExecution",
+    "mevProtection",
+    "highFrequencyTrading",
+    "multiPoolSwapping",
+    "quantumPathfinding",
+    "recursiveFlashLoans",
+    "strictAtomicity",
+    "dynamicSlippageOptimization"
+  ],
+  "dependencies": [
+    "priceFeeds",
+    "walletManager",
+    "flashLoanProvider",
+    "transactionEngine",
+    "pathfinder",
+    "slippageOptimizer",
+    "gasOptimizer",
+    "executionEngine",
+    "opportunityScorer"
+  ],
+  "configuration": {
+    "scanIntervalMs": 500,
+    "executionTimeoutMs": 20000,
+    "maxConcurrentOperations": 5,
+    "retryAttempts": 3,
+    "useReattemptLogic": true,
+    "logLevel": "info",
+    "priority": "highest",
+    "memoryBufferMB": 512,
+    "cpuPriority": "high",
+    "optimizationLevel": "maximum"
+  },
+  "performance": {
+    "averageExecutionTimeMs": 0,
+    "successRate": 0,
+    "profitPerDaySOL": 0,
+    "profitPerDayUSD": 0
+  }
+}

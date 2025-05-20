@@ -1,0 +1,195 @@
+{
+  "version": "2.1.0",
+  "enabled": true,
+  "defaultProvider": "jupiter",
+  "refreshInterval": 5000,
+  "providers": [
+    {
+      "name": "jupiter",
+      "type": "aggregator",
+      "priority": 1,
+      "enabled": true,
+      "config": {
+        "endpoint": "https://price.jup.ag/v4",
+        "timeout": 3000,
+        "maxRetries": 3
+      }
+    },
+    {
+      "name": "birdeye",
+      "type": "dex_aggregator",
+      "priority": 2,
+      "enabled": true,
+      "config": {
+        "timeout": 3000,
+        "maxRetries": 3
+      }
+    },
+    {
+      "name": "phoenix",
+      "type": "dex",
+      "priority": 3,
+      "enabled": true,
+      "config": {
+        "timeout": 2000,
+        "maxRetries": 2
+      }
+    }
+  ],
+  "pairs": [
+    {
+      "base": "SOL",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye",
+        "phoenix"
+      ]
+    },
+    {
+      "base": "SOL",
+      "quote": "USDT",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "ETH",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye",
+        "phoenix"
+      ]
+    },
+    {
+      "base": "ETH",
+      "quote": "USDT",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "BTC",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "BTC",
+      "quote": "USDT",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "SOL",
+      "quote": "ETH",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "BONK",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "JUP",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "RAY",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    },
+    {
+      "base": "ORCA",
+      "quote": "USDC",
+      "providers": [
+        "jupiter",
+        "birdeye"
+      ]
+    }
+  ],
+  "arbitrage": {
+    "enabled": true,
+    "minProfitThresholdPercent": 0.03,
+    "maxSlippageBps": 50,
+    "routes": [
+      [
+        "SOL",
+        "USDC",
+        "SOL"
+      ],
+      [
+        "ETH",
+        "USDC",
+        "ETH"
+      ],
+      [
+        "SOL",
+        "ETH",
+        "SOL"
+      ],
+      [
+        "USDC",
+        "SOL",
+        "ETH",
+        "USDC"
+      ],
+      [
+        "USDC",
+        "JUP",
+        "USDC"
+      ],
+      [
+        "USDC",
+        "BONK",
+        "USDC"
+      ]
+    ]
+  },
+  "rateLimitHandling": {
+    "enabled": true,
+    "strategies": [
+      "exponential_backoff",
+      "source_rotation",
+      "cache_fallback",
+      "adaptive_intervals"
+    ],
+    "maxRetries": 5,
+    "initialBackoffMs": 500,
+    "maxBackoffMs": 10000,
+    "backoffMultiplier": 2,
+    "adaptiveRefreshEnabled": true
+  },
+  "sourceRotation": {
+    "enabled": true,
+    "rotationIntervalMs": 120000,
+    "priorityWeighting": true
+  },
+  "resilienceOptions": {
+    "cacheStaleDataTimeoutMs": 300000,
+    "allowPartialFailures": true,
+    "healthCheckIntervalMs": 60000,
+    "circuitBreakerThreshold": 3,
+    "circuitBreakerResetTimeMs": 1800000
+  }
+}
