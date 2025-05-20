@@ -69,11 +69,11 @@
   ],
   "caching": {
     "enabled": true,
-    "accountInfoTtlMs": 60000,
-    "balanceTtlMs": 60000,
+    "accountInfoTtlMs": 120000,
+    "balanceTtlMs": 120000,
     "transactionTtlMs": 7200000,
-    "blockTtlMs": 120000,
-    "slotTtlMs": 20000
+    "blockTtlMs": 300000,
+    "slotTtlMs": 30000
   },
   "fallback": {
     "enabled": true,
