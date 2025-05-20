@@ -1,15 +1,42 @@
 {
-  "primaryProvider": "Syndica",
-  "secondaryProvider": "Helius",
-  "tertiaryProvider": "Triton",
-  "healthCheckIntervalMs": 60000,
-  "maxConsecutiveFailures": 2,
-  "loadBalancingStrategy": "priority",
-  "maxRequestsPerSecond": 120,
-  "retryDelayMs": 500,
-  "maxRetries": 3,
-  "optimizedBatchSize": 20,
-  "useBatchRequests": true,
-  "cacheTimeMs": 5000,
-  "requestTimeout": 30000
+  "rpcEndpoints": [
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "priority": 2
+    },
+    {
+      "url": "https://solana-api.projectserum.com",
+      "priority": 2
+    },
+    {
+      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "priority": 1
+    },
+    {
+      "url": "https://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "priority": 2
+    }
+  ],
+  "caching": {
+    "enabled": true,
+    "defaultTtlMs": 30000,
+    "accountInfoTtlMs": 30000,
+    "tokenAccountsTtlMs": 60000,
+    "transactionTtlMs": 86400000
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "requestsPerMinute": 40,
+    "cooldownMs": 5000
+  },
+  "fallback": {
+    "enabled": true,
+    "retryDelayMs": 500,
+    "maxRetries": 3
+  },
+  "optimization": {
+    "batchRequests": true,
+    "loadBalancing": true,
+    "prioritization": true
+  }
 }
