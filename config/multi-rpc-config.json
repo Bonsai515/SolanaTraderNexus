@@ -1,0 +1,99 @@
+{
+  "providers": [
+    {
+      "name": "Helius",
+      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "websocketUrl": "wss://mainnet.helius-rpc.com/ws?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "priority": 1,
+      "weight": 10,
+      "rateLimit": {
+        "requestsPerMinute": 200
+      },
+      "inUse": true
+    },
+    {
+      "name": "Alchemy",
+      "url": "https://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "websocketUrl": "wss://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
+      "priority": 1,
+      "weight": 10,
+      "rateLimit": {
+        "requestsPerMinute": 200
+      },
+      "inUse": true
+    },
+    {
+      "name": "Syndica",
+      "url": "https://solana-api.syndica.io/rpc",
+      "websocketUrl": "wss://solana-api.syndica.io/rpc",
+      "priority": 2,
+      "weight": 5,
+      "rateLimit": {
+        "requestsPerMinute": 100
+      },
+      "inUse": true
+    },
+    {
+      "name": "Solana Public",
+      "url": "https://api.mainnet-beta.solana.com",
+      "websocketUrl": "wss://api.mainnet-beta.solana.com",
+      "priority": 3,
+      "weight": 1,
+      "rateLimit": {
+        "requestsPerMinute": 40
+      },
+      "inUse": true
+    },
+    {
+      "name": "Serum",
+      "url": "https://solana-api.projectserum.com",
+      "websocketUrl": "wss://solana-api.projectserum.com",
+      "priority": 3,
+      "weight": 1,
+      "rateLimit": {
+        "requestsPerMinute": 40
+      },
+      "inUse": true
+    },
+    {
+      "name": "Instant Nodes",
+      "url": "https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9",
+      "websocketUrl": "",
+      "priority": 5,
+      "weight": 0,
+      "rateLimit": {
+        "requestsPerMinute": 0
+      },
+      "inUse": false
+    }
+  ],
+  "caching": {
+    "enabled": true,
+    "accountInfoTtlMs": 30000,
+    "balanceTtlMs": 30000,
+    "transactionTtlMs": 3600000,
+    "blockTtlMs": 60000,
+    "slotTtlMs": 10000
+  },
+  "fallback": {
+    "enabled": true,
+    "maxRetries": 3,
+    "retryDelayMs": 500
+  },
+  "loadBalancing": {
+    "enabled": true,
+    "strategy": "priority-weighted",
+    "healthCheckIntervalMs": 60000
+  },
+  "streaming": {
+    "enabled": true,
+    "maxSubscriptions": 20,
+    "reconnectOnError": true,
+    "reconnectIntervalMs": 1000
+  },
+  "rateLimit": {
+    "enabled": true,
+    "strategy": "provider-specific"
+  },
+  "mainWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+}
