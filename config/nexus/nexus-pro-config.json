@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "name": "Nexus Pro Engine",
+  "wallet": {
+    "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "useRealFunds": true
+  },
+  "rpc": {
+    "primary": "https://solana-api.syndica.io/rpc",
+    "backup": null,
+    "websocket": "wss://solana-api.syndica.io/rpc",
+    "useStreaming": true
+  },
+  "performance": {
+    "maxConcurrentTransactions": 3,
+    "retryAttempts": 3,
+    "caching": {
+      "enabled": true,
+      "ttlSeconds": 300
+    },
+    "batchProcessing": {
+      "enabled": true,
+      "maxBatchSize": 5
+    }
+  },
+  "logging": {
+    "level": "info",
+    "persistToDisk": true,
+    "showTimestamps": true
+  },
+  "safety": {
+    "maxTransactionValueUSD": 10,
+    "emergencyShutdownOnFailures": true,
+    "simulateBeforeExecute": true
+  },
+  "strategies": {
+    "enabled": [
+      "hyperion",
+      "quantum-omega",
+      "singularity"
+    ],
+    "priority": [
+      "hyperion",
+      "quantum-omega",
+      "singularity"
+    ]
+  }
+}
