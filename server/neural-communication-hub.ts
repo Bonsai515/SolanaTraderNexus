@@ -1,50 +1,45 @@
 /**
  * Neural Communication Hub
  * 
- * This module handles communication between neural components in the system,
- * allowing various transformers and processors to send and receive signals
- * for coordinated execution.
+ * This module provides a central communication system for neural signals
+ * between various components of the trading system.
  */
 
 import * as logger from './logger';
-import { v4 as uuidv4 } from 'uuid';
 
-// Signal priorities
-export enum SignalPriority {
-  LOW = 'LOW',              // Background processing, no urgency
-  NORMAL = 'NORMAL',        // Standard priority
-  HIGH = 'HIGH',            // Higher priority, process soon
-  IMMEDIATE = 'IMMEDIATE'   // Highest priority, process ASAP
-}
-
-// Signal types
+// Signal type definitions
 export enum SignalType {
-  INFORMATION = 'INFORMATION', // Just informational
-  PRICE_MOVE = 'PRICE_MOVE',   // Price movement detected
-  VOLUME_SPIKE = 'VOLUME_SPIKE', // Volume spike detected
-  LIQUIDITY_CHANGE = 'LIQUIDITY_CHANGE', // Liquidity change detected
-  TREND_CHANGE = 'TREND_CHANGE', // Trend reversal or shift detected
-  OPPORTUNITY = 'OPPORTUNITY', // Trading opportunity detected
-  EXECUTION = 'EXECUTION',   // Signal to execute a trade
-  RISK_ALERT = 'RISK_ALERT'  // Risk management alert
+  PRICE_MOVE = 'PRICE_MOVE',
+  VOLUME_SPIKE = 'VOLUME_SPIKE',
+  TREND_CHANGE = 'TREND_CHANGE',
+  NEW_TOKEN = 'NEW_TOKEN',
+  LIQUIDITY_ADDED = 'LIQUIDITY_ADDED',
+  RISK_ALERT = 'RISK_ALERT',
+  OPPORTUNITY = 'OPPORTUNITY',
+  INFORMATION = 'INFORMATION'
 }
 
-// Signal directions
-export enum SignalDirection {
-  BULLISH = 'BULLISH',       // Positive direction
-  SLIGHTLY_BULLISH = 'SLIGHTLY_BULLISH', // Slightly positive
-  NEUTRAL = 'NEUTRAL',       // No clear direction
-  SLIGHTLY_BEARISH = 'SLIGHTLY_BEARISH', // Slightly negative
-  BEARISH = 'BEARISH'        // Negative direction
-}
-
-// Signal strengths
 export enum SignalStrength {
-  VERY_WEAK = 'VERY_WEAK',   // Very low confidence
-  WEAK = 'WEAK',             // Low confidence
-  MEDIUM = 'MEDIUM',         // Medium confidence
-  STRONG = 'STRONG',         // High confidence
-  VERY_STRONG = 'VERY_STRONG' // Very high confidence
+  VERY_WEAK = 'VERY_WEAK',
+  WEAK = 'WEAK',
+  MEDIUM = 'MEDIUM',
+  STRONG = 'STRONG',
+  VERY_STRONG = 'VERY_STRONG'
+}
+
+export enum SignalDirection {
+  BULLISH = 'BULLISH',
+  SLIGHTLY_BULLISH = 'SLIGHTLY_BULLISH',
+  NEUTRAL = 'NEUTRAL',
+  SLIGHTLY_BEARISH = 'SLIGHTLY_BEARISH',
+  BEARISH = 'BEARISH'
+}
+
+export enum SignalPriority {
+  LOW = 'LOW',
+  NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT'
 }
 
 // Neural signal interface
@@ -56,35 +51,81 @@ export interface NeuralSignal {
   strength: SignalStrength;
   direction: SignalDirection;
   priority: SignalPriority;
-  payload: any;
   timestamp: number;
+  payload: any;
   processed: boolean;
   processingAttempts: number;
-  lastProcessedTimestamp?: number;
+  lastProcessed?: number;
+  error?: string;
 }
 
-// Signal subscriber function type
-type SignalSubscriber = (signal: NeuralSignal) => Promise<void>;
+// Signal frequency control interface
+interface SignalFrequencyControl {
+  tokenSymbol: string;
+  lastSignalTimestamp: number;
+  cooldownPeriodMs: number;
+  signalCount: number;
+}
 
-// Storage for signals and subscriptions
-const signalStore: Record<string, NeuralSignal> = {};
-const subscriptions: Record<string, Record<string, SignalSubscriber[]>> = {};
+// In-memory signal storage
+const signals: NeuralSignal[] = [];
+const frequencyControls: Record<string, SignalFrequencyControl> = {};
+const MAX_SIGNALS = 1000;
+const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
-// Maximum age for signals before cleanup (20 minutes)
-const MAX_SIGNAL_AGE_MS = 20 * 60 * 1000;
-
-// Signal staleness threshold (5 minutes)
-const STALLED_SIGNAL_THRESHOLD_MS = 5 * 60 * 1000;
+// Module state
+const moduleState = {
+  isInitialized: false,
+  signalProcessorTimer: null as NodeJS.Timeout | null,
+  processingIntervalMs: 1000, // Process signals every second
+  activeConnections: {} as Record<string, boolean>
+};
 
 /**
  * Generate a unique signal ID
  */
 function generateSignalId(): string {
-  return `signal-${Date.now()}-${uuidv4().slice(0, 8)}`;
+  return `sig-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
 /**
- * Send a neural signal from a source to a target
+ * Check if a token is in cooldown period
+ */
+function isTokenInCooldown(tokenSymbol: string): boolean {
+  const control = frequencyControls[tokenSymbol];
+  if (!control) return false;
+  
+  const timeSinceLastSignal = Date.now() - control.lastSignalTimestamp;
+  return timeSinceLastSignal < control.cooldownPeriodMs;
+}
+
+/**
+ * Update token frequency control
+ */
+function updateTokenFrequencyControl(tokenSymbol: string): void {
+  if (!tokenSymbol) return;
+  
+  const control = frequencyControls[tokenSymbol] || {
+    tokenSymbol,
+    lastSignalTimestamp: 0,
+    cooldownPeriodMs: DEFAULT_COOLDOWN_MS,
+    signalCount: 0
+  };
+  
+  control.lastSignalTimestamp = Date.now();
+  control.signalCount++;
+  
+  // Adjust cooldown based on frequency of signals
+  // More frequent signals = longer cooldown
+  if (control.signalCount > 10) {
+    control.cooldownPeriodMs = Math.min(30 * 60 * 1000, control.cooldownPeriodMs * 1.5); // Up to 30 minutes
+  }
+  
+  frequencyControls[tokenSymbol] = control;
+}
+
+/**
+ * Send a neural signal from one component to another
  */
 export async function sendSignal(
   source: string,
@@ -92,193 +133,318 @@ export async function sendSignal(
   type: SignalType,
   strength: SignalStrength,
   direction: SignalDirection,
-  priority: SignalPriority,
-  payload: any
-): Promise<string> {
-  const signalId = generateSignalId();
-  
-  const signal: NeuralSignal = {
-    id: signalId,
-    source,
-    target,
-    type,
-    strength,
-    direction,
-    priority,
-    payload,
-    timestamp: Date.now(),
-    processed: false,
-    processingAttempts: 0
-  };
-  
-  // Store the signal
-  signalStore[signalId] = signal;
-  
-  // Process the signal asynchronously
-  setTimeout(() => processSignal(signal), 0);
-  
-  return signalId;
-}
-
-/**
- * Process a neural signal and deliver to subscribers
- */
-async function processSignal(signal: NeuralSignal): Promise<void> {
+  priority: SignalPriority = SignalPriority.NORMAL,
+  payload: any = {}
+): Promise<boolean> {
   try {
-    if (signal.processed) {
-      return;
+    // Check if the source and target are connected
+    const connectionKey = `${source}-to-${target}`;
+    if (!moduleState.activeConnections[connectionKey]) {
+      logger.warn(`[NeuralHub] Cannot send signal: No active connection from ${source} to ${target}`);
+      return false;
     }
     
-    signal.processingAttempts += 1;
-    
-    // Check if there are subscribers for this source-target pair
-    const sourceSubscribers = subscriptions[signal.source] || {};
-    const subscribers = sourceSubscribers[signal.target] || [];
-    
-    if (subscribers.length === 0) {
-      // No subscribers, mark as processed
-      signal.processed = true;
-      signal.lastProcessedTimestamp = Date.now();
-      return;
+    // Prevent excessive signaling for the same token
+    const tokenSymbol = payload?.tokenSymbol;
+    if (tokenSymbol && isTokenInCooldown(tokenSymbol)) {
+      logger.info(`[NeuralHub] Signal for ${tokenSymbol} skipped: Token in cooldown period`);
+      return false;
     }
     
-    // Deliver the signal to each subscriber
-    for (const subscriber of subscribers) {
-      try {
-        await subscriber(signal);
-      } catch (error) {
-        logger.error(`[NeuralComms] Error in subscriber (${signal.source} -> ${signal.target}): ${error.message}`);
+    // Create the signal
+    const signal: NeuralSignal = {
+      id: generateSignalId(),
+      source,
+      target,
+      type,
+      strength,
+      direction,
+      priority,
+      timestamp: Date.now(),
+      payload,
+      processed: false,
+      processingAttempts: 0
+    };
+    
+    // Add the signal to the queue
+    signals.push(signal);
+    
+    // Update token frequency control
+    if (tokenSymbol) {
+      updateTokenFrequencyControl(tokenSymbol);
+    }
+    
+    // Trim the signal queue if it's getting too large
+    if (signals.length > MAX_SIGNALS) {
+      // Remove the oldest processed signals first
+      const processedCount = signals.filter(s => s.processed).length;
+      if (processedCount > 0) {
+        // Remove 10% of processed signals
+        const removeCount = Math.max(1, Math.floor(processedCount * 0.1));
+        const oldestProcessed = signals
+          .filter(s => s.processed)
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .slice(0, removeCount);
+        
+        oldestProcessed.forEach(s => {
+          const index = signals.findIndex(sig => sig.id === s.id);
+          if (index !== -1) {
+            signals.splice(index, 1);
+          }
+        });
+      } else {
+        // If no processed signals, remove the oldest signals
+        signals.sort((a, b) => a.timestamp - b.timestamp);
+        signals.splice(0, Math.max(1, Math.floor(signals.length * 0.1)));
       }
     }
     
-    // Mark the signal as processed
-    signal.processed = true;
-    signal.lastProcessedTimestamp = Date.now();
+    logger.info(`[NeuralHub] Signal sent from ${source} to ${target}: ${type} (${strength}, ${direction})`);
+    return true;
   } catch (error) {
-    logger.error(`[NeuralComms] Error processing signal ${signal.id}: ${error.message}`);
-  }
-}
-
-/**
- * Subscribe to neural signals from a source to a target
- */
-export function subscribeToSignals(
-  source: string,
-  target: string,
-  handler: SignalSubscriber
-): void {
-  // Initialize source and target if needed
-  subscriptions[source] = subscriptions[source] || {};
-  subscriptions[source][target] = subscriptions[source][target] || [];
-  
-  // Add the subscriber
-  subscriptions[source][target].push(handler);
-  
-  logger.info(`[NeuralComms] Added subscriber from ${source} to ${target}`);
-}
-
-/**
- * Unsubscribe from neural signals
- */
-export function unsubscribeFromSignals(
-  source: string,
-  target: string,
-  handler: SignalSubscriber
-): boolean {
-  // Check if source and target exist
-  if (!subscriptions[source] || !subscriptions[source][target]) {
+    logger.error(`[NeuralHub] Error sending signal: ${error.message}`);
     return false;
   }
-  
-  // Find and remove the handler
-  const handlers = subscriptions[source][target];
-  const index = handlers.indexOf(handler);
-  
-  if (index !== -1) {
-    handlers.splice(index, 1);
-    logger.info(`[NeuralComms] Removed subscriber from ${source} to ${target}`);
-    return true;
-  }
-  
-  return false;
 }
 
 /**
- * Get a signal by ID
+ * Process all pending neural signals
  */
-export function getSignal(signalId: string): NeuralSignal | null {
-  return signalStore[signalId] || null;
-}
-
-/**
- * Get all signals for a specific source
- */
-export function getSignalsBySource(source: string): NeuralSignal[] {
-  return Object.values(signalStore).filter(signal => signal.source === source);
-}
-
-/**
- * Get all signals for a specific target
- */
-export function getSignalsByTarget(target: string): NeuralSignal[] {
-  return Object.values(signalStore).filter(signal => signal.target === target);
-}
-
-/**
- * Clean up old signals
- */
-function cleanupOldSignals(): void {
-  const now = Date.now();
-  let cleanedCount = 0;
-  
-  // Check for stalled signals first (signals being processed for too long)
-  for (const signalId in signalStore) {
-    const signal = signalStore[signalId];
+async function processSignals(): Promise<void> {
+  try {
+    // Find unprocessed signals
+    const pendingSignals = signals.filter(s => !s.processed);
+    if (pendingSignals.length === 0) return;
     
-    if (!signal.processed && (now - signal.timestamp) > STALLED_SIGNAL_THRESHOLD_MS) {
-      logger.warn(`[NeuralComms] Detected stalled signal: ${signalId}, age: ${((now - signal.timestamp) / 1000).toFixed(3)}s`);
-    }
-  }
-  
-  // Clean up old signals
-  for (const signalId in signalStore) {
-    const signal = signalStore[signalId];
+    logger.debug(`[NeuralHub] Processing ${pendingSignals.length} pending signals`);
     
-    if ((now - signal.timestamp) > MAX_SIGNAL_AGE_MS) {
-      delete signalStore[signalId];
-      cleanedCount++;
+    // Sort by priority and timestamp
+    pendingSignals.sort((a, b) => {
+      // First by priority
+      const priorityOrder = {
+        [SignalPriority.URGENT]: 0,
+        [SignalPriority.HIGH]: 1,
+        [SignalPriority.NORMAL]: 2,
+        [SignalPriority.LOW]: 3
+      };
+      
+      const aPriority = priorityOrder[a.priority];
+      const bPriority = priorityOrder[b.priority];
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+      
+      // Then by timestamp (oldest first)
+      return a.timestamp - b.timestamp;
+    });
+    
+    // Process each signal
+    for (const signal of pendingSignals) {
+      try {
+        // Find appropriate handler based on target
+        const handlerFound = await dispatchSignalToHandler(signal);
+        
+        if (handlerFound) {
+          // Mark as processed
+          signal.processed = true;
+          signal.lastProcessed = Date.now();
+        } else {
+          // Increment attempts
+          signal.processingAttempts++;
+          
+          // If too many attempts, mark as processed with error
+          if (signal.processingAttempts >= 3) {
+            signal.processed = true;
+            signal.error = 'No handler found after multiple attempts';
+            logger.warn(`[NeuralHub] No handler found for signal ${signal.id} after ${signal.processingAttempts} attempts`);
+          }
+        }
+      } catch (error) {
+        logger.error(`[NeuralHub] Error processing signal ${signal.id}: ${error.message}`);
+        signal.processingAttempts++;
+        signal.error = error.message;
+        
+        // Mark as processed after too many attempts
+        if (signal.processingAttempts >= 3) {
+          signal.processed = true;
+        }
+      }
     }
-  }
-  
-  if (cleanedCount > 0) {
-    logger.info(`[NeuralComms] Cleaned up ${cleanedCount} old signals`);
+  } catch (error) {
+    logger.error(`[NeuralHub] Error in signal processing: ${error.message}`);
   }
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupOldSignals, 5 * 60 * 1000);
+/**
+ * Dispatch a signal to its target handler
+ */
+async function dispatchSignalToHandler(signal: NeuralSignal): Promise<boolean> {
+  try {
+    const { target } = signal;
+    
+    // Find and call the appropriate handler
+    switch (target) {
+      case 'QuantumOmega':
+        // For Quantum Omega signals (sniper)
+        try {
+          const { processNeuralSignal } = require('./strategies/quantumOmegaSniperController');
+          await processNeuralSignal(signal);
+          return true;
+        } catch (error) {
+          logger.error(`[NeuralHub] Error routing to QuantumOmega: ${error.message}`);
+          return false;
+        }
+        
+      case 'MomentumSurfing':
+        // For Momentum Surfing signals
+        try {
+          const { processNeuralSignal } = require('./strategies/momentum-surfing-strategy');
+          await processNeuralSignal(signal);
+          return true;
+        } catch (error) {
+          logger.error(`[NeuralHub] Error routing to MomentumSurfing: ${error.message}`);
+          return false;
+        }
+        
+      case 'Hyperion':
+        // For Hyperion transformer signals
+        try {
+          logger.info(`[NeuralHub] Routing signal to Hyperion: ${signal.type}`);
+          // Placeholder for Hyperion integration
+          return true;
+        } catch (error) {
+          logger.error(`[NeuralHub] Error routing to Hyperion: ${error.message}`);
+          return false;
+        }
+        
+      case 'NexusEngine':
+        // For Nexus Engine signals (execution)
+        try {
+          logger.info(`[NeuralHub] Routing signal to NexusEngine: ${signal.type}`);
+          // Placeholder for NexusEngine integration
+          return true;
+        } catch (error) {
+          logger.error(`[NeuralHub] Error routing to NexusEngine: ${error.message}`);
+          return false;
+        }
+        
+      default:
+        logger.warn(`[NeuralHub] No handler found for target: ${target}`);
+        return false;
+    }
+  } catch (error) {
+    logger.error(`[NeuralHub] Error dispatching signal: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Start the signal processor
+ */
+function startSignalProcessor(): void {
+  if (moduleState.signalProcessorTimer) {
+    clearInterval(moduleState.signalProcessorTimer);
+  }
+  
+  moduleState.signalProcessorTimer = setInterval(async () => {
+    await processSignals();
+  }, moduleState.processingIntervalMs);
+  
+  logger.info(`[NeuralHub] Started signal processor with interval of ${moduleState.processingIntervalMs}ms`);
+}
+
+/**
+ * Stop the signal processor
+ */
+function stopSignalProcessor(): void {
+  if (moduleState.signalProcessorTimer) {
+    clearInterval(moduleState.signalProcessorTimer);
+    moduleState.signalProcessorTimer = null;
+    logger.info('[NeuralHub] Stopped signal processor');
+  }
+}
+
+/**
+ * Setup neural connections between components
+ */
+function setupConnections(): void {
+  // Define active connections
+  const connections = [
+    // From MemeToken transformer to strategies
+    'MemeTokenTransformer-to-QuantumOmega',
+    'MemeTokenTransformer-to-MomentumSurfing',
+    'MemeTokenTransformer-to-Hyperion',
+    
+    // From SocialAnalyzer to strategies
+    'SocialAnalyzer-to-QuantumOmega',
+    'SocialAnalyzer-to-MomentumSurfing',
+    
+    // From MemeCortex transformers to strategies
+    'MemeCortex-to-QuantumOmega',
+    'MemeCortex-to-MomentumSurfing',
+    'MemeCortex-to-Hyperion',
+    
+    // From strategies to execution engine
+    'QuantumOmega-to-NexusEngine',
+    'MomentumSurfing-to-NexusEngine',
+    'Hyperion-to-NexusEngine'
+  ];
+  
+  // Enable all connections
+  connections.forEach(connection => {
+    moduleState.activeConnections[connection] = true;
+  });
+  
+  logger.info(`[NeuralHub] Set up ${connections.length} neural connections`);
+}
 
 /**
  * Initialize the Neural Communication Hub
  */
-export async function initializeNeuralCommunicationHub(): Promise<boolean> {
+export async function initialize(): Promise<boolean> {
   try {
-    logger.info('[NeuralComms] Initializing Neural Communication Hub...');
+    if (moduleState.isInitialized) {
+      logger.info('[NeuralHub] Already initialized');
+      return true;
+    }
     
-    // Run initial cleanup
-    cleanupOldSignals();
+    logger.info('[NeuralHub] Initializing Neural Communication Hub...');
     
-    logger.info('[NeuralComms] Neural Communication Hub initialized successfully');
+    // Setup connections
+    setupConnections();
+    
+    // Start signal processor
+    startSignalProcessor();
+    
+    moduleState.isInitialized = true;
+    logger.info('[NeuralHub] Successfully initialized Neural Communication Hub');
     return true;
   } catch (error) {
-    logger.error(`[NeuralComms] Failed to initialize: ${error.message}`);
+    logger.error(`[NeuralHub] Failed to initialize: ${error.message}`);
     return false;
   }
 }
 
-// Initialize when loaded directly
+/**
+ * Shutdown the Neural Communication Hub
+ */
+export function shutdown(): void {
+  stopSignalProcessor();
+  
+  // Clear signals and connections
+  signals.length = 0;
+  Object.keys(moduleState.activeConnections).forEach(key => {
+    moduleState.activeConnections[key] = false;
+  });
+  
+  moduleState.isInitialized = false;
+  logger.info('[NeuralHub] Neural Communication Hub shutdown');
+}
+
+// Initialize on module load if running directly
 if (require.main === module) {
-  initializeNeuralCommunicationHub().catch(error => {
-    logger.error(`[NeuralComms] Error during initialization: ${error.message}`);
+  initialize().catch(error => {
+    logger.error(`[NeuralHub] Error during initialization: ${error.message}`);
   });
 }
