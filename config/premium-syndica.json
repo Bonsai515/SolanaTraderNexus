@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "name": "Premium Syndica Configuration",
+  "wallet": {
+    "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "useRealFunds": true
+  },
+  "rpc": {
+    "provider": "syndica",
+    "url": "https://solana-api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk/rpc",
+    "websocketUrl": "wss://chainstream.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
+    "apiKey": "q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+  },
+  "rateLimit": {
+    "requestsPerSecond": 25,
+    "maxConcurrent": 10,
+    "retryEnabled": true
+  },
+  "caching": {
+    "enabled": true,
+    "accountTtlMs": 60000,
+    "balanceTtlMs": 30000,
+    "transactionTtlMs": 3600000
+  },
+  "strategies": {
+    "enabled": [
+      "hyperion",
+      "quantum-omega",
+      "singularity"
+    ]
+  }
+}
