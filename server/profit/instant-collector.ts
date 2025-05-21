@@ -345,3 +345,14 @@ export class InstantProfitCollector {
 
 // Export default instance
 export const profitCollector = InstantProfitCollector.getInstance();
+export function initialize() {
+  console.log('Initializing profit collector');
+}
+
+export function captureProfit(amount: number) {
+  console.log('Capturing profit:', amount);
+}
+
+export function updateSettings(settings: any) {
+  console.log('Updating profit collector settings:', settings);
+}
