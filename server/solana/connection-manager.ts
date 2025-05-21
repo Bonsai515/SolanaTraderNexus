@@ -20,18 +20,21 @@ const defaultConnectionConfig: ConnectionConfig = {
 };
 
 /**
- * Get a connection with specific commitment
+ * Get a connection with specific commitment and usage type
  */
-export function getConnection(commitment: Commitment = 'confirmed'): Connection {
+export function getConnection(
+  commitment: Commitment = 'confirmed', 
+  usageType: 'transactions' | 'queries' | 'all' = 'all'
+): Connection {
   try {
     // Check if we have a cached connection
-    const cacheKey = `connection-${commitment}`;
+    const cacheKey = `connection-${commitment}-${usageType}`;
     if (connectionCache.has(cacheKey)) {
       return connectionCache.get(cacheKey)!;
     }
     
-    // Get the best RPC endpoint
-    const endpoint = getBestRPCEndpoint();
+    // Get the best RPC endpoint for the given usage type
+    const endpoint = getBestRPCEndpoint(usageType);
     
     // Create connection
     const config: ConnectionConfig = {
@@ -44,7 +47,7 @@ export function getConnection(commitment: Commitment = 'confirmed'): Connection 
     // Cache the connection
     connectionCache.set(cacheKey, connection);
     
-    logger.info(`[ConnectionManager] Created new Solana connection with ${commitment} commitment using ${endpoint.name}`);
+    logger.info(`[ConnectionManager] Created new Solana connection with ${commitment} commitment using ${endpoint.name} for ${usageType}`);
     return connection;
   } catch (error) {
     logger.error(`[ConnectionManager] Error creating connection: ${error.message}`);

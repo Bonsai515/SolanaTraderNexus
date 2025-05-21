@@ -24,6 +24,7 @@ export interface RPCEndpoint {
     errorCount: number;
     lastError?: string;
   };
+  usageType?: 'transactions' | 'queries' | 'all'; // Type of operations this endpoint should be used for
 }
 
 // Global RPC configuration
@@ -35,10 +36,29 @@ export const rpcConfig = {
       wsUrl: 'wss://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8',
       name: 'QuickNode Primary',
       priority: 1,
+      usageType: 'transactions' as 'transactions', // Use primarily for transactions
       rateLimit: {
         maxRequestsPerSecond: 50,
         maxRequestsPerMinute: 2000,
         maxRequestsPerHour: 100000
+      },
+      health: {
+        lastChecked: 0,
+        isHealthy: true,
+        errorCount: 0
+      }
+    },
+    // Add Helius for neural processing
+    {
+      url: 'https://rpc.helius.xyz/?api-key=5e032502-2ab7-4ebf-9b61-cfa1523b1f9e',
+      wsUrl: 'wss://rpc.helius.xyz/?api-key=5e032502-2ab7-4ebf-9b61-cfa1523b1f9e',
+      name: 'Helius Neural',
+      priority: 2,
+      usageType: 'queries' as 'queries', // Use primarily for data queries and neural processing
+      rateLimit: {
+        maxRequestsPerSecond: 30,
+        maxRequestsPerMinute: 1000,
+        maxRequestsPerHour: 30000
       },
       health: {
         lastChecked: 0,
@@ -54,6 +74,7 @@ export const rpcConfig = {
       url: 'https://api.mainnet-beta.solana.com',
       name: 'Solana Public RPC',
       priority: 10,
+      usageType: 'queries' as 'queries', // Use for light operations like balance checks
       rateLimit: {
         maxRequestsPerSecond: 10,
         maxRequestsPerMinute: 100
@@ -68,9 +89,25 @@ export const rpcConfig = {
       url: 'https://solana-api.projectserum.com',
       name: 'Project Serum RPC',
       priority: 20,
+      usageType: 'queries', // Use for light operations
       rateLimit: {
         maxRequestsPerSecond: 5,
         maxRequestsPerMinute: 50
+      },
+      health: {
+        lastChecked: 0,
+        isHealthy: true,
+        errorCount: 0
+      }
+    },
+    {
+      url: 'https://rpc.ankr.com/solana',
+      name: 'Ankr Public RPC',
+      priority: 15,
+      usageType: 'queries', // Use for light operations
+      rateLimit: {
+        maxRequestsPerSecond: 8,
+        maxRequestsPerMinute: 80
       },
       health: {
         lastChecked: 0,
@@ -85,6 +122,7 @@ export const rpcConfig = {
     url: 'https://solana-api.instantnodes.io/token-NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9',
     name: 'Instant Nodes',
     priority: 100, // Very low priority
+    usageType: 'all', // Only use as last resort
     rateLimit: {
       maxRequestsPerSecond: 1,
       maxRequestsPerMinute: 10
@@ -115,14 +153,18 @@ let activeWSEndpoint: RPCEndpoint | null = null;
 /**
  * Get the best available RPC endpoint
  */
-export function getBestRPCEndpoint(): RPCEndpoint {
-  // If we have an active endpoint that's healthy, use it
-  if (activeRPCEndpoint && activeRPCEndpoint.health.isHealthy) {
+export function getBestRPCEndpoint(usageType: 'transactions' | 'queries' | 'all' = 'all'): RPCEndpoint {
+  // If we have an active endpoint that's healthy and matches the usage type, use it
+  if (
+    activeRPCEndpoint && 
+    activeRPCEndpoint.health.isHealthy && 
+    (activeRPCEndpoint.usageType === usageType || activeRPCEndpoint.usageType === 'all' || usageType === 'all')
+  ) {
     return activeRPCEndpoint;
   }
   
-  // Find the highest priority healthy endpoint
-  const allEndpoints = [
+  // Find the highest priority healthy endpoint that matches the usage type
+  let allEndpoints = [
     ...rpcConfig.primaryEndpoints,
     ...rpcConfig.backupEndpoints
   ];
