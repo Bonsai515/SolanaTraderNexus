@@ -12,7 +12,7 @@
  */
 
 import { SignalPriority, SignalType, BaseSignal } from '../shared/signalTypes';
-import { Signal } from './signalHub';
+import { TransformerSignal as Signal } from "./signalHub";
 import { logger } from './logger';
 import { zkProofVerification, ZkProofScheme } from './lib/zkProofVerification';
 
@@ -78,7 +78,8 @@ class SignalValidator {
           signal.strength && 
           signal.direction && 
           signal.confidence !== undefined && 
-          signal.description
+          signal.description &&
+          signal.strategy
         );
       },
       errorMessage: () => 'Missing required signal fields',
@@ -130,7 +131,7 @@ class SignalValidator {
     this.rules.push({
       name: 'actionable-targeting',
       validate: (signal) => {
-        return !signal.actionable || ((signal as any).targetComponents && (signal as any).targetComponents.length > 0) ? true : false;
+        return !signal.actionable || (signal.targetComponents && signal.targetComponents.length > 0) ? true : false;
       },
       errorMessage: () => 'Actionable signals must specify target components',
       severity: 'error'
