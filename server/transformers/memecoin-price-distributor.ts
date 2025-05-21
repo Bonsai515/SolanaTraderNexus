@@ -11,6 +11,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import { priceFeedCache } from '../lib/priceFeedCache';
+import * as logger from '../logger';
+import { 
+  makeExternalApiRequest,
+  getTrendingTokens 
+} from '../lib/externalApiManager';
 
 interface MemeTokenPrice {
   symbol: string;
@@ -256,10 +261,16 @@ class MemecoinPriceDistributor extends EventEmitter {
    */
   private async fetchDexScreenerData(memecoinData: Record<string, MemeTokenPrice>): Promise<void> {
     try {
-      const response = await axios.get('https://api.dexscreener.com/latest/dex/tokens/H6QSvF5q8HA9jHmYnD7Z3Ah4gwZLN4YtNz3wAkNmzgj7,4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R,AU9jk7rMrJYQtgYRzJi6q7KQVrxBn3x1JkBznDxvJkpA,7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263,Ez3nzG9ofUoXZGRCMWMcZA21yR2nLhVaJUEcSc6rEzHn');
+      // Use rate-limited API request with smart caching
+      const data = await makeExternalApiRequest<any>(
+        'https://api.dexscreener.com/latest/dex/tokens/H6QSvF5q8HA9jHmYnD7Z3Ah4gwZLN4YtNz3wAkNmzgj7,4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R,AU9jk7rMrJYQtgYRzJi6q7KQVrxBn3x1JkBznDxvJkpA,7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263,Ez3nzG9ofUoXZGRCMWMcZA21yR2nLhVaJUEcSc6rEzHn',
+        {},
+        true, // cache results
+        true  // use cache during rate limits
+      );
       
-      if (response.data && response.data.pairs) {
-        for (const pair of response.data.pairs) {
+      if (data && data.pairs) {
+        for (const pair of data.pairs) {
           // Extract token info
           const tokenSymbol = pair.baseToken.symbol;
           
@@ -293,7 +304,8 @@ class MemecoinPriceDistributor extends EventEmitter {
         }
       }
     } catch (error) {
-      console.warn('Error fetching DexScreener data:', error);
+      logger.warn('Error fetching DexScreener data:', error);
+      // Continue with cached data
     }
   }
 
@@ -302,10 +314,11 @@ class MemecoinPriceDistributor extends EventEmitter {
    */
   private async fetchPumpFunData(memecoinData: Record<string, MemeTokenPrice>): Promise<void> {
     try {
-      const response = await axios.get('https://api.pump.fun/solana/tokens/trending?limit=50');
+      // Use our rate-limited function from externalApiManager
+      const tokens = await getTrendingTokens(50);
       
-      if (response.data && response.data.tokens) {
-        for (const token of response.data.tokens) {
+      if (tokens && tokens.length > 0) {
+        for (const token of tokens) {
           const tokenSymbol = token.symbol;
           
           // Skip if not likely a memecoin
@@ -339,7 +352,8 @@ class MemecoinPriceDistributor extends EventEmitter {
         }
       }
     } catch (error) {
-      console.warn('Error fetching Pump.fun data:', error);
+      logger.warn('Error fetching Pump.fun data:', error);
+      // Continue with cached data if available
     }
   }
 
@@ -348,10 +362,16 @@ class MemecoinPriceDistributor extends EventEmitter {
    */
   private async fetchRaydiumData(memecoinData: Record<string, MemeTokenPrice>): Promise<void> {
     try {
-      const response = await axios.get('https://api.raydium.io/v2/main/pairs');
+      // Use our rate-limited API manager with caching
+      const data = await makeExternalApiRequest<any>(
+        'https://api.raydium.io/v2/main/pairs',
+        {},
+        true, // cache results
+        true  // use cache during rate limits
+      );
       
-      if (response.data && response.data.data) {
-        for (const pair of response.data.data) {
+      if (data && data.data) {
+        for (const pair of data.data) {
           // Skip if not SOL or USDC pair
           if (!pair.name.endsWith('/USDC') && !pair.name.endsWith('/SOL')) {
             continue;
@@ -389,7 +409,8 @@ class MemecoinPriceDistributor extends EventEmitter {
         }
       }
     } catch (error) {
-      console.warn('Error fetching Raydium data:', error);
+      logger.warn('Error fetching Raydium data:', error);
+      // Continue with existing data
     }
   }
 
@@ -400,17 +421,24 @@ class MemecoinPriceDistributor extends EventEmitter {
     try {
       // Skip if no Birdeye API key
       if (!process.env.BIRDEYE_API_KEY) {
+        logger.warn('Skipping Birdeye API - no API key found');
         return;
       }
       
-      const response = await axios.get('https://public-api.birdeye.so/defi/trending_tokens?chain=solana', {
-        headers: {
-          'X-API-KEY': process.env.BIRDEYE_API_KEY
-        }
-      });
+      // Use rate-limited API request with smart caching
+      const data = await makeExternalApiRequest<any>(
+        'https://public-api.birdeye.so/defi/trending_tokens?chain=solana',
+        {
+          headers: {
+            'X-API-KEY': process.env.BIRDEYE_API_KEY
+          }
+        },
+        true, // cache results
+        true  // use cache during rate limits
+      );
       
-      if (response.data && response.data.data) {
-        for (const token of response.data.data) {
+      if (data && data.data) {
+        for (const token of data.data) {
           const tokenSymbol = token.symbol;
           
           // Skip if not likely a memecoin
@@ -444,7 +472,8 @@ class MemecoinPriceDistributor extends EventEmitter {
         }
       }
     } catch (error) {
-      console.warn('Error fetching Birdeye data:', error);
+      logger.warn('Error fetching Birdeye data:', error);
+      // Continue with existing data
     }
   }
 
@@ -453,10 +482,16 @@ class MemecoinPriceDistributor extends EventEmitter {
    */
   private async fetchMeteoraData(memecoinData: Record<string, MemeTokenPrice>): Promise<void> {
     try {
-      const response = await axios.get('https://stats-api.meteora.ag/pools/all');
+      // Use rate-limited API request with smart caching
+      const data = await makeExternalApiRequest<any>(
+        'https://stats-api.meteora.ag/pools/all',
+        {},
+        true, // cache results
+        true  // use cache during rate limits
+      );
       
-      if (response.data && response.data.data) {
-        for (const pool of response.data.data) {
+      if (data && data.data) {
+        for (const pool of data.data) {
           // Extract token info
           const tokenA = pool.tokenASymbol;
           const tokenB = pool.tokenBSymbol;
