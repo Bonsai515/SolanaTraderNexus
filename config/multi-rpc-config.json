@@ -1,13 +1,13 @@
 {
   "providers": [
     {
-      "name": "Helius",
-      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
-      "websocketUrl": "wss://mainnet.helius-rpc.com/ws?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "name": "Syndica",
+      "url": "https://solana-api.syndica.io/rpc",
+      "websocketUrl": "wss://solana-api.syndica.io/rpc",
       "priority": 1,
       "weight": 10,
       "rateLimit": {
-        "requestsPerMinute": 200
+        "requestsPerMinute": 100
       },
       "inUse": true
     },
@@ -15,21 +15,21 @@
       "name": "Alchemy",
       "url": "https://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
       "websocketUrl": "wss://solana-mainnet.g.alchemy.com/v2/PPQbbM4WmrX_82GOP8QR5pJ_JsBvyLWR",
-      "priority": 1,
-      "weight": 10,
+      "priority": 2,
+      "weight": 8,
       "rateLimit": {
         "requestsPerMinute": 200
       },
       "inUse": true
     },
     {
-      "name": "Syndica",
-      "url": "https://solana-api.syndica.io/rpc",
-      "websocketUrl": "wss://solana-api.syndica.io/rpc",
-      "priority": 2,
-      "weight": 5,
+      "name": "Helius",
+      "url": "https://mainnet.helius-rpc.com/?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "websocketUrl": "wss://mainnet.helius-rpc.com/ws?api-key=5d0d1d98-4695-4a7d-b8a0-d4f9836da17f",
+      "priority": 3,
+      "weight": 6,
       "rateLimit": {
-        "requestsPerMinute": 100
+        "requestsPerMinute": 200
       },
       "inUse": true
     },
@@ -37,8 +37,8 @@
       "name": "Solana Public",
       "url": "https://api.mainnet-beta.solana.com",
       "websocketUrl": "wss://api.mainnet-beta.solana.com",
-      "priority": 3,
-      "weight": 1,
+      "priority": 4,
+      "weight": 2,
       "rateLimit": {
         "requestsPerMinute": 40
       },
@@ -48,8 +48,8 @@
       "name": "Serum",
       "url": "https://solana-api.projectserum.com",
       "websocketUrl": "wss://solana-api.projectserum.com",
-      "priority": 3,
-      "weight": 1,
+      "priority": 5,
+      "weight": 2,
       "rateLimit": {
         "requestsPerMinute": 40
       },
@@ -58,11 +58,11 @@
   ],
   "caching": {
     "enabled": true,
-    "accountInfoTtlMs": 300000,
-    "balanceTtlMs": 300000,
-    "transactionTtlMs": 86400000,
-    "blockTtlMs": 600000,
-    "slotTtlMs": 60000
+    "accountInfoTtlMs": 120000,
+    "balanceTtlMs": 120000,
+    "transactionTtlMs": 3600000,
+    "blockTtlMs": 300000,
+    "slotTtlMs": 30000
   },
   "fallback": {
     "enabled": true,
