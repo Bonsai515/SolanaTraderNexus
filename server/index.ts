@@ -35,6 +35,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Solana Trading Platform is running', timestamp: new Date().toISOString() });
 });
 
+// Initialize the memetoken connector module for token data
+if (process.env.INITIALIZE_MEMETOKEN_CACHE === 'true' || process.env.NODE_ENV === 'production') {
+  try {
+    const { initialize } = require('./lib/memeTokenConnector');
+    initialize().catch(error => {
+      logger.error(`Failed to initialize memecoin connector: ${error.message}`);
+    });
+    logger.info('Initialized memecoin global cache');
+  } catch (error) {
+    logger.error(`Error loading memecoin connector: ${error.message}`);
+  }
+}
+
 // Special endpoints for testing
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Solana Trading Platform server is running' });
