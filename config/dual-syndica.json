@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+  "name": "Dual Syndica Premium Configuration",
+  "wallet": {
+    "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "useRealFunds": true
+  },
+  "syndica": {
+    "endpoints": [
+      {
+        "name": "Premium 1",
+        "url": "https://solana-api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk/rpc",
+        "websocket": "wss://chainstream.api.syndica.io/api-key/q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk",
+        "apiKey": "q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk"
+      },
+      {
+        "name": "Premium 2",
+        "url": "https://solana-api.syndica.io/api-key/pCvktxK4Qc2JhNhVme1gpW9yZYxpVi53tQqroouPqJLtssQV28hVkaDk5zjL7W9SY7GPic9AqTXhRBMvdVemjd3vRHs1ypfPci/rpc",
+        "websocket": "wss://chainstream.api.syndica.io/api-key/pCvktxK4Qc2JhNhVme1gpW9yZYxpVi53tQqroouPqJLtssQV28hVkaDk5zjL7W9SY7GPic9AqTXhRBMvdVemjd3vRHs1ypfPci",
+        "apiKey": "pCvktxK4Qc2JhNhVme1gpW9yZYxpVi53tQqroouPqJLtssQV28hVkaDk5zjL7W9SY7GPic9AqTXhRBMvdVemjd3vRHs1ypfPci"
+      }
+    ],
+    "useDualEndpoints": true,
+    "loadBalancing": "round-robin"
+  },
+  "rateLimit": {
+    "requestsPerSecond": 40,
+    "maxConcurrent": 20,
+    "retryEnabled": true
+  },
+  "strategies": {
+    "enabled": [
+      "hyperion",
+      "quantum-omega",
+      "singularity"
+    ]
+  }
+}
