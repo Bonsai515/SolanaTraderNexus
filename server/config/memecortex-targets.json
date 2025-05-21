@@ -1,0 +1,57 @@
+{
+  "version": "1.0.0",
+  "priority_tokens": [
+    "SOL",
+    "BONK",
+    "WIF",
+    "MEME",
+    "JUP",
+    "DOGE",
+    "SHIB",
+    "MNGO",
+    "COPE",
+    "SAMO"
+  ],
+  "monitored_exchanges": [
+    "Raydium",
+    "Jupiter",
+    "Openbook",
+    "Meteora",
+    "Orca",
+    "Pump.fun"
+  ],
+  "scoring_weights": {
+    "liquidity": 0.3,
+    "volume": 0.25,
+    "social_engagement": 0.2,
+    "price_momentum": 0.15,
+    "holder_growth": 0.1
+  },
+  "signal_thresholds": {
+    "minimum_liquidity_sol": 5.0,
+    "minimum_volume_24h": 10000,
+    "minimum_confidence": 65,
+    "activation_threshold": 80 
+  },
+  "launch_detection": {
+    "monitored_dexes": [
+      "Raydium",
+      "Jupiter",
+      "Openbook",
+      "Meteora",
+      "Orca",
+      "Pump.fun"
+    ],
+    "initial_liquidity_minimum": 2.0,
+    "minimum_pool_age_seconds": 60,
+    "sniper_opportunity_window_minutes": 10,
+    "verification_required": true
+  },
+  "execution_settings": {
+    "max_position_size_sol": 0.25,
+    "default_slippage_bps": 100,
+    "max_slippage_bps": 500,
+    "cooldown_period_minutes": 30,
+    "simulate_only": true
+  }
+}

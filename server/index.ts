@@ -350,6 +350,33 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
       } else {
         console.warn('⚠️ Failed to initialize Trade Tracker');
       }
+      
+      // Initialize MemeToken Neural Transformer
+      console.log('Initializing MemeToken Neural Transformer...');
+      try {
+        const { initialize: initMemeTokenTransformer } = require('./transformers/memeTokenNeuralTransformer');
+        const memeTokenTransformerInitialized = await initMemeTokenTransformer();
+        if (memeTokenTransformerInitialized) {
+          console.log('✅ Successfully initialized MemeToken Neural Transformer');
+          console.log('   Processing token data and sending neural signals to Quantum Omega');
+          console.log('   Monitoring launch events, price surges, and sniper opportunities');
+          
+          // Initialize Quantum Omega Sniper Controller
+          console.log('Initializing Quantum Omega Sniper Controller...');
+          const { initialize: initQuantumOmegaController } = require('./strategies/quantumOmegaSniperController');
+          const quantumOmegaControllerInitialized = await initQuantumOmegaController();
+          if (quantumOmegaControllerInitialized) {
+            console.log('✅ Successfully initialized Quantum Omega Sniper Controller');
+            console.log('   Processing neural signals for execution of sniper opportunities');
+          } else {
+            console.warn('⚠️ Failed to initialize Quantum Omega Sniper Controller');
+          }
+        } else {
+          console.warn('⚠️ Failed to initialize MemeToken Neural Transformer');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing MemeToken Neural Integration:', error instanceof Error ? error.message : 'Unknown error');
+      }
     } catch (error) {
       console.error('❌ Error initializing Neural Communication Hub:', error instanceof Error ? error.message : 'Unknown error');
     }
