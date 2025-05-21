@@ -1,0 +1,28 @@
+{
+  "wallet": {
+    "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "useRealFunds": true
+  },
+  "rpc": {
+    "provider": "syndica",
+    "url": "https://solana-api.syndica.io/rpc",
+    "websocketUrl": "wss://solana-api.syndica.io/rpc"
+  },
+  "caching": {
+    "enabled": true,
+    "ttlSeconds": 300
+  },
+  "rateLimit": {
+    "enabled": true,
+    "requestsPerSecond": 2,
+    "maxBurst": 5
+  },
+  "trading": {
+    "enabled": true,
+    "strategies": [
+      "hyperion",
+      "quantum-omega",
+      "singularity"
+    ]
+  }
+}
