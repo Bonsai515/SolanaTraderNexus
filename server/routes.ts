@@ -28,6 +28,9 @@ import * as path from 'path';
 import { generateStaticDashboard, Signal as DashboardSignal } from './static-dashboard';
 // Import special route modules in the registerRoutes function
 import solendRouter from './routes/solend';
+import sniperRouter from './routes/sniperRoutes';
+// Import token scanner 
+import { scanForTokens, findSniperOpportunities } from './lib/memeTokenScanner';
 
 const router = express.Router();
 let usingNexusEngine = true; // Always use the Nexus Professional Engine
