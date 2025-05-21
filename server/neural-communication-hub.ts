@@ -442,6 +442,9 @@ export function shutdown(): void {
   logger.info('[NeuralHub] Neural Communication Hub shutdown');
 }
 
+// Export the initialization function with an alternate name to match what's expected in index.ts
+export const initNeuralCommunicationHub = initialize;
+
 // Initialize on module load if running directly
 if (require.main === module) {
   initialize().catch(error => {
