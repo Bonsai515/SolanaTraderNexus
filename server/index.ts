@@ -371,6 +371,30 @@ const SYSTEM_WALLET = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
           } else {
             console.warn('⚠️ Failed to initialize Quantum Omega Sniper Controller');
           }
+          
+          // Initialize Memecoin Social Analyzer
+          console.log('Initializing Memecoin Social Analyzer...');
+          const { initialize: initSocialAnalyzer } = require('./transformers/memecoin-social-analyzer');
+          const socialAnalyzerInitialized = await initSocialAnalyzer();
+          if (socialAnalyzerInitialized) {
+            console.log('✅ Successfully initialized Memecoin Social Analyzer');
+            console.log('   Analyzing social signals from Twitter, Telegram, Discord, and Reddit');
+            console.log('   Sending social sentiment signals to Quantum Omega');
+            
+            // Initialize Momentum Surfing Strategy
+            console.log('Initializing Momentum Surfing Strategy...');
+            const { initialize: initMomentumSurfing } = require('./strategies/momentum-surfing-strategy');
+            const momentumSurfingInitialized = await initMomentumSurfing();
+            if (momentumSurfingInitialized) {
+              console.log('✅ Successfully initialized Momentum Surfing Strategy');
+              console.log('   Managing longer-term positions based on social and price signals');
+              console.log('   Applying smart exit strategies with take profit and stop loss');
+            } else {
+              console.warn('⚠️ Failed to initialize Momentum Surfing Strategy');
+            }
+          } else {
+            console.warn('⚠️ Failed to initialize Memecoin Social Analyzer');
+          }
         } else {
           console.warn('⚠️ Failed to initialize MemeToken Neural Transformer');
         }
