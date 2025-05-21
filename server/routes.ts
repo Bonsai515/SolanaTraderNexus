@@ -29,6 +29,7 @@ import { generateStaticDashboard, Signal as DashboardSignal } from './static-das
 // Import special route modules in the registerRoutes function
 import solendRouter from './routes/solend';
 import sniperRouter from './routes/sniperRoutes';
+import memecoinRouter from './routes/memecoinRoutes';
 // Import token scanner 
 import { scanForTokens, findSniperOpportunities } from './lib/memeTokenScanner';
 
