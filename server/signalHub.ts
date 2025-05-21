@@ -88,11 +88,11 @@ export interface TransformerSignal {
 class SignalHub {
   private signals: Map<string, TransformerSignal> = new Map();
   private eventEmitter: EventEmitter = new EventEmitter();
-  
+
   constructor() {
     this.eventEmitter.setMaxListeners(50);
   }
-  
+
   /**
    * Submit a new signal
    * @param signal The signal to submit
@@ -102,27 +102,27 @@ class SignalHub {
     try {
       // Generate ID if not provided
       const signalId = signal.id || `signal_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-      
+
       // Ensure ID is assigned to signal
       signal.id = signalId;
-      
+
       // Store signal
       this.signals.set(signalId, signal);
-      
+
       // Log signal submission
       logger.info(`[SignalHub] Signal submitted: ${signalId} (${signal.type}) - ${signal.sourceToken} → ${signal.targetToken}`);
-      
+
       // Emit signal events
       this.eventEmitter.emit('signal', signal);
       this.eventEmitter.emit(`signal:${signal.type}`, signal);
-      
+
       return signalId;
     } catch (error) {
       logger.error(`[SignalHub] Error submitting signal: ${error}`);
       return '';
     }
   }
-  
+
   /**
    * Get a signal by ID
    * @param id The signal ID
@@ -131,7 +131,7 @@ class SignalHub {
   public getSignal(id: string): TransformerSignal | undefined {
     return this.signals.get(id);
   }
-  
+
   /**
    * Get recent signals
    * @param limit Maximum number of signals to return
@@ -142,7 +142,7 @@ class SignalHub {
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
-  
+
   /**
    * Listen for new signals
    * @param callback Callback function to handle new signals
@@ -152,7 +152,7 @@ class SignalHub {
     this.eventEmitter.on('signal', callback);
     return () => this.eventEmitter.off('signal', callback);
   }
-  
+
   /**
    * Listen for signals of a specific type
    * @param type Signal type to listen for
@@ -213,7 +213,8 @@ interface TokenPrice {
   lastUpdated: number;
 }
 
-interface TransformerSignal {
+// Redefining the TransformerSignal interface (duplicate)
+export interface TransformerSignal {
   id: string;
   timestamp: number;
   transformer: string;
@@ -265,26 +266,26 @@ const priceCache = new Map<string, TokenPrice>();
 export async function initSignalHub(): Promise<boolean> {
   try {
     logger.info(`[SignalHub] Initializing signal processing hub`);
-    
+
     // Create signals directory if it doesn't exist
     if (!fs.existsSync(SIGNALS_DIR)) {
       fs.mkdirSync(SIGNALS_DIR, { recursive: true });
     }
-    
+
     // Initialize processed signals file if it doesn't exist
     if (!fs.existsSync(PROCESSED_SIGNALS_PATH)) {
       fs.writeFileSync(PROCESSED_SIGNALS_PATH, JSON.stringify([], null, 2), 'utf8');
     }
-    
+
     // Update price cache initially
     await updatePriceCache();
-    
+
     // Start signal processing loop
     startSignalProcessing();
-    
+
     // Generate test signals for each transformer
     generateTestSignals();
-    
+
     logger.info(`[SignalHub] Signal hub initialized successfully`);
     return true;
   } catch (error) {
@@ -305,7 +306,7 @@ function startSignalProcessing(): void {
       logger.error(`[SignalHub] Error processing signals: ${error}`);
     }
   }, 5000);
-  
+
   // Update price cache every 30 seconds
   setInterval(async () => {
     try {
@@ -314,7 +315,7 @@ function startSignalProcessing(): void {
       logger.error(`[SignalHub] Error updating price cache: ${error}`);
     }
   }, 30000);
-  
+
   logger.info(`[SignalHub] Signal processing loop started`);
 }
 
@@ -330,12 +331,12 @@ function generateTestSignals(): void {
       'Security',
       'CrossChain'
     ];
-    
+
     // Generate signals for each transformer
     transformers.forEach(transformer => {
       generateTransformerSignals(transformer);
     });
-    
+
     logger.info(`[SignalHub] Generated test signals for transformers`);
   } catch (error) {
     logger.error(`[SignalHub] Error generating test signals: ${error}`);
@@ -349,7 +350,7 @@ function generateTransformerSignals(transformer: string): void {
   try {
     // Signal configurations based on transformer type
     let signalConfigs: Partial<TransformerSignal>[] = [];
-    
+
     switch (transformer) {
       case 'MicroQHC':
         // USDC to BONK trade signal
@@ -365,7 +366,7 @@ function generateTransformerSignals(transformer: string): void {
           dex: 'jupiter',
           description: 'MicroQHC detected high buy pressure on BONK'
         });
-        
+
         // SOL to MEME trade signal
         signalConfigs.push({
           type: SignalType.ENTRY,
@@ -380,7 +381,7 @@ function generateTransformerSignals(transformer: string): void {
           description: 'MicroQHC identified bullish pattern on MEME'
         });
         break;
-        
+
       case 'MemeCortex':
         // USDC to JUP trade signal
         signalConfigs.push({
@@ -396,7 +397,7 @@ function generateTransformerSignals(transformer: string): void {
           description: 'MemeCortex detected JUP uptrend beginning'
         });
         break;
-        
+
       case 'MemeCortexRemix':
         // Flash loan opportunity
         signalConfigs.push({
@@ -413,7 +414,7 @@ function generateTransformerSignals(transformer: string): void {
           description: 'MemeCortexRemix detected flash loan arbitrage opportunity'
         });
         break;
-        
+
       case 'Security':
         // Exit signal for MEME
         signalConfigs.push({
@@ -428,7 +429,7 @@ function generateTransformerSignals(transformer: string): void {
           description: 'Security detected potential downtrend for MEME'
         });
         break;
-        
+
       case 'CrossChain':
         // Cross-chain opportunity
         signalConfigs.push({
@@ -445,7 +446,7 @@ function generateTransformerSignals(transformer: string): void {
         });
         break;
     }
-    
+
     // Generate and submit signals
     signalConfigs.forEach(config => {
       const signal: TransformerSignal = {
@@ -471,7 +472,7 @@ function generateTransformerSignals(transformer: string): void {
         description: config.description || `${transformer} generated signal`,
         metadata: config.metadata
       };
-      
+
       submitTransformerSignal(signal);
     });
   } catch (error) {
@@ -486,14 +487,14 @@ export function submitTransformerSignal(signal: TransformerSignal): boolean {
   try {
     // Log signal receipt
     logger.info(`[SignalHub] Received new signal from ${signal.transformer}: ${signal.action} ${signal.sourceToken} → ${signal.targetToken}`);
-    
+
     // Store signal in temporary file
     const signalPath = path.join(SIGNALS_DIR, `signal_${signal.id}.json`);
     fs.writeFileSync(signalPath, JSON.stringify(signal, null, 2), 'utf8');
-    
+
     // Emit signal event
     EVENT_EMITTER.emit('newSignal', signal);
-    
+
     return true;
   } catch (error) {
     logger.error(`[SignalHub] Error submitting transformer signal: ${error}`);
@@ -509,24 +510,24 @@ async function processNewSignals(): Promise<void> {
     // Get all signal files
     const signalFiles = fs.readdirSync(SIGNALS_DIR)
       .filter(file => file.startsWith('signal_') && file.endsWith('.json'));
-    
+
     // Read processed signals
     const processedSignals: ProcessedSignal[] = JSON.parse(
       fs.readFileSync(PROCESSED_SIGNALS_PATH, 'utf8')
     );
-    
+
     // Process each signal file
     for (const file of signalFiles) {
       const filePath = path.join(SIGNALS_DIR, file);
       const signal: TransformerSignal = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      
+
       // Check if signal has already been processed
       const alreadyProcessed = processedSignals.some(ps => ps.id === signal.id);
-      
+
       if (!alreadyProcessed) {
         // Process signal
         await processSignal(signal, processedSignals);
-        
+
         // Remove signal file after processing
         fs.unlinkSync(filePath);
       }
@@ -545,7 +546,7 @@ async function processSignal(
 ): Promise<void> {
   try {
     logger.info(`[SignalHub] Processing signal ${signal.id} from ${signal.transformer}`);
-    
+
     // Create processed signal record
     const processedSignal: ProcessedSignal = {
       ...signal,
@@ -554,33 +555,33 @@ async function processSignal(
       status: 'pending',
       statusMessage: 'Signal received, preparing execution'
     };
-    
+
     // Update processed signals list
     processedSignals.push(processedSignal);
     fs.writeFileSync(PROCESSED_SIGNALS_PATH, JSON.stringify(processedSignals, null, 2), 'utf8');
-    
+
     // Execute signal based on type
     let success = false;
-    
+
     switch (signal.type) {
       case SignalType.ENTRY:
       case SignalType.EXIT:
         success = await executeTradeSignal(processedSignal);
         break;
-        
+
       case SignalType.FLASH_OPPORTUNITY:
         success = await executeFlashLoanOpportunity(processedSignal);
         break;
-        
+
       case SignalType.CROSS_CHAIN:
         success = await executeCrossChainOpportunity(processedSignal);
         break;
-        
+
       case SignalType.REBALANCE:
         success = await executeRebalance(processedSignal);
         break;
     }
-    
+
     // Update processed signal with result
     const index = processedSignals.findIndex(ps => ps.id === processedSignal.id);
     if (index !== -1) {
@@ -593,17 +594,17 @@ async function processSignal(
           ? 'Signal executed successfully' 
           : 'Signal execution failed'
       };
-      
+
       // Save updated processed signals
       fs.writeFileSync(PROCESSED_SIGNALS_PATH, JSON.stringify(processedSignals, null, 2), 'utf8');
     }
-    
+
     // Emit signal processed event
     EVENT_EMITTER.emit('signalProcessed', processedSignals[index]);
-    
+
   } catch (error) {
     logger.error(`[SignalHub] Error processing signal: ${error}`);
-    
+
     // Update processed signal with error
     const index = processedSignals.findIndex(ps => ps.id === signal.id);
     if (index !== -1) {
@@ -620,16 +621,16 @@ async function processSignal(
 async function executeTradeSignal(signal: ProcessedSignal): Promise<boolean> {
   try {
     logger.info(`[SignalHub] Executing trade signal: ${signal.action} ${signal.sourceToken} → ${signal.targetToken}`);
-    
+
     // Update signal status
     updateSignalStatus(signal, 'executing', 'Preparing to execute trade');
-    
+
     // Get Nexus engine
     const nexusEngine = getNexusEngine();
     if (!nexusEngine) {
       throw new Error('Nexus Engine not available');
     }
-    
+
     // Prepare trade parameters
     const tradeParams = {
       sourceToken: signal.sourceToken,
@@ -640,12 +641,13 @@ async function executeTradeSignal(signal: ProcessedSignal): Promise<boolean> {
       isSimulation: false, // Real trading
       signalId: signal.id,
       confidence: signal.confidence,
-      description: signal.description
+      description: signal.description,
+      strategy: 'default'
     };
-    
+
     // Execute trade via Nexus Engine
     const result = await nexusEngine.executeTrade(tradeParams);
-    
+
     if (result.success) {
       // Update signal with transaction signature
       updateSignalStatus(
@@ -654,7 +656,7 @@ async function executeTradeSignal(signal: ProcessedSignal): Promise<boolean> {
         `Trade executed successfully: ${result.signature}`,
         result.signature
       );
-      
+
       logger.info(`[SignalHub] Trade executed successfully: ${result.signature}`);
       return true;
     } else {
@@ -675,16 +677,16 @@ async function executeTradeSignal(signal: ProcessedSignal): Promise<boolean> {
 async function executeFlashLoanOpportunity(signal: ProcessedSignal): Promise<boolean> {
   try {
     logger.info(`[SignalHub] Executing flash loan opportunity`);
-    
+
     // Update signal status
     updateSignalStatus(signal, 'executing', 'Preparing flash loan execution');
-    
+
     // Get Nexus engine
     const nexusEngine = getNexusEngine();
     if (!nexusEngine) {
       throw new Error('Nexus Engine not available');
     }
-    
+
     // Prepare flash loan parameters
     const flashLoanParams = {
       sourceToken: signal.sourceToken,
@@ -693,10 +695,10 @@ async function executeFlashLoanOpportunity(signal: ProcessedSignal): Promise<boo
       useRealFunds: true,
       signalId: signal.id
     };
-    
+
     // Execute flash loan via Nexus Engine
     const result = await nexusEngine.executeFlashLoan(flashLoanParams);
-    
+
     if (result.success) {
       // Update signal with transaction signature
       updateSignalStatus(
@@ -705,7 +707,7 @@ async function executeFlashLoanOpportunity(signal: ProcessedSignal): Promise<boo
         `Flash loan executed successfully: ${result.signature}`,
         result.signature
       );
-      
+
       logger.info(`[SignalHub] Flash loan executed successfully: ${result.signature}`);
       return true;
     } else {
@@ -726,16 +728,16 @@ async function executeFlashLoanOpportunity(signal: ProcessedSignal): Promise<boo
 async function executeCrossChainOpportunity(signal: ProcessedSignal): Promise<boolean> {
   try {
     logger.info(`[SignalHub] Executing cross-chain opportunity`);
-    
+
     // Update signal status
     updateSignalStatus(signal, 'executing', 'Preparing cross-chain execution');
-    
+
     // Get Nexus engine
     const nexusEngine = getNexusEngine();
     if (!nexusEngine) {
       throw new Error('Nexus Engine not available');
     }
-    
+
     // Prepare cross-chain parameters
     const crossChainParams = {
       sourceToken: signal.sourceToken,
@@ -747,10 +749,10 @@ async function executeCrossChainOpportunity(signal: ProcessedSignal): Promise<bo
       useRealFunds: true,
       signalId: signal.id
     };
-    
+
     // Execute cross-chain via Nexus Engine
     const result = await nexusEngine.executeCrossChain(crossChainParams);
-    
+
     if (result.success) {
       // Update signal with transaction signature
       updateSignalStatus(
@@ -759,7 +761,7 @@ async function executeCrossChainOpportunity(signal: ProcessedSignal): Promise<bo
         `Cross-chain executed successfully: ${result.signature}`,
         result.signature
       );
-      
+
       logger.info(`[SignalHub] Cross-chain executed successfully: ${result.signature}`);
       return true;
     } else {
@@ -780,26 +782,26 @@ async function executeCrossChainOpportunity(signal: ProcessedSignal): Promise<bo
 async function executeRebalance(signal: ProcessedSignal): Promise<boolean> {
   try {
     logger.info(`[SignalHub] Executing portfolio rebalance`);
-    
+
     // Update signal status
     updateSignalStatus(signal, 'executing', 'Preparing portfolio rebalance');
-    
+
     // Get Nexus engine
     const nexusEngine = getNexusEngine();
     if (!nexusEngine) {
       throw new Error('Nexus Engine not available');
     }
-    
+
     // Prepare rebalance parameters
     const rebalanceParams = {
       targetAllocation: signal.metadata?.targetAllocation || {},
       useRealFunds: true,
       signalId: signal.id
     };
-    
+
     // Execute rebalance via Nexus Engine
     const result = await nexusEngine.rebalancePortfolio(rebalanceParams);
-    
+
     if (result.success) {
       // Update signal with transaction signatures
       updateSignalStatus(
@@ -808,7 +810,7 @@ async function executeRebalance(signal: ProcessedSignal): Promise<boolean> {
         `Rebalance executed successfully with ${result.transactions.length} transactions`,
         result.transactions[0]
       );
-      
+
       logger.info(`[SignalHub] Rebalance executed successfully: ${result.transactions.length} transactions`);
       return true;
     } else {
@@ -837,20 +839,20 @@ function updateSignalStatus(
     const processedSignals: ProcessedSignal[] = JSON.parse(
       fs.readFileSync(PROCESSED_SIGNALS_PATH, 'utf8')
     );
-    
+
     // Find and update signal
     const index = processedSignals.findIndex(ps => ps.id === signal.id);
     if (index !== -1) {
       processedSignals[index].status = status;
       processedSignals[index].statusMessage = statusMessage;
-      
+
       if (transactionSignature) {
         processedSignals[index].transactionSignature = transactionSignature;
       }
-      
+
       // Save updated processed signals
       fs.writeFileSync(PROCESSED_SIGNALS_PATH, JSON.stringify(processedSignals, null, 2), 'utf8');
-      
+
       // Update passed signal object
       signal.status = status;
       signal.statusMessage = statusMessage;
@@ -870,7 +872,7 @@ async function updatePriceCache(): Promise<void> {
   try {
     // For real implementation, this would fetch prices from Jupiter API or similar
     // For simplicity, we'll use placeholder values
-    
+
     // Update SOL price
     priceCache.set('SOL', {
       symbol: 'SOL',
@@ -878,7 +880,7 @@ async function updatePriceCache(): Promise<void> {
       solPrice: 1,
       lastUpdated: Date.now()
     });
-    
+
     // Update USDC price
     priceCache.set('USDC', {
       symbol: 'USDC',
@@ -886,7 +888,7 @@ async function updatePriceCache(): Promise<void> {
       solPrice: 1 / 140.25,
       lastUpdated: Date.now()
     });
-    
+
     // Update BONK price
     priceCache.set('BONK', {
       symbol: 'BONK',
@@ -894,7 +896,7 @@ async function updatePriceCache(): Promise<void> {
       solPrice: 0.00005 / 140.25,
       lastUpdated: Date.now()
     });
-    
+
     // Update MEME price
     priceCache.set('MEME', {
       symbol: 'MEME',
@@ -902,7 +904,7 @@ async function updatePriceCache(): Promise<void> {
       solPrice: 0.037 / 140.25,
       lastUpdated: Date.now()
     });
-    
+
     // Update JUP price
     priceCache.set('JUP', {
       symbol: 'JUP',
@@ -924,14 +926,14 @@ export function getRecentSignals(limit: number = 10): ProcessedSignal[] {
       const signals: ProcessedSignal[] = JSON.parse(
         fs.readFileSync(PROCESSED_SIGNALS_PATH, 'utf8')
       );
-      
+
       // Return most recent signals
       return signals.slice(-limit).reverse();
     }
   } catch (error) {
     logger.error(`[SignalHub] Error getting recent signals: ${error}`);
   }
-  
+
   return [];
 }
 
@@ -944,14 +946,14 @@ export function getActiveSignals(): ProcessedSignal[] {
       const signals: ProcessedSignal[] = JSON.parse(
         fs.readFileSync(PROCESSED_SIGNALS_PATH, 'utf8')
       );
-      
+
       // Return active signals
       return signals.filter(s => s.status === 'pending' || s.status === 'executing');
     }
   } catch (error) {
     logger.error(`[SignalHub] Error getting active signals: ${error}`);
   }
-  
+
   return [];
 }
 
@@ -960,7 +962,7 @@ export function getActiveSignals(): ProcessedSignal[] {
  */
 export function onNewSignal(callback: (signal: TransformerSignal) => void): () => void {
   EVENT_EMITTER.on('newSignal', callback);
-  
+
   // Return unsubscribe function
   return () => {
     EVENT_EMITTER.off('newSignal', callback);
@@ -972,7 +974,7 @@ export function onNewSignal(callback: (signal: TransformerSignal) => void): () =
  */
 export function onSignalProcessed(callback: (signal: ProcessedSignal) => void): () => void {
   EVENT_EMITTER.on('signalProcessed', callback);
-  
+
   // Return unsubscribe function
   return () => {
     EVENT_EMITTER.off('signalProcessed', callback);

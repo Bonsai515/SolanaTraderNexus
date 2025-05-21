@@ -116,6 +116,15 @@ let engineInstance: NexusEngine | null = null;
  * Nexus Engine class for singleton pattern
  */
 export class NexusEngine {
+  async getTokenPrice(tokenAddress: string): Promise<number> {
+    try {
+      // Implement price fetching logic
+      return 0; // Replace with actual implementation
+    } catch (error) {
+      console.error('Error getting token price:', error);
+      return 0;
+    }
+  }
   constructor() {
     // Initialization happens through the initialize function
     if (!initialized) {

@@ -1,7 +1,5 @@
-
-export class NexusEngine {
-  async getTokenPrice(tokenAddress: string): Promise<number> {
-    // Implement price fetching logic
-    return 0;
-  }
+export interface NexusEngine {
+  executeFlashLoan(params: any): Promise<any>;
+  executeCrossChain(params: any): Promise<any>;
+  rebalancePortfolio(params: any): Promise<any>;
 }

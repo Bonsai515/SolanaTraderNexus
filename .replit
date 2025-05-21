@@ -8,7 +8,7 @@ packages = ["openssl", "pkg-config", "jq"]
 
 [deployment]
 deploymentTarget = "cloudrun"
-build = ["sh", "-c", "tsc --skipLibCheck || exit 0"]
+build = ["sh", "-c", "tsc --skipLibCheck"]
 run = ["sh", "-c", "node server/production.js"]
 
 [[ports]]
