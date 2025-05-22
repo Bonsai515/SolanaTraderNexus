@@ -5,5 +5,19 @@
     "status": "test",
     "timestamp": "2025-05-22T14:25:14.618Z",
     "profit": 0.000412
+  },
+  {
+    "strategy": "nuclearFlashArbitrage",
+    "txid": "test_1747929712142_8724",
+    "status": "test",
+    "timestamp": "2025-05-22T16:01:52.142Z",
+    "profit": 0.000412
+  },
+  {
+    "strategy": "nuclearFlashArbitrage",
+    "txid": "test_1747930873833_7232",
+    "status": "test",
+    "timestamp": "2025-05-22T16:21:13.832Z",
+    "profit": 0.000412
   }
 ]

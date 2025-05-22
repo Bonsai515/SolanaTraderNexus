@@ -4,5 +4,17 @@
     "strategy": "nuclearFlashArbitrage",
     "amount": 0.000412,
     "txid": "test_1747923914619_3919"
+  },
+  {
+    "timestamp": "2025-05-22T16:01:52.142Z",
+    "strategy": "nuclearFlashArbitrage",
+    "amount": 0.000412,
+    "txid": "test_1747929712142_8724"
+  },
+  {
+    "timestamp": "2025-05-22T16:21:13.832Z",
+    "strategy": "nuclearFlashArbitrage",
+    "amount": 0.000412,
+    "txid": "test_1747930873833_7232"
   }
 ]
