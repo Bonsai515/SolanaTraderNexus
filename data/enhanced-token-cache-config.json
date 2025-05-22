@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "primarySource": "syndica",
+  "secondarySources": [
+    "jupiter",
+    "dexscreener"
+  ],
+  "fallbackSources": [
+    "raydium",
+    "orca"
+  ],
+  "updateIntervals": {
+    "highVolume": 30000,
+    "mediumVolume": 60000,
+    "lowVolume": 300000,
+    "metadata": 3600000
+  },
+  "cacheSettings": {
+    "maxTokens": 1000,
+    "persistToDisk": true,
+    "compressData": true,
+    "diskPath": "./data/enhanced-token-cache",
+    "backupInterval": 600000
+  },
+  "preloadTokens": [
+    "SOL",
+    "USDC",
+    "BONK",
+    "WIF",
+    "JUP",
+    "MEME",
+    "RAY",
+    "MNGO",
+    "ORCA",
+    "SHDW"
+  ],
+  "websocketEnabled": true,
+  "websocketEndpoint": "wss://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
+  "streamingEnabled": true,
+  "streamPriceUpdates": true,
+  "createdAt": "2025-05-22T01:58:51.246Z"
+}

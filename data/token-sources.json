@@ -1,5 +1,6 @@
 {
   "enabled": [
+    "syndica",
     "dexscreener",
     "jupiter",
     "raydium",
@@ -8,29 +9,35 @@
   ],
   "disabled": [
     "pumpfun",
-    "instantnodes"
+    "instantnodes",
+    "coingecko"
   ],
   "priorities": {
     "price": [
+      "syndica",
       "jupiter",
       "dexscreener",
-      "raydium",
-      "orca",
-      "meteora"
-    ],
-    "volume": [
-      "dexscreener",
-      "jupiter",
       "raydium",
       "orca"
     ],
+    "volume": [
+      "syndica",
+      "dexscreener",
+      "jupiter",
+      "raydium"
+    ],
     "trending": [
+      "syndica",
       "dexscreener",
       "jupiter",
       "meteora"
     ]
   },
   "rateLimits": {
+    "syndica": {
+      "requestsPerMinute": 300,
+      "requestsPerHour": 5000
+    },
     "dexscreener": {
       "requestsPerMinute": 30,
       "requestsPerHour": 1000
@@ -52,7 +59,7 @@
       "requestsPerHour": 2000
     }
   },
-  "updateFrequencyMs": 60000,
-  "cacheExpiryMs": 300000,
-  "lastUpdated": "2025-05-22T01:53:48.294Z"
+  "updateFrequencyMs": 30000,
+  "cacheExpiryMs": 180000,
+  "lastUpdated": "2025-05-22T01:58:51.236Z"
 }

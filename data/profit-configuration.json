@@ -1,0 +1,23 @@
+{
+  "mode": "aggressive_growth",
+  "reinvestmentRate": 90,
+  "profitSplitting": {
+    "reinvest": 90,
+    "reserve": 10,
+    "withdraw": 0
+  },
+  "capitalAllocation": {
+    "quantumOmega": 20,
+    "flashMinimal": 20,
+    "moneyGlitch": 30,
+    "hyperion": 30
+  },
+  "compoundingEnabled": true,
+  "compoundingFrequency": "daily",
+  "riskLevel": "high",
+  "targetGrowthRatePercent": 15,
+  "profitLockingEnabled": false,
+  "stopTradingThreshold": -15,
+  "autoscalingEnabled": true,
+  "updatedAt": "2025-05-22T02:00:32.828Z"
+}

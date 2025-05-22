@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "tradingMode": "aggressive",
+  "strategies": {
+    "quantumOmega": {
+      "dailyProfitRangeSol": [
+        0.004,
+        0.035
+      ],
+      "successRate": [
+        45,
+        65
+      ],
+      "dailyOpportunities": [
+        6,
+        18
+      ]
+    },
+    "flashMinimal": {
+      "dailyProfitRangeSol": [
+        0.008,
+        0.065
+      ],
+      "successRate": [
+        65,
+        80
+      ],
+      "dailyOpportunities": [
+        4,
+        12
+      ]
+    },
+    "moneyGlitch": {
+      "dailyProfitRangeSol": [
+        0.015,
+        0.09
+      ],
+      "successRate": [
+        55,
+        70
+      ],
+      "dailyOpportunities": [
+        3,
+        8
+      ]
+    },
+    "hyperion": {
+      "dailyProfitRangeSol": [
+        0.03,
+        0.18
+      ],
+      "successRate": [
+        75,
+        85
+      ],
+      "dailyOpportunities": [
+        2,
+        5
+      ]
+    }
+  },
+  "dailyProjection": {
+    "conservative": 0.057,
+    "moderate": 0.129,
+    "aggressive": 0.37
+  },
+  "monthlyProjection": {
+    "conservative": 1.71,
+    "moderate": 3.87,
+    "aggressive": 11.1
+  },
+  "riskAssessment": {
+    "maxDrawdownPercent": 15,
+    "volatilityScore": 8.5,
+    "recoveryTimeEstimateDays": 2.5
+  },
+  "generatedAt": "2025-05-22T02:00:32.830Z"
+}

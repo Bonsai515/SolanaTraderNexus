@@ -5,14 +5,14 @@
   "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
   "maxPositionSizeSOL": 0.25,
   "maxPositionSizePercentage": 40,
-  "minProfitThresholdUSD": 1,
-  "maxSlippageTolerance": 1,
+  "minProfitThresholdUSD": 0.2,
+  "maxSlippageTolerance": 2.5,
   "loanProtocols": [
     "Solend",
     "Marinade",
     "Jet"
   ],
-  "maxDailyTransactions": 200,
+  "maxDailyTransactions": 25,
   "targetedTokens": [
     "SOL",
     "BONK",
@@ -28,13 +28,14 @@
   "parallelExecution": true,
   "adaptiveRiskManagement": true,
   "executionPriorities": [
-    8,
     9,
-    10
+    8,
+    7,
+    6
   ],
-  "optimizationInterval": 60000,
+  "optimizationInterval": 5000,
   "useIntegratedDex": true,
-  "transactionTimeoutMs": 20000,
+  "transactionTimeoutMs": 30000,
   "useMemoryGraph": true,
   "transformerModels": [
     "MemeCortex",
@@ -50,7 +51,7 @@
   "usePremiumRpc": true,
   "transactionEndpoint": "https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8",
   "useTransactionEndpointOnly": true,
-  "dataEndpoint": "https://api.mainnet-beta.solana.com",
+  "dataEndpoint": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
   "separateTransactionAndDataEndpoints": true,
   "endpointPriorities": {
     "transactions": [
@@ -58,8 +59,10 @@
       "syndica"
     ],
     "queries": [
-      "public",
-      "helius"
+      "syndica",
+      "quicknode",
+      "public"
     ]
-  }
+  },
+  "maxPositionSizePercent": 30
 }

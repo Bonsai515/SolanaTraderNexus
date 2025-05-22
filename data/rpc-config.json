@@ -1,9 +1,9 @@
 {
-  "poolSize": 2,
+  "poolSize": 3,
   "maxBatchSize": 5,
   "cacheSettings": {
     "accountInfo": 10000,
-    "tokenInfo": 30000,
+    "tokenInfo": 20000,
     "blockInfo": 5000,
     "balance": 10000,
     "transaction": 30000
@@ -18,10 +18,18 @@
       "minuteLimit": 500
     },
     {
-      "url": "https://api.mainnet-beta.solana.com",
+      "url": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
       "purpose": "data",
-      "weight": 5,
+      "weight": 8,
       "priority": 2,
+      "maxRequestsPerSecond": 15,
+      "minuteLimit": 800
+    },
+    {
+      "url": "https://api.mainnet-beta.solana.com",
+      "purpose": "fallback",
+      "weight": 2,
+      "priority": 3,
       "maxRequestsPerSecond": 5,
       "minuteLimit": 150
     }
@@ -45,7 +53,7 @@
       "maxRequests": 500
     }
   },
-  "optimizedAt": "2025-05-22T01:54:58.347Z",
+  "optimizedAt": "2025-05-22T01:58:51.239Z",
   "transactionRouting": {
     "enabled": true,
     "rules": [
