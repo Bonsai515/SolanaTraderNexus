@@ -1,5 +1,5 @@
 {
-  "poolSize": 2,
+  "poolSize": 3,
   "maxBatchSize": 5,
   "cacheSettings": {
     "accountInfo": 10000,
@@ -11,7 +11,6 @@
   "endpoints": [
     {
       "url": "https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8",
-      "purpose": "transactions",
       "weight": 10,
       "priority": 1,
       "maxRequestsPerSecond": 10,
@@ -19,11 +18,15 @@
     },
     {
       "url": "https://api.mainnet-beta.solana.com",
-      "purpose": "data",
-      "weight": 5,
+      "weight": 2,
       "priority": 2,
-      "maxRequestsPerSecond": 5,
-      "minuteLimit": 150
+      "maxRequestsPerSecond": 2
+    },
+    {
+      "url": "https://solana-api.projectserum.com",
+      "weight": 1,
+      "priority": 3,
+      "maxRequestsPerSecond": 1
     }
   ],
   "httpOptions": {
@@ -45,20 +48,5 @@
       "maxRequests": 500
     }
   },
-  "optimizedAt": "2025-05-22T01:54:58.347Z",
-  "transactionRouting": {
-    "enabled": true,
-    "rules": [
-      {
-        "type": "trade",
-        "endpoint": 0,
-        "priority": "high"
-      },
-      {
-        "type": "query",
-        "endpoint": 1,
-        "priority": "medium"
-      }
-    ]
-  }
+  "optimizedAt": "2025-05-22T01:53:00.128Z"
 }
