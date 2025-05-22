@@ -1,63 +1,71 @@
 {
   "SOL": {
     "symbol": "SOL",
-    "priceUsd": 132.45,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 178.46,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 5.4197279733548465
   },
   "BONK": {
     "symbol": "BONK",
-    "priceUsd": 0.000023,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 0.00002174,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 7.166103672724485
   },
   "JUP": {
     "symbol": "JUP",
-    "priceUsd": 0.764,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 0.00092255,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 1.7572209187429952
   },
   "USDC": {
     "symbol": "USDC",
-    "priceUsd": 0.999,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 0.999789,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": -0.01018598020212746
   },
   "USDT": {
     "symbol": "USDT",
-    "priceUsd": 0.998,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 0.999972,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": -0.03575863856039756
   },
   "ETH": {
     "symbol": "ETH",
-    "priceUsd": 3750.32,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 2652.3,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 4.365745299184885
   },
   "WIF": {
     "symbol": "WIF",
     "priceUsd": 0.645,
-    "lastUpdated": 1747913393637,
+    "lastUpdated": 1747913874303,
     "source": "Jupiter"
   },
   "MEME": {
     "symbol": "MEME",
-    "priceUsd": 0.032,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 0.00674321,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 4.2376761442856115
   },
   "GUAC": {
     "symbol": "GUAC",
-    "priceUsd": 0.00117,
-    "lastUpdated": 1747913393637,
-    "source": "Jupiter"
+    "priceUsd": 3.1374e-8,
+    "lastUpdated": 1747915216586,
+    "source": "CoinGecko",
+    "change24h": 11.55526412644197
   },
   "BTC": {
     "symbol": "BTC",
-    "priceUsd": 110780,
-    "lastUpdated": 1747912149687,
+    "priceUsd": 110892,
+    "lastUpdated": 1747915216586,
     "source": "CoinGecko",
-    "change24h": 4.127625596296052
+    "change24h": 4.053113833927783
   }
 }
