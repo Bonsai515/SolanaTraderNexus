@@ -1,19 +1,19 @@
 {
-  "tradingMode": "ultra_aggressive",
-  "riskLevel": "very_high",
+  "tradingMode": "maximum_returns",
+  "riskLevel": "ultra_high",
   "maxCapitalUtilization": 90,
   "strategyWeights": {
     "Temporal Block Arbitrage": 25,
-    "Flash Loan Singularity": 25,
+    "Flash Loan Singularity": 20,
     "Quantum Arbitrage": 10,
     "quantumOmega": 2,
     "flashMinimal": 2,
     "moneyGlitch": 1,
     "hyperion": 0,
-    "Cascade Flash": 30,
-    "Jito Bundle MEV": 5,
-    "Backrun Strategy": 5,
-    "Just-In-Time Liquidity": 1
+    "Cascade Flash": 35,
+    "Jito Bundle MEV": 4,
+    "Backrun Strategy": 3,
+    "Just-In-Time Liquidity": 3
   },
   "lastModified": "2025-05-22T02:30:20.194Z",
   "aggressiveModeActivated": "2025-05-22T02:00:32.829Z",
@@ -101,5 +101,34 @@
     "prioritizeTradeFrequency": true,
     "minimumProfitThresholdMultiplier": 0.7,
     "maxDailyTradesMultiplier": 1.5
+  },
+  "onChainIntegration": {
+    "enabled": true,
+    "lastUpdated": "2025-05-22T02:41:06.844Z",
+    "programs": [
+      {
+        "name": "Flash Loan Router",
+        "status": "active",
+        "integrated": true
+      },
+      {
+        "name": "MEV Bundle Program",
+        "status": "active",
+        "integrated": true
+      },
+      {
+        "name": "Arbitrage Calculator",
+        "status": "active",
+        "integrated": true
+      }
+    ],
+    "performanceBoost": 30
+  },
+  "blockchainVerification": {
+    "enabled": true,
+    "transactionVerification": true,
+    "solscanLinks": true,
+    "balanceTracking": true,
+    "awsIntegration": true
   }
 }

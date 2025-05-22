@@ -4,7 +4,7 @@
   "enabled": true,
   "priority": "high",
   "executionMode": "aggressive",
-  "maxPositionSizePercent": 400,
+  "maxPositionSizePercent": 600,
   "minProfitThresholdSOL": 0.003,
   "targetProfitPercent": 2.5,
   "maxActiveLoans": 8,
@@ -57,5 +57,16 @@
     5,
     12
   ],
-  "createdAt": "2025-05-22T02:02:55.862Z"
+  "createdAt": "2025-05-22T02:02:55.862Z",
+  "useOnChainRouter": true,
+  "onChainRouterAddress": "FLR1dXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "onChainRouterIntegrated": true,
+  "profitProjection": {
+    "daily": {
+      "min": 0.04,
+      "avg": 0.07,
+      "max": 0.12
+    },
+    "onChainBoostPercent": 30
+  }
 }
