@@ -1,60 +1,74 @@
 {
   "version": "3.0.0",
   "general": {
-    "maxPositionSizePercent": 15,
-    "maxPositionSizeSOL": 0.1507434495,
-    "minProfitThresholdSOL": 0.0015,
-    "maxSlippageBps": 30,
-    "maxTradingFeeBps": 100,
-    "emergencyStopLossPercent": 7.5
+    "maxPositionSizePercent": 25,
+    "maxPositionSizeSOL": 0.2512390825,
+    "minProfitThresholdSOL": 0.001,
+    "maxSlippageBps": 50,
+    "maxTradingFeeBps": 150,
+    "emergencyStopLossPercent": 10
   },
   "strategies": {
     "flashLoanSingularity": {
-      "allocationPercent": 25,
-      "maxPositionSizeSOL": 0.037685862375,
+      "allocationPercent": 30,
+      "maxPositionSizeSOL": 0.07537172475,
       "enabled": true,
-      "priority": 1
+      "priority": 1,
+      "aggressiveMode": true
     },
     "quantumArbitrage": {
       "allocationPercent": 25,
-      "maxPositionSizeSOL": 0.037685862375,
+      "maxPositionSizeSOL": 0.062809770625,
       "enabled": true,
-      "priority": 1
+      "priority": 1,
+      "aggressiveMode": true
     },
     "temporalBlockArbitrage": {
       "allocationPercent": 20,
-      "maxPositionSizeSOL": 0.030148689899999997,
+      "maxPositionSizeSOL": 0.0502478165,
       "enabled": true,
       "priority": 2,
-      "blockDelayMs": 75
+      "blockDelayMs": 50,
+      "aggressiveMode": true
     },
     "cascadeFlash": {
-      "allocationPercent": 20,
-      "maxPositionSizeSOL": 0.030148689899999997,
+      "allocationPercent": 15,
+      "maxPositionSizeSOL": 0.037685862375,
       "enabled": true,
       "priority": 2,
-      "leverage": 10
+      "leverage": 15,
+      "aggressiveMode": true
     },
     "jitoBundle": {
       "allocationPercent": 10,
-      "maxPositionSizeSOL": 0.015074344949999999,
+      "maxPositionSizeSOL": 0.02512390825,
       "enabled": true,
-      "priority": 3
+      "priority": 3,
+      "maxBidPriceMultiplier": 2,
+      "aggressiveMode": true
     }
   },
   "projections": {
     "daily": {
-      "profitSOL": 0.02512390825,
-      "profitPercent": 2.5
+      "profitSOL": 0.0401982532,
+      "profitPercent": 4
     },
     "weekly": {
-      "profitSOL": 0.17586735775,
-      "profitPercent": 17.5
+      "profitSOL": 0.2813877724,
+      "profitPercent": 28
     },
     "monthly": {
-      "profitSOL": 0.7537172475,
-      "profitPercent": 75
+      "profitSOL": 1.205947596,
+      "profitPercent": 120
     }
   },
-  "timestamp": 1747885680829
+  "aggressiveMode": {
+    "enabled": true,
+    "maximizeFrequency": true,
+    "useAdvancedPricingModels": true,
+    "shortTermOpportunistic": true,
+    "bypassLiquidityChecks": false,
+    "neurialIntensiveScanning": true
+  },
+  "timestamp": 1747891069390
 }

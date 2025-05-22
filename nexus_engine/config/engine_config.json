@@ -1,13 +1,14 @@
 {
   "version": "3.0.0",
   "engine": {
-    "name": "Nexus Pro Engine",
-    "mode": "live",
+    "name": "Nexus Pro Engine (Aggressive)",
+    "mode": "aggressive",
     "executionModel": "blockchain",
-    "concurrentTransactions": 3,
-    "transactionRetries": 3,
-    "transactionTimeoutMs": 45000,
-    "useJitoBundle": true
+    "concurrentTransactions": 5,
+    "transactionRetries": 5,
+    "transactionTimeoutMs": 30000,
+    "useJitoBundle": true,
+    "priorityFeeMultiplier": 2
   },
   "monitoring": {
     "enabled": true,
@@ -19,12 +20,20 @@
     "simulateTransactions": true,
     "verifyTransactions": true,
     "requireConfirmations": 1,
-    "maxTransactionLifetimeMs": 60000
+    "maxTransactionLifetimeMs": 45000
   },
   "profitCollection": {
     "enabled": true,
-    "threshold": 0.01,
-    "frequency": "daily",
+    "threshold": 0.005,
+    "frequency": "hourly",
     "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+  },
+  "aggressiveSettings": {
+    "enabled": true,
+    "frequentRPCReconnection": true,
+    "prioritizeThroughput": true,
+    "useAdvancedOrderRouting": true,
+    "useAdvancedTradingAlgorithms": true,
+    "bypassConfirmationDelays": true
   }
 }
