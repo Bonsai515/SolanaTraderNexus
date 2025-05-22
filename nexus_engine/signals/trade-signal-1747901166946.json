@@ -1,0 +1,17 @@
+{
+  "id": "quantumArbitrage-1747901166946",
+  "strategy": "quantumArbitrage",
+  "type": "trade",
+  "sourceToken": "SOL",
+  "targetToken": "WIF",
+  "amount": 0.002,
+  "confidence": 95,
+  "timestamp": 1747901166946,
+  "priority": "high",
+  "executionParams": {
+    "slippageBps": 50,
+    "deadline": 1747901226946,
+    "feeBps": 2,
+    "wallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+  }
+}

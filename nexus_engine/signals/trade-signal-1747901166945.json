@@ -1,0 +1,17 @@
+{
+  "id": "flashLoanSingularity-1747901166945",
+  "strategy": "flashLoanSingularity",
+  "type": "trade",
+  "sourceToken": "SOL",
+  "targetToken": "BONK",
+  "amount": 0.001,
+  "confidence": 95,
+  "timestamp": 1747901166945,
+  "priority": "high",
+  "executionParams": {
+    "slippageBps": 50,
+    "deadline": 1747901226945,
+    "feeBps": 2,
+    "wallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+  }
+}
