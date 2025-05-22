@@ -15,7 +15,9 @@
       "weight": 10,
       "priority": 1,
       "maxRequestsPerSecond": 10,
-      "minuteLimit": 500
+      "minuteLimit": 500,
+      "mevProtection": true,
+      "useBundling": true
     },
     {
       "url": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
@@ -23,7 +25,9 @@
       "weight": 8,
       "priority": 2,
       "maxRequestsPerSecond": 15,
-      "minuteLimit": 800
+      "minuteLimit": 800,
+      "mevProtection": true,
+      "useBundling": true
     },
     {
       "url": "https://api.mainnet-beta.solana.com",
@@ -31,7 +35,9 @@
       "weight": 2,
       "priority": 3,
       "maxRequestsPerSecond": 5,
-      "minuteLimit": 150
+      "minuteLimit": 150,
+      "mevProtection": true,
+      "useBundling": true
     },
     {
       "url": "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e",
@@ -42,7 +48,9 @@
       "maxRequestsPerSecond": 15,
       "minuteLimit": 800,
       "provider": "quicknode",
-      "name": "QuickNode Neural"
+      "name": "QuickNode Neural",
+      "mevProtection": true,
+      "useBundling": true
     }
   ],
   "httpOptions": {
@@ -82,5 +90,23 @@
   },
   "useLoadBalancing": true,
   "neuralEndpointIndex": 3,
-  "lastUpdated": "2025-05-22T02:21:30.958Z"
+  "lastUpdated": "2025-05-22T02:30:20.189Z",
+  "jitoConfig": {
+    "enabled": true,
+    "relayUrl": "https://mainnet.block-engine.jito.wtf/api/v1/bundles",
+    "authEnabled": false,
+    "bundlePriorityFee": 100000,
+    "useTipAccounts": true,
+    "searcherKey": ""
+  },
+  "mevSettings": {
+    "enabled": true,
+    "bundlingEnabled": true,
+    "backrunEnabled": true,
+    "jitLiquidityEnabled": true,
+    "maxBundlesPerBlock": 3,
+    "searcherIdentity": "QuantumHyperion",
+    "trackingEnabled": true,
+    "lastUpdated": "2025-05-22T02:30:20.189Z"
+  }
 }
