@@ -7,7 +7,7 @@
     "skipPreflightCheck": false,
     "maxRetries": 3,
     "transactionTimeout": 30000,
-    "slippageTolerance": 0.01,
+    "slippageTolerance": 0.02,
     "priorityFee": "MEDIUM"
   },
   "wallet": {
@@ -35,17 +35,17 @@
       "lowRiskStrategies": 0.7
     },
     "profitThresholds": {
-      "nuclearFlashArbitrage": 0.0008,
-      "hyperionMoneyLoop": 0.0008,
-      "flashLoanSingularity": 0.001,
-      "quantumArbitrage": 0.001,
-      "hyperNetworkBlitz": 0.001,
-      "jitoBundle": 0.0012,
-      "cascadeFlash": 0.0012,
-      "temporalBlockArbitrage": 0.0012,
-      "ultraQuantumMEV": 0.0012
+      "nuclearFlashArbitrage": 0.0004,
+      "hyperionMoneyLoop": 0.0004,
+      "flashLoanSingularity": 0.0005,
+      "quantumArbitrage": 0.0005,
+      "hyperNetworkBlitz": 0.0005,
+      "jitoBundle": 0.0006,
+      "cascadeFlash": 0.0006,
+      "temporalBlockArbitrage": 0.0006,
+      "ultraQuantumMEV": 0.0006
     },
-    "tradeFrequencySeconds": 120
+    "tradeFrequencySeconds": 60
   },
   "strategies": [
     {

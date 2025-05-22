@@ -1,7 +1,7 @@
 {
   "name": "hyperNetworkBlitz",
   "description": "Hyper-network blitz trading with MEV protection",
-  "minProfitThreshold": 0.001,
+  "minProfitThreshold": 0.0005,
   "positionSizing": 0.85,
   "priority": 10,
   "maxSlippageBps": 100,
