@@ -1,14 +1,15 @@
 {
   "version": "3.0.0",
   "engine": {
-    "name": "Nexus Pro Engine (Aggressive)",
-    "mode": "aggressive",
+    "name": "Nexus Pro Engine (Maximum Frequency)",
+    "mode": "ultra",
     "executionModel": "blockchain",
-    "concurrentTransactions": 5,
-    "transactionRetries": 5,
-    "transactionTimeoutMs": 30000,
+    "concurrentTransactions": 8,
+    "transactionRetries": 8,
+    "transactionTimeoutMs": 15000,
     "useJitoBundle": true,
-    "priorityFeeMultiplier": 2
+    "priorityFeeMultiplier": 4,
+    "maxTransactionsPerSecond": 5
   },
   "monitoring": {
     "enabled": true,
@@ -20,20 +21,26 @@
     "simulateTransactions": true,
     "verifyTransactions": true,
     "requireConfirmations": 1,
-    "maxTransactionLifetimeMs": 45000
+    "maxTransactionLifetimeMs": 30000,
+    "bypassSlowSecurity": true
   },
   "profitCollection": {
     "enabled": true,
-    "threshold": 0.005,
-    "frequency": "hourly",
+    "threshold": 0.001,
+    "frequency": "every-15-minutes",
     "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
   },
-  "aggressiveSettings": {
+  "ultraSettings": {
     "enabled": true,
     "frequentRPCReconnection": true,
     "prioritizeThroughput": true,
     "useAdvancedOrderRouting": true,
     "useAdvancedTradingAlgorithms": true,
-    "bypassConfirmationDelays": true
+    "bypassConfirmationDelays": true,
+    "maximumTradingFrequency": true,
+    "minimizeScanIntervals": true,
+    "useMultiRPC": true,
+    "opportunisticTrading": true,
+    "useParallelTransactionSigning": true
   }
 }
