@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "profitCollection": {
+    "enabled": true,
+    "mode": "instant",
+    "threshold": 0.0001,
+    "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "minimumBalanceSOL": 0.05,
+    "securityChecks": true
+  },
+  "instantCollection": {
+    "enabled": true,
+    "collectAfterEachTrade": true,
+    "minimumCollectionAmount": 0.0001,
+    "maxCollectionDelayMs": 100
+  },
+  "security": {
+    "verifyDestinationWallet": true,
+    "confirmCollections": true,
+    "emergencyCollection": {
+      "enabled": true,
+      "threshold": 0.1
+    }
+  },
+  "logging": {
+    "enabled": true,
+    "logAllCollections": true,
+    "logFailures": true
+  }
+}
