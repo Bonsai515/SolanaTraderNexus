@@ -17,7 +17,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 287929.86
     },
     {
@@ -37,7 +37,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 69630.44
     },
     {
@@ -57,7 +57,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 346648.05
     }
   ],
@@ -79,7 +79,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 287929.86
     },
     {
@@ -99,7 +99,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 346648.05
     },
     {
@@ -119,7 +119,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 69630.44
     }
   ],
@@ -142,7 +142,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 346648.05,
       "trendingScore": 25.240302999999997
     },
@@ -163,7 +163,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 287929.86,
       "trendingScore": 22.474328
     },
@@ -184,11 +184,10 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747891314952,
+      "lastUpdated": 1747891339536,
       "liquidityUSD": 69630.44,
       "trendingScore": 10.053093
     }
   ],
   "lastFullUpdate": 0
-}
 }
