@@ -2,7 +2,7 @@
   "enabled": true,
   "version": "2.0.0",
   "capital": {
-    "maxAllocationPercent": 5,
+    "maxAllocationPercent": 10,
     "minBalanceRequired": 0.05,
     "reservePercent": 20
   },
@@ -16,7 +16,7 @@
       "bundleProvider": "jito",
       "tipLamports": 100000,
       "maxBundleSize": 5,
-      "searchIntervalMs": 100,
+      "searchIntervalMs": 70,
       "targetMarkets": [
         "raydium",
         "jupiter",
@@ -24,7 +24,7 @@
         "meteora"
       ],
       "risklevel": "medium",
-      "profitThresholdSol": 0.0007,
+      "profitThresholdSol": 0.00049,
       "projectedDailyProfitRange": [
         0.008,
         0.035
@@ -36,7 +36,7 @@
       "type": "backrun",
       "priority": "high",
       "description": "Backrun large swaps for guaranteed profit",
-      "scanIntervalMs": 50,
+      "scanIntervalMs": 35,
       "minSwapSizeUsd": 10000,
       "maxSlippageBps": 25,
       "targetDEXs": [
@@ -52,7 +52,7 @@
         "JUP"
       ],
       "risklevel": "low",
-      "profitThresholdSol": 0.0005,
+      "profitThresholdSol": 0.00035,
       "projectedDailyProfitRange": [
         0.005,
         0.02
@@ -64,7 +64,7 @@
       "type": "jit_liquidity",
       "priority": "medium",
       "description": "Provide just-in-time liquidity for large swaps",
-      "scanIntervalMs": 75,
+      "scanIntervalMs": 52,
       "minLiquidityUsd": 1000,
       "maxPositionDurationMs": 3000,
       "targetPools": [
@@ -75,7 +75,7 @@
         "WIF/USDC"
       ],
       "risklevel": "medium",
-      "profitThresholdSol": 0.0008,
+      "profitThresholdSol": 0.00056,
       "projectedDailyProfitRange": [
         0.006,
         0.025
@@ -103,8 +103,8 @@
     "optimizeParallelExecution": true
   },
   "totalProjectedDailyProfit": {
-    "min": 0.019,
-    "max": 0.08
+    "min": 0.025,
+    "max": 0.11
   },
   "lastUpdated": "2025-05-22T02:30:19.956Z"
 }
