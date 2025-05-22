@@ -17,7 +17,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 290117.88
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
@@ -36,7 +37,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 70444.58
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
@@ -55,7 +57,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 345589.9000000001
     }
   ],
   "topTokens": [
@@ -76,7 +79,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 345589.9000000001
     },
     {
       "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
@@ -95,7 +99,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 290117.88
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
@@ -114,7 +119,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 70444.58
     }
   ],
   "newTokens": [],
@@ -136,7 +142,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730,
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 290117.88,
       "trendingScore": 29.374451999999998
     },
     {
@@ -156,7 +163,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730,
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 345589.9000000001,
       "trendingScore": 29.150627
     },
     {
@@ -176,7 +184,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747913071730,
+      "lastUpdated": 1747913096398,
+      "liquidityUSD": 70444.58,
       "trendingScore": 15.362701999999999
     }
   ],
