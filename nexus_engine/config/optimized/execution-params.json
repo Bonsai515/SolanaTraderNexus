@@ -1,0 +1,39 @@
+{
+  "executionSettings": {
+    "transactionTimeout": 45000,
+    "maxConcurrentTransactions": 5,
+    "priorityLevels": 3,
+    "useRouteOptimization": true,
+    "useConcurrentExecution": true,
+    "useTransactionBatching": true,
+    "usePreflightChecks": true,
+    "useBlockhashCaching": true,
+    "usePriorityFees": true,
+    "maxRetries": 5,
+    "retryBackoffMs": 200,
+    "maxBlockhashAge": 25,
+    "minSignatureConfirmations": 1,
+    "maxSignatureValidationAttempts": 5
+  },
+  "transactionOptimizations": {
+    "useVersionedTransactions": true,
+    "useAddressLookupTables": true,
+    "useComputeBudgetProgram": true,
+    "computeUnitLimit": 1400000,
+    "computeUnitPrice": 10000,
+    "usePreferredValidator": true,
+    "prioritizeThroughput": true,
+    "batchTransactionsWhenPossible": true,
+    "skipPreflight": false,
+    "skipPreflightSim": true
+  },
+  "connectionOptimizations": {
+    "useMultipleRpcEndpoints": true,
+    "useWebSocketForPriorityOperations": true,
+    "useHttpKeepAlive": true,
+    "useConnectionPooling": true,
+    "useRequestPipelining": true,
+    "useSmartRpcRouting": true,
+    "maxConnectionsPerEndpoint": 5
+  }
+}

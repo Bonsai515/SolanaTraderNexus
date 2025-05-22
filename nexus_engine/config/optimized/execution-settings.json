@@ -1,0 +1,39 @@
+{
+  "execution": {
+    "parallelism": {
+      "enabled": true,
+      "maxConcurrentTransactions": 5,
+      "maxConcurrentStrategies": 4,
+      "useThreadPooling": true,
+      "useNodeWorkerThreads": true,
+      "useBatchExecution": true
+    },
+    "performance": {
+      "useJIT": true,
+      "useCachedRoutes": true,
+      "useCachedQuotes": true,
+      "useCachedTokenLists": true,
+      "useRPCConnectionPooling": true,
+      "useRouteOptimization": true,
+      "useFastDeserialization": true
+    },
+    "reliability": {
+      "useTransactionRetries": true,
+      "maxRetries": 5,
+      "useFailover": true,
+      "useRedundantQuotes": true,
+      "useTransactionSimulation": true,
+      "useFallbackRoutes": true,
+      "useHealthChecks": true
+    },
+    "timing": {
+      "useRequestPrioritization": true,
+      "usePrecomputedRoutes": true,
+      "usePrefetchedBlockhash": true,
+      "useOptimisticExecution": true,
+      "maxBlockhashValiditySeconds": 30,
+      "maxTransactionTimeoutMs": 45000,
+      "minConfirmationTargetMs": 15000
+    }
+  }
+}

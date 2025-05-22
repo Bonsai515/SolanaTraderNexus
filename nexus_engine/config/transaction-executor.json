@@ -1,0 +1,28 @@
+{
+  "executor": {
+    "version": "2.0",
+    "type": "hyper-aggressive",
+    "useVersionedTransactions": true,
+    "useComputeBudget": true,
+    "computeUnitLimit": 1400000,
+    "computeUnitPrice": 10000,
+    "useAddressLookupTables": true,
+    "useSendAndConfirmVersionedTransaction": true,
+    "maxSignatureConfirmations": 1,
+    "priorityFeeMultiplier": 2,
+    "simulateTransaction": true,
+    "skipPreflightChecksInSimulation": true,
+    "maxRetries": 5,
+    "useParallelSigning": true,
+    "useConcurrentConfirmation": true,
+    "useWebSocketForConfirmation": true,
+    "enableTimeWarp": true,
+    "precomputeTransactionSize": true,
+    "maxMEVProtection": true,
+    "usePreflightChecks": true,
+    "useOptimisticExecution": true,
+    "maxTimeoutMs": 45000,
+    "minLamports": 1000000,
+    "maxLamports": 700000000
+  }
+}
