@@ -4,9 +4,9 @@
  * This script monitors trading activity and tracks profits in real-time.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+const fs = require('fs');
+const path = require('path');
+const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -34,7 +34,7 @@ let failedTrades = 0;
 let startTime = Date.now();
 
 // Log function
-function log(message: string): void {
+function log(message) {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}`;
   console.log(logMessage);
@@ -42,24 +42,24 @@ function log(message: string): void {
 }
 
 // Connect to Solana
-function connectToSolana(): Connection {
+function connectToSolana() {
   return new Connection(RPC_URL, 'confirmed');
 }
 
 // Get wallet balance
-async function getWalletBalance(connection: Connection): Promise<number> {
+async function getWalletBalance(connection) {
   try {
     const publicKey = new PublicKey(WALLET_ADDRESS);
     const balance = await connection.getBalance(publicKey);
     return balance / LAMPORTS_PER_SOL;
   } catch (error) {
-    log(`Error getting wallet balance: ${(error as Error).message}`);
+    log(`Error getting wallet balance: ${error.message}`);
     return 0;
   }
 }
 
 // Format time
-function formatTime(ms: number): string {
+function formatTime(ms) {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -69,17 +69,17 @@ function formatTime(ms: number): string {
 }
 
 // Calculate profit
-function calculateProfit(): number {
+function calculateProfit() {
   return currentBalance - initialBalance;
 }
 
 // Calculate profit percentage
-function calculateProfitPercentage(): number {
+function calculateProfitPercentage() {
   return initialBalance > 0 ? (calculateProfit() / initialBalance) * 100 : 0;
 }
 
 // Display stats
-function displayStats(): void {
+function displayStats() {
   const profit = calculateProfit();
   const profitPercentage = calculateProfitPercentage();
   const runTime = formatTime(Date.now() - startTime);
@@ -108,7 +108,7 @@ function displayStats(): void {
 }
 
 // Main monitor function
-async function monitorTrades(): Promise<void> {
+async function monitorTrades() {
   try {
     log(`Starting trade monitor for wallet: ${WALLET_ADDRESS}`);
     
@@ -210,7 +210,7 @@ async function monitorTrades(): Promise<void> {
         // Display stats
         displayStats();
       } catch (error) {
-        log(`Error in monitor loop: ${(error as Error).message}`);
+        log(`Error in monitor loop: ${error.message}`);
       }
     }, UPDATE_INTERVAL_MS);
     
@@ -219,7 +219,7 @@ async function monitorTrades(): Promise<void> {
     
     log('Trade monitor running. Press Ctrl+C to exit.');
   } catch (error) {
-    log(`Error starting monitor: ${(error as Error).message}`);
+    log(`Error starting monitor: ${error.message}`);
   }
 }
 

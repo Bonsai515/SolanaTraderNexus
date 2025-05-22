@@ -11,11 +11,11 @@ mkdir -p ./nexus_engine/logs
 
 # Start the Nexus Pro Engine in aggressive mode
 echo "Starting Nexus Pro Engine in AGGRESSIVE mode..."
-node ./nexus_engine/start.js --wallet=2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH --config=./nexus_engine/config --mode=aggressive &
+npx ts-node ./nexus_engine/start.ts --wallet=2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH --config=./nexus_engine/config --mode=aggressive &
 
 # Start the trade monitor
 echo "Starting trade monitor..."
-node ./trade-monitor-simple.js --wallet=2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH &
+npx ts-node ./trade-monitor-simple.ts --wallet=2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH &
 
 echo "===== AGGRESSIVE TRADING SYSTEM STARTED ====="
 echo "⚠️ WARNING: Aggressive mode uses higher position sizes and increased risk parameters"
