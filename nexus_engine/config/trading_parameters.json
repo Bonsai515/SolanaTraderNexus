@@ -1,65 +1,72 @@
 {
   "version": "3.0.0",
   "general": {
-    "maxPositionSizePercent": 25,
-    "maxPositionSizeSOL": 0.2512390825,
-    "minProfitThresholdSOL": 0.001,
-    "maxSlippageBps": 50,
-    "maxTradingFeeBps": 150,
-    "emergencyStopLossPercent": 10
+    "maxPositionSizePercent": 30,
+    "maxPositionSizeSOL": 0.301486899,
+    "minProfitThresholdSOL": 0.0005,
+    "maxSlippageBps": 100,
+    "maxTradingFeeBps": 200,
+    "emergencyStopLossPercent": 12
   },
   "strategies": {
     "flashLoanSingularity": {
       "allocationPercent": 30,
-      "maxPositionSizeSOL": 0.07537172475,
+      "maxPositionSizeSOL": 0.09044606969999999,
       "enabled": true,
       "priority": 1,
-      "aggressiveMode": true
+      "aggressiveMode": true,
+      "maxFrequencyMode": true,
+      "minTimeBetweenTradesMs": 200
     },
     "quantumArbitrage": {
       "allocationPercent": 25,
-      "maxPositionSizeSOL": 0.062809770625,
+      "maxPositionSizeSOL": 0.07537172475,
       "enabled": true,
       "priority": 1,
-      "aggressiveMode": true
+      "aggressiveMode": true,
+      "maxFrequencyMode": true,
+      "minTimeBetweenTradesMs": 150
     },
     "temporalBlockArbitrage": {
       "allocationPercent": 20,
-      "maxPositionSizeSOL": 0.0502478165,
+      "maxPositionSizeSOL": 0.060297379799999995,
       "enabled": true,
-      "priority": 2,
-      "blockDelayMs": 50,
-      "aggressiveMode": true
+      "priority": 1,
+      "blockDelayMs": 30,
+      "aggressiveMode": true,
+      "maxFrequencyMode": true
     },
     "cascadeFlash": {
       "allocationPercent": 15,
-      "maxPositionSizeSOL": 0.037685862375,
+      "maxPositionSizeSOL": 0.045223034849999996,
       "enabled": true,
       "priority": 2,
-      "leverage": 15,
-      "aggressiveMode": true
+      "leverage": 20,
+      "aggressiveMode": true,
+      "maxFrequencyMode": true
     },
     "jitoBundle": {
       "allocationPercent": 10,
-      "maxPositionSizeSOL": 0.02512390825,
+      "maxPositionSizeSOL": 0.030148689899999997,
       "enabled": true,
-      "priority": 3,
-      "maxBidPriceMultiplier": 2,
-      "aggressiveMode": true
+      "priority": 2,
+      "maxBidPriceMultiplier": 3,
+      "aggressiveMode": true,
+      "maxFrequencyMode": true
     }
   },
   "projections": {
     "daily": {
-      "profitSOL": 0.0401982532,
-      "profitPercent": 4
+      "profitSOL": 0.0502478165,
+      "profitPercent": 5
     },
     "weekly": {
-      "profitSOL": 0.2813877724,
-      "profitPercent": 28
+      "profitSOL": 0.3517347155,
+      "profitPercent": 35
     },
     "monthly": {
-      "profitSOL": 1.205947596,
-      "profitPercent": 120
+      "profitSOL": 1.507434495,
+      "profitPercent": 150
     }
   },
   "aggressiveMode": {
@@ -67,8 +74,22 @@
     "maximizeFrequency": true,
     "useAdvancedPricingModels": true,
     "shortTermOpportunistic": true,
-    "bypassLiquidityChecks": false,
-    "neurialIntensiveScanning": true
+    "bypassLiquidityChecks": true,
+    "neurialIntensiveScanning": true,
+    "maxFrequencyEnabled": true,
+    "ultraHighFrequencyMode": true,
+    "rapidFireExecution": true
   },
-  "timestamp": 1747891069390
+  "scanFrequency": {
+    "intervalMs": 1000,
+    "priorityScanIntervalMs": 500,
+    "emergencyScanIntervalMs": 250
+  },
+  "executionSettings": {
+    "maxParallelTrades": 5,
+    "maxTradesPerMinute": 60,
+    "precomputeRoutes": true,
+    "useJitoBundlesForSpeed": true
+  },
+  "timestamp": 1747891891653
 }
