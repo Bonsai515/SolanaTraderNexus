@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "directExecution": {
+    "enabled": true,
+    "bypassPreExecution": true,
+    "bypassAnalysis": false,
+    "bypassSlippageCheck": false,
+    "maxParallelSignals": 10
+  },
+  "strategyConnections": {
+    "flashLoanSingularity": {
+      "directNexusExecution": true,
+      "signalPriority": "critical",
+      "executionMode": "instant"
+    },
+    "quantumArbitrage": {
+      "directNexusExecution": true,
+      "signalPriority": "critical",
+      "executionMode": "instant"
+    },
+    "temporalBlockArbitrage": {
+      "directNexusExecution": true,
+      "signalPriority": "high",
+      "executionMode": "fast"
+    },
+    "cascadeFlash": {
+      "directNexusExecution": true,
+      "signalPriority": "high",
+      "executionMode": "fast"
+    },
+    "jitoBundle": {
+      "directNexusExecution": true,
+      "signalPriority": "medium",
+      "executionMode": "standard"
+    }
+  },
+  "nexusEngineConnection": {
+    "enabled": true,
+    "signalEndpoint": "./nexus_engine/signals",
+    "realTimeForwarding": true,
+    "executionConfirmation": true,
+    "minSignalInterval": 100,
+    "signalBuffer": 20
+  },
+  "security": {
+    "validateSignals": true,
+    "validatePricing": true
+  }
+}

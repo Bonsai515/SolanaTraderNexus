@@ -25,6 +25,10 @@ npx ts-node ./trade-monitor-simple.ts --wallet=2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAk
 echo "Starting real-time trade notifications..."
 npx ts-node ./auto-trade-updates.ts &
 
+# Start Nexus signal processor for direct signal execution
+echo "Starting Nexus signal processor..."
+npx ts-node ./nexus_engine/signals/process_signals.ts &
+
 echo "===== MAXIMUM FREQUENCY TRADING SYSTEM STARTED ====="
 echo "⚠️ ⚠️ WARNING: Maximum frequency mode uses ultra-aggressive parameters ⚠️ ⚠️"
 echo "Use Ctrl+C to stop the trading system"

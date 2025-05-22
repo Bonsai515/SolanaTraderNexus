@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "signalSources": [
+    {
+      "name": "flashLoanSingularity",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    },
+    {
+      "name": "quantumArbitrage",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    },
+    {
+      "name": "temporalBlockArbitrage",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    },
+    {
+      "name": "cascadeFlash",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    },
+    {
+      "name": "jitoBundle",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    },
+    {
+      "name": "externalSignals",
+      "enabled": true,
+      "signalFormat": "nexus-standard",
+      "throttleMs": 0,
+      "priority": 1
+    }
+  ],
+  "nexusIntegration": {
+    "enabled": true,
+    "directExecutionEnabled": true,
+    "signalValidation": true,
+    "pricingValidation": true,
+    "executionConfirmation": true
+  },
+  "logging": {
+    "enabled": true,
+    "logAllSignals": true,
+    "logExecutions": true,
+    "logFailures": true
+  }
+}
