@@ -1,0 +1,14 @@
+{
+  "id": "real-jitoBundle-1747911992360",
+  "strategy": "jitoBundle",
+  "type": "real_trade",
+  "sourceToken": "SOL",
+  "targetToken": "USDC",
+  "amount": 0.05,
+  "confidence": 95,
+  "timestamp": 1747911992480,
+  "priority": 8,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "realTrading": true
+}

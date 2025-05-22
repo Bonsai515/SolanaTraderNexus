@@ -1,0 +1,120 @@
+{
+  "version": "3.0.0",
+  "engineMode": "REAL_TRADING",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "rpc": {
+    "mainnet": "https://api.mainnet-beta.solana.com",
+    "backup": [
+      "https://solana-api.projectserum.com",
+      "https://solana.rpcpool.com"
+    ]
+  },
+  "realTrading": {
+    "enabled": true,
+    "simulationMode": false,
+    "dryRun": false,
+    "useRealFunds": true,
+    "verifyTransactions": true,
+    "confirmations": 1,
+    "maxRetries": 3,
+    "slippageTolerance": 0.5,
+    "priorityFee": "auto"
+  },
+  "strategies": {
+    "flashLoanSingularity": {
+      "enabled": true,
+      "maxPositionSizePercent": 30,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 10,
+      "priority": 10,
+      "useRealFunds": true
+    },
+    "quantumArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 20,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 10,
+      "priority": 9,
+      "useRealFunds": true
+    },
+    "jitoBundle": {
+      "enabled": true,
+      "maxPositionSizePercent": 15,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 8,
+      "priority": 8,
+      "useRealFunds": true
+    },
+    "cascadeFlash": {
+      "enabled": true,
+      "maxPositionSizePercent": 15,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 8,
+      "priority": 7,
+      "useRealFunds": true
+    },
+    "temporalBlockArbitrage": {
+      "enabled": false,
+      "maxPositionSizePercent": 10,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 5,
+      "priority": 6,
+      "useRealFunds": true
+    },
+    "hyperNetworkBlitz": {
+      "enabled": true,
+      "maxPositionSizePercent": 25,
+      "minProfitThresholdSOL": 0.001,
+      "maxDailyTrades": 10,
+      "priority": 9,
+      "useRealFunds": true
+    },
+    "ultraQuantumMEV": {
+      "enabled": false,
+      "maxPositionSizePercent": 15,
+      "minProfitThresholdSOL": 0.002,
+      "maxDailyTrades": 5,
+      "priority": 7,
+      "useRealFunds": true
+    }
+  },
+  "profitCollection": {
+    "destinationWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "instantCollection": true,
+    "minAmountToCollect": 0.005,
+    "collectionFrequencyHours": 1
+  },
+  "security": {
+    "maxDailyTradeVolume": 0.5,
+    "emergencyStopLossPercent": 5,
+    "transactionVerification": true,
+    "preExecutionSimulation": true,
+    "postExecutionVerification": true
+  },
+  "autonomousMode": {
+    "enabled": true,
+    "tradingInterval": 120000,
+    "dynamicIntervals": true,
+    "opportunisticTrading": true,
+    "autoRebalance": true
+  },
+  "jupiterDEX": {
+    "useExactOut": false,
+    "slippageBps": 50,
+    "onlyDirectRoutes": false,
+    "asLegacyTransaction": false,
+    "useTokenLedger": true
+  },
+  "transactionVerification": {
+    "enabled": true,
+    "verifySignatures": true,
+    "verifyBalanceChanges": true,
+    "minConfirmations": 1,
+    "checkSuccessStatus": true,
+    "logAllTransactions": true,
+    "notifyOnFailure": true
+  }
+}
