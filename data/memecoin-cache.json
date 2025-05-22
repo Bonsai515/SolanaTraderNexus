@@ -4,11 +4,11 @@
       "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
       "symbol": "$WIF",
       "name": "dogwifhat",
-      "price": 1.12,
-      "priceChange24h": 5.61,
-      "priceChange1h": 0.56,
-      "volume24h": 299743.11,
-      "liquidity": 214.4076,
+      "price": 1.11,
+      "priceChange24h": 4.69,
+      "priceChange1h": -0.09,
+      "volume24h": 301962.37,
+      "liquidity": 213.10573333333335,
       "score": 32.8615338,
       "sources": {
         "pumpFun": false,
@@ -17,18 +17,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 16080.57
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 15982.93
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002073,
-      "priceChange24h": 3.08,
-      "priceChange1h": 0.68,
-      "volume24h": 18597.05,
-      "liquidity": 916.2398666666668,
+      "price": 0.0000206,
+      "priceChange24h": 2.45,
+      "priceChange1h": 0.07,
+      "volume24h": 18621.15,
+      "liquidity": 913.4616,
       "score": 5.8404246,
       "sources": {
         "pumpFun": false,
@@ -37,8 +37,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 68717.99
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 68509.62
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
@@ -57,7 +57,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
+      "lastUpdated": 1747873104180,
       "liquidityUSD": 338395.75
     }
   ],
@@ -66,11 +66,11 @@
       "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
       "symbol": "$WIF",
       "name": "dogwifhat",
-      "price": 1.12,
-      "priceChange24h": 5.61,
-      "priceChange1h": 0.56,
-      "volume24h": 299743.11,
-      "liquidity": 214.4076,
+      "price": 1.11,
+      "priceChange24h": 4.69,
+      "priceChange1h": -0.09,
+      "volume24h": 301962.37,
+      "liquidity": 213.10573333333335,
       "score": 32.8615338,
       "sources": {
         "pumpFun": false,
@@ -79,8 +79,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 16080.57
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 15982.93
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
@@ -99,18 +99,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
+      "lastUpdated": 1747873104180,
       "liquidityUSD": 338395.75
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002073,
-      "priceChange24h": 3.08,
-      "priceChange1h": 0.68,
-      "volume24h": 18597.05,
-      "liquidity": 916.2398666666668,
+      "price": 0.0000206,
+      "priceChange24h": 2.45,
+      "priceChange1h": 0.07,
+      "volume24h": 18621.15,
+      "liquidity": 913.4616,
       "score": 5.8404246,
       "sources": {
         "pumpFun": false,
@@ -119,8 +119,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 68717.99
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 68509.62
     }
   ],
   "newTokens": [],
@@ -129,11 +129,11 @@
       "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
       "symbol": "$WIF",
       "name": "dogwifhat",
-      "price": 1.12,
-      "priceChange24h": 5.61,
-      "priceChange1h": 0.56,
-      "volume24h": 299743.11,
-      "liquidity": 214.4076,
+      "price": 1.11,
+      "priceChange24h": 4.69,
+      "priceChange1h": -0.09,
+      "volume24h": 301962.37,
+      "liquidity": 213.10573333333335,
       "score": 32.8615338,
       "sources": {
         "pumpFun": false,
@@ -142,9 +142,9 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 16080.57,
-      "trendingScore": 41.194311
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 15982.93,
+      "trendingScore": 39.576237
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
@@ -163,7 +163,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
+      "lastUpdated": 1747873104180,
       "liquidityUSD": 338395.75,
       "trendingScore": 23.238286
     },
@@ -171,11 +171,11 @@
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002073,
-      "priceChange24h": 3.08,
-      "priceChange1h": 0.68,
-      "volume24h": 18597.05,
-      "liquidity": 916.2398666666668,
+      "price": 0.0000206,
+      "priceChange24h": 2.45,
+      "priceChange1h": 0.07,
+      "volume24h": 18621.15,
+      "liquidity": 913.4616,
       "score": 5.8404246,
       "sources": {
         "pumpFun": false,
@@ -184,12 +184,10 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747872987492,
-      "liquidityUSD": 68717.99,
-      "trendingScore": 8.019705
+      "lastUpdated": 1747873104180,
+      "liquidityUSD": 68509.62,
+      "trendingScore": 6.7621150000000005
     }
   ],
-  "lastFullUpdate": 0
-}],
   "lastFullUpdate": 0
 }
