@@ -1,0 +1,14 @@
+{
+  "id": "hyper-flashLoanSingularity-1747913084549",
+  "strategy": "flashLoanSingularity",
+  "type": "hyper_aggressive_trade",
+  "sourceToken": "SOL",
+  "targetToken": "BONK",
+  "amount": 0.6080076152,
+  "confidence": 95,
+  "timestamp": 1747913084756,
+  "priority": 10,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "hyperAggressive": true
+}

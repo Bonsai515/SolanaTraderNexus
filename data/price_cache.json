@@ -2,62 +2,62 @@
   "SOL": {
     "symbol": "SOL",
     "priceUsd": 132.45,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "BONK": {
     "symbol": "BONK",
     "priceUsd": 0.000023,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "JUP": {
     "symbol": "JUP",
     "priceUsd": 0.764,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "USDC": {
     "symbol": "USDC",
     "priceUsd": 0.999,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "USDT": {
     "symbol": "USDT",
     "priceUsd": 0.998,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "ETH": {
     "symbol": "ETH",
     "priceUsd": 3750.32,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "WIF": {
     "symbol": "WIF",
     "priceUsd": 0.645,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "MEME": {
     "symbol": "MEME",
     "priceUsd": 0.032,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "GUAC": {
     "symbol": "GUAC",
     "priceUsd": 0.00117,
-    "lastUpdated": 1747912029548,
+    "lastUpdated": 1747913079546,
     "source": "Jupiter"
   },
   "BTC": {
     "symbol": "BTC",
-    "priceUsd": 110818,
-    "lastUpdated": 1747911888770,
+    "priceUsd": 110780,
+    "lastUpdated": 1747912149687,
     "source": "CoinGecko",
-    "change24h": 4.195152735671857
+    "change24h": 4.127625596296052
   }
 }
