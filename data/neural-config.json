@@ -1,0 +1,34 @@
+{
+  "enabled": true,
+  "endpointUrl": "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e",
+  "websocketUrl": "wss://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e",
+  "priorityLevel": "highest",
+  "useExclusivelyForNeural": true,
+  "transformers": {
+    "memeCortex": {
+      "useQuickNode": true,
+      "useWebsocket": true,
+      "refreshRateMs": 1000,
+      "confidenceThreshold": 65
+    },
+    "quantumHyperion": {
+      "useQuickNode": true,
+      "useWebsocket": true,
+      "refreshRateMs": 500,
+      "confidenceThreshold": 70
+    },
+    "cascadeOptimizer": {
+      "useQuickNode": true,
+      "useWebsocket": true,
+      "refreshRateMs": 250,
+      "confidenceThreshold": 65
+    }
+  },
+  "optimizationSettings": {
+    "useParallelComputation": true,
+    "useQuantumPathfinding": true,
+    "usePredictiveModeling": true,
+    "maxConcurrentTransformers": 5
+  },
+  "createdAt": "2025-05-22T02:21:30.959Z"
+}

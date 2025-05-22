@@ -1,0 +1,34 @@
+{
+  "jupiter": {
+    "baseUrl": "https://public.jupiterapi.com",
+    "enabled": true,
+    "priority": 1,
+    "endpoints": {
+      "quote": "https://public.jupiterapi.com/quote",
+      "swap": "https://public.jupiterapi.com/swap",
+      "price": "https://public.jupiterapi.com/price",
+      "tokenList": "https://public.jupiterapi.com/tokens",
+      "indexedRouteMap": "https://public.jupiterapi.com/indexed-route-map",
+      "markets": "https://public.jupiterapi.com/markets"
+    },
+    "rateLimits": {
+      "requestsPerSecond": 10,
+      "requestsPerMinute": 300,
+      "requestsPerHour": 10000
+    },
+    "caching": {
+      "enabled": true,
+      "tokenListTtlMs": 3600000,
+      "priceTtlMs": 15000,
+      "routeTtlMs": 10000,
+      "marketsTtlMs": 60000
+    },
+    "preferredOverDex": true,
+    "preferredForPriceData": true,
+    "backupEndpoints": [
+      "https://price.jup.ag/v6",
+      "https://token.jup.ag/all"
+    ],
+    "lastUpdated": "2025-05-22T02:22:53.481Z"
+  }
+}
