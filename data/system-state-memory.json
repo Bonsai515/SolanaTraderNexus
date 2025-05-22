@@ -1,6 +1,6 @@
 {
-  "tradingMode": "high_yield",
-  "riskLevel": "adaptive",
+  "tradingMode": "ultra_aggressive",
+  "riskLevel": "very_high",
   "maxCapitalUtilization": 90,
   "strategyWeights": {
     "Temporal Block Arbitrage": 25,
@@ -10,9 +10,9 @@
     "flashMinimal": 2,
     "moneyGlitch": 1,
     "hyperion": 0,
-    "Cascade Flash": 24,
-    "Jito Bundle MEV": 2,
-    "Backrun Strategy": 2,
+    "Cascade Flash": 30,
+    "Jito Bundle MEV": 5,
+    "Backrun Strategy": 5,
     "Just-In-Time Liquidity": 1
   },
   "lastModified": "2025-05-22T02:30:20.194Z",
@@ -96,5 +96,10 @@
     "bundlingEnabled": true,
     "lastActivated": "2025-05-22T02:30:20.194Z"
   },
-  "mevActivated": "2025-05-22T02:30:20.194Z"
+  "mevActivated": "2025-05-22T02:30:20.194Z",
+  "performanceSettings": {
+    "prioritizeTradeFrequency": true,
+    "minimumProfitThresholdMultiplier": 0.7,
+    "maxDailyTradesMultiplier": 1.5
+  }
 }
