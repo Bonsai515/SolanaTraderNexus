@@ -1,20 +1,116 @@
 {
-  "configured": true,
-  "timestamp": "2025-05-18T04:44:13.616Z",
-  "requiredEnvVars": [
-    "SOLANA_RPC_URL",
-    "TRADING_WALLET_PUBLIC_KEY",
-    "TRADING_WALLET_PRIVATE_KEY"
-  ],
-  "optionalEnvVars": [
-    "HELIUS_API_KEY",
-    "QUICKNODE_RPC_URL",
-    "COINGECKO_API_KEY"
-  ],
+  "version": "2.0.0",
+  "mode": "REAL_BLOCKCHAIN",
+  "simulation": false,
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "capital": {
+    "total": 0.80001002,
+    "reserved": 0.040000501,
+    "available": 0.7600095189999999
+  },
+  "limits": {
+    "dailyVolume": 3.5,
+    "maxDrawdown": 0.05,
+    "maxSlippage": 0.01,
+    "minConfirmations": 1
+  },
+  "profit": {
+    "collection": {
+      "enabled": true,
+      "threshold": 0.01,
+      "interval": 30
+    },
+    "verification": {
+      "enabled": true,
+      "requireOnChainConfirmation": true,
+      "logTransactions": true
+    }
+  },
   "strategies": [
-    "octa_hop",
-    "stablecoin_flash",
-    "triangle_arbitrage",
-    "high_frequency"
-  ]
+    {
+      "name": "nuclearFlashArbitrage",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0008,
+      "positionSizing": 0.95,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "hyperionMoneyLoop",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0008,
+      "positionSizing": 0.95,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "flashLoanSingularity",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "quantumArbitrage",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "hyperNetworkBlitz",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "jitoBundle",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "cascadeFlash",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "temporalBlockArbitrage",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    },
+    {
+      "name": "ultraQuantumMEV",
+      "enabled": true,
+      "priority": 10,
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "maxActivePositions": 1
+    }
+  ],
+  "trading": {
+    "frequency": 120,
+    "validateBalanceChanges": true,
+    "skipSimulation": false,
+    "timeout": 30000
+  },
+  "rpc": {
+    "primary": "https://api.mainnet-beta.solana.com",
+    "backup": "https://solana-mainnet.rpc.extrnode.com"
+  }
 }

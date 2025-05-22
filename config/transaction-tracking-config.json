@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "realTimeBalanceCheck": true,
+  "transactionVerification": true,
+  "profitTracking": true,
+  "transactionLogging": true,
+  "logDirectory": "logs/trades",
+  "balanceDashboardPath": "./REAL_TIME_WALLET_BALANCES.md",
+  "profitDashboardPath": "./REAL_PROFIT_DASHBOARD.md",
+  "transactionListPath": "./REAL_BLOCKCHAIN_TRANSACTIONS.md",
+  "checkInterval": 60,
+  "blockchainExplorer": "https://explorer.solana.com/tx/"
+}

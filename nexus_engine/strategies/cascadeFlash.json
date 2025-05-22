@@ -1,0 +1,9 @@
+{
+  "name": "cascadeFlash",
+  "description": "Cascade flash with multi-exchange routing",
+  "minProfitThreshold": 0.0012,
+  "positionSizing": 0.85,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}

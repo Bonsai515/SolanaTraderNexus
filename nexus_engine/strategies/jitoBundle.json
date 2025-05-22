@@ -1,0 +1,9 @@
+{
+  "name": "jitoBundle",
+  "description": "Jito MEV bundles for frontrunning protection",
+  "minProfitThreshold": 0.0012,
+  "positionSizing": 0.85,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}
