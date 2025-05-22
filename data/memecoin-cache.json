@@ -5,10 +5,10 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.12,
-      "priceChange24h": 5.94,
-      "priceChange1h": -1.32,
-      "volume24h": 393620.11,
-      "liquidity": 248.67653333333337,
+      "priceChange24h": 5.6,
+      "priceChange1h": -2.15,
+      "volume24h": 397286.04,
+      "liquidity": 248.43373333333332,
       "score": 33.6556456,
       "sources": {
         "pumpFun": false,
@@ -17,19 +17,19 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
-      "liquidityUSD": 18650.74
+      "lastUpdated": 1747879469526,
+      "liquidityUSD": 18632.53
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
       "price": 0.00002095,
-      "priceChange24h": 5.84,
+      "priceChange24h": 5.95,
       "priceChange1h": 0.03,
-      "volume24h": 19997.36,
+      "volume24h": 19976.78,
       "liquidity": 921.1617333333334,
-      "score": 7.099221200000001,
+      "score": 7.141163200000001,
       "sources": {
         "pumpFun": false,
         "dexScreener": true,
@@ -37,7 +37,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 69087.13
     },
     {
@@ -45,9 +45,9 @@
       "symbol": "RAY",
       "name": "Raydium",
       "price": 3.27,
-      "priceChange24h": 4.33,
+      "priceChange24h": 5.14,
       "priceChange1h": 0.05,
-      "volume24h": 166441.22,
+      "volume24h": 165561.98,
       "liquidity": 4494.449066666667,
       "score": 32.9689238,
       "sources": {
@@ -57,7 +57,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 337083.68000000005
     }
   ],
@@ -67,10 +67,10 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.12,
-      "priceChange24h": 5.94,
-      "priceChange1h": -1.32,
-      "volume24h": 393620.11,
-      "liquidity": 248.67653333333337,
+      "priceChange24h": 5.6,
+      "priceChange1h": -2.15,
+      "volume24h": 397286.04,
+      "liquidity": 248.43373333333332,
       "score": 33.6556456,
       "sources": {
         "pumpFun": false,
@@ -79,17 +79,17 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
-      "liquidityUSD": 18650.74
+      "lastUpdated": 1747879469526,
+      "liquidityUSD": 18632.53
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
       "symbol": "RAY",
       "name": "Raydium",
       "price": 3.27,
-      "priceChange24h": 4.33,
+      "priceChange24h": 5.14,
       "priceChange1h": 0.05,
-      "volume24h": 166441.22,
+      "volume24h": 165561.98,
       "liquidity": 4494.449066666667,
       "score": 32.9689238,
       "sources": {
@@ -99,7 +99,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 337083.68000000005
     },
     {
@@ -107,11 +107,11 @@
       "symbol": "Bonk",
       "name": "Bonk",
       "price": 0.00002095,
-      "priceChange24h": 5.84,
+      "priceChange24h": 5.95,
       "priceChange1h": 0.03,
-      "volume24h": 19997.36,
+      "volume24h": 19976.78,
       "liquidity": 921.1617333333334,
-      "score": 7.099221200000001,
+      "score": 7.141163200000001,
       "sources": {
         "pumpFun": false,
         "dexScreener": true,
@@ -119,7 +119,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 69087.13
     }
   ],
@@ -130,10 +130,10 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.12,
-      "priceChange24h": 5.94,
-      "priceChange1h": -1.32,
-      "volume24h": 393620.11,
-      "liquidity": 248.67653333333337,
+      "priceChange24h": 5.6,
+      "priceChange1h": -2.15,
+      "volume24h": 397286.04,
+      "liquidity": 248.43373333333332,
       "score": 33.6556456,
       "sources": {
         "pumpFun": false,
@@ -142,18 +142,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
-      "liquidityUSD": 18650.74,
-      "trendingScore": 51.242011
+      "lastUpdated": 1747879469526,
+      "liquidityUSD": 18632.53,
+      "trendingScore": 50.92860399999999
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
       "symbol": "RAY",
       "name": "Raydium",
       "price": 3.27,
-      "priceChange24h": 4.33,
+      "priceChange24h": 5.14,
       "priceChange1h": 0.05,
-      "volume24h": 166441.22,
+      "volume24h": 165561.98,
       "liquidity": 4494.449066666667,
       "score": 32.9689238,
       "sources": {
@@ -163,20 +163,20 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 337083.68000000005,
-      "trendingScore": 25.304122
+      "trendingScore": 26.836198000000003
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
       "price": 0.00002095,
-      "priceChange24h": 5.84,
+      "priceChange24h": 5.95,
       "priceChange1h": 0.03,
-      "volume24h": 19997.36,
+      "volume24h": 19976.78,
       "liquidity": 921.1617333333334,
-      "score": 7.099221200000001,
+      "score": 7.141163200000001,
       "sources": {
         "pumpFun": false,
         "dexScreener": true,
@@ -184,12 +184,10 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747879347948,
+      "lastUpdated": 1747879469526,
       "liquidityUSD": 69087.13,
-      "trendingScore": 13.679736
+      "trendingScore": 13.897678
     }
   ],
-  "lastFullUpdate": 0
-}
   "lastFullUpdate": 0
 }
