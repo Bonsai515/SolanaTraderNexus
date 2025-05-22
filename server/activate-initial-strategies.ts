@@ -313,7 +313,7 @@ export async function activateInitialStrategies(walletAddress?: string): Promise
     logger.info('Starting activation of initial trading strategies...');
     
     // Use provided wallet address or default
-    const systemWallet = walletAddress || '31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e';
+    const systemWallet = walletAddress || 'HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF';
     
     // Check wallet balance
     logger.info(`Checking balance for wallet: ${systemWallet}`);
