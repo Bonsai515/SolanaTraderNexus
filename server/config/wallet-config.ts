@@ -9,7 +9,7 @@ export const WALLET_CONFIG = {
   TRADING_WALLET: 'HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF',
   
   // Prophet wallet for profit collection
-  PROPHET_WALLET: '31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e',
+  PROPHET_WALLET: 'HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF',
   
   // Default wallet allocation percentages
   DEFAULT_ALLOCATION: {
