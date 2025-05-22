@@ -13,5 +13,10 @@
     "label": "Trading Wallet 2",
     "publicKey": "HH2hMVDuw4WT8QoGTBZX2H5BPWubDL9BFemH6UhhDPYR",
     "privateKey": "69995cf93de5220f423e76cd73cbe2eea129d0b42ea00c0322d804745ec6c7bff1d6337eb1eefbc8e5d45d65e51bdcff596aeec7b957f34d2d910dd3da11f6d6"
+  },
+  {
+    "label": "Phantom Trading Wallet",
+    "publicKey": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "privateKey": "57m35R4EhtNDvFe7pUNYqCHjeZxeJ2coSE5UpmVYxXPL7JqkXsBXKEaXfcUs3BmVaxjFmNEKxC24SsQDM12ruNNy"
   }
 ]
