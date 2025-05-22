@@ -1,13 +1,22 @@
 {
-  "tradingMode": "aggressive",
-  "riskLevel": "high",
+  "tradingMode": "high_yield",
+  "riskLevel": "adaptive",
   "maxCapitalUtilization": 90,
   "strategyWeights": {
-    "quantumOmega": 20,
-    "flashMinimal": 20,
-    "moneyGlitch": 30,
-    "hyperion": 30
+    "Temporal Block Arbitrage": 30,
+    "Flash Loan Singularity": 30,
+    "Quantum Arbitrage": 20,
+    "quantumOmega": 5,
+    "flashMinimal": 5,
+    "moneyGlitch": 5,
+    "hyperion": 5
   },
-  "lastModified": "2025-05-22T02:00:32.829Z",
-  "aggressiveModeActivated": "2025-05-22T02:00:32.829Z"
+  "lastModified": "2025-05-22T02:02:55.865Z",
+  "aggressiveModeActivated": "2025-05-22T02:00:32.829Z",
+  "activeStrategies": [
+    "Temporal Block Arbitrage",
+    "Flash Loan Singularity",
+    "Quantum Arbitrage"
+  ],
+  "highYieldActivated": "2025-05-22T02:02:55.865Z"
 }
