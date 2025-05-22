@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "wallets": {
     "main": {
-      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "address": "HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF",
       "type": "main",
       "active": true,
       "description": "Main trading wallet",

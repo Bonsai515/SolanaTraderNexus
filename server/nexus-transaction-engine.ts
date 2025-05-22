@@ -101,7 +101,7 @@ let mainWalletPublicKey: PublicKey;
 let config: EngineConfig = {
   useRealFunds: true,
   priorityFee: 50000, // 0.00005 SOL
-  mainWalletAddress: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb'
+  mainWalletAddress: 'HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF'
 };
 let walletKeypair: Keypair | null = null;
 let registeredStrategies: Map<string, Strategy> = new Map();
