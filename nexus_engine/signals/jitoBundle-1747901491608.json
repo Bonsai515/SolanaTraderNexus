@@ -1,0 +1,14 @@
+{
+  "id": "jitoBundle-1747901491608",
+  "strategy": "jitoBundle",
+  "type": "trade",
+  "sourceToken": "SOL",
+  "targetToken": "USDC",
+  "amount": 0.01,
+  "confidence": 95,
+  "timestamp": 1747901491608,
+  "priority": 9,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "autonomousMode": true
+}
