@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "engineMode": "AUTONOMOUS_TRADING",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "rpc": {
+    "mainnet": "https://api.mainnet-beta.solana.com",
+    "backup": [
+      "https://solana-api.projectserum.com",
+      "https://solana.rpcpool.com"
+    ]
+  },
+  "strategies": {
+    "flashLoanSingularity": {
+      "enabled": true,
+      "maxPositionSizePercent": 40,
+      "minProfitThresholdSOL": 0.0005,
+      "maxDailyTrades": 20,
+      "priority": 10
+    },
+    "quantumArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 30,
+      "minProfitThresholdSOL": 0.0005,
+      "maxDailyTrades": 20,
+      "priority": 8
+    },
+    "jitoBundle": {
+      "enabled": true,
+      "maxPositionSizePercent": 20,
+      "minProfitThresholdSOL": 0.0005,
+      "maxDailyTrades": 15,
+      "priority": 9
+    },
+    "cascadeFlash": {
+      "enabled": true,
+      "maxPositionSizePercent": 15,
+      "minProfitThresholdSOL": 0.0005,
+      "maxDailyTrades": 15,
+      "priority": 7
+    },
+    "temporalBlockArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 10,
+      "minProfitThresholdSOL": 0.0005,
+      "maxDailyTrades": 10,
+      "priority": 6
+    }
+  },
+  "profitCollection": {
+    "destinationWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "instantCollection": true,
+    "minAmountToCollect": 0.001,
+    "collectionFrequencyHours": 6
+  },
+  "security": {
+    "maxDailyTradeVolume": 1,
+    "emergencyStopLossPercent": 15
+  },
+  "autonomousMode": {
+    "enabled": true,
+    "tradingInterval": 300000,
+    "dynamicIntervals": true,
+    "opportunisticTrading": true,
+    "autoRebalance": true
+  }
+}
