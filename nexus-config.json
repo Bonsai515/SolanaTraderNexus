@@ -1,39 +1,10 @@
 {
-  "version": "1.0.0",
-  "walletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
-  "walletType": "phantom",
-  "useDirectBlockchain": true,
-  "rpcEndpoints": [
-    "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e/",
-    "https://api.mainnet-beta.solana.com"
-  ],
-  "strategies": {
-    "Temporal Block Arbitrage": {
-      "enabled": true,
-      "maxCapitalPercent": 5
-    },
-    "Flash Loan Singularity": {
-      "enabled": true,
-      "maxCapitalPercent": 10
-    },
-    "Quantum Arbitrage": {
-      "enabled": true,
-      "maxCapitalPercent": 15
-    },
-    "Cascade Flash": {
-      "enabled": true,
-      "maxCapitalPercent": 20
-    },
-    "Jito Bundle MEV": {
-      "enabled": true,
-      "maxCapitalPercent": 10
-    }
+  "walletTransfer": {
+    "enabled": true,
+    "fromAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "toAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "transferAll": true,
+    "timestamp": 1747883728341
   },
-  "safetySettings": {
-    "maxSlippageBps": 50,
-    "minProfitThresholdSol": 0.002,
-    "maxTransactionsPerHour": 10
-  },
-  "verificationEnabled": true,
-  "solscanVerification": true
+  "lastUpdated": "2025-05-22T03:15:28.341Z"
 }
