@@ -1,0 +1,15 @@
+{
+  "id": "hyperNetworkBlitz-1747911723489",
+  "strategy": "hyperNetworkBlitz",
+  "type": "trade",
+  "sourceToken": "SOL",
+  "targetToken": "RAY",
+  "amount": 0.04752877299281119,
+  "confidence": 94.92400691019404,
+  "timestamp": 1747911723489,
+  "priority": 10,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "autonomousMode": true,
+  "ultraAggressiveMode": true
+}
