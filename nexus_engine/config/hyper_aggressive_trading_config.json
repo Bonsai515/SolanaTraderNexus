@@ -20,78 +20,78 @@
     "verifyTransactions": true,
     "confirmations": 1,
     "maxRetries": 3,
-    "slippageTolerance": 1,
+    "slippageTolerance": 1.5,
     "priorityFee": "auto"
   },
   "strategies": {
     "flashLoanSingularity": {
       "enabled": true,
-      "maxPositionSizePercent": 80,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "quantumArbitrage": {
       "enabled": true,
-      "maxPositionSizePercent": 75,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "jitoBundle": {
       "enabled": true,
-      "maxPositionSizePercent": 70,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "cascadeFlash": {
       "enabled": true,
-      "maxPositionSizePercent": 75,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "temporalBlockArbitrage": {
       "enabled": true,
-      "maxPositionSizePercent": 70,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "hyperNetworkBlitz": {
       "enabled": true,
-      "maxPositionSizePercent": 80,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "ultraQuantumMEV": {
       "enabled": true,
-      "maxPositionSizePercent": 80,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "nuclearFlashArbitrage": {
       "enabled": true,
-      "maxPositionSizePercent": 90,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 95,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
     },
     "hyperionMoneyLoop": {
       "enabled": true,
-      "maxPositionSizePercent": 90,
-      "minProfitThresholdSOL": 0.0001,
+      "maxPositionSizePercent": 95,
+      "minProfitThresholdSOL": 0.0005,
       "maxDailyTrades": 40,
       "priority": 10,
       "useRealFunds": true
@@ -104,7 +104,7 @@
     "collectionFrequencyHours": 0.5
   },
   "security": {
-    "maxDailyTradeVolume": 3,
+    "maxDailyTradeVolume": 3.5,
     "emergencyStopLossPercent": 10,
     "transactionVerification": true,
     "preExecutionSimulation": true,
@@ -112,14 +112,14 @@
   },
   "autonomousMode": {
     "enabled": true,
-    "tradingInterval": 20000,
+    "tradingInterval": 120000,
     "dynamicIntervals": true,
     "opportunisticTrading": true,
     "autoRebalance": true
   },
   "jupiterDEX": {
     "useExactOut": false,
-    "slippageBps": 100,
+    "slippageBps": 150,
     "onlyDirectRoutes": false,
     "asLegacyTransaction": false,
     "useTokenLedger": true

@@ -1,6 +1,6 @@
 # HYPER-AGGRESSIVE BLOCKCHAIN TRADING DASHBOARD
 
-**Last Updated:** 5/22/2025, 11:26:33 AM
+**Last Updated:** 5/22/2025, 11:28:21 AM
 
 ## HYPER-AGGRESSIVE TRADING STATUS
 
@@ -14,10 +14,10 @@
 This system is configured for MAXIMUM returns with extreme parameters:
 
 - **Ultra Position Sizing:** 70-90% of available capital per trade
-- **Ultra-High Frequency:** Trading every 20 seconds
-- **Ultra-Low Profit Thresholds:** Takes trades with as little as 0.0002 SOL profit
+- **Ultra-High Frequency:** Trading every 2 minutes
+- **Ultra-Low Profit Thresholds:** Takes trades with as little as 0.0005 SOL profit
 - **Aggressive Slippage:** Accepts up to 1.0% slippage
-- **Maximum Daily Volume:** Up to 3.0 SOL in trade volume per day
+- **Maximum Daily Volume:** Up to 3.5 SOL in trade volume per day
 - **Profit Collection:** Every 30 minutes to Prophet wallet
 
 ## PROFIT SUMMARY
@@ -32,6 +32,15 @@ This system is configured for MAXIMUM returns with extreme parameters:
 
 | Strategy | Position Size | Min Profit | Priority |
 |----------|--------------|-----------|----------|
+| flashLoanSingularity | 85% | 0.0005 SOL | 10 |
+| quantumArbitrage | 85% | 0.0005 SOL | 10 |
+| jitoBundle | 85% | 0.0005 SOL | 10 |
+| cascadeFlash | 85% | 0.0005 SOL | 10 |
+| temporalBlockArbitrage | 85% | 0.0005 SOL | 10 |
+| hyperNetworkBlitz | 85% | 0.0005 SOL | 10 |
+| ultraQuantumMEV | 85% | 0.0005 SOL | 10 |
+| nuclearFlashArbitrage | 95% | 0.0005 SOL | 10 |
+| hyperionMoneyLoop | 95% | 0.0005 SOL | 10 ||--------------|-----------|----------|
 | flashLoanSingularity | 80% | 0.0003 SOL | 10 |
 | quantumArbitrage | 75% | 0.0003 SOL | 10 |
 | jitoBundle | 70% | 0.0003 SOL | 10 |
