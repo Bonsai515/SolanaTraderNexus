@@ -29,5 +29,8 @@
   "crossExchangeArbitrage": true,
   "profitSplitPercent": 95,
   "useRbsProtection": true,
-  "enabled": true
+  "enabled": true,
+  "rpcProvider": "QuickNode",
+  "useInstantNodes": false,
+  "usePremiumRpc": true
 }

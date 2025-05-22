@@ -44,5 +44,8 @@
   ],
   "requireVerification": true,
   "maxGasFeeBudgetSOL": 0.005,
-  "enabled": true
+  "enabled": true,
+  "rpcProvider": "QuickNode",
+  "useInstantNodes": false,
+  "usePremiumRpc": true
 }

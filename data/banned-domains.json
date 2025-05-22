@@ -1,0 +1,19 @@
+{
+  "domains": [
+    "pump.fun",
+    "api.pump.fun",
+    "stats-api.pump.fun",
+    "api.stats.pump.fun",
+    "birdeye-cache.pump.fun",
+    "instantnodes.io",
+    "solana-api.instantnodes.io"
+  ],
+  "reason": "Frequent timeouts and connection errors",
+  "bannedAt": "2025-05-22T01:53:48.306Z",
+  "useAlternatives": [
+    "dexscreener.com",
+    "api.dexscreener.com",
+    "jupiter.ag",
+    "meteora.ag"
+  ]
+}

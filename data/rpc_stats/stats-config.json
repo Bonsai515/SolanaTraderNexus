@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "trackingIntervalMs": 60000,
+  "historyLength": 1440,
+  "alertThresholds": {
+    "errorRatePercent": 5,
+    "latencyMs": 2000,
+    "availabilityPercent": 95
+  },
+  "metrics": [
+    "requestCount",
+    "errorCount",
+    "timeoutCount",
+    "latencyAvgMs",
+    "availability"
+  ],
+  "startedAt": "2025-05-22T01:53:00.132Z"
+}

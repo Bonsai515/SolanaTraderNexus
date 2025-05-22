@@ -1,0 +1,58 @@
+{
+  "enabled": [
+    "dexscreener",
+    "jupiter",
+    "raydium",
+    "orca",
+    "meteora"
+  ],
+  "disabled": [
+    "pumpfun",
+    "instantnodes"
+  ],
+  "priorities": {
+    "price": [
+      "jupiter",
+      "dexscreener",
+      "raydium",
+      "orca",
+      "meteora"
+    ],
+    "volume": [
+      "dexscreener",
+      "jupiter",
+      "raydium",
+      "orca"
+    ],
+    "trending": [
+      "dexscreener",
+      "jupiter",
+      "meteora"
+    ]
+  },
+  "rateLimits": {
+    "dexscreener": {
+      "requestsPerMinute": 30,
+      "requestsPerHour": 1000
+    },
+    "jupiter": {
+      "requestsPerMinute": 60,
+      "requestsPerHour": 3000
+    },
+    "raydium": {
+      "requestsPerMinute": 40,
+      "requestsPerHour": 2000
+    },
+    "orca": {
+      "requestsPerMinute": 40,
+      "requestsPerHour": 2000
+    },
+    "meteora": {
+      "requestsPerMinute": 40,
+      "requestsPerHour": 2000
+    }
+  },
+  "updateFrequencyMs": 60000,
+  "cacheExpiryMs": 300000,
+  "lastUpdated": "2025-05-22T01:53:48.294Z"
+}
