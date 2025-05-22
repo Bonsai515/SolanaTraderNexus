@@ -1,0 +1,14 @@
+[
+  {
+    "type": "transfer",
+    "source": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "destination": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "amount": "all",
+    "fee": 5000,
+    "priority": "high",
+    "timestamp": 1747883728342,
+    "status": "pending",
+    "id": "transfer-1747883728342",
+    "description": "Transfer all funds from HPN wallet to Phantom wallet"
+  }
+]

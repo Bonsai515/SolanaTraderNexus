@@ -1,0 +1,10 @@
+{
+  "type": "wallet_transfer",
+  "source": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "destination": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "amount": "all",
+  "timestamp": 1747883728340,
+  "priority": "high",
+  "id": "transfer-1747883728340",
+  "callback": null
+}
