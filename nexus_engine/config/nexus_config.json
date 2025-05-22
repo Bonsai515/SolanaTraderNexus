@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "engineMode": "REAL_TRADING",
+  "wallets": {
+    "trading": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "profit": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "fallback": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "rpc": {
+    "mainnet": "https://api.mainnet-beta.solana.com",
+    "backup": [
+      "https://solana-api.projectserum.com",
+      "https://solana.rpcpool.com"
+    ]
+  },
+  "strategies": {
+    "flashLoanSingularity": {
+      "enabled": true,
+      "maxPositionSizePercent": 40,
+      "executionPriority": 10,
+      "maxSlippageBps": 50
+    },
+    "quantumArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 30,
+      "executionPriority": 8,
+      "maxSlippageBps": 50
+    },
+    "jitoBundle": {
+      "enabled": true,
+      "maxPositionSizePercent": 20,
+      "executionPriority": 9,
+      "maxSlippageBps": 50
+    },
+    "cascadeFlash": {
+      "enabled": true,
+      "maxPositionSizePercent": 15,
+      "executionPriority": 7,
+      "maxSlippageBps": 50
+    },
+    "temporalBlockArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 10,
+      "executionPriority": 6,
+      "maxSlippageBps": 50
+    }
+  },
+  "profitCollection": {
+    "instantCollection": true,
+    "minAmountToCollect": 0.001,
+    "autoReinvest": true
+  },
+  "security": {
+    "maxDailyTradeVolume": 1,
+    "emergencyStopLossPercent": 15,
+    "requireConfirmation": false
+  },
+  "execution": {
+    "jupiter": {
+      "enabled": true,
+      "url": "https://quote-api.jup.ag/v6"
+    },
+    "orca": {
+      "enabled": true
+    },
+    "raydium": {
+      "enabled": true
+    }
+  }
+}
