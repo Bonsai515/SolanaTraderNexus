@@ -1,7 +1,7 @@
 {
   "name": "quantumArbitrage",
   "description": "Quantum arbitrage with neural network predictions",
-  "minProfitThreshold": 0.001,
+  "minProfitThreshold": 0.0005,
   "positionSizing": 0.85,
   "priority": 10,
   "maxSlippageBps": 100,

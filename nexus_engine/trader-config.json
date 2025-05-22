@@ -17,13 +17,13 @@
     "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
   },
   "slippage": {
-    "default": 0.01,
-    "aggressive": 0.015,
+    "default": 0.02,
+    "aggressive": 0.03,
     "conservative": 0.005
   },
   "tradingLogic": {
     "forceTradingOn": true,
-    "bypassSimulation": false,
+    "bypassSimulation": true,
     "bypassVerification": false
   }
 }
