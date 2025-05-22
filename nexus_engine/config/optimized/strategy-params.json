@@ -1,0 +1,124 @@
+{
+  "globalParameters": {
+    "tradeFrequencyMs": 20000,
+    "minProfitThresholdSOL": 0.00015,
+    "maxPositionSizePercent": 95,
+    "slippageTolerancePercent": 3.5,
+    "emergencyStopLossPercent": 10,
+    "profitCollectionIntervalMs": 1200000,
+    "profitReinvestmentRate": 95,
+    "prioritizeNewTokens": true,
+    "useConcurrentExecution": true,
+    "useAdvancedRoutingOptimization": true,
+    "useTransformerNeuralPredictions": true,
+    "useQuantumEntanglement": true,
+    "useMemecortexAdvanced": true
+  },
+  "strategyParameters": {
+    "quantumNuclearFlashArbitrage": {
+      "enabled": true,
+      "priority": 10,
+      "maxPositionSizePercent": 95,
+      "minProfitThresholdSOL": 0.00015,
+      "slippageTolerancePercent": 3.0,
+      "executionPriority": "ultra-high",
+      "useFlashLoans": true,
+      "useJitoBundles": true,
+      "useCrossExchangeArbitrage": true
+    },
+    "memecortexSupernova": {
+      "enabled": true,
+      "priority": 10,
+      "maxPositionSizePercent": 95,
+      "minProfitThresholdSOL": 0.00015,
+      "slippageTolerancePercent": 3.5,
+      "executionPriority": "ultra-high",
+      "useNeuralPrediction": true,
+      "useSocialSentimentAnalysis": true,
+      "useMemeTokenSpecialization": true
+    },
+    "singularityBlackHole": {
+      "enabled": true,
+      "priority": 10,
+      "maxPositionSizePercent": 90,
+      "minProfitThresholdSOL": 0.0002,
+      "slippageTolerancePercent": 3.0,
+      "executionPriority": "ultra-high",
+      "useWormholeXChain": true,
+      "useQuantumSingularity": true,
+      "useMultiverseArbitrage": true
+    },
+    "flashLoanSingularity": {
+      "enabled": true,
+      "priority": 9,
+      "maxPositionSizePercent": 90,
+      "minProfitThresholdSOL": 0.00018,
+      "slippageTolerancePercent": 3.0,
+      "executionPriority": "high",
+      "useMultiPoolArbitrage": true,
+      "useFlashLoanChaining": true
+    },
+    "cascadeFlash": {
+      "enabled": true,
+      "priority": 9,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.0002,
+      "slippageTolerancePercent": 3.0,
+      "executionPriority": "high",
+      "useCascadeExecution": true,
+      "useFlashLoanBatching": true
+    },
+    "temporalBlockArbitrage": {
+      "enabled": true,
+      "priority": 8,
+      "maxPositionSizePercent": 80,
+      "minProfitThresholdSOL": 0.0002,
+      "slippageTolerancePercent": 2.5,
+      "executionPriority": "high",
+      "useBlockPrediction": true,
+      "usePriorityFees": true
+    },
+    "hyperNetworkBlitz": {
+      "enabled": true,
+      "priority": 8,
+      "maxPositionSizePercent": 85,
+      "minProfitThresholdSOL": 0.00018,
+      "slippageTolerancePercent": 3.0,
+      "executionPriority": "high",
+      "useParallelExecution": true,
+      "useNetworkOptimization": true
+    },
+    "hyperionMoneyLoop": {
+      "enabled": true,
+      "priority": 9,
+      "maxPositionSizePercent": 90,
+      "minProfitThresholdSOL": 0.00015,
+      "slippageTolerancePercent": 3.5,
+      "executionPriority": "ultra-high",
+      "useNeuralTransformers": true,
+      "useHyperionAcceleration": true
+    }
+  },
+  "specializedTokenParameters": {
+    "BERN": {
+      "priority": 10,
+      "maxPositionSizePercent": 95,
+      "slippageTolerancePercent": 4.0
+    },
+    "POPCAT": {
+      "priority": 10,
+      "maxPositionSizePercent": 95,
+      "slippageTolerancePercent": 4.5
+    },
+    "BONK": {
+      "priority": 9,
+      "maxPositionSizePercent": 90,
+      "slippageTolerancePercent": 4.0
+    },
+    "BOME": {
+      "priority": 9,
+      "maxPositionSizePercent": 90,
+      "slippageTolerancePercent": 4.5
+    }
+  }
+}

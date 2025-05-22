@@ -1,0 +1,40 @@
+{
+  "hyperAggressiveTrading": {
+    "enabled": true,
+    "tradeFrequencySeconds": 20,
+    "profitThresholds": {
+      "nuclearFlashArbitrage": 0.00015,
+      "hyperionMoneyLoop": 0.00015,
+      "flashLoanSingularity": 0.00018,
+      "quantumArbitrage": 0.00018,
+      "hyperNetworkBlitz": 0.00018,
+      "jitoBundle": 0.0002,
+      "cascadeFlash": 0.0002,
+      "temporalBlockArbitrage": 0.0002,
+      "ultraQuantumMEV": 0.0002
+    },
+    "positionSizing": {
+      "nuclearFlashArbitrage": 0.95,
+      "hyperionMoneyLoop": 0.95,
+      "flashLoanSingularity": 0.90,
+      "quantumArbitrage": 0.90,
+      "hyperNetworkBlitz": 0.85,
+      "jitoBundle": 0.80,
+      "cascadeFlash": 0.85,
+      "temporalBlockArbitrage": 0.80,
+      "ultraQuantumMEV": 0.85
+    },
+    "slippageTolerance": {
+      "default": 0.025,
+      "aggressive": 0.035,
+      "ultraAggressive": 0.045
+    },
+    "priorityFeesEnabled": true,
+    "priorityFeeMultiplier": 2.0,
+    "useJitoBundles": true,
+    "useMEVProtection": true,
+    "emergencyStopLossPercent": 10,
+    "profitCollectionIntervalMinutes": 20,
+    "profitReinvestmentRate": 95
+  }
+}

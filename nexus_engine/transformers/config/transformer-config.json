@@ -1,0 +1,54 @@
+{
+  "transformers": {
+    "memecortex": {
+      "enabled": true,
+      "layers": 8,
+      "hiddenSize": 512,
+      "attentionHeads": 8,
+      "learningRate": 0.0001,
+      "batchSize": 32,
+      "epochInterval": 1000,
+      "useQuantization": true,
+      "precision": "float16",
+      "useLayerNormalization": true,
+      "useResidualConnections": true,
+      "useSelfAttention": true,
+      "activationFunction": "gelu",
+      "optimizerType": "adam"
+    },
+    "hyperion": {
+      "enabled": true,
+      "layers": 6,
+      "hiddenSize": 384,
+      "attentionHeads": 6,
+      "learningRate": 0.0001,
+      "batchSize": 32,
+      "epochInterval": 1000,
+      "useQuantization": true,
+      "precision": "float16",
+      "useLayerNormalization": true,
+      "useResidualConnections": true,
+      "useSelfAttention": true,
+      "activationFunction": "gelu",
+      "optimizerType": "adam"
+    },
+    "quantum": {
+      "enabled": true,
+      "layers": 4,
+      "hiddenSize": 256,
+      "attentionHeads": 4,
+      "learningRate": 0.0001,
+      "batchSize": 32,
+      "epochInterval": 1000,
+      "useQuantization": true,
+      "precision": "float16",
+      "useLayerNormalization": true,
+      "useResidualConnections": true,
+      "useSelfAttention": true,
+      "activationFunction": "gelu",
+      "optimizerType": "adam",
+      "useQuantumNoise": true,
+      "useEntanglement": true
+    }
+  }
+}
