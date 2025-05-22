@@ -2,7 +2,7 @@
   "enabled": true,
   "version": "2.0.0",
   "capital": {
-    "maxAllocationPercent": 10,
+    "maxAllocationPercent": 15,
     "minBalanceRequired": 0.05,
     "reservePercent": 20
   },
@@ -24,11 +24,13 @@
         "meteora"
       ],
       "risklevel": "medium",
-      "profitThresholdSol": 0.00049,
+      "profitThresholdSol": 0.000294,
       "projectedDailyProfitRange": [
         0.008,
         0.035
-      ]
+      ],
+      "useOnChainProgram": true,
+      "onChainProgramIntegrated": true
     },
     {
       "name": "Backrun Strategy",
@@ -36,7 +38,7 @@
       "type": "backrun",
       "priority": "high",
       "description": "Backrun large swaps for guaranteed profit",
-      "scanIntervalMs": 35,
+      "scanIntervalMs": 17,
       "minSwapSizeUsd": 10000,
       "maxSlippageBps": 25,
       "targetDEXs": [
@@ -52,11 +54,13 @@
         "JUP"
       ],
       "risklevel": "low",
-      "profitThresholdSol": 0.00035,
+      "profitThresholdSol": 0.00020999999999999998,
       "projectedDailyProfitRange": [
         0.005,
         0.02
-      ]
+      ],
+      "useOnChainProgram": true,
+      "onChainProgramIntegrated": true
     },
     {
       "name": "Just-In-Time Liquidity",
@@ -64,7 +68,7 @@
       "type": "jit_liquidity",
       "priority": "medium",
       "description": "Provide just-in-time liquidity for large swaps",
-      "scanIntervalMs": 52,
+      "scanIntervalMs": 26,
       "minLiquidityUsd": 1000,
       "maxPositionDurationMs": 3000,
       "targetPools": [
@@ -75,11 +79,13 @@
         "WIF/USDC"
       ],
       "risklevel": "medium",
-      "profitThresholdSol": 0.00056,
+      "profitThresholdSol": 0.000336,
       "projectedDailyProfitRange": [
         0.006,
         0.025
-      ]
+      ],
+      "useOnChainProgram": true,
+      "onChainProgramIntegrated": true
     }
   ],
   "execution": {
@@ -103,8 +109,11 @@
     "optimizeParallelExecution": true
   },
   "totalProjectedDailyProfit": {
-    "min": 0.025,
-    "max": 0.11
+    "min": 0.035,
+    "max": 0.18
   },
-  "lastUpdated": "2025-05-22T02:30:19.956Z"
+  "lastUpdated": "2025-05-22T02:30:19.956Z",
+  "useOnChainProgram": true,
+  "onChainProgramAddress": "MEVbundXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "onChainProgramIntegrated": true
 }

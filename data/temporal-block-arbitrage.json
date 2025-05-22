@@ -4,15 +4,15 @@
   "enabled": true,
   "priority": "critical",
   "executionMode": "aggressive",
-  "maxPositionSizePercent": 50,
-  "minProfitThresholdSOL": 0.002,
+  "maxPositionSizePercent": 60,
+  "minProfitThresholdSOL": 0.0015,
   "targetProfitPercent": 3.5,
   "stopLossPercent": 1.5,
   "blockSubscriptionEnabled": true,
   "monitorPendingTransactions": true,
-  "maxBlockLookback": 5,
-  "maxPendingTxMonitored": 300,
-  "blockTimeThresholdMs": 300,
+  "maxBlockLookback": 7,
+  "maxPendingTxMonitored": 400,
+  "blockTimeThresholdMs": 250,
   "mevProtectionEnabled": true,
   "privateTxEnabled": true,
   "privateTransactionProvider": "jito",
@@ -26,7 +26,7 @@
   "simulateBeforeExecution": true,
   "adaptivePositionSizing": true,
   "useSmartRouting": true,
-  "minSuccessRate": 70,
+  "minSuccessRate": 65,
   "profitReinvestmentRate": 95,
   "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
   "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
@@ -47,5 +47,16 @@
     "JUP",
     "RNDR"
   ],
-  "createdAt": "2025-05-22T02:02:55.860Z"
+  "createdAt": "2025-05-22T02:02:55.860Z",
+  "useOnChainCalculator": true,
+  "onChainCalculatorAddress": "ArbCalcXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "onChainCalculatorIntegrated": true,
+  "profitProjection": {
+    "daily": {
+      "min": 0.05,
+      "avg": 0.08,
+      "max": 0.15
+    },
+    "onChainBoostPercent": 25
+  }
 }

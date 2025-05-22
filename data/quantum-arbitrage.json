@@ -4,15 +4,15 @@
   "enabled": true,
   "priority": "high",
   "executionMode": "precision",
-  "maxPositionSizePercent": 35,
-  "minProfitThresholdSOL": 0.0015,
+  "maxPositionSizePercent": 40,
+  "minProfitThresholdSOL": 0.001,
   "targetProfitPercent": 1.8,
   "stopLossPercent": 0.8,
-  "maxActivePositions": 6,
-  "maxDailyTransactions": 60,
+  "maxActivePositions": 8,
+  "maxDailyTransactions": 80,
   "precisionMode": true,
-  "minWinRatePercent": 90,
-  "confidenceThreshold": 80,
+  "minWinRatePercent": 88,
+  "confidenceThreshold": 75,
   "useStatisticalArbitrage": true,
   "useAdvancedFiltering": true,
   "quantumFiltering": true,
@@ -52,5 +52,16 @@
     4,
     10
   ],
-  "createdAt": "2025-05-22T02:02:55.863Z"
+  "createdAt": "2025-05-22T02:02:55.863Z",
+  "useOnChainCalculator": true,
+  "onChainCalculatorAddress": "ArbCalcXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "onChainCalculatorIntegrated": true,
+  "profitProjection": {
+    "daily": {
+      "min": 0.025,
+      "avg": 0.04,
+      "max": 0.07
+    },
+    "onChainBoostPercent": 20
+  }
 }
