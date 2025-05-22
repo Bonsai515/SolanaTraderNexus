@@ -1,0 +1,61 @@
+{
+  "name": "Flash Loan Singularity",
+  "version": "1.5.0",
+  "enabled": true,
+  "priority": "high",
+  "executionMode": "aggressive",
+  "maxPositionSizePercent": 300,
+  "minProfitThresholdSOL": 0.005,
+  "targetProfitPercent": 2.5,
+  "maxActiveLoans": 5,
+  "maxDailyTransactions": 75,
+  "loanProtocols": [
+    "Solend",
+    "Marginfi",
+    "Kamino",
+    "Tulip",
+    "Jet"
+  ],
+  "routingOptimization": true,
+  "useAdvancedRouting": true,
+  "maxGasFeeSOL": 0.003,
+  "timeoutMs": 25000,
+  "useFeeDiscounting": true,
+  "minLiquidityPoolSize": 7500,
+  "triangularArbitrage": true,
+  "crossExchangeArbitrage": true,
+  "useHangingOrderStrategy": true,
+  "sandwichProtection": true,
+  "multicallExecution": true,
+  "atomicExecution": true,
+  "mevProtection": true,
+  "simulateBeforeSend": true,
+  "revertProtection": true,
+  "maxSlippageBps": 200,
+  "gasPriceStrategy": "aggressive",
+  "jupiterIntegration": true,
+  "orcaIntegration": true,
+  "raydiumIntegration": true,
+  "meteoraIntegration": true,
+  "loopDetection": true,
+  "maxLoopLength": 5,
+  "minConfidenceScore": 70,
+  "profitReinvestmentRate": 95,
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "dataRpcEndpoint": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
+  "transactionRpcEndpoint": "https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8",
+  "projectedDailyProfitRangeSol": [
+    0.025,
+    0.15
+  ],
+  "projectedSuccessRate": [
+    80,
+    90
+  ],
+  "projectedDailyOpportunities": [
+    5,
+    12
+  ],
+  "createdAt": "2025-05-22T02:02:55.862Z"
+}
