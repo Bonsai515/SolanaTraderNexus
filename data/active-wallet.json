@@ -5,7 +5,7 @@
       "address": "HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF",
       "type": "main",
       "active": true,
-      "description": "Main trading wallet with 0.5 SOL balance",
+      "description": "HPN Trading Wallet with 0.5 SOL balance",
       "useForTrading": true
     }
   },
