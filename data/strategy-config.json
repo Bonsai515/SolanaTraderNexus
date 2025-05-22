@@ -1,18 +1,52 @@
 {
-  "parallelExecution": false,
-  "asyncSignalProcessing": true,
-  "backgroundProcessing": true,
-  "maxStrategiesPerBlock": 1,
-  "signalBufferSize": 20,
-  "preemptivePositionSizing": true,
-  "smartOrderRouting": true,
-  "memoryBufferSizeMB": 256,
-  "throttling": {
-    "enabled": true,
-    "maxSignalsPerMinute": 10,
-    "maxExecutionsPerMinute": 3,
-    "minTimeBetweenSignalsMs": 6000,
-    "minTimeBetweenExecutionsMs": 20000
+  "version": "1.0.0",
+  "allocation": {
+    "Temporal Block Arbitrage": 20,
+    "Flash Loan Singularity": 25,
+    "Quantum Arbitrage": 25,
+    "Cascade Flash": 20,
+    "Jito Bundle MEV": 10
   },
-  "optimizedAt": "2025-05-16T03:00:19.979Z"
+  "activeStrategies": [
+    "Temporal Block Arbitrage",
+    "Flash Loan Singularity",
+    "Quantum Arbitrage",
+    "Cascade Flash",
+    "Jito Bundle MEV"
+  ],
+  "cascadeFlash": {
+    "enabled": true,
+    "leveragePercent": 1000,
+    "maxOpenPositions": 3,
+    "maxDrawdownPercent": 5
+  },
+  "temporalBlockArbitrage": {
+    "enabled": true,
+    "minBlockDelayMs": 50,
+    "maxBlockDelayMs": 200,
+    "useJitoBundles": true
+  },
+  "flashLoanSingularity": {
+    "enabled": true,
+    "maxFlashLoans": 2,
+    "minProfitUSD": 0.5,
+    "targetProtocols": [
+      "Jupiter",
+      "Kamino",
+      "Lifinity"
+    ]
+  },
+  "quantumArbitrage": {
+    "enabled": true,
+    "useNeuralPrediction": true,
+    "minConfidence": 70,
+    "maxSlippageBps": 50
+  },
+  "jitoBundle": {
+    "enabled": true,
+    "maxBundleFeeSOL": 0.005,
+    "useSandwich": false,
+    "useBackrunning": true
+  },
+  "timestamp": 1747883840286
 }
