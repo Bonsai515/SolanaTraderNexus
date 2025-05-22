@@ -1,0 +1,79 @@
+{
+  "rateLimiting": {
+    "enabled": true,
+    "defaultBaseDelay": 1000,
+    "defaultMaxRetries": 3,
+    "defaultBackoffFactor": 2,
+    "defaultMaxDelay": 30000,
+    "defaultCooldownPeriod": 180000
+  },
+  "providers": {
+    "dexscreener": {
+      "baseDelay": 1500,
+      "maxRetries": 4,
+      "backoffFactor": 2,
+      "maxDelay": 45000,
+      "cooldownPeriod": 240000,
+      "enabled": true
+    },
+    "jupiter": {
+      "baseDelay": 1000,
+      "maxRetries": 5,
+      "backoffFactor": 1.5,
+      "maxDelay": 20000,
+      "cooldownPeriod": 120000,
+      "enabled": true
+    },
+    "meteora": {
+      "baseDelay": 1500,
+      "maxRetries": 4,
+      "backoffFactor": 2,
+      "maxDelay": 30000,
+      "cooldownPeriod": 180000,
+      "enabled": true
+    },
+    "birdeye": {
+      "baseDelay": 1200,
+      "maxRetries": 4,
+      "backoffFactor": 2,
+      "maxDelay": 40000,
+      "cooldownPeriod": 240000,
+      "enabled": true
+    },
+    "gmgn": {
+      "baseDelay": 2000,
+      "maxRetries": 3,
+      "backoffFactor": 2,
+      "maxDelay": 30000,
+      "cooldownPeriod": 180000,
+      "enabled": true
+    },
+    "pump.fun": {
+      "baseDelay": 2000,
+      "maxRetries": 0,
+      "backoffFactor": 2.5,
+      "maxDelay": 60000,
+      "cooldownPeriod": 300000,
+      "enabled": false
+    },
+    "instantnodes.io": {
+      "baseDelay": 1500,
+      "maxRetries": 0,
+      "backoffFactor": 2,
+      "maxDelay": 30000,
+      "cooldownPeriod": 300000,
+      "enabled": false
+    }
+  },
+  "banned": [
+    "pump.fun",
+    "instantnodes.io"
+  ],
+  "caching": {
+    "enabled": true,
+    "defaultTtlMs": 300000,
+    "refreshStaleEnabled": true,
+    "refreshStaleIntervalMs": 60000
+  },
+  "lastUpdated": "2025-05-22T01:53:48.308Z"
+}

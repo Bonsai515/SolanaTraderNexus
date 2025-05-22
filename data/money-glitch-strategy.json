@@ -46,5 +46,8 @@
   "maxLoopLength": 4,
   "minConfidenceScore": 65,
   "autoAdjustThresholds": true,
-  "enabled": true
+  "enabled": true,
+  "rpcProvider": "QuickNode",
+  "useInstantNodes": false,
+  "usePremiumRpc": true
 }
