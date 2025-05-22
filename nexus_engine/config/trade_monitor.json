@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "monitor": {
+    "enabled": true,
+    "updateFrequencyMs": 5000,
+    "logTrades": true
+  },
+  "notifications": {
+    "enabled": true,
+    "tradeStart": true,
+    "tradeComplete": true,
+    "errorNotification": true
+  },
+  "tracking": {
+    "dailyProfitTracking": true,
+    "totalProfitTracking": true,
+    "strategyPerformanceTracking": true
+  },
+  "display": {
+    "showLiveUpdates": true,
+    "showProfitGraph": true,
+    "detailedLogs": true
+  }
+}

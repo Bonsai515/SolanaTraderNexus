@@ -1,0 +1,19 @@
+{
+  "version": "2.1.0",
+  "wallets": {
+    "trading": {
+      "address": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+      "balanceSOL": 1.00495633,
+      "type": "phantom",
+      "default": true
+    }
+  },
+  "accounts": {
+    "main": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "profit": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "fees": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+  },
+  "connectOnStartup": true,
+  "requestApprovalOnTrades": false,
+  "useDirectBlockchainInteractions": true
+}

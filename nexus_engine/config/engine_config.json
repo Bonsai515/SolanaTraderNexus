@@ -1,0 +1,30 @@
+{
+  "version": "3.0.0",
+  "engine": {
+    "name": "Nexus Pro Engine",
+    "mode": "live",
+    "executionModel": "blockchain",
+    "concurrentTransactions": 3,
+    "transactionRetries": 3,
+    "transactionTimeoutMs": 45000,
+    "useJitoBundle": true
+  },
+  "monitoring": {
+    "enabled": true,
+    "logLevel": "info",
+    "alertThreshold": "warning",
+    "dashboardEnabled": true
+  },
+  "security": {
+    "simulateTransactions": true,
+    "verifyTransactions": true,
+    "requireConfirmations": 1,
+    "maxTransactionLifetimeMs": 60000
+  },
+  "profitCollection": {
+    "enabled": true,
+    "threshold": 0.01,
+    "frequency": "daily",
+    "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+  }
+}
