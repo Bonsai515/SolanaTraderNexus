@@ -1,0 +1,60 @@
+{
+  "version": "3.0.0",
+  "general": {
+    "maxPositionSizePercent": 15,
+    "maxPositionSizeSOL": 0.1507434495,
+    "minProfitThresholdSOL": 0.0015,
+    "maxSlippageBps": 30,
+    "maxTradingFeeBps": 100,
+    "emergencyStopLossPercent": 7.5
+  },
+  "strategies": {
+    "flashLoanSingularity": {
+      "allocationPercent": 25,
+      "maxPositionSizeSOL": 0.037685862375,
+      "enabled": true,
+      "priority": 1
+    },
+    "quantumArbitrage": {
+      "allocationPercent": 25,
+      "maxPositionSizeSOL": 0.037685862375,
+      "enabled": true,
+      "priority": 1
+    },
+    "temporalBlockArbitrage": {
+      "allocationPercent": 20,
+      "maxPositionSizeSOL": 0.030148689899999997,
+      "enabled": true,
+      "priority": 2,
+      "blockDelayMs": 75
+    },
+    "cascadeFlash": {
+      "allocationPercent": 20,
+      "maxPositionSizeSOL": 0.030148689899999997,
+      "enabled": true,
+      "priority": 2,
+      "leverage": 10
+    },
+    "jitoBundle": {
+      "allocationPercent": 10,
+      "maxPositionSizeSOL": 0.015074344949999999,
+      "enabled": true,
+      "priority": 3
+    }
+  },
+  "projections": {
+    "daily": {
+      "profitSOL": 0.02512390825,
+      "profitPercent": 2.5
+    },
+    "weekly": {
+      "profitSOL": 0.17586735775,
+      "profitPercent": 17.5
+    },
+    "monthly": {
+      "profitSOL": 0.7537172475,
+      "profitPercent": 75
+    }
+  },
+  "timestamp": 1747885680829
+}

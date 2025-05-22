@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "endpoints": {
+    "primary": {
+      "url": "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e/",
+      "weight": 100,
+      "priority": 1
+    },
+    "backup": {
+      "url": "https://solana-mainnet.g.alchemy.com/v2/demo",
+      "weight": 50,
+      "priority": 2
+    },
+    "fallback": {
+      "url": "https://api.mainnet-beta.solana.com",
+      "weight": 25,
+      "priority": 3
+    }
+  },
+  "websocketEndpoints": {
+    "primary": {
+      "url": "wss://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e/",
+      "priority": 1
+    }
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "maxRequestsPerSecond": 25,
+    "burstRequests": 50
+  },
+  "healthCheck": {
+    "enabled": true,
+    "intervalSeconds": 30
+  }
+}

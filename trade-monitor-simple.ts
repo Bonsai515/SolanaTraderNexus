@@ -1,256 +1,177 @@
 /**
- * Simple Trade Monitor
+ * Simple Trade Monitor for Phantom Wallet
  * 
- * Provides real-time updates on trade opportunities found vs executed,
- * along with profit tracking - directly in the console.
+ * This script monitors trades executed by the Nexus Pro Engine
+ * and tracks profits in your Phantom wallet.
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const walletArg = args.find(arg => arg.startsWith('--wallet='));
+const WALLET_ADDRESS = walletArg ? walletArg.split('=')[1] : '2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH';
 
 // Configuration
-const UPDATE_INTERVAL = 10 * 1000; // 10 seconds
-const DATA_PATH = path.join('.', 'data', 'trade-stats.json');
-const PRIMARY_WALLET = "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH";
+const LOG_PATH = './trade-monitor.log';
+const RPC_URL = 'https://api.mainnet-beta.solana.com';
+const UPDATE_INTERVAL_MS = 10000; // 10 seconds
 
-// Track trade statistics
-interface TradeStats {
-  opportunitiesFound: number;
-  opportunitiesExecuted: number;
-  profit: number;
-  startTimestamp: string;
-  lastUpdateTimestamp: string;
-  strategies: Record<string, {
-    found: number;
-    executed: number;
-    profit: number;
-  }>;
-  recentExecutions: Array<{
-    timestamp: string;
-    strategy: string;
-    profit: number;
-  }>;
+// Initialize log
+if (!fs.existsSync(LOG_PATH)) {
+  fs.writeFileSync(LOG_PATH, '--- TRADE MONITOR LOG ---\n');
 }
 
-// Initialize trade stats
-let tradeStats: TradeStats = {
-  opportunitiesFound: 0,
-  opportunitiesExecuted: 0,
-  profit: 0,
-  startTimestamp: new Date().toISOString(),
-  lastUpdateTimestamp: new Date().toISOString(),
-  strategies: {},
-  recentExecutions: []
-};
+// Trading stats
+let initialBalance = 0;
+let currentBalance = 0;
+let highestBalance = 0;
+let lowestBalance = Number.MAX_VALUE;
+let totalTrades = 0;
+let successfulTrades = 0;
+let failedTrades = 0;
+let startTime = Date.now();
 
-// Helper function to format numbers
-function formatNumber(num: number, decimals: number = 6): string {
-  return num.toFixed(decimals);
+// Log function
+function log(message: string) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}`;
+  console.log(logMessage);
+  fs.appendFileSync(LOG_PATH, logMessage + '\n');
 }
 
-// Helper function to format percentage
-function formatPercent(value: number, total: number): string {
-  if (total === 0) return '0.0%';
-  return `${((value / total) * 100).toFixed(1)}%`;
+// Connect to Solana
+function connectToSolana(): Connection {
+  return new Connection(RPC_URL, 'confirmed');
 }
 
-// Make sure data directory exists
-function ensureDataDirectory(): void {
-  const dataDir = path.join('.', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+// Get wallet balance
+async function getWalletBalance(connection: Connection): Promise<number> {
+  try {
+    const publicKey = new PublicKey(WALLET_ADDRESS);
+    const balance = await connection.getBalance(publicKey);
+    return balance / LAMPORTS_PER_SOL;
+  } catch (error) {
+    log(`Error getting wallet balance: ${(error as Error).message}`);
+    return 0;
   }
 }
 
-// Save trade stats to disk
-function saveTradeStats(): void {
-  ensureDataDirectory();
-  fs.writeFileSync(DATA_PATH, JSON.stringify(tradeStats, null, 2));
+// Format time
+function formatTime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
 }
 
-// Load trade stats from disk
-function loadTradeStats(): void {
-  if (fs.existsSync(DATA_PATH)) {
-    try {
-      tradeStats = JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
-    } catch (error) {
-      console.error('Error loading trade stats:', error);
-    }
-  } else {
-    saveTradeStats();
-  }
+// Calculate profit
+function calculateProfit(): number {
+  return currentBalance - initialBalance;
 }
 
-// Update trade stats with new data
-function updateTradeStats(): void {
-  // Simulate finding new opportunities and executing trades
-  const strategies = [
-    'Cascade Flash',
-    'Temporal Block Arbitrage',
-    'Flash Loan Singularity',
-    'Quantum Arbitrage',
-    'Jito Bundle MEV',
-    'Backrun Strategy',
-    'JIT Liquidity'
-  ];
-  
-  // 60% chance of finding a new opportunity
-  if (Math.random() < 0.6) {
-    const newOpportunities = Math.floor(Math.random() * 3) + 1; // 1-3 opportunities
-    tradeStats.opportunitiesFound += newOpportunities;
-    
-    // Choose a random strategy for these opportunities
-    const strategy = strategies[Math.floor(Math.random() * strategies.length)];
-    
-    // Initialize strategy if it doesn't exist
-    if (!tradeStats.strategies[strategy]) {
-      tradeStats.strategies[strategy] = {
-        found: 0,
-        executed: 0,
-        profit: 0
-      };
-    }
-    
-    // Update strategy stats
-    tradeStats.strategies[strategy].found += newOpportunities;
-    
-    // 50% chance of executing an opportunity
-    if (Math.random() < 0.5) {
-      const executed = Math.min(
-        newOpportunities,
-        Math.floor(Math.random() * 2) + 1
-      );
-      tradeStats.opportunitiesExecuted += executed;
-      tradeStats.strategies[strategy].executed += executed;
-      
-      // Generate profit for executed trades
-      const profit = executed * (Math.random() * 0.01); // 0-0.01 SOL per trade
-      tradeStats.profit += profit;
-      tradeStats.strategies[strategy].profit += profit;
-      
-      // Add to recent executions
-      tradeStats.recentExecutions.push({
-        timestamp: new Date().toISOString(),
-        strategy,
-        profit
-      });
-      
-      // Keep only most recent 10 executions
-      if (tradeStats.recentExecutions.length > 10) {
-        tradeStats.recentExecutions = tradeStats.recentExecutions.slice(-10);
-      }
-    }
-  }
-  
-  // Update timestamp
-  tradeStats.lastUpdateTimestamp = new Date().toISOString();
-  
-  // Save updated stats
-  saveTradeStats();
+// Calculate profit percentage
+function calculateProfitPercentage(): number {
+  return initialBalance > 0 ? (calculateProfit() / initialBalance) * 100 : 0;
 }
 
-// Display trade stats in console
-function displayTradeStats(): void {
-  // Calculate success rate
-  const successRate = tradeStats.opportunitiesFound > 0
-    ? (tradeStats.opportunitiesExecuted / tradeStats.opportunitiesFound) * 100
-    : 0;
+// Display stats
+function displayStats() {
+  const profit = calculateProfit();
+  const profitPercentage = calculateProfitPercentage();
+  const runTime = formatTime(Date.now() - startTime);
   
-  // Calculate ROI
-  const startBalance = 1.04; // Starting balance in SOL
-  const roi = (tradeStats.profit / startBalance) * 100;
-  
-  // Clear console
   console.clear();
-  
-  // Display header
-  console.log('\x1b[36;1m===== TRADE MONITOR =====\x1b[0m');
-  console.log(`\x1b[32m${new Date().toLocaleString()}\x1b[0m`);
-  console.log();
-  
-  // Display wallet info
-  console.log('\x1b[36;1mWALLET:\x1b[0m');
-  console.log(`Address: \x1b[33m${PRIMARY_WALLET}\x1b[0m`);
-  console.log(`Balance: \x1b[33m${(startBalance + tradeStats.profit).toFixed(6)} SOL\x1b[0m`);
-  console.log();
-  
-  // Display trade stats
-  console.log('\x1b[36;1mTRADE STATISTICS:\x1b[0m');
-  console.log(`Opportunities Found: \x1b[33m${tradeStats.opportunitiesFound}\x1b[0m`);
-  console.log(`Opportunities Executed: \x1b[33m${tradeStats.opportunitiesExecuted}\x1b[0m`);
-  console.log(`Success Rate: \x1b[33m${successRate.toFixed(1)}%\x1b[0m`);
-  console.log(`Total Profit: \x1b[32m${formatNumber(tradeStats.profit)} SOL\x1b[0m`);
-  console.log(`ROI: \x1b[32m${roi.toFixed(2)}%\x1b[0m`);
-  console.log();
-  
-  // Display strategy performance
-  console.log('\x1b[36;1mSTRATEGY PERFORMANCE:\x1b[0m');
-  console.log('\x1b[2mStrategy                Found    Executed    Success    Profit\x1b[0m');
-  
-  // Sort strategies by profit (highest first)
-  const sortedStrategies = Object.entries(tradeStats.strategies)
-    .sort(([, a], [, b]) => b.profit - a.profit);
-  
-  for (const [strategy, stats] of sortedStrategies) {
-    const strategySuccessRate = stats.found > 0
-      ? (stats.executed / stats.found) * 100
-      : 0;
-    
-    console.log(
-      `${strategy.padEnd(24)} ` +
-      `\x1b[33m${stats.found.toString().padStart(6)}\x1b[0m    ` +
-      `\x1b[33m${stats.executed.toString().padStart(6)}\x1b[0m    ` +
-      `\x1b[33m${strategySuccessRate.toFixed(1).padStart(5)}%\x1b[0m    ` +
-      `\x1b[32m${formatNumber(stats.profit)} SOL\x1b[0m`
-    );
-  }
-  console.log();
-  
-  // Display recent executions
-  console.log('\x1b[36;1mRECENT EXECUTIONS:\x1b[0m');
-  if (tradeStats.recentExecutions.length === 0) {
-    console.log('No recent executions');
-  } else {
-    console.log('\x1b[2mTimestamp           Strategy                Profit\x1b[0m');
-    
-    // Display most recent first
-    for (const execution of [...tradeStats.recentExecutions].reverse()) {
-      const timestamp = new Date(execution.timestamp).toLocaleTimeString();
-      console.log(
-        `${timestamp.padEnd(18)} ` +
-        `${execution.strategy.padEnd(24)} ` +
-        `\x1b[32m${formatNumber(execution.profit)} SOL\x1b[0m`
-      );
-    }
-  }
-  console.log();
-  
-  // Display found vs executed summary
-  console.log('\x1b[36;1mSUMMARY:\x1b[0m');
-  console.log(`\x1b[33mFound/Executed: ${tradeStats.opportunitiesExecuted}/${tradeStats.opportunitiesFound} (${successRate.toFixed(1)}%)\x1b[0m`);
-  console.log(`\x1b[32mProfit: ${formatNumber(tradeStats.profit)} SOL\x1b[0m`);
-  console.log();
-  
-  // Display update information
-  console.log('\x1b[2mUpdating every 10 seconds... Press Ctrl+C to exit.\x1b[0m');
+  console.log('=============================================');
+  console.log('          PHANTOM WALLET TRADE MONITOR      ');
+  console.log('=============================================');
+  console.log(`Wallet: ${WALLET_ADDRESS}`);
+  console.log(`Runtime: ${runTime}`);
+  console.log('---------------------------------------------');
+  console.log(`Initial Balance:  ${initialBalance.toFixed(6)} SOL`);
+  console.log(`Current Balance:  ${currentBalance.toFixed(6)} SOL`);
+  console.log(`Highest Balance:  ${highestBalance.toFixed(6)} SOL`);
+  console.log(`Lowest Balance:   ${lowestBalance.toFixed(6)} SOL`);
+  console.log('---------------------------------------------');
+  console.log(`Profit/Loss:      ${profit.toFixed(6)} SOL (${profitPercentage.toFixed(2)}%)`);
+  console.log('---------------------------------------------');
+  console.log(`Total Trades:     ${totalTrades}`);
+  console.log(`Successful:       ${successfulTrades}`);
+  console.log(`Failed:           ${failedTrades}`);
+  console.log('---------------------------------------------');
+  console.log(`Success Rate:     ${totalTrades > 0 ? ((successfulTrades / totalTrades) * 100).toFixed(2) : 0}%`);
+  console.log('=============================================');
+  console.log('Press Ctrl+C to exit');
 }
 
-// Main function
-function main(): void {
-  console.log('Starting Trade Monitor...');
-  
-  // Load existing stats if available
-  loadTradeStats();
-  
-  // Display initial stats
-  displayTradeStats();
-  
-  // Update stats periodically
-  setInterval(() => {
-    updateTradeStats();
-    displayTradeStats();
-  }, UPDATE_INTERVAL);
+// Main monitor function
+async function monitorTrades() {
+  try {
+    log(`Starting trade monitor for wallet: ${WALLET_ADDRESS}`);
+    
+    const connection = connectToSolana();
+    
+    // Get initial balance
+    initialBalance = await getWalletBalance(connection);
+    currentBalance = initialBalance;
+    highestBalance = initialBalance;
+    lowestBalance = initialBalance;
+    
+    log(`Initial wallet balance: ${initialBalance.toFixed(6)} SOL`);
+    
+    // Start monitoring
+    setInterval(async () => {
+      try {
+        // Update current balance
+        const newBalance = await getWalletBalance(connection);
+        
+        // Detect trades based on balance changes
+        if (newBalance !== currentBalance) {
+          const difference = newBalance - currentBalance;
+          
+          if (difference > 0) {
+            successfulTrades++;
+            log(`✅ Successful trade detected! Profit: +${difference.toFixed(6)} SOL`);
+          } else {
+            failedTrades++;
+            log(`❌ Failed trade detected! Loss: ${difference.toFixed(6)} SOL`);
+          }
+          
+          totalTrades++;
+          
+          // Update balance
+          currentBalance = newBalance;
+          
+          // Update highest and lowest balances
+          if (currentBalance > highestBalance) {
+            highestBalance = currentBalance;
+          }
+          
+          if (currentBalance < lowestBalance) {
+            lowestBalance = currentBalance;
+          }
+        }
+        
+        // Display stats
+        displayStats();
+      } catch (error) {
+        log(`Error in monitor loop: ${(error as Error).message}`);
+      }
+    }, UPDATE_INTERVAL_MS);
+    
+    // Display initial stats
+    displayStats();
+    
+    log('Trade monitor running. Press Ctrl+C to exit.');
+  } catch (error) {
+    log(`Error starting monitor: ${(error as Error).message}`);
+  }
 }
 
-// Run the main function
-main();
+// Start monitoring
+monitorTrades().catch(error => {
+  log(`Fatal error: ${error.message}`);
+});
