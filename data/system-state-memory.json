@@ -3,20 +3,22 @@
   "riskLevel": "adaptive",
   "maxCapitalUtilization": 90,
   "strategyWeights": {
-    "Temporal Block Arbitrage": 35,
-    "Flash Loan Singularity": 35,
-    "Quantum Arbitrage": 15,
-    "quantumOmega": 5,
-    "flashMinimal": 5,
-    "moneyGlitch": 3,
-    "hyperion": 2
+    "Temporal Block Arbitrage": 26,
+    "Flash Loan Singularity": 26,
+    "Quantum Arbitrage": 11,
+    "quantumOmega": 3,
+    "flashMinimal": 3,
+    "moneyGlitch": 2,
+    "hyperion": 1,
+    "Cascade Flash": 25
   },
-  "lastModified": "2025-05-22T02:16:26.037Z",
+  "lastModified": "2025-05-22T02:22:53.484Z",
   "aggressiveModeActivated": "2025-05-22T02:00:32.829Z",
   "activeStrategies": [
     "Temporal Block Arbitrage",
     "Flash Loan Singularity",
-    "Quantum Arbitrage"
+    "Quantum Arbitrage",
+    "Cascade Flash"
   ],
   "highYieldActivated": "2025-05-22T02:02:55.865Z",
   "dynamicAllocationEnabled": true,
@@ -46,5 +48,40 @@
     "autoRebalance": true,
     "performanceBased": true,
     "lastStarted": "2025-05-22T02:16:30.060Z"
-  }
+  },
+  "rpcConfiguration": {
+    "neuralEndpoint": "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e",
+    "useNeuralEndpoint": true
+  },
+  "cascadeFlashActivated": "2025-05-22T02:21:30.961Z",
+  "apiConfiguration": {
+    "jupiter": {
+      "enabled": true,
+      "useForPriceData": true,
+      "useForRouting": true,
+      "useForMarketData": true,
+      "useJupiterSwap": true,
+      "url": "https://public.jupiterapi.com",
+      "priorityLevel": "highest"
+    }
+  },
+  "strategyConfigurations": {
+    "Temporal Block Arbitrage": {
+      "useJupiterApi": true,
+      "jupiterPriority": "highest"
+    },
+    "Flash Loan Singularity": {
+      "useJupiterApi": true,
+      "jupiterPriority": "highest"
+    },
+    "Quantum Arbitrage": {
+      "useJupiterApi": true,
+      "jupiterPriority": "highest"
+    },
+    "Cascade Flash": {
+      "useJupiterApi": true,
+      "jupiterPriority": "highest"
+    }
+  },
+  "jupiterConfigured": "2025-05-22T02:22:53.484Z"
 }

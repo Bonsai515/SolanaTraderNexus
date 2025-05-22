@@ -1,0 +1,60 @@
+{
+  "enabled": true,
+  "version": "1.0.0",
+  "storage": {
+    "persistToDisk": true,
+    "diskPath": "./data/jupiter-cache",
+    "loadOnStartup": true,
+    "saveIntervalMs": 60000
+  },
+  "cacheTypes": {
+    "tokenList": {
+      "enabled": true,
+      "ttlMs": 3600000,
+      "refreshStaleAfterMs": 1800000,
+      "maxSize": 5000
+    },
+    "prices": {
+      "enabled": true,
+      "ttlMs": 15000,
+      "refreshStaleAfterMs": 5000,
+      "maxSize": 1000
+    },
+    "routes": {
+      "enabled": true,
+      "ttlMs": 10000,
+      "refreshStaleAfterMs": 5000,
+      "maxSize": 500
+    },
+    "markets": {
+      "enabled": true,
+      "ttlMs": 60000,
+      "refreshStaleAfterMs": 30000,
+      "maxSize": 200
+    }
+  },
+  "streamingUpdates": {
+    "enabled": true,
+    "connectOnStartup": true,
+    "reconnectIntervalMs": 5000,
+    "websocketUrl": "wss://price.jup.ag/v6/ws"
+  },
+  "optimization": {
+    "useCompression": true,
+    "useDeduplication": true,
+    "prioritizeHighVolumeTokens": true,
+    "preloadCommonTokenPairs": true
+  },
+  "commonTokenPairs": [
+    "SOL/USDC",
+    "SOL/USDT",
+    "USDC/USDT",
+    "BTC/USDC",
+    "ETH/USDC",
+    "BONK/USDC",
+    "JUP/USDC",
+    "MNGO/USDC",
+    "WIF/USDC"
+  ],
+  "createdAt": "2025-05-22T02:22:53.483Z"
+}
