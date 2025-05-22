@@ -1,0 +1,14 @@
+{
+  "id": "hyper-jitoBundle-1747913422788",
+  "strategy": "jitoBundle",
+  "type": "hyper_aggressive_trade",
+  "sourceToken": "SOL",
+  "targetToken": "USDC",
+  "amount": 0.64600809115,
+  "confidence": 95,
+  "timestamp": 1747913422912,
+  "priority": 10,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "hyperAggressive": true
+}

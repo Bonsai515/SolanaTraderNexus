@@ -1,0 +1,14 @@
+{
+  "id": "hyper-quantumArbitrage-1747913422511",
+  "strategy": "quantumArbitrage",
+  "type": "hyper_aggressive_trade",
+  "sourceToken": "SOL",
+  "targetToken": "WIF",
+  "amount": 0.64600809115,
+  "confidence": 95,
+  "timestamp": 1747913422637,
+  "priority": 10,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "hyperAggressive": true
+}

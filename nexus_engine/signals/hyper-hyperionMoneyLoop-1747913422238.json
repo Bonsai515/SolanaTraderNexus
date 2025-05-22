@@ -1,0 +1,14 @@
+{
+  "id": "hyper-hyperionMoneyLoop-1747913422238",
+  "strategy": "hyperionMoneyLoop",
+  "type": "hyper_aggressive_trade",
+  "sourceToken": "SOL",
+  "targetToken": "SAMO",
+  "amount": 0.65,
+  "confidence": 95,
+  "timestamp": 1747913422358,
+  "priority": 10,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "hyperAggressive": true
+}
