@@ -24,6 +24,48 @@ const API_CONFIGS = {
     maxDelay: 45000,
     cooldownPeriod: 240000
   },
+  'meteora.ag': {
+    baseDelay: 1500,
+    maxRetries: 4,
+    backoffFactor: 2,
+    maxDelay: 30000,
+    cooldownPeriod: 180000
+  },
+  'gmgn.ai': {
+    baseDelay: 2000,
+    maxRetries: 3,
+    backoffFactor: 2,
+    maxDelay: 30000,
+    cooldownPeriod: 180000
+  },
+  'jup.ag': {
+    baseDelay: 1000,
+    maxRetries: 5,
+    backoffFactor: 1.5,
+    maxDelay: 20000,
+    cooldownPeriod: 120000
+  },
+  'birdeye.so': {
+    baseDelay: 1200,
+    maxRetries: 4,
+    backoffFactor: 2,
+    maxDelay: 40000,
+    cooldownPeriod: 240000
+  },
+  'orca.so': {
+    baseDelay: 1000,
+    maxRetries: 3,
+    backoffFactor: 1.5,
+    maxDelay: 20000,
+    cooldownPeriod: 120000
+  },
+  'raydium.io': {
+    baseDelay: 1200,
+    maxRetries: 3,
+    backoffFactor: 1.8,
+    maxDelay: 25000,
+    cooldownPeriod: 150000
+  },
   'default': {
     baseDelay: 1000,
     maxRetries: 3,

@@ -1,0 +1,48 @@
+{
+  "name": "Hyperion Transformers",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
+  "maxPositionSizeSOL": 0.25,
+  "maxPositionSizePercentage": 40,
+  "minProfitThresholdUSD": 1,
+  "maxSlippageTolerance": 1,
+  "loanProtocols": [
+    "Solend",
+    "Marinade",
+    "Jet"
+  ],
+  "maxDailyTransactions": 200,
+  "targetedTokens": [
+    "SOL",
+    "BONK",
+    "WIF",
+    "JUP",
+    "RAY",
+    "MEME",
+    "SAMO"
+  ],
+  "transformerLayers": 4,
+  "quantumFiltering": true,
+  "neuralOptimization": true,
+  "parallelExecution": true,
+  "adaptiveRiskManagement": true,
+  "executionPriorities": [
+    8,
+    9,
+    10
+  ],
+  "optimizationInterval": 60000,
+  "useIntegratedDex": true,
+  "transactionTimeoutMs": 20000,
+  "useMemoryGraph": true,
+  "transformerModels": [
+    "MemeCortex",
+    "MarketSentiment",
+    "OnchainActivity",
+    "VolumePredictor"
+  ],
+  "requireVerification": true,
+  "maxGasFeeBudgetSOL": 0.005,
+  "enabled": true
+}

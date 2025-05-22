@@ -1,0 +1,50 @@
+{
+  "name": "Money Glitch Cross-DEX",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
+  "maxPositionSizeSOL": 0.1,
+  "maxPositionSizePercentage": 20,
+  "minProfitThresholdUSD": 0.5,
+  "maxSlippageTolerance": 0.8,
+  "maxActiveLoans": 2,
+  "maxDailyTransactions": 100,
+  "loanProtocols": [
+    "Solend",
+    "Marinade",
+    "Jet"
+  ],
+  "routingOptimization": true,
+  "maxGasFeeSOL": 0.0003,
+  "timeoutMs": 15000,
+  "dexes": [
+    "Jupiter",
+    "Orca",
+    "Raydium",
+    "Meteora",
+    "GooseFX"
+  ],
+  "minSpreadPercent": 0.8,
+  "spreadCalculationMethod": "weighted-average",
+  "triangularArbitrage": true,
+  "sandwichAttackProtection": true,
+  "multicallExecution": true,
+  "atomicExecution": true,
+  "mevProtection": true,
+  "flashLoanSourcePriority": [
+    "Solend",
+    "Marinade",
+    "Jet"
+  ],
+  "profitSplitPercent": 95,
+  "simulateBeforeSend": true,
+  "useAdvancedRouting": true,
+  "revertProtection": true,
+  "gasPriceStrategy": "dynamic",
+  "jupiterIntegration": true,
+  "loopDetection": true,
+  "maxLoopLength": 4,
+  "minConfidenceScore": 65,
+  "autoAdjustThresholds": true,
+  "enabled": true
+}
