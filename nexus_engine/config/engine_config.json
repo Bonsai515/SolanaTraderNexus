@@ -3,13 +3,14 @@
   "engine": {
     "name": "Nexus Pro Engine (Maximum Frequency)",
     "mode": "ultra",
-    "executionModel": "blockchain",
+    "executionModel": "onchain",
     "concurrentTransactions": 8,
     "transactionRetries": 8,
     "transactionTimeoutMs": 15000,
     "useJitoBundle": true,
     "priorityFeeMultiplier": 4,
-    "maxTransactionsPerSecond": 5
+    "maxTransactionsPerSecond": 5,
+    "useAdvancedTransactions": true
   },
   "monitoring": {
     "enabled": true,
@@ -26,9 +27,11 @@
   },
   "profitCollection": {
     "enabled": true,
-    "threshold": 0.001,
-    "frequency": "every-15-minutes",
-    "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH"
+    "threshold": 0.0001,
+    "frequency": "instant",
+    "destinationWallet": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "instantMode": true,
+    "collectAfterEachTrade": true
   },
   "ultraSettings": {
     "enabled": true,
@@ -82,5 +85,28 @@
       "priority": "medium",
       "maxSignalsPerSecond": 5
     }
-  ]
+  ],
+  "onChainPrograms": {
+    "enabled": true,
+    "jupiterAggregator": true,
+    "jitoMEV": true,
+    "mango": true,
+    "raydium": true,
+    "solend": true,
+    "openbook": true,
+    "pyth": true,
+    "switchboard": true,
+    "dolphin": true,
+    "meteora": true
+  },
+  "transactionSettings": {
+    "useVersionedTransactions": true,
+    "useAddressLookupTables": true,
+    "usePriorityFees": true,
+    "priorityFeeMultiplier": 2,
+    "maxRetries": 5,
+    "useJitoTips": true,
+    "useBatchedTransactions": true,
+    "maxTransactionsInBatch": 3
+  }
 }

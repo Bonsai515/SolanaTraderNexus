@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "enabledPrograms": {
+    "jupiterAggregator": true,
+    "jitoMEV": true,
+    "mango": true,
+    "raydiumLiquidity": true,
+    "solendLending": true,
+    "flashLenders": true,
+    "dolphinLiquidity": true,
+    "pythOracle": true,
+    "switchboardFeed": true,
+    "openBookDex": true,
+    "meteoraAggregator": true,
+    "serumOrderbook": true
+  },
+  "programAddresses": {
+    "jupiterAggregator": "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB",
+    "jitoTipAccount": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "raydiumAmmProgram": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+    "openBookDexProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+    "solendProgram": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo",
+    "mangoProgram": "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg",
+    "pythProgram": "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH",
+    "switchboardProgram": "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f",
+    "dolphinProgram": "DLPv2fzXQX5pWqxUYqT8MDcwxwDPHYYGmCxKT6xuamQz",
+    "meteoraProgram": "M3stEYgRMjSiMNGpXrZLjL3GLQ5qyn7No4kCUwQLzXYj"
+  },
+  "programIntegration": {
+    "directExecution": true,
+    "batchedTransactions": true,
+    "priorityFees": true,
+    "lookupTables": true,
+    "versionedTransactions": true,
+    "computeBudgetProgram": true
+  },
+  "jupiterRouting": {
+    "enabled": true,
+    "useV6": true,
+    "strictMode": false,
+    "platformFeeBps": 0,
+    "maxAccounts": 30,
+    "priorityFeeMultiplier": 2
+  },
+  "jitoMEV": {
+    "enabled": true,
+    "searcher": true,
+    "tipPercentage": 75,
+    "bundler": {
+      "enabled": true,
+      "maxRetries": 5,
+      "timeoutMs": 10000
+    }
+  },
+  "flashLoans": {
+    "provider": "mango",
+    "fallbackProvider": "solend",
+    "maxLoanLamports": 100000000000,
+    "repayPadding": 1.001
+  }
+}
