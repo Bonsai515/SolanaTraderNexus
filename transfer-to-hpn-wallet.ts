@@ -14,7 +14,7 @@ const RPC_URL = 'https://api.mainnet-beta.solana.com';
 const LOG_PATH = './transfer.log';
 
 // Amount to transfer (in SOL)
-const AMOUNT_TO_TRANSFER = 0.1; // Transfer 0.1 SOL for trading
+const AMOUNT_TO_TRANSFER = 0.8; // Transfer 0.8 SOL for trading
 
 // Initialize log
 if (!fs.existsSync(LOG_PATH)) {
