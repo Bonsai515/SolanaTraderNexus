@@ -1,266 +1,477 @@
 /**
- * Configure Syndica RPC
+ * Configure Syndica for Price Feeds and Token Data
  * 
- * This script configures the system to use Syndica as the primary RPC provider,
- * which will significantly reduce rate limit errors.
+ * This script configures Syndica as the primary data source for:
+ * - Price feeds
+ * - Token data
+ * - Memecoin information
+ * - Cached routes
  */
 
-import fs from 'fs';
-import path from 'path';
-import { config } from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Load environment variables
-config();
+// Syndica endpoint information
+const SYNDICA_ENDPOINT = 'https://solana-api.syndica.io/access-token/DEFAULT_TOKEN';
+const SYNDICA_WS_ENDPOINT = 'wss://solana-api.syndica.io/access-token/DEFAULT_TOKEN';
 
-// Constants
-const MAIN_WALLET_ADDRESS = 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
-const CONFIG_DIR = './config';
-const RPC_CONFIG_PATH = path.join(CONFIG_DIR, 'rpc-config.json');
+// Configuration paths
+const TOKEN_SOURCES_PATH = path.join('./data', 'token-sources.json');
+const RPC_CONFIG_PATH = path.join('./data', 'rpc-config.json');
+const CACHE_CONFIG_PATH = path.join('./data', 'cache-config.json');
+const ROUTER_CONFIG_PATH = path.join('./data', 'request-router.json');
 
-// Make sure config directory exists
-if (!fs.existsSync(CONFIG_DIR)) {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-}
-
-// Read existing RPC config if available
-let rpcConfig: any = {
-  rpcEndpoints: [],
-  caching: {
-    enabled: true,
-    defaultTtlMs: 30000
-  },
-  rateLimiting: {
-    enabled: true,
-    requestsPerMinute: 60
-  },
-  fallback: {
-    enabled: true,
-    maxRetries: 3
-  }
-};
-
-if (fs.existsSync(RPC_CONFIG_PATH)) {
+/**
+ * Configure price feed sources to prioritize Syndica
+ */
+function configurePriceFeedSources() {
+  console.log('Configuring price feed sources...');
+  
   try {
-    rpcConfig = JSON.parse(fs.readFileSync(RPC_CONFIG_PATH, 'utf8'));
-  } catch (error) {
-    console.error('Error reading existing RPC config:', error);
-  }
-}
-
-// Define Syndica endpoint (using your environment variable if available)
-const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY;
-const SYNDICA_ENDPOINT = SYNDICA_API_KEY 
-  ? `https://solana-api.syndica.io/access-token/${SYNDICA_API_KEY}/rpc`
-  : 'https://solana-api.syndica.io/rpc'; // Fallback to public endpoint if no key
-
-// Define all RPC endpoints with priorities
-const rpcEndpoints = [
-  // Syndica as highest priority
-  {
-    url: SYNDICA_ENDPOINT,
-    priority: 1,
-    weight: 10,
-    rateLimit: { requestsPerMinute: 200 },
-    name: 'Syndica Primary'
-  },
-  
-  // Helius as secondary (if key available)
-  ...(process.env.HELIUS_API_KEY ? [{
-    url: `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
-    priority: 2,
-    weight: 5,
-    rateLimit: { requestsPerMinute: 100 },
-    name: 'Helius'
-  }] : []),
-  
-  // Alchemy as tertiary (if key available)
-  ...(process.env.ALCHEMY_API_KEY ? [{
-    url: `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-    priority: 2,
-    weight: 5,
-    rateLimit: { requestsPerMinute: 100 },
-    name: 'Alchemy'
-  }] : []),
-  
-  // Fallback public endpoints
-  {
-    url: 'https://api.mainnet-beta.solana.com',
-    priority: 3,
-    weight: 1,
-    rateLimit: { requestsPerMinute: 40 },
-    name: 'Public Solana'
-  },
-  {
-    url: 'https://solana-api.projectserum.com',
-    priority: 3,
-    weight: 1,
-    rateLimit: { requestsPerMinute: 40 },
-    name: 'Project Serum'
-  }
-];
-
-// Update RPC config
-rpcConfig.rpcEndpoints = rpcEndpoints;
-
-// Write updated config
-try {
-  fs.writeFileSync(RPC_CONFIG_PATH, JSON.stringify(rpcConfig, null, 2));
-  console.log(`✅ Updated RPC config with Syndica as primary endpoint at ${RPC_CONFIG_PATH}`);
-} catch (error) {
-  console.error('Error writing RPC config:', error);
-}
-
-// Create .env file with Syndica config (if not exists)
-const envPath = './.env';
-let envContent = '';
-
-if (fs.existsSync(envPath)) {
-  envContent = fs.readFileSync(envPath, 'utf8');
-}
-
-// Add Syndica config if not already present
-if (!envContent.includes('RPC_URL=')) {
-  envContent += `\n# Primary RPC provider\nRPC_URL=${SYNDICA_ENDPOINT}\n`;
-  
-  fs.writeFileSync(envPath, envContent);
-  console.log('✅ Added Syndica RPC URL to .env file');
-}
-
-// Update connection configuration files
-const connectionFiles = [
-  './src/connection.ts',
-  './src/utils/connection.ts',
-  './server/connection.ts'
-];
-
-let updatedConnectionFile = false;
-
-for (const filePath of connectionFiles) {
-  if (fs.existsSync(filePath)) {
-    try {
-      let content = fs.readFileSync(filePath, 'utf8');
-      
-      // Check if file already uses Syndica
-      if (content.includes('syndica.io')) {
-        console.log(`${filePath} already uses Syndica`);
-        continue;
-      }
-      
-      // Replace any hardcoded RPC URLs with Syndica
-      const rpcUrlRegex = /(['"])https?:\/\/[^'"]*solana[^'"]*(['"])/g;
-      content = content.replace(rpcUrlRegex, `$1${SYNDICA_ENDPOINT}$2`);
-      
-      // Replace any env variable references that might not use RPC_URL
-      const envVarRegex = /process\.env\.[A-Z_]+_RPC|process\.env\.[A-Z_]+_URL/g;
-      content = content.replace(envVarRegex, 'process.env.RPC_URL');
-      
-      fs.writeFileSync(filePath, content);
-      console.log(`✅ Updated ${filePath} to use Syndica`);
-      updatedConnectionFile = true;
-    } catch (error) {
-      console.error(`Error updating ${filePath}:`, error);
+    // Create or update token sources configuration
+    let sourcesConfig: any = {};
+    if (fs.existsSync(TOKEN_SOURCES_PATH)) {
+      sourcesConfig = JSON.parse(fs.readFileSync(TOKEN_SOURCES_PATH, 'utf8'));
     }
+    
+    // Update sources configuration
+    sourcesConfig.enabled = [
+      'syndica',       // Add Syndica as primary source
+      'dexscreener',
+      'jupiter',
+      'raydium',
+      'orca',
+      'meteora'
+    ];
+    
+    sourcesConfig.disabled = [
+      'pumpfun',
+      'instantnodes',
+      'coingecko'      // Disable CoinGecko due to rate limits
+    ];
+    
+    // Update source priorities
+    sourcesConfig.priorities = {
+      price: ['syndica', 'jupiter', 'dexscreener', 'raydium', 'orca'],
+      volume: ['syndica', 'dexscreener', 'jupiter', 'raydium'],
+      trending: ['syndica', 'dexscreener', 'jupiter', 'meteora']
+    };
+    
+    // Configure rate limits
+    sourcesConfig.rateLimits = {
+      syndica: {
+        requestsPerMinute: 300,
+        requestsPerHour: 5000
+      },
+      dexscreener: {
+        requestsPerMinute: 30,
+        requestsPerHour: 1000
+      },
+      jupiter: {
+        requestsPerMinute: 60,
+        requestsPerHour: 3000
+      },
+      raydium: {
+        requestsPerMinute: 40,
+        requestsPerHour: 2000
+      },
+      orca: {
+        requestsPerMinute: 40,
+        requestsPerHour: 2000
+      },
+      meteora: {
+        requestsPerMinute: 40,
+        requestsPerHour: 2000
+      }
+    };
+    
+    // Configure caching parameters
+    sourcesConfig.updateFrequencyMs = 30000;  // Faster updates for better data
+    sourcesConfig.cacheExpiryMs = 180000;     // Shorter cache expiry
+    sourcesConfig.lastUpdated = new Date().toISOString();
+    
+    // Save updated configuration
+    fs.writeFileSync(TOKEN_SOURCES_PATH, JSON.stringify(sourcesConfig, null, 2));
+    console.log('✅ Updated price feed sources to prioritize Syndica');
+    
+    return true;
+  } catch (error) {
+    console.error('Error configuring price feed sources:', error);
+    return false;
   }
 }
 
-if (!updatedConnectionFile) {
-  console.log('No connection files found or updated');
+/**
+ * Configure token data caching
+ */
+function configureTokenDataCaching() {
+  console.log('Configuring token data caching...');
+  
+  try {
+    // Create token data cache configuration
+    const cacheConfig = {
+      enabled: true,
+      types: {
+        price: {
+          ttlMs: 60000,            // 1 minute TTL for price data
+          refreshStaleAfterMs: 30000,  // Refresh stale data after 30 seconds
+          maxSize: 1000,           // Cache up to 1000 tokens
+          priorityRefresh: true,   // Prioritize refreshing high-volume tokens
+        },
+        metadata: {
+          ttlMs: 3600000,          // 1 hour TTL for metadata
+          refreshStaleAfterMs: 1800000, // Refresh stale data after 30 minutes
+          maxSize: 500,            // Cache up to 500 tokens
+          priorityRefresh: false,  // No priority refreshing needed
+        },
+        liquidity: {
+          ttlMs: 300000,           // 5 minutes TTL for liquidity data
+          refreshStaleAfterMs: 150000, // Refresh stale data after 2.5 minutes
+          maxSize: 300,            // Cache up to 300 tokens
+          priorityRefresh: true,   // Prioritize refreshing high-volume pools
+        },
+        routes: {
+          ttlMs: 300000,           // 5 minutes TTL for routes
+          refreshStaleAfterMs: 120000, // Refresh stale data after 2 minutes
+          maxSize: 200,            // Cache up to 200 routes
+          priorityRefresh: true,   // Prioritize refreshing common routes
+        }
+      },
+      storage: {
+        persistToDisk: true,       // Save cache to disk
+        diskPath: './data/token-cache',
+        saveIntervalMs: 60000,     // Save every minute
+        loadOnStartup: true,       // Load cache on startup
+      },
+      optimization: {
+        compressionEnabled: true,  // Compress cached data
+        deduplicate: true,         // Deduplicate data
+        preloadCommonTokens: true, // Preload common tokens
+      },
+      sources: {
+        price: ['syndica', 'jupiter', 'dexscreener'],
+        metadata: ['syndica', 'jupiter'],
+        liquidity: ['syndica', 'raydium', 'orca'],
+        routes: ['syndica', 'jupiter'],
+      },
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // Save cache configuration
+    fs.writeFileSync(CACHE_CONFIG_PATH, JSON.stringify(cacheConfig, null, 2));
+    console.log('✅ Configured token data caching with Syndica as primary source');
+    
+    return true;
+  } catch (error) {
+    console.error('Error configuring token data caching:', error);
+    return false;
+  }
 }
 
-// Create Syndica monitor script
-const monitorScriptPath = './monitor-syndica.sh';
-const monitorScript = `#!/bin/bash
-# Monitor Syndica RPC performance
-
-echo "=== SYNDICA RPC MONITOR ==="
-echo "Monitoring Syndica RPC performance..."
-
-# Measure response time for getSlot
-while true; do
-  echo "$(date): Checking Syndica performance..."
+/**
+ * Update RPC configuration to use Syndica for data operations
+ */
+function updateRpcConfiguration() {
+  console.log('Updating RPC configuration...');
   
-  start_time=$(date +%s.%N)
-  curl -s -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}' ${SYNDICA_ENDPOINT} > /dev/null
-  end_time=$(date +%s.%N)
+  try {
+    // Read existing configuration
+    let rpcConfig: any = {};
+    if (fs.existsSync(RPC_CONFIG_PATH)) {
+      rpcConfig = JSON.parse(fs.readFileSync(RPC_CONFIG_PATH, 'utf8'));
+    }
+    
+    // Get QuickNode URL from existing config
+    const quickNodeUrl = rpcConfig.endpoints?.[0]?.url || 
+      'https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8';
+    
+    // Update endpoints with Syndica for data operations
+    rpcConfig.endpoints = [
+      {
+        // QuickNode remains primary transaction endpoint
+        url: quickNodeUrl,
+        purpose: 'transactions',
+        weight: 10,
+        priority: 1,
+        maxRequestsPerSecond: 10,
+        minuteLimit: 500
+      },
+      {
+        // Syndica for data operations
+        url: SYNDICA_ENDPOINT,
+        purpose: 'data',
+        weight: 8,
+        priority: 2,
+        maxRequestsPerSecond: 15,
+        minuteLimit: 800
+      },
+      {
+        // Public endpoint as fallback
+        url: 'https://api.mainnet-beta.solana.com',
+        purpose: 'fallback',
+        weight: 2,
+        priority: 3,
+        maxRequestsPerSecond: 5,
+        minuteLimit: 150
+      }
+    ];
+    
+    // Set pool size and configuration
+    rpcConfig.poolSize = 3;
+    rpcConfig.maxBatchSize = 5;
+    rpcConfig.useGrpc = false;
+    rpcConfig.keepAlive = true;
+    
+    // Configure enhanced caching for different operations
+    rpcConfig.cacheSettings = {
+      accountInfo: 10000,
+      tokenInfo: 20000,
+      blockInfo: 5000,
+      balance: 10000,
+      transaction: 30000
+    };
+    
+    // Save updated configuration
+    rpcConfig.optimizedAt = new Date().toISOString();
+    fs.writeFileSync(RPC_CONFIG_PATH, JSON.stringify(rpcConfig, null, 2));
+    console.log('✅ Updated RPC configuration to use Syndica for data operations');
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating RPC configuration:', error);
+    return false;
+  }
+}
+
+/**
+ * Update request router to direct price checks to Syndica
+ */
+function updateRequestRouter() {
+  console.log('Updating request router...');
   
-  # Calculate duration in milliseconds
-  duration=$(echo "($end_time - $start_time) * 1000" | bc)
+  try {
+    // Read existing router if it exists
+    let routerConfig: any = {};
+    if (fs.existsSync(ROUTER_CONFIG_PATH)) {
+      routerConfig = JSON.parse(fs.readFileSync(ROUTER_CONFIG_PATH, 'utf8'));
+    }
+    
+    // Get QuickNode URL from existing config or use default
+    const quickNodeUrl = routerConfig.activeEndpoints?.quicknode || 
+      'https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8';
+    
+    // Update routing rules
+    routerConfig.routingRules = [
+      {
+        type: 'transaction',
+        endpoint: 'quicknode',
+        fallback: 'syndica'
+      },
+      {
+        type: 'getBalance',
+        endpoint: 'syndica',
+        fallback: 'quicknode'
+      },
+      {
+        type: 'getTokenAccountsByOwner',
+        endpoint: 'syndica',
+        fallback: 'quicknode'
+      },
+      {
+        type: 'getProgramAccounts',
+        endpoint: 'syndica',
+        fallback: 'quicknode'
+      },
+      {
+        type: 'getAccountInfo',
+        endpoint: 'syndica',
+        fallback: 'quicknode'
+      },
+      {
+        type: 'getTokenSupply',
+        endpoint: 'syndica',
+        fallback: 'public'
+      },
+      {
+        type: 'getMultipleAccounts',
+        endpoint: 'syndica',
+        fallback: 'quicknode'
+      }
+    ];
+    
+    // Update active endpoints
+    routerConfig.activeEndpoints = {
+      quicknode: quickNodeUrl,
+      syndica: SYNDICA_ENDPOINT,
+      public: 'https://api.mainnet-beta.solana.com'
+    };
+    
+    // Enable adaptive routing
+    routerConfig.useAdaptiveRouting = true;
+    routerConfig.adaptiveRoutingConfig = {
+      monitorLatency: true,
+      monitorErrors: true,
+      switchOnConsecutiveErrors: 3,
+      latencyThresholdMs: 2000
+    };
+    
+    // Update metadata
+    routerConfig.enabled = true;
+    routerConfig.createdAt = new Date().toISOString();
+    
+    // Save updated router configuration
+    fs.writeFileSync(ROUTER_CONFIG_PATH, JSON.stringify(routerConfig, null, 2));
+    console.log('✅ Updated request router to direct price checks to Syndica');
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating request router:', error);
+    return false;
+  }
+}
+
+/**
+ * Configure trading strategies to use Syndica for price data
+ */
+function configureStrategiesForSyndica() {
+  console.log('Configuring trading strategies for Syndica...');
   
-  echo "Syndica response time: ${duration}ms"
+  try {
+    const strategies = [
+      './data/quantum-omega-strategy.json',
+      './data/minimal-flash-strategy.json', 
+      './data/money-glitch-strategy.json',
+      './data/hyperion-transformers-strategy.json'
+    ];
+    
+    for (const strategyPath of strategies) {
+      if (fs.existsSync(strategyPath)) {
+        const strategy = JSON.parse(fs.readFileSync(strategyPath, 'utf8'));
+        
+        // Keep transaction endpoint as QuickNode
+        // Set data endpoint to Syndica
+        strategy.dataEndpoint = SYNDICA_ENDPOINT;
+        strategy.separateTransactionAndDataEndpoints = true;
+        
+        // Set endpoint priorities
+        strategy.endpointPriorities = {
+          transactions: ['quicknode', 'syndica'],
+          queries: ['syndica', 'quicknode', 'public']
+        };
+        
+        // Configure data sources
+        if (strategy.dataSources) {
+          strategy.dataSources = strategy.dataSources.filter(
+            (source: string) => !source.toLowerCase().includes('pump') && 
+                                !source.toLowerCase().includes('instantnodes')
+          );
+          
+          // Add Syndica if not already present
+          if (!strategy.dataSources.includes('syndica')) {
+            strategy.dataSources.unshift('syndica');
+          }
+        }
+        
+        // Save updated strategy
+        fs.writeFileSync(strategyPath, JSON.stringify(strategy, null, 2));
+      }
+    }
+    
+    console.log('✅ Configured trading strategies to use Syndica for price data');
+    return true;
+  } catch (error) {
+    console.error('Error configuring trading strategies:', error);
+    return false;
+  }
+}
+
+/**
+ * Create a Syndica-optimized token cache system
+ */
+function createOptimizedTokenCache() {
+  console.log('Creating optimized token cache system...');
   
-  # Check if cache directory exists and count entries
-  if [ -d "./data/rpc_cache" ]; then
-    cache_count=$(ls -1 ./data/rpc_cache | wc -l)
-    echo "RPC cache entries: ${cache_count}"
-  fi
+  try {
+    const tokenCacheConfig = {
+      version: "1.0.0",
+      enabled: true,
+      primarySource: "syndica",
+      secondarySources: ["jupiter", "dexscreener"],
+      fallbackSources: ["raydium", "orca"],
+      updateIntervals: {
+        highVolume: 30000,    // 30 seconds for high volume tokens
+        mediumVolume: 60000,  // 1 minute for medium volume
+        lowVolume: 300000,    // 5 minutes for low volume
+        metadata: 3600000     // 1 hour for metadata
+      },
+      cacheSettings: {
+        maxTokens: 1000,
+        persistToDisk: true,
+        compressData: true,
+        diskPath: "./data/enhanced-token-cache",
+        backupInterval: 600000  // 10 minutes
+      },
+      preloadTokens: [
+        "SOL", "USDC", "BONK", "WIF", "JUP", "MEME", 
+        "RAY", "MNGO", "ORCA", "SHDW"
+      ],
+      websocketEnabled: true,
+      websocketEndpoint: SYNDICA_WS_ENDPOINT,
+      streamingEnabled: true,
+      streamPriceUpdates: true,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Save token cache configuration
+    const cachePath = path.join('./data', 'enhanced-token-cache-config.json');
+    fs.writeFileSync(cachePath, JSON.stringify(tokenCacheConfig, null, 2));
+    console.log('✅ Created optimized token cache system with Syndica as primary source');
+    
+    return true;
+  } catch (error) {
+    console.error('Error creating optimized token cache:', error);
+    return false;
+  }
+}
+
+/**
+ * Main function to configure Syndica
+ */
+async function main() {
+  console.log('Starting Syndica configuration...');
   
-  sleep 10
-done
-`;
-
-fs.writeFileSync(monitorScriptPath, monitorScript);
-fs.chmodSync(monitorScriptPath, 0o755); // Make executable
-console.log(`✅ Created Syndica monitor script at ${monitorScriptPath}`);
-
-// Create restart script that uses Syndica
-const restartScriptPath = './restart-with-syndica.sh';
-const restartScript = `#!/bin/bash
-# Restart trading system with Syndica RPC
-
-echo "========================================"
-echo "    RESTARTING TRADING SYSTEM          "
-echo "       WITH SYNDICA RPC                "
-echo "========================================"
-echo
-
-# Stop running processes
-echo "Stopping current trading system..."
-pkill -f "ts-node" || true
-pkill -f "npx tsx" || true
-pkill -f "strategy.ts" || true
-sleep 2
-
-# Clean RPC cache
-echo "Clearing old RPC cache..."
-find ./data/rpc_cache -name "*.json" -mmin +60 -delete 2>/dev/null || true
-
-# Export Syndica as RPC_URL
-export RPC_URL="${SYNDICA_ENDPOINT}"
-
-# Start with Syndica configuration
-echo "Starting trading system with Syndica RPC..."
-./launch-enhanced-system.sh &
-
-echo "System restarted with Syndica as primary RPC"
-echo "========================================"
-`;
-
-fs.writeFileSync(restartScriptPath, restartScript);
-fs.chmodSync(restartScriptPath, 0o755); // Make executable
-console.log(`✅ Created restart script at ${restartScriptPath}`);
-
-console.log('\n=== SYNDICA CONFIGURATION COMPLETE ===');
-console.log('The system is now configured to use Syndica as the primary RPC provider');
-console.log('This will significantly reduce rate limit errors and improve performance');
-
-console.log('\nTo monitor Syndica performance, run:');
-console.log('./monitor-syndica.sh');
-
-console.log('\nTo restart the system with Syndica as the primary RPC, run:');
-console.log('./restart-with-syndica.sh');
-
-// Ask if user wants to restart now
-console.log('\nWould you like to restart the system with Syndica now? (y/n)');
-process.stdin.once('data', (data) => {
-  const input = data.toString().trim().toLowerCase();
+  // Create backup of existing configurations
+  const backupDir = './data/backups';
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+  }
   
-  if (input === 'y' || input === 'yes') {
-    console.log('Restarting system with Syndica...');
-    require('child_process').execSync('./restart-with-syndica.sh', { stdio: 'inherit' });
+  // Run configuration steps
+  const priceFeedsResult = configurePriceFeedSources();
+  const cachingResult = configureTokenDataCaching();
+  const rpcResult = updateRpcConfiguration();
+  const routerResult = updateRequestRouter();
+  const strategiesResult = configureStrategiesForSyndica();
+  const tokenCacheResult = createOptimizedTokenCache();
+  
+  if (priceFeedsResult && cachingResult && rpcResult && 
+      routerResult && strategiesResult && tokenCacheResult) {
+    console.log('\n=== SYNDICA CONFIGURATION COMPLETED SUCCESSFULLY ===');
+    console.log('✅ Configured Syndica as primary data source for price feeds');
+    console.log('✅ Optimized token data caching for improved performance');
+    console.log('✅ Updated RPC configuration to use Syndica for data operations');
+    console.log('✅ Configured request router to direct price checks to Syndica');
+    console.log('✅ Updated all trading strategies to use Syndica for price data');
+    console.log('✅ Created optimized token cache system with Syndica as primary source');
+    console.log('\nThe system will now use Syndica for all price checks and token data,');
+    console.log('while maintaining QuickNode for critical transaction processing.');
   } else {
-    console.log('Restart skipped. You can restart manually later by running:');
-    console.log('./restart-with-syndica.sh');
+    console.error('\n⚠️ Syndica configuration completed with some errors');
   }
-  
-  process.exit(0);
-});
+}
+
+// Run the main function
+main()
+  .catch(error => {
+    console.error('Error in Syndica configuration:', error);
+  });

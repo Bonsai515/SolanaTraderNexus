@@ -1,0 +1,13 @@
+{
+  "tradingMode": "aggressive",
+  "riskLevel": "high",
+  "maxCapitalUtilization": 90,
+  "strategyWeights": {
+    "quantumOmega": 20,
+    "flashMinimal": 20,
+    "moneyGlitch": 30,
+    "hyperion": 30
+  },
+  "lastModified": "2025-05-22T02:00:32.829Z",
+  "aggressiveModeActivated": "2025-05-22T02:00:32.829Z"
+}

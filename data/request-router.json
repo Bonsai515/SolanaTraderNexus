@@ -8,27 +8,38 @@
     },
     {
       "type": "getBalance",
-      "endpoint": "public",
+      "endpoint": "syndica",
       "fallback": "quicknode"
     },
     {
       "type": "getTokenAccountsByOwner",
-      "endpoint": "public",
+      "endpoint": "syndica",
       "fallback": "quicknode"
     },
     {
       "type": "getProgramAccounts",
-      "endpoint": "public",
+      "endpoint": "syndica",
       "fallback": "quicknode"
     },
     {
       "type": "getAccountInfo",
-      "endpoint": "public",
+      "endpoint": "syndica",
+      "fallback": "quicknode"
+    },
+    {
+      "type": "getTokenSupply",
+      "endpoint": "syndica",
+      "fallback": "public"
+    },
+    {
+      "type": "getMultipleAccounts",
+      "endpoint": "syndica",
       "fallback": "quicknode"
     }
   ],
   "activeEndpoints": {
     "quicknode": "https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8",
+    "syndica": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
     "public": "https://api.mainnet-beta.solana.com"
   },
   "useAdaptiveRouting": true,
@@ -38,5 +49,5 @@
     "switchOnConsecutiveErrors": 3,
     "latencyThresholdMs": 2000
   },
-  "createdAt": "2025-05-22T01:54:58.355Z"
+  "createdAt": "2025-05-22T01:58:51.240Z"
 }

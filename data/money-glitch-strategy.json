@@ -5,18 +5,18 @@
   "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
   "maxPositionSizeSOL": 0.1,
   "maxPositionSizePercentage": 20,
-  "minProfitThresholdUSD": 0.5,
-  "maxSlippageTolerance": 0.8,
-  "maxActiveLoans": 2,
-  "maxDailyTransactions": 100,
+  "minProfitThresholdUSD": 0.1,
+  "maxSlippageTolerance": 3,
+  "maxActiveLoans": 4,
+  "maxDailyTransactions": 50,
   "loanProtocols": [
     "Solend",
     "Marinade",
     "Jet"
   ],
   "routingOptimization": true,
-  "maxGasFeeSOL": 0.0003,
-  "timeoutMs": 15000,
+  "maxGasFeeSOL": 0.002,
+  "timeoutMs": 25000,
   "dexes": [
     "Jupiter",
     "Orca",
@@ -24,8 +24,8 @@
     "Meteora",
     "GooseFX"
   ],
-  "minSpreadPercent": 0.8,
-  "spreadCalculationMethod": "weighted-average",
+  "minSpreadPercent": 0.35,
+  "spreadCalculationMethod": "midpoint",
   "triangularArbitrage": true,
   "sandwichAttackProtection": true,
   "multicallExecution": true,
@@ -36,14 +36,14 @@
     "Marinade",
     "Jet"
   ],
-  "profitSplitPercent": 95,
+  "profitSplitPercent": 90,
   "simulateBeforeSend": true,
   "useAdvancedRouting": true,
   "revertProtection": true,
   "gasPriceStrategy": "dynamic",
   "jupiterIntegration": true,
   "loopDetection": true,
-  "maxLoopLength": 4,
+  "maxLoopLength": 5,
   "minConfidenceScore": 65,
   "autoAdjustThresholds": true,
   "enabled": true,
@@ -52,7 +52,7 @@
   "usePremiumRpc": true,
   "transactionEndpoint": "https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8",
   "useTransactionEndpointOnly": true,
-  "dataEndpoint": "https://api.mainnet-beta.solana.com",
+  "dataEndpoint": "https://solana-api.syndica.io/access-token/DEFAULT_TOKEN",
   "separateTransactionAndDataEndpoints": true,
   "endpointPriorities": {
     "transactions": [
@@ -60,8 +60,14 @@
       "syndica"
     ],
     "queries": [
-      "public",
-      "helius"
+      "syndica",
+      "quicknode",
+      "public"
     ]
-  }
+  },
+  "maxPositionSizePercent": 20,
+  "useRbsProtection": true,
+  "balancerIntegration": true,
+  "orcaIntegration": true,
+  "raydiumIntegration": true
 }

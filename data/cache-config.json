@@ -1,0 +1,61 @@
+{
+  "enabled": true,
+  "types": {
+    "price": {
+      "ttlMs": 60000,
+      "refreshStaleAfterMs": 30000,
+      "maxSize": 1000,
+      "priorityRefresh": true
+    },
+    "metadata": {
+      "ttlMs": 3600000,
+      "refreshStaleAfterMs": 1800000,
+      "maxSize": 500,
+      "priorityRefresh": false
+    },
+    "liquidity": {
+      "ttlMs": 300000,
+      "refreshStaleAfterMs": 150000,
+      "maxSize": 300,
+      "priorityRefresh": true
+    },
+    "routes": {
+      "ttlMs": 300000,
+      "refreshStaleAfterMs": 120000,
+      "maxSize": 200,
+      "priorityRefresh": true
+    }
+  },
+  "storage": {
+    "persistToDisk": true,
+    "diskPath": "./data/token-cache",
+    "saveIntervalMs": 60000,
+    "loadOnStartup": true
+  },
+  "optimization": {
+    "compressionEnabled": true,
+    "deduplicate": true,
+    "preloadCommonTokens": true
+  },
+  "sources": {
+    "price": [
+      "syndica",
+      "jupiter",
+      "dexscreener"
+    ],
+    "metadata": [
+      "syndica",
+      "jupiter"
+    ],
+    "liquidity": [
+      "syndica",
+      "raydium",
+      "orca"
+    ],
+    "routes": [
+      "syndica",
+      "jupiter"
+    ]
+  },
+  "lastUpdated": "2025-05-22T01:58:51.237Z"
+}
