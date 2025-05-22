@@ -1,0 +1,69 @@
+{
+  "signals": [
+    {
+      "id": "force-high-profit-flashLoanSingularity-1747893699443",
+      "strategy": "flashLoanSingularity",
+      "type": "trade",
+      "sourceToken": "USDC",
+      "targetToken": "BONK",
+      "amount": 0.04,
+      "confidence": 99,
+      "timestamp": 1747893699443,
+      "forced": true,
+      "priority": "critical",
+      "profit": 0.00456
+    },
+    {
+      "id": "force-high-profit-quantumArbitrage-1747893699443",
+      "strategy": "quantumArbitrage",
+      "type": "trade",
+      "sourceToken": "USDC",
+      "targetToken": "WIF",
+      "amount": 0.04,
+      "confidence": 99,
+      "timestamp": 1747893699443,
+      "forced": true,
+      "priority": "critical",
+      "profit": 0.00389
+    },
+    {
+      "id": "force-high-profit-jitoBundle-1747893699443",
+      "strategy": "jitoBundle",
+      "type": "trade",
+      "sourceToken": "USDC",
+      "targetToken": "SOL",
+      "amount": 0.04,
+      "confidence": 99,
+      "timestamp": 1747893699443,
+      "forced": true,
+      "priority": "critical",
+      "profit": 0.00512
+    },
+    {
+      "id": "force-high-profit-cascadeFlash-1747893699443",
+      "strategy": "cascadeFlash",
+      "type": "trade",
+      "sourceToken": "USDC",
+      "targetToken": "JUP",
+      "amount": 0.04,
+      "confidence": 99,
+      "timestamp": 1747893699443,
+      "forced": true,
+      "priority": "critical",
+      "profit": 0.00678
+    },
+    {
+      "id": "force-high-profit-temporalBlockArbitrage-1747893699443",
+      "strategy": "temporalBlockArbitrage",
+      "type": "trade",
+      "sourceToken": "USDC",
+      "targetToken": "MEME",
+      "amount": 0.04,
+      "confidence": 99,
+      "timestamp": 1747893699443,
+      "forced": true,
+      "priority": "critical",
+      "profit": 0.00298
+    }
+  ]
+}
