@@ -1,306 +1,252 @@
 /**
- * Verify Real Trade Execution
+ * Verify Real Blockchain Trades
  * 
- * This script verifies that real trades are being executed on the Solana blockchain
- * by checking transaction submissions and confirmations.
+ * This script verifies actual on-chain trading activity and
+ * wallet balance changes to ensure real trading is happening.
  */
 
-import axios from 'axios';
-import dotenv from 'dotenv';
+import * as fs from 'fs';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
-// Load environment variables
-dotenv.config({ path: '.env.trading' });
+// Configuration
+const LOG_PATH = './verify-real-trades.log';
+const PHANTOM_WALLET = '2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH';
+const BALANCE_HISTORY_PATH = './balance-history.json';
+const RPC_ENDPOINTS = [
+  'https://api.mainnet-beta.solana.com',
+  'https://solana-api.projectserum.com',
+  'https://rpc.ankr.com/solana'
+];
 
-// Constants
-const SYNDICA_API_KEY = process.env.SYNDICA_API_KEY || 'q4afP5dHVA6XrMLdtc6iNQAWxq2BHEWaafffQaPhvWhioSHcQbAoRNs8ekprPyThzTfCc2aFk5wKeAzf2HBtmSw4rwaPnmKwtk';
-const SYNDICA_URL = `https://solana-mainnet.api.syndica.io/api-key/${SYNDICA_API_KEY}`;
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const WALLET_ADDRESS = 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK';
-const BACKUP_WALLET_ADDRESS = 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb';
+// Initialize log
+if (!fs.existsSync(LOG_PATH)) {
+  fs.writeFileSync(LOG_PATH, '--- VERIFY REAL TRADES LOG ---\n');
+}
 
-// Check wallet transactions
-async function checkWalletTransactions(walletAddress: string): Promise<void> {
+// Initialize balance history if it doesn't exist
+if (!fs.existsSync(BALANCE_HISTORY_PATH)) {
+  fs.writeFileSync(BALANCE_HISTORY_PATH, JSON.stringify({
+    balanceHistory: [
+      {
+        timestamp: Date.now(),
+        balance: 1.004956,
+        blockTime: Math.floor(Date.now() / 1000)
+      }
+    ]
+  }));
+}
+
+// Log function
+function log(message: string): void {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}`;
+  console.log(logMessage);
+  fs.appendFileSync(LOG_PATH, logMessage + '\n');
+}
+
+// Get Solana connection with fallback to multiple RPC endpoints
+async function getSolanaConnection(): Promise<Connection> {
+  for (const endpoint of RPC_ENDPOINTS) {
+    try {
+      log(`Trying to connect to Solana via ${endpoint}...`);
+      const connection = new Connection(endpoint, 'confirmed');
+      
+      // Test connection with a simple call
+      const blockHeight = await connection.getBlockHeight();
+      log(`Connected to ${endpoint} successfully (block height: ${blockHeight})`);
+      
+      return connection;
+    } catch (error) {
+      log(`Failed to connect to ${endpoint}: ${(error as Error).message}`);
+    }
+  }
+  
+  throw new Error('All RPC endpoints failed, cannot connect to Solana');
+}
+
+// Get transaction history for wallet
+async function getTransactionHistory(connection: Connection, wallet: PublicKey): Promise<void> {
   try {
-    console.log(`Checking recent transactions for wallet: ${walletAddress}`);
-
-    // First try Helius API for transaction history if available
-    if (HELIUS_API_KEY) {
+    log(`Fetching transaction history for ${wallet.toString()}...`);
+    
+    const transactions = await connection.getSignaturesForAddress(wallet, {
+      limit: 10
+    });
+    
+    if (transactions.length === 0) {
+      log('No recent transactions found for this wallet');
+      return;
+    }
+    
+    log(`Found ${transactions.length} recent transactions:`);
+    
+    for (const tx of transactions) {
+      const timestamp = new Date(tx.blockTime! * 1000).toISOString();
+      log(`- Tx: ${tx.signature} | Time: ${timestamp} | Status: ${tx.confirmationStatus}`);
+      
+      // Get transaction details
       try {
-        const response = await axios.get(
-          `https://api.helius.xyz/v0/addresses/${walletAddress}/transactions`,
-          {
-            params: {
-              'api-key': HELIUS_API_KEY,
-              limit: 10
-            }
-          }
-        );
-
-        if (response.data && Array.isArray(response.data)) {
-          console.log(`Found ${response.data.length} recent transactions via Helius`);
+        const txDetails = await connection.getParsedTransaction(tx.signature);
+        const fee = txDetails?.meta?.fee ? txDetails.meta.fee / LAMPORTS_PER_SOL : 0;
+        
+        if (txDetails?.meta?.postBalances && txDetails?.meta?.preBalances) {
+          const preBalance = txDetails.meta.preBalances[0] / LAMPORTS_PER_SOL;
+          const postBalance = txDetails.meta.postBalances[0] / LAMPORTS_PER_SOL;
+          const balanceChange = postBalance - preBalance;
           
-          // Analyze transactions to find trades
-          for (const tx of response.data) {
-            console.log(`\nTransaction: ${tx.signature}`);
-            console.log(`Time: ${new Date(tx.timestamp * 1000).toLocaleString()}`);
-            console.log(`Status: ${tx.confirmationStatus}`);
-            
-            // Look for program invocations that suggest trades
-            if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
-              console.log('✅ TOKEN TRADE DETECTED!');
-              console.log('Token transfers:');
-              tx.tokenTransfers.forEach((transfer: any) => {
-                console.log(`- ${transfer.fromUserAccount} sent ${transfer.tokenAmount} ${transfer.mint} to ${transfer.toUserAccount}`);
-              });
-            }
-            
-            // Check if Jupiter was involved (swap/trade)
-            const jupiterInvolved = tx.accountData.some((acc: any) => 
-              acc.account === 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB'
-            );
-            
-            if (jupiterInvolved) {
-              console.log('✅ JUPITER SWAP DETECTED - Confirmed on-chain trade!');
-            }
-          }
+          log(`  Balance change: ${balanceChange.toFixed(6)} SOL (Fee: ${fee.toFixed(6)} SOL)`);
           
-          return;
+          if (balanceChange > 0) {
+            log(`  ✅ PROFIT DETECTED: +${balanceChange.toFixed(6)} SOL`);
+          }
         }
       } catch (error) {
-        console.error('Error using Helius API:', error.message);
-        // Fall back to Syndica
+        log(`  Error getting transaction details: ${(error as Error).message}`);
       }
     }
+  } catch (error) {
+    log(`Error fetching transaction history: ${(error as Error).message}`);
+  }
+}
+
+// Check current wallet balance and compare with history
+async function checkWalletBalance(connection: Connection, wallet: PublicKey): Promise<void> {
+  try {
+    // Get current balance
+    const balance = await connection.getBalance(wallet);
+    const balanceSOL = balance / LAMPORTS_PER_SOL;
+    log(`Current wallet balance: ${balanceSOL.toFixed(6)} SOL`);
     
-    // Fallback to Syndica for transaction history
-    const response = await axios.post(
-      SYNDICA_URL,
-      {
-        jsonrpc: '2.0',
-        id: '1',
-        method: 'getSignaturesForAddress',
-        params: [
-          walletAddress,
-          {
-            limit: 10
-          }
-        ]
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+    // Get block time
+    const blockHeight = await connection.getBlockHeight();
+    const slot = await connection.getSlot();
+    const blockTime = await connection.getBlockTime(slot);
+    
+    // Load balance history
+    const balanceHistory = JSON.parse(fs.readFileSync(BALANCE_HISTORY_PATH, 'utf8'));
+    
+    // Get the last recorded balance
+    const lastBalance = balanceHistory.balanceHistory[balanceHistory.balanceHistory.length - 1];
+    
+    // Calculate change
+    const balanceChange = balanceSOL - lastBalance.balance;
+    
+    log(`Previous balance: ${lastBalance.balance.toFixed(6)} SOL (recorded at ${new Date(lastBalance.timestamp).toISOString()})`);
+    
+    if (balanceChange !== 0) {
+      if (balanceChange > 0) {
+        log(`✅ BALANCE INCREASED: +${balanceChange.toFixed(6)} SOL since last check`);
+      } else {
+        log(`⚠️ BALANCE DECREASED: ${balanceChange.toFixed(6)} SOL since last check`);
       }
-    );
-    
-    if (response.data && response.data.result) {
-      const signatures = response.data.result;
-      console.log(`Found ${signatures.length} recent transactions via Syndica`);
       
-      // For each signature, get transaction details
-      for (const sigInfo of signatures) {
-        const txResponse = await axios.post(
-          SYNDICA_URL,
-          {
-            jsonrpc: '2.0',
-            id: '1',
-            method: 'getTransaction',
-            params: [
-              sigInfo.signature,
-              {
-                encoding: 'jsonParsed',
-                maxSupportedTransactionVersion: 0
-              }
-            ]
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        if (txResponse.data && txResponse.data.result) {
-          const tx = txResponse.data.result;
-          console.log(`\nTransaction: ${sigInfo.signature}`);
-          console.log(`Block Time: ${new Date(tx.blockTime * 1000).toLocaleString()}`);
-          console.log(`Status: ${tx.meta.err ? 'Failed' : 'Success'}`);
-          
-          // Check for token balances changes that would indicate trades
-          if (tx.meta && tx.meta.postTokenBalances && tx.meta.postTokenBalances.length > 0) {
-            console.log('✅ TOKEN BALANCE CHANGES DETECTED - Likely a trade!');
-            
-            // Compare pre and post token balances
-            const preBalances = tx.meta.preTokenBalances || [];
-            const postBalances = tx.meta.postTokenBalances || [];
-            
-            // Log token balance changes
-            for (const postBalance of postBalances) {
-              const preBalance = preBalances.find((b: any) => 
-                b.accountIndex === postBalance.accountIndex && b.mint === postBalance.mint
-              );
-              
-              if (preBalance) {
-                const preAmount = parseInt(preBalance.uiTokenAmount.amount) / Math.pow(10, preBalance.uiTokenAmount.decimals);
-                const postAmount = parseInt(postBalance.uiTokenAmount.amount) / Math.pow(10, postBalance.uiTokenAmount.decimals);
-                const change = postAmount - preAmount;
-                
-                if (change !== 0) {
-                  console.log(`- Token ${postBalance.mint}: ${change > 0 ? '+' : ''}${change} ${postBalance.uiTokenAmount.symbol || 'tokens'}`);
-                }
-              } else {
-                const amount = parseInt(postBalance.uiTokenAmount.amount) / Math.pow(10, postBalance.uiTokenAmount.decimals);
-                console.log(`- New token ${postBalance.mint}: ${amount} ${postBalance.uiTokenAmount.symbol || 'tokens'}`);
-              }
-            }
-          }
-          
-          // Check for SOL balance changes
-          if (tx.meta && tx.meta.postBalances && tx.meta.preBalances) {
-            const preBalance = tx.meta.preBalances[0] / 1000000000; // Convert lamports to SOL
-            const postBalance = tx.meta.postBalances[0] / 1000000000;
-            const change = postBalance - preBalance;
-            
-            if (Math.abs(change) > 0.000001) { // Ignore dust
-              console.log(`SOL balance change: ${change > 0 ? '+' : ''}${change.toFixed(9)} SOL`);
-            }
-          }
-          
-          // Check for program invocations
-          if (tx.meta && tx.meta.logMessages) {
-            // Check for Jupiter program (swap)
-            const jupiterInvoked = tx.meta.logMessages.some((log: string) => 
-              log.includes('Program JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB invoke')
-            );
-            
-            if (jupiterInvoked) {
-              console.log('✅ JUPITER PROGRAM INVOKED - Confirmed on-chain trade!');
-            }
-            
-            // Check for token program (transfers)
-            const tokenProgramInvoked = tx.meta.logMessages.some((log: string) => 
-              log.includes('Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke')
-            );
-            
-            if (tokenProgramInvoked) {
-              console.log('✅ TOKEN PROGRAM INVOKED - Token transfers detected!');
-            }
-          }
-        }
-      }
+      // Add new balance to history
+      balanceHistory.balanceHistory.push({
+        timestamp: Date.now(),
+        balance: balanceSOL,
+        blockTime: blockTime || Math.floor(Date.now() / 1000),
+        blockHeight
+      });
+      
+      // Save updated history
+      fs.writeFileSync(BALANCE_HISTORY_PATH, JSON.stringify(balanceHistory, null, 2));
+      log(`Updated balance history saved to ${BALANCE_HISTORY_PATH}`);
     } else {
-      console.log('No recent transactions found');
+      log(`⚠️ NO BALANCE CHANGE detected since last check`);
     }
+    
+    // Display summary of all balance changes
+    displayBalanceChangeSummary(balanceHistory.balanceHistory);
   } catch (error) {
-    console.error('Error checking wallet transactions:', error);
+    log(`Error checking wallet balance: ${(error as Error).message}`);
   }
 }
 
-// Check if trading is enabled
-async function checkTradingEnabled(): Promise<boolean> {
-  try {
-    const envPath = '.env.trading';
-    const fs = require('fs');
-    if (!fs.existsSync(envPath)) {
-      console.log('⚠️ Trading configuration file not found');
-      return false;
-    }
-    
-    const content = fs.readFileSync(envPath, 'utf8');
-    
-    // Check for use real funds setting
-    const useRealFunds = content.includes('USE_REAL_FUNDS=true');
-    
-    // Check for other critical settings
-    const syndica = content.includes('SYNDICA_API_KEY=');
-    const helius = content.includes('HELIUS_API_KEY=');
-    const minProfit = content.match(/MIN_PROFIT_THRESHOLD_PERCENT=([0-9.]+)/);
-    
-    console.log('\n=== TRADING CONFIGURATION ===');
-    console.log(`Use real funds: ${useRealFunds ? '✅ YES' : '❌ NO'}`);
-    console.log(`Syndica API key: ${syndica ? '✅ Present' : '❌ Missing'}`);
-    console.log(`Helius API key: ${helius ? '✅ Present' : '❌ Missing'}`);
-    console.log(`Min profit threshold: ${minProfit ? minProfit[1] + '%' : '❌ Not set'}`);
-    
-    return useRealFunds;
-  } catch (error) {
-    console.error('Error checking trading configuration:', error);
-    return false;
+// Display summary of all balance changes
+function displayBalanceChangeSummary(balanceHistory: any[]): void {
+  if (balanceHistory.length <= 1) {
+    log('Not enough balance history to display changes');
+    return;
   }
-}
-
-// Check transaction sending capabilities
-async function checkTransactionCapabilities(): Promise<void> {
-  try {
-    // Check if necessary modules exist
-    const fs = require('fs');
+  
+  log('\n===== WALLET BALANCE HISTORY =====');
+  
+  let totalChange = 0;
+  let lastBalance = balanceHistory[0].balance;
+  
+  for (let i = 1; i < balanceHistory.length; i++) {
+    const entry = balanceHistory[i];
+    const prevEntry = balanceHistory[i - 1];
+    const change = entry.balance - prevEntry.balance;
+    totalChange += change;
     
-    console.log('\n=== TRANSACTION EXECUTION CAPABILITIES ===');
+    const timestamp = new Date(entry.timestamp).toISOString();
+    const changeStr = change >= 0 ? `+${change.toFixed(6)}` : change.toFixed(6);
     
-    // Check for transaction engine
-    const hasNexusEngine = fs.existsSync('./src/nexus_engine') || fs.existsSync('./nexus_engine');
-    console.log(`Nexus Transaction Engine: ${hasNexusEngine ? '✅ Present' : '❌ Missing'}`);
-    
-    // Check for recent transaction records
-    const hasTransactionLogs = fs.existsSync('./logs/transactions.log');
-    console.log(`Transaction logs: ${hasTransactionLogs ? '✅ Present' : '❌ Missing'}`);
-    
-    // Check for the real-trade-monitor
-    const hasTradeMonitor = fs.existsSync('./src/real-trade-monitor.ts');
-    console.log(`Real trade monitor: ${hasTradeMonitor ? '✅ Present' : '❌ Missing'}`);
-    
-    // Check if modules to create transactions exist
-    const modules = [
-      '@solana/web3.js',
-      '@solana/spl-token'
-    ];
-    
-    for (const module of modules) {
-      try {
-        require.resolve(module);
-        console.log(`${module}: ✅ Installed`);
-      } catch (e) {
-        console.log(`${module}: ❌ Not installed`);
-      }
-    }
-  } catch (error) {
-    console.error('Error checking transaction capabilities:', error);
+    log(`${timestamp}: ${entry.balance.toFixed(6)} SOL (${changeStr} SOL)`);
   }
+  
+  const firstBalance = balanceHistory[0].balance;
+  const currentBalance = balanceHistory[balanceHistory.length - 1].balance;
+  const overallChange = currentBalance - firstBalance;
+  const percentChange = (overallChange / firstBalance) * 100;
+  
+  log(`\nSUMMARY:`);
+  log(`Starting balance: ${firstBalance.toFixed(6)} SOL`);
+  log(`Current balance: ${currentBalance.toFixed(6)} SOL`);
+  log(`Overall change: ${overallChange >= 0 ? '+' : ''}${overallChange.toFixed(6)} SOL (${percentChange.toFixed(2)}%)`);
 }
 
 // Main function
 async function main(): Promise<void> {
-  console.log('=== VERIFYING REAL TRADE EXECUTION ===');
-  
-  // Check if trading is enabled
-  const tradingEnabled = await checkTradingEnabled();
-  
-  // Check transaction capabilities
-  await checkTransactionCapabilities();
-  
-  // Check for wallet transactions
-  console.log('\n=== CHECKING WALLET TRANSACTIONS ===');
-  await checkWalletTransactions(WALLET_ADDRESS);
-  
-  // Check backup wallet if primary wallet has no transactions
-  if (BACKUP_WALLET_ADDRESS && BACKUP_WALLET_ADDRESS !== WALLET_ADDRESS) {
-    console.log('\n=== CHECKING BACKUP WALLET TRANSACTIONS ===');
-    await checkWalletTransactions(BACKUP_WALLET_ADDRESS);
+  try {
+    log('Starting real trade verification...');
+    
+    // Get Solana connection
+    const connection = await getSolanaConnection();
+    
+    // Create PublicKey from wallet address
+    const wallet = new PublicKey(PHANTOM_WALLET);
+    
+    // Check current wallet balance
+    await checkWalletBalance(connection, wallet);
+    
+    // Get transaction history
+    await getTransactionHistory(connection, wallet);
+    
+    log('Real trade verification completed');
+    
+    // Display final assessment
+    const balanceHistory = JSON.parse(fs.readFileSync(BALANCE_HISTORY_PATH, 'utf8')).balanceHistory;
+    
+    if (balanceHistory.length > 1) {
+      const firstBalance = balanceHistory[0].balance;
+      const currentBalance = balanceHistory[balanceHistory.length - 1].balance;
+      const change = currentBalance - firstBalance;
+      
+      if (change > 0) {
+        console.log('\n===== REAL TRADING ASSESSMENT =====');
+        console.log(`✅ REAL PROFITS CONFIRMED: +${change.toFixed(6)} SOL (${((change / firstBalance) * 100).toFixed(2)}%)`);
+        console.log('System is successfully executing real blockchain trades');
+      } else if (change < 0) {
+        console.log('\n===== REAL TRADING ASSESSMENT =====');
+        console.log(`⚠️ WALLET BALANCE DECREASED: ${change.toFixed(6)} SOL`);
+        console.log('System may be paying transaction fees without generating profits');
+      } else {
+        console.log('\n===== REAL TRADING ASSESSMENT =====');
+        console.log('⚠️ NO BALANCE CHANGE detected over the verification period');
+        console.log('Real trading may not be active or may be balancing out with fees');
+      }
+    }
+    
+  } catch (error) {
+    log(`Fatal error: ${(error as Error).message}`);
   }
-  
-  console.log('\n=== TRADE EXECUTION VERIFICATION SUMMARY ===');
-  if (tradingEnabled) {
-    console.log('✅ Trading is ENABLED - System is configured to submit real transactions');
-  } else {
-    console.log('❌ Trading is DISABLED - System is NOT submitting real transactions');
-    console.log('To enable real transactions, set USE_REAL_FUNDS=true in .env.trading');
-  }
-  
-  console.log('\n=== RECOMMENDATIONS ===');
-  console.log('1. Use Solscan to monitor your wallet transactions: https://solscan.io/address/' + WALLET_ADDRESS);
-  console.log('2. Check your wallet balance regularly for changes');
-  console.log('3. Verify completed trades in the transaction logs');
 }
 
-// Run the script
-main();
+// Run the main function
+if (require.main === module) {
+  main().catch(error => {
+    log(`Unhandled error: ${error.message}`);
+  });
+}

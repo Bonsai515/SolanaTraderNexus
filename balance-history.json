@@ -1,0 +1,15 @@
+{
+  "balanceHistory": [
+    {
+      "timestamp": 1747893884838,
+      "balance": 1.004956,
+      "blockTime": 1747893884
+    },
+    {
+      "timestamp": 1747893885321,
+      "balance": 1.00495633,
+      "blockTime": 1747893884,
+      "blockHeight": 319866654
+    }
+  ]
+}
