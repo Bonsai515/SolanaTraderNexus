@@ -1,24 +1,30 @@
 {
-  "primaryEndpoint": "https://api.mainnet-beta.solana.com",
+  "primaryEndpoint": "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
   "backupEndpoints": [
+    "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/",
     "https://solana-mainnet.g.alchemy.com/v2/demo",
-    "https://solana-mainnet.rpc.extrnode.com",
+    "https://api.mainnet-beta.solana.com",
     "https://solana.api.minepi.com"
+  ],
+  "highPriorityEndpoints": [
+    "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
+    "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
   ],
   "rateLimiting": {
     "enabled": true,
-    "maxRequestsPerSecond": 5,
-    "delayBetweenRequests": 200
+    "maxRequestsPerSecond": 15,
+    "delayBetweenRequests": 50
   },
   "retryStrategy": {
     "enabled": true,
-    "maxRetries": 3,
-    "initialDelay": 500,
-    "maxDelay": 5000
+    "maxRetries": 5,
+    "initialDelay": 200,
+    "maxDelay": 2000
   },
   "fallbackStrategy": {
     "enabled": true,
     "rotateEndpointsOnFailure": true,
-    "useBackupForHighPriority": true
+    "useBackupForHighPriority": true,
+    "preferPremiumEndpoints": true
   }
 }
