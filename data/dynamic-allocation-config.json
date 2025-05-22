@@ -1,0 +1,43 @@
+{
+  "enabled": true,
+  "mode": "performance_driven",
+  "updateFrequencyMs": 300000,
+  "performanceMetrics": {
+    "dailyProfitWeight": 0.5,
+    "successRateWeight": 0.3,
+    "volumeWeight": 0.1,
+    "riskAdjustmentWeight": 0.1
+  },
+  "limits": {
+    "minAllocationPercent": 5,
+    "maxAllocationPercent": 60,
+    "maxAllocationShiftPercent": 10,
+    "emergencyRebalanceThreshold": 25
+  },
+  "strategyPreferences": {
+    "Temporal Block Arbitrage": {
+      "preferred": true,
+      "minAllocationPercent": 10,
+      "maxAllocationPercent": 60
+    },
+    "Flash Loan Singularity": {
+      "preferred": true,
+      "minAllocationPercent": 10,
+      "maxAllocationPercent": 60
+    },
+    "Quantum Arbitrage": {
+      "preferred": true,
+      "minAllocationPercent": 10,
+      "maxAllocationPercent": 40
+    }
+  },
+  "capitalBoostSettings": {
+    "enabled": true,
+    "boostThresholdROIPercent": 5,
+    "boostMultiplier": 1.5,
+    "maxBoostAllocationPercent": 60,
+    "consecutiveWinsForBoost": 5
+  },
+  "performanceHistoryDays": 7,
+  "createdAt": "2025-05-22T02:16:26.033Z"
+}
