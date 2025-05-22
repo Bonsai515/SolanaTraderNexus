@@ -130,5 +130,28 @@
     "solscanLinks": true,
     "balanceTracking": true,
     "awsIntegration": true
+  },
+  "dataSources": {
+    "birdeye": {
+      "enabled": true,
+      "type": "free",
+      "priority": 2,
+      "useFreeBirdeyeScanner": true,
+      "lastUpdated": "2025-05-22T02:50:33.994Z"
+    }
+  },
+  "wallets": {
+    "trading": {
+      "address": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+      "type": "primary",
+      "enabled": true
+    }
+  },
+  "transactionExecution": {
+    "enabled": true,
+    "maxRetries": 5,
+    "useRealFunds": true,
+    "useExponentialBackoff": true,
+    "confirmationLevel": "recent"
   }
 }

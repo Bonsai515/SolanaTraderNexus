@@ -1,0 +1,11 @@
+{
+  "walletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "tradingParams": {
+    "maxSlippageBps": 50,
+    "minProfitThresholdSOL": 0.002,
+    "maxPositionSizePercent": 10,
+    "routeOptimization": true
+  },
+  "updateType": "parameters",
+  "timestamp": 1747883389703
+}
