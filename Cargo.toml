@@ -40,7 +40,7 @@ futures = "0.3.28"
 async-trait = "0.1.73"
 rayon = "1.8.0"  # High-level parallel processing library
 crossbeam = "0.8.2"  # Low-level concurrent primitives
-time-warp = "0.5.0"  # Time manipulation for testing and simulation
+# Removed time manipulation libraries since they're not needed for deployment
 
 # Logging
 log = "0.4.19"
@@ -113,6 +113,10 @@ path = "src/main.rs"
 [[bin]]
 name = "activate_singularity"
 path = "src/bin/activate_singularity.rs"
+
+[[bin]]
+name = "deploy_nexus_strategies"
+path = "src/bin/deploy_nexus_strategies.rs"
 
 [profile.release]
 opt-level = 3

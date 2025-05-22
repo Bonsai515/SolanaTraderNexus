@@ -1,0 +1,9 @@
+{
+  "name": "flashLoanSingularity",
+  "description": "Flash loan singularity with multi-hop routing",
+  "minProfitThreshold": 0.001,
+  "positionSizing": 0.85,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}

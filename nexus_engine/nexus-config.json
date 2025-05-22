@@ -1,0 +1,137 @@
+{
+  "version": "3.0.0",
+  "trading": {
+    "mode": "REAL_BLOCKCHAIN",
+    "simulation": false,
+    "validateTransactions": true,
+    "skipPreflightCheck": false,
+    "maxRetries": 3,
+    "transactionTimeout": 30000,
+    "slippageTolerance": 0.01,
+    "priorityFee": "MEDIUM"
+  },
+  "wallet": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "rpc": {
+    "primaryEndpoint": "https://api.mainnet-beta.solana.com",
+    "backupEndpoints": [
+      "https://solana-mainnet.g.alchemy.com/v2/demo",
+      "https://solana-mainnet.rpc.extrnode.com",
+      "https://solana.api.minepi.com"
+    ]
+  },
+  "capital": {
+    "total": 0.80001002,
+    "reserved": 0.040000501,
+    "available": 0.7600095189999999
+  },
+  "hyperAggressiveTrading": {
+    "enabled": true,
+    "positionSizing": {
+      "nuclearStrategies": 0.95,
+      "standardStrategies": 0.85,
+      "lowRiskStrategies": 0.7
+    },
+    "profitThresholds": {
+      "nuclearFlashArbitrage": 0.0008,
+      "hyperionMoneyLoop": 0.0008,
+      "flashLoanSingularity": 0.001,
+      "quantumArbitrage": 0.001,
+      "hyperNetworkBlitz": 0.001,
+      "jitoBundle": 0.0012,
+      "cascadeFlash": 0.0012,
+      "temporalBlockArbitrage": 0.0012,
+      "ultraQuantumMEV": 0.0012
+    },
+    "tradeFrequencySeconds": 120
+  },
+  "strategies": [
+    {
+      "name": "nuclearFlashArbitrage",
+      "description": "Ultra-high frequency nuclear flash loans",
+      "minProfitThreshold": 0.0008,
+      "positionSizing": 0.95,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "hyperionMoneyLoop",
+      "description": "Hyperion money loop with flash loans",
+      "minProfitThreshold": 0.0008,
+      "positionSizing": 0.95,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "flashLoanSingularity",
+      "description": "Flash loan singularity with multi-hop routing",
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "quantumArbitrage",
+      "description": "Quantum arbitrage with neural network predictions",
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "hyperNetworkBlitz",
+      "description": "Hyper-network blitz trading with MEV protection",
+      "minProfitThreshold": 0.001,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "jitoBundle",
+      "description": "Jito MEV bundles for frontrunning protection",
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "cascadeFlash",
+      "description": "Cascade flash with multi-exchange routing",
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "temporalBlockArbitrage",
+      "description": "Temporal block arbitrage with latency optimization",
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    },
+    {
+      "name": "ultraQuantumMEV",
+      "description": "Ultra quantum MEV extraction with validator priority",
+      "minProfitThreshold": 0.0012,
+      "positionSizing": 0.85,
+      "priority": 10,
+      "maxSlippageBps": 100,
+      "enabled": true
+    }
+  ],
+  "rpcFallback": {
+    "enabled": true,
+    "rotateOnFailure": true
+  }
+}

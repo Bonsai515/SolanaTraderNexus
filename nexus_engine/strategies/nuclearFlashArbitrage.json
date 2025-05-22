@@ -1,0 +1,9 @@
+{
+  "name": "nuclearFlashArbitrage",
+  "description": "Ultra-high frequency nuclear flash loans",
+  "minProfitThreshold": 0.0008,
+  "positionSizing": 0.95,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}

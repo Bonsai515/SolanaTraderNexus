@@ -1,0 +1,9 @@
+{
+  "name": "temporalBlockArbitrage",
+  "description": "Temporal block arbitrage with latency optimization",
+  "minProfitThreshold": 0.0012,
+  "positionSizing": 0.85,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}

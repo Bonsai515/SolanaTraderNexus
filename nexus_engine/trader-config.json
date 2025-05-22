@@ -1,0 +1,29 @@
+{
+  "executionMode": "REAL_BLOCKCHAIN",
+  "simulation": false,
+  "transactionSettings": {
+    "maxRetries": 5,
+    "priorityFee": {
+      "enabled": true,
+      "microLamports": 250000
+    },
+    "preflightChecks": true,
+    "confirmationTarget": "confirmed",
+    "maxSignatureAge": 60,
+    "skipPreflight": false
+  },
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "slippage": {
+    "default": 0.01,
+    "aggressive": 0.015,
+    "conservative": 0.005
+  },
+  "tradingLogic": {
+    "forceTradingOn": true,
+    "bypassSimulation": false,
+    "bypassVerification": false
+  }
+}

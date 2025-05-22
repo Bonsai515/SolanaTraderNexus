@@ -1,6 +1,6 @@
 # REAL-TIME WALLET BALANCES
 
-**Last Updated:** 5/22/2025, 12:00:28 PM
+**Last Updated:** 5/22/2025, 1:30:47 PM
 
 ## ACTIVE TRADING WALLETS
 

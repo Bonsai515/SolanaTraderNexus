@@ -1,0 +1,9 @@
+{
+  "name": "ultraQuantumMEV",
+  "description": "Ultra quantum MEV extraction with validator priority",
+  "minProfitThreshold": 0.0012,
+  "positionSizing": 0.85,
+  "priority": 10,
+  "maxSlippageBps": 100,
+  "enabled": true
+}
