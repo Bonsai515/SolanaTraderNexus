@@ -2,14 +2,21 @@
   "version": "1.0.0",
   "wallets": {
     "main": {
-      "address": "HPN9rV3Ja5FCgT3WiNLK6PWrPkLZs3zXE1QWWwJGmvmF",
+      "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
       "type": "main",
       "active": true,
       "description": "Main trading wallet",
       "useForTrading": true
     },
+    "backup": {
+      "address": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+      "type": "backup",
+      "active": true,
+      "description": "Phantom backup wallet",
+      "useForTrading": false
+    },
     "prophet": {
-      "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "address": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
       "type": "profit",
       "active": true,
       "description": "Prophet wallet for profit collection",
