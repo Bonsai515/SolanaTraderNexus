@@ -1,0 +1,15 @@
+TRADING STATUS: 5/22/2025, 2:55:47 AM
+==============================================
+FOUND/EXECUTED: 0/0 (0.0%)
+PROFIT: 0.000000 SOL
+BALANCE: 1.040000 SOL
+CURRENT OPPORTUNITIES: 0
+ACTIVE STRATEGIES: 7
+
+TOP STRATEGIES:
+
+
+LATEST TRADES:
+
+==============================================
+Auto-updates every 10 seconds

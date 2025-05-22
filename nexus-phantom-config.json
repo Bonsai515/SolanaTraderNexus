@@ -1,0 +1,26 @@
+{
+  "walletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "usePhantomWallet": true,
+  "enabledStrategies": {
+    "Temporal Block Arbitrage": true,
+    "Flash Loan Singularity": true,
+    "Quantum Arbitrage": true,
+    "Cascade Flash": true,
+    "Jito Bundle MEV": true
+  },
+  "tradingParams": {
+    "maxSlippageBps": 50,
+    "minProfitThresholdSOL": 0.002,
+    "maxPositionSizePercent": 10,
+    "routeOptimization": true
+  },
+  "notifications": {
+    "enableTradeNotifications": true,
+    "notifyOnOpportunities": true
+  },
+  "rpcEndpoints": [
+    "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e/",
+    "https://api.mainnet-beta.solana.com"
+  ],
+  "lastConfigUpdate": "2025-05-22T03:09:49.702Z"
+}

@@ -1,0 +1,9 @@
+{
+  "totalTrades": 0,
+  "successfulTrades": 0,
+  "failedTrades": 0,
+  "totalProfitSol": 0,
+  "highestProfitTrade": null,
+  "lastExecuted": null,
+  "startedAt": "2025-05-22T03:07:35.721Z"
+}

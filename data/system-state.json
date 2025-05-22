@@ -1,0 +1,12 @@
+{
+  "wallet": {
+    "primary": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+    "type": "phantom",
+    "configuredAt": "2025-05-22T03:07:27.832Z"
+  },
+  "trading": {
+    "useDirectBlockchainExecution": true,
+    "verifyOnSolscan": true,
+    "lastUpdated": "2025-05-22T03:07:27.832Z"
+  }
+}

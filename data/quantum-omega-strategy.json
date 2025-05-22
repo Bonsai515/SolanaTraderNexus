@@ -59,5 +59,10 @@
   "executionPriority": "high",
   "allowUnverifiedTokens": true,
   "riskLevel": "high",
-  "capitalUtilizationTarget": 90
+  "capitalUtilizationTarget": 90,
+  "targetedTokens": [],
+  "dataSources": [
+    "birdeye-free"
+  ],
+  "performanceBoost": 0.25
 }
