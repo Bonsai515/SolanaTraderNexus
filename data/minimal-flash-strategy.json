@@ -1,61 +1,33 @@
 {
-  "id": "minimal-flash-strategy",
-  "name": "Minimal Capital Flash Loan Strategy",
-  "description": "Optimized flash loan strategy for minimal starting capital",
-  "type": "flash-loan",
-  "enabled": true,
-  "settings": {
-    "flashLoanProvider": "solend",
-    "maxLoanSizeSOL": 0.5,
-    "minProfitThreshold": 0.0001,
-    "maxSlippageBps": 200,
-    "routeLength": 3,
-    "preferredDEXs": [
-      "jupiter",
-      "orca"
-    ],
-    "backoffMultiplier": 1.5,
-    "maxExecutionsPerHour": 6,
-    "gasOptimized": true
-  },
-  "routes": [
-    {
-      "name": "Basic SOL-USDC-SOL",
-      "steps": [
-        {
-          "from": "SOL",
-          "to": "USDC",
-          "dex": "jupiter"
-        },
-        {
-          "from": "USDC",
-          "to": "SOL",
-          "dex": "orca"
-        }
-      ],
-      "enabled": true
-    },
-    {
-      "name": "Basic USDC-ETH-USDC",
-      "steps": [
-        {
-          "from": "USDC",
-          "to": "ETH",
-          "dex": "jupiter"
-        },
-        {
-          "from": "ETH",
-          "to": "USDC",
-          "dex": "orca"
-        }
-      ],
-      "enabled": true
-    }
+  "name": "Minimal Flash Strategy",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
+  "maxPositionSizeSOL": 0.05,
+  "maxPositionSizePercentage": 10,
+  "minProfitThresholdUSD": 0.2,
+  "maxSlippageTolerance": 0.5,
+  "maxActiveLoans": 1,
+  "maxDailyTransactions": 50,
+  "loanProtocols": [
+    "Solend",
+    "Marinade",
+    "Jet"
   ],
-  "safety": {
-    "maxPercentOfWalletBalance": 100,
-    "stopLossPercentage": 2,
-    "requireFlashLoan": true,
-    "onlyExecuteInProfit": true
-  }
+  "routingOptimization": true,
+  "maxGasFeeSOL": 0.00025,
+  "timeoutMs": 15000,
+  "useFeeDiscounting": true,
+  "targetedTokens": [
+    "SOL",
+    "BONK",
+    "WIF",
+    "JUP",
+    "RAY"
+  ],
+  "usePriceImpactProtection": true,
+  "crossExchangeArbitrage": true,
+  "profitSplitPercent": 95,
+  "useRbsProtection": true,
+  "enabled": true
 }

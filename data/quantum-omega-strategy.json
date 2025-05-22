@@ -1,0 +1,28 @@
+{
+  "name": "Quantum Omega Meme Scanner",
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "backupWalletAddress": "2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH",
+  "profitWalletAddress": "5KJhonWngrkP8qtzf69F7trirJubtqVM7swsR7Apr2fG",
+  "maxPositionSizeSOL": 0.01,
+  "maxPositionSizePercentage": 2,
+  "profitTargetPercentage": 15,
+  "stopLossPercentage": 7,
+  "maxConcurrentPositions": 3,
+  "scanIntervalMs": 30000,
+  "tokenBlacklist": [
+    "USDC",
+    "USDT",
+    "ETH",
+    "BTC",
+    "SOL"
+  ],
+  "prioritizeLiquidity": true,
+  "minLiquidityUSD": 50000,
+  "useAdvancedFormulaScoring": true,
+  "useMemeCortexSignals": true,
+  "snipeNewTokens": true,
+  "snipeOnlyVerified": false,
+  "autoCollectProfits": true,
+  "autoCompound": true,
+  "enabled": true
+}
