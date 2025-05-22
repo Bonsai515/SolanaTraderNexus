@@ -1,0 +1,96 @@
+{
+  "version": "2.0.0",
+  "engineMode": "ULTRA_AGGRESSIVE_TRADING",
+  "wallets": {
+    "trading": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profit": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e"
+  },
+  "rpc": {
+    "mainnet": "https://api.mainnet-beta.solana.com",
+    "backup": [
+      "https://solana-api.projectserum.com",
+      "https://solana.rpcpool.com"
+    ]
+  },
+  "strategies": {
+    "flashLoanSingularity": {
+      "enabled": true,
+      "maxPositionSizePercent": 60,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 40,
+      "priority": 10
+    },
+    "quantumArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 50,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 35,
+      "priority": 9
+    },
+    "jitoBundle": {
+      "enabled": true,
+      "maxPositionSizePercent": 40,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 30,
+      "priority": 8
+    },
+    "cascadeFlash": {
+      "enabled": true,
+      "maxPositionSizePercent": 45,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 30,
+      "priority": 7
+    },
+    "temporalBlockArbitrage": {
+      "enabled": true,
+      "maxPositionSizePercent": 35,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 25,
+      "priority": 7
+    },
+    "hyperNetworkBlitz": {
+      "enabled": true,
+      "maxPositionSizePercent": 65,
+      "minProfitThresholdSOL": 0.0003,
+      "maxDailyTrades": 45,
+      "priority": 10
+    },
+    "ultraQuantumMEV": {
+      "enabled": true,
+      "maxPositionSizePercent": 70,
+      "minProfitThresholdSOL": 0.0002,
+      "maxDailyTrades": 50,
+      "priority": 10
+    }
+  },
+  "profitCollection": {
+    "destinationWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "instantCollection": true,
+    "minAmountToCollect": 0.0005,
+    "collectionFrequencyHours": 1
+  },
+  "security": {
+    "maxDailyTradeVolume": 5,
+    "emergencyStopLossPercent": 10
+  },
+  "autonomousMode": {
+    "enabled": true,
+    "tradingInterval": 60000,
+    "dynamicIntervals": true,
+    "opportunisticTrading": true,
+    "autoRebalance": true,
+    "aggressiveMode": true,
+    "highYieldMode": true
+  },
+  "notifications": {
+    "tradingUpdates": true,
+    "profitAlerts": true,
+    "balanceUpdates": true,
+    "updateInterval": 60000
+  },
+  "autoUpdate": {
+    "enabled": true,
+    "updateIntervalMs": 60000,
+    "dashboardPath": "./ULTRA_AGGRESSIVE_PROFIT_DASHBOARD.md"
+  }
+}
