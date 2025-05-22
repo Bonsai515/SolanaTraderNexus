@@ -42,5 +42,45 @@
     "useMultiRPC": true,
     "opportunisticTrading": true,
     "useParallelTransactionSigning": true
-  }
+  },
+  "signalProcessing": {
+    "enabled": true,
+    "directSignalExecution": true,
+    "signalEndpoint": "./nexus_engine/signals",
+    "maxSignalBuffer": 50,
+    "processIntervalMs": 50,
+    "priorityQueue": true
+  },
+  "signalSources": [
+    {
+      "name": "flashLoanSingularity",
+      "enabled": true,
+      "priority": "critical",
+      "maxSignalsPerSecond": 10
+    },
+    {
+      "name": "quantumArbitrage",
+      "enabled": true,
+      "priority": "critical",
+      "maxSignalsPerSecond": 10
+    },
+    {
+      "name": "temporalBlockArbitrage",
+      "enabled": true,
+      "priority": "high",
+      "maxSignalsPerSecond": 8
+    },
+    {
+      "name": "cascadeFlash",
+      "enabled": true,
+      "priority": "high",
+      "maxSignalsPerSecond": 8
+    },
+    {
+      "name": "jitoBundle",
+      "enabled": true,
+      "priority": "medium",
+      "maxSignalsPerSecond": 5
+    }
+  ]
 }
