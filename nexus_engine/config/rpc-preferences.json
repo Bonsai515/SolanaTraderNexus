@@ -1,0 +1,6 @@
+{
+  "preferredProviders": ["syndica", "quicknode", "helius"],
+  "avoidedProviders": ["instantnodes"],
+  "connectionStrategy": "premium-only",
+  "fallbackStrategy": "rotate-premium-only"
+}
