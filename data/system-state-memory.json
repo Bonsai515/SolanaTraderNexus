@@ -3,22 +3,28 @@
   "riskLevel": "adaptive",
   "maxCapitalUtilization": 90,
   "strategyWeights": {
-    "Temporal Block Arbitrage": 26,
-    "Flash Loan Singularity": 26,
-    "Quantum Arbitrage": 11,
-    "quantumOmega": 3,
-    "flashMinimal": 3,
-    "moneyGlitch": 2,
-    "hyperion": 1,
-    "Cascade Flash": 25
+    "Temporal Block Arbitrage": 25,
+    "Flash Loan Singularity": 25,
+    "Quantum Arbitrage": 10,
+    "quantumOmega": 2,
+    "flashMinimal": 2,
+    "moneyGlitch": 1,
+    "hyperion": 0,
+    "Cascade Flash": 24,
+    "Jito Bundle MEV": 2,
+    "Backrun Strategy": 2,
+    "Just-In-Time Liquidity": 1
   },
-  "lastModified": "2025-05-22T02:22:53.484Z",
+  "lastModified": "2025-05-22T02:30:20.194Z",
   "aggressiveModeActivated": "2025-05-22T02:00:32.829Z",
   "activeStrategies": [
     "Temporal Block Arbitrage",
     "Flash Loan Singularity",
     "Quantum Arbitrage",
-    "Cascade Flash"
+    "Cascade Flash",
+    "Jito Bundle MEV",
+    "Backrun Strategy",
+    "Just-In-Time Liquidity"
   ],
   "highYieldActivated": "2025-05-22T02:02:55.865Z",
   "dynamicAllocationEnabled": true,
@@ -83,5 +89,12 @@
       "jupiterPriority": "highest"
     }
   },
-  "jupiterConfigured": "2025-05-22T02:22:53.484Z"
+  "jupiterConfigured": "2025-05-22T02:22:53.484Z",
+  "mevEnabled": true,
+  "mevConfig": {
+    "enabled": true,
+    "bundlingEnabled": true,
+    "lastActivated": "2025-05-22T02:30:20.194Z"
+  },
+  "mevActivated": "2025-05-22T02:30:20.194Z"
 }

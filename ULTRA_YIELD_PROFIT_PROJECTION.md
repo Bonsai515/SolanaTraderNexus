@@ -42,6 +42,14 @@
 - Daily opportunities: 4-10
 - Capital allocation: 15%
 
+
+#### MEV Strategies (Low Capital)
+- Jito Bundle MEV: 0.008-0.035 SOL daily
+- Backrun Strategy: 0.005-0.020 SOL daily
+- Just-In-Time Liquidity: 0.006-0.025 SOL daily
+- Combined daily profit range: 0.019-0.080 SOL
+- Combined capital allocation: 5%
+
 #### Previous Strategies (Reduced Allocation)
 - Quantum Omega, Flash Minimal, Money Glitch, Hyperion
 - Combined daily profit range: 0.010-0.050 SOL

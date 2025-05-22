@@ -1,0 +1,110 @@
+{
+  "enabled": true,
+  "version": "2.0.0",
+  "capital": {
+    "maxAllocationPercent": 5,
+    "minBalanceRequired": 0.05,
+    "reservePercent": 20
+  },
+  "strategies": [
+    {
+      "name": "Jito Bundle MEV",
+      "enabled": true,
+      "type": "bundle_inclusion",
+      "priority": "highest",
+      "description": "Capture MEV by including transactions in Jito bundles",
+      "bundleProvider": "jito",
+      "tipLamports": 100000,
+      "maxBundleSize": 5,
+      "searchIntervalMs": 100,
+      "targetMarkets": [
+        "raydium",
+        "jupiter",
+        "orca",
+        "meteora"
+      ],
+      "risklevel": "medium",
+      "profitThresholdSol": 0.0007,
+      "projectedDailyProfitRange": [
+        0.008,
+        0.035
+      ]
+    },
+    {
+      "name": "Backrun Strategy",
+      "enabled": true,
+      "type": "backrun",
+      "priority": "high",
+      "description": "Backrun large swaps for guaranteed profit",
+      "scanIntervalMs": 50,
+      "minSwapSizeUsd": 10000,
+      "maxSlippageBps": 25,
+      "targetDEXs": [
+        "raydium",
+        "jupiter",
+        "orca"
+      ],
+      "targetTokens": [
+        "SOL",
+        "USDC",
+        "ETH",
+        "BONK",
+        "JUP"
+      ],
+      "risklevel": "low",
+      "profitThresholdSol": 0.0005,
+      "projectedDailyProfitRange": [
+        0.005,
+        0.02
+      ]
+    },
+    {
+      "name": "Just-In-Time Liquidity",
+      "enabled": true,
+      "type": "jit_liquidity",
+      "priority": "medium",
+      "description": "Provide just-in-time liquidity for large swaps",
+      "scanIntervalMs": 75,
+      "minLiquidityUsd": 1000,
+      "maxPositionDurationMs": 3000,
+      "targetPools": [
+        "SOL/USDC",
+        "ETH/USDC",
+        "BONK/USDC",
+        "JUP/USDC",
+        "WIF/USDC"
+      ],
+      "risklevel": "medium",
+      "profitThresholdSol": 0.0008,
+      "projectedDailyProfitRange": [
+        0.006,
+        0.025
+      ]
+    }
+  ],
+  "execution": {
+    "useBundling": true,
+    "usePrivateTransactions": true,
+    "maxParallelExecutions": 3,
+    "priorityFeeStrategy": "adaptive",
+    "maxFeeBudgetPerDaySol": 0.02,
+    "simulateBeforeSend": true
+  },
+  "monitoring": {
+    "minSuccessRate": 90,
+    "adaptiveParameters": true,
+    "checkProfitabilityBeforeSend": true,
+    "loggingLevel": "verbose",
+    "alertOnErrors": true
+  },
+  "neural": {
+    "usePredictiveModeling": true,
+    "enhanceTxRecognition": true,
+    "optimizeParallelExecution": true
+  },
+  "totalProjectedDailyProfit": {
+    "min": 0.019,
+    "max": 0.08
+  },
+  "lastUpdated": "2025-05-22T02:30:19.956Z"
+}
