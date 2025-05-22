@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "feeds": {
+    "jupiter": {
+      "enabled": true,
+      "priority": 1
+    },
+    "coinGecko": {
+      "enabled": false,
+      "priority": 3
+    },
+    "birdeye": {
+      "enabled": false,
+      "priority": 4
+    },
+    "pumpFun": {
+      "enabled": false,
+      "priority": 5
+    }
+  },
+  "updateIntervalMs": 10000,
+  "cacheTimeMs": 60000
+}

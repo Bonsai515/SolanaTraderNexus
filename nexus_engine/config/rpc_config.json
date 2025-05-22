@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "endpoints": {
     "primary": {
-      "url": "https://empty-hidden-spring.solana-mainnet.quiknode.pro/ea24f1bb95ea3b2dc4cddbe74a4bce8e10eaa88e/",
+      "url": "https://api.mainnet-beta.solana.com",
       "weight": 100,
       "priority": 1
     },
@@ -25,8 +25,8 @@
   },
   "rateLimiting": {
     "enabled": true,
-    "maxRequestsPerSecond": 25,
-    "burstRequests": 50
+    "maxRequestsPerSecond": 5,
+    "burstRequests": 10
   },
   "healthCheck": {
     "enabled": true,

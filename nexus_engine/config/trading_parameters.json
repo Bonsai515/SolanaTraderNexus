@@ -16,7 +16,8 @@
       "priority": 1,
       "aggressiveMode": true,
       "maxFrequencyMode": true,
-      "minTimeBetweenTradesMs": 200
+      "minTimeBetweenTradesMs": 200,
+      "minimumConfidence": 30
     },
     "quantumArbitrage": {
       "allocationPercent": 25,
@@ -25,7 +26,8 @@
       "priority": 1,
       "aggressiveMode": true,
       "maxFrequencyMode": true,
-      "minTimeBetweenTradesMs": 150
+      "minTimeBetweenTradesMs": 150,
+      "minimumConfidence": 30
     },
     "temporalBlockArbitrage": {
       "allocationPercent": 20,
@@ -34,7 +36,8 @@
       "priority": 1,
       "blockDelayMs": 30,
       "aggressiveMode": true,
-      "maxFrequencyMode": true
+      "maxFrequencyMode": true,
+      "minimumConfidence": 30
     },
     "cascadeFlash": {
       "allocationPercent": 15,
@@ -43,7 +46,8 @@
       "priority": 2,
       "leverage": 20,
       "aggressiveMode": true,
-      "maxFrequencyMode": true
+      "maxFrequencyMode": true,
+      "minimumConfidence": 30
     },
     "jitoBundle": {
       "allocationPercent": 10,
@@ -52,7 +56,8 @@
       "priority": 2,
       "maxBidPriceMultiplier": 3,
       "aggressiveMode": true,
-      "maxFrequencyMode": true
+      "maxFrequencyMode": true,
+      "minimumConfidence": 30
     }
   },
   "projections": {
@@ -91,5 +96,20 @@
     "precomputeRoutes": true,
     "useJitoBundlesForSpeed": true
   },
-  "timestamp": 1747891891653
+  "timestamp": 1747891891653,
+  "confidenceThresholds": {
+    "weak": 40,
+    "medium": 50,
+    "strong": 60,
+    "veryStrong": 70,
+    "minimum": 30
+  },
+  "signalSettings": {
+    "executeWeakSignals": true,
+    "executeMediumSignals": true,
+    "executeAllSignalTypes": true,
+    "ignoreConflictingSignals": true,
+    "maxSignalAgeMs": 5000,
+    "prioritizeNewerSignals": true
+  }
 }
