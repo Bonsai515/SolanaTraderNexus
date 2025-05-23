@@ -1,0 +1,124 @@
+{
+  "nuclearProtocols": {
+    "enabled": true,
+    "mode": "maximum-leverage",
+    "borrowingProtocols": [
+      {
+        "name": "JetProtocol",
+        "programId": "JPLEXiMBNWK9zCaDozhD9pLo3gdLHZHWaBAvKQZbIzp",
+        "maxBorrowSOL": 25000,
+        "borrowRate": 0.0008,
+        "enabled": true,
+        "priority": 10
+      },
+      {
+        "name": "BoltProtocol", 
+        "programId": "BoLt7k3gLRr5PsA8W8Y8aRSHHSc8J9hWfPT8u5XbTn1",
+        "maxBorrowSOL": 18000,
+        "borrowRate": 0.0006,
+        "enabled": true,
+        "priority": 9
+      },
+      {
+        "name": "MangoMarkets",
+        "programId": "mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68",
+        "maxBorrowSOL": 30000,
+        "borrowRate": 0.0007,
+        "enabled": true,
+        "priority": 10
+      },
+      {
+        "name": "DriftProtocol",
+        "programId": "dRiftyHA39MWEi3m9aunc5MzRF1JYuBsbn6VPcn33UH",
+        "maxBorrowSOL": 22000,
+        "borrowRate": 0.0005,
+        "enabled": true,
+        "priority": 9
+      },
+      {
+        "name": "SolendProtocol",
+        "programId": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo",
+        "maxBorrowSOL": 15000,
+        "borrowRate": 0.0009,
+        "enabled": true,
+        "priority": 8
+      },
+      {
+        "name": "KaminoLending",
+        "programId": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD",
+        "maxBorrowSOL": 20000,
+        "borrowRate": 0.0004,
+        "enabled": true,
+        "priority": 9
+      }
+    ],
+    "totalBorrowingCapacity": 130000,
+    "nuclearStrategies": [
+      {
+        "name": "QuantumNuclearArbitrage",
+        "capitalAllocation": 35000,
+        "aiAgent": "NuclearQuantumAI",
+        "enabled": true
+      },
+      {
+        "name": "HyperionSingularity",
+        "capitalAllocation": 30000,
+        "aiAgent": "SingularityAI",
+        "enabled": true
+      },
+      {
+        "name": "TemporalFlashLoan",
+        "capitalAllocation": 25000,
+        "aiAgent": "TemporalAI",
+        "enabled": true
+      },
+      {
+        "name": "CrossChainNuclear",
+        "capitalAllocation": 20000,
+        "aiAgent": "CrossChainAI",
+        "enabled": true
+      },
+      {
+        "name": "MEVExtractionNuclear",
+        "capitalAllocation": 15000,
+        "aiAgent": "MEVAI",
+        "enabled": true
+      },
+      {
+        "name": "NeuralMemeNuclear",
+        "capitalAllocation": 5000,
+        "aiAgent": "NeuralMemeAI",
+        "enabled": true
+      }
+    ]
+  },
+  "aiAgents": {
+    "nuclearQuantumAI": {
+      "enabled": true,
+      "intelligence": "quantum-enhanced",
+      "decisionSpeed": "nanosecond",
+      "riskTolerance": "nuclear",
+      "learningRate": 0.95
+    },
+    "singularityAI": {
+      "enabled": true,
+      "intelligence": "singularity-level",
+      "decisionSpeed": "instantaneous",
+      "riskTolerance": "maximum",
+      "learningRate": 0.98
+    },
+    "temporalAI": {
+      "enabled": true,
+      "intelligence": "temporal-quantum",
+      "decisionSpeed": "pre-cognitive",
+      "riskTolerance": "unlimited",
+      "learningRate": 0.99
+    }
+  },
+  "blockchainConnection": {
+    "directIntegration": true,
+    "programExecution": true,
+    "realTimeVerification": true,
+    "priorityExecution": true
+  }
+}
