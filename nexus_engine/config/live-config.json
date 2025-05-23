@@ -1,0 +1,39 @@
+{
+  "liveTrading": {
+    "enabled": true,
+    "mode": "aggressive",
+    "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+    "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+    "maxPositionSizeSOL": 0.7,
+    "minProfitThresholdSOL": 0.0001,
+    "maxDailyLossSOL": 0.08,
+    "emergencyStopLossPercent": 15,
+    "confirmTransactions": true,
+    "useRealBlockchain": true,
+    "simulationMode": false
+  },
+  "tradingParameters": {
+    "tradeFrequencySeconds": 25,
+    "slippageTolerancePercent": 2.5,
+    "priorityFeeMultiplier": 1.5,
+    "maxConcurrentTrades": 3,
+    "useJitoBundles": true,
+    "useMEVProtection": true,
+    "requireProfitConfirmation": true
+  },
+  "riskManagement": {
+    "maxPositionSizePercent": 87.5,
+    "stopLossEnabled": true,
+    "takeProfitEnabled": true,
+    "maxDrawdownPercent": 15,
+    "dailyLossLimitEnabled": true,
+    "requireBalanceChecks": true
+  },
+  "targetTokens": [
+    "So11111111111111111111111111111111111111112",
+    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "JUPyiwrYJFskUPiHa7keR8VUtAeFoSYbKedZNsDvCN",
+    "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
+  ]
+}

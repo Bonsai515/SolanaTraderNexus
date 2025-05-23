@@ -1,0 +1,14 @@
+{
+  "mode": "live",
+  "simulationMode": false,
+  "liveTrading": true,
+  "confirmTransactions": true,
+  "useRealBlockchain": true,
+  "tradingWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "profitWallet": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+  "riskLimits": {
+    "maxPositionSizeSOL": 0.7,
+    "dailyLossLimitSOL": 0.08,
+    "emergencyStopPercent": 15
+  }
+}
