@@ -1,0 +1,85 @@
+{
+  "version": "2.0",
+  "premiumDataSources": {
+    "primaryDEXes": [
+      {
+        "name": "Jupiter",
+        "endpoint": "https://price.jup.ag/v4",
+        "websocket": "wss://price.jup.ag/v4/ws",
+        "priority": 10,
+        "enabled": true,
+        "rateLimit": 100,
+        "features": ["price", "swap", "routes", "tokens"]
+      },
+      {
+        "name": "Raydium",
+        "endpoint": "https://api.raydium.io/v2",
+        "priority": 9,
+        "enabled": true,
+        "rateLimit": 50,
+        "features": ["pools", "farms", "price", "volume"]
+      },
+      {
+        "name": "Orca",
+        "endpoint": "https://api.orca.so",
+        "priority": 9,
+        "enabled": true,
+        "rateLimit": 50,
+        "features": ["whirlpools", "price", "volume"]
+      },
+      {
+        "name": "Serum",
+        "endpoint": "https://serum-api.bonfida.com",
+        "priority": 8,
+        "enabled": true,
+        "rateLimit": 30,
+        "features": ["orderbook", "trades", "price"]
+      },
+      {
+        "name": "DexScreener",
+        "endpoint": "https://api.dexscreener.com/latest/dex",
+        "priority": 7,
+        "enabled": true,
+        "rateLimit": 20,
+        "features": ["price", "volume", "pairs"]
+      }
+    ],
+    "disabledSources": [
+      "pump.fun",
+      "api.gmgn.ai",
+      "meteora.ag",
+      "instantnodes",
+      "birdeye-cache.pump.fun"
+    ],
+    "fallbackSources": [
+      {
+        "name": "CoinGecko",
+        "endpoint": "https://api.coingecko.com/api/v3",
+        "priority": 5,
+        "enabled": true,
+        "rateLimit": 10
+      }
+    ]
+  },
+  "rpcConfiguration": {
+    "primaryEndpoints": [
+      "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
+      "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
+    ],
+    "websocketEndpoints": [
+      "wss://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/ws",
+      "wss://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
+    ],
+    "disabledEndpoints": [
+      "instantnodes",
+      "solana-api.instantnodes.io"
+    ],
+    "connectionSettings": {
+      "maxRetries": 3,
+      "timeoutMs": 30000,
+      "rateLimitPerSecond": 25,
+      "useWebSocketForSubscriptions": true,
+      "preferPremiumEndpoints": true
+    }
+  }
+}
