@@ -1,0 +1,57 @@
+{
+  "aggressiveCapital": {
+    "enabled": true,
+    "mode": "maximum-aggressive",
+    "borrowMaximum": true,
+    "capitalSources": [
+      {
+        "protocol": "Solend",
+        "maxBorrowSOL": 10000,
+        "utilizationTarget": 100,
+        "enabled": true,
+        "priority": 10
+      },
+      {
+        "protocol": "Kamino", 
+        "maxBorrowSOL": 15000,
+        "utilizationTarget": 100,
+        "enabled": true,
+        "priority": 9
+      },
+      {
+        "protocol": "Marinade",
+        "maxBorrowSOL": 8000,
+        "utilizationTarget": 100,
+        "enabled": true,
+        "priority": 8
+      },
+      {
+        "protocol": "FlashLoans",
+        "maxBorrowSOL": 20000,
+        "utilizationTarget": 100,
+        "enabled": true,
+        "priority": 7
+      }
+    ],
+    "totalAvailableCapital": 53000,
+    "aggressiveAllocation": {
+      "quantumFlashArbitrage": 15000,
+      "neuralMemeSniper": 12000,
+      "crossChainArbitrage": 10000,
+      "temporalBlockSingularity": 8000,
+      "jitoMEVIntercept": 5000,
+      "hyperionFlashLoans": 3000
+    }
+  },
+  "aggressiveParameters": {
+    "positionSizePercent": 95,
+    "leverageMultiplier": 3.5,
+    "riskTolerance": "ultra-high",
+    "profitThresholdSOL": 0.00005,
+    "maxConcurrentTrades": 8,
+    "tradeFrequencySeconds": 12,
+    "emergencyStopLoss": 8,
+    "useMaximumLeverage": true,
+    "compoundProfits": true
+  }
+}
