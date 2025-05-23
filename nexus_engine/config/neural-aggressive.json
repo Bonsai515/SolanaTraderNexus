@@ -1,0 +1,16 @@
+{
+  "neuralProcessing": {
+    "minimumConfidence": 0.55,
+    "executionThreshold": 0.60,
+    "aggressiveMode": true,
+    "instantExecution": true,
+    "signalAmplification": 1.5,
+    "lowConfidenceExecution": true
+  },
+  "tradingRules": {
+    "executeWeakSignals": true,
+    "amplifySignalStrength": true,
+    "reduceWaitTimes": true,
+    "maximizeTradeFrequency": true
+  }
+}

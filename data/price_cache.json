@@ -2,42 +2,42 @@
   "SOL": {
     "symbol": "SOL",
     "priceUsd": 184.06,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 5.627838440719814
   },
   "BONK": {
     "symbol": "BONK",
     "priceUsd": 0.00002371,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 13.26513109604125
   },
   "JUP": {
     "symbol": "JUP",
     "priceUsd": 0.00095337,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 2.87123706415777
   },
   "USDC": {
     "symbol": "USDC",
     "priceUsd": 0.999802,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 0.0022345778793753804
   },
   "USDT": {
     "symbol": "USDT",
     "priceUsd": 1,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": -0.018369883697628868
   },
   "ETH": {
     "symbol": "ETH",
     "priceUsd": 2709.22,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 4.447522307212917
   },
@@ -50,21 +50,21 @@
   "MEME": {
     "symbol": "MEME",
     "priceUsd": 0.00677258,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 0.7543860200104971
   },
   "GUAC": {
     "symbol": "GUAC",
     "priceUsd": 3.3031e-8,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 8.818483024914494
   },
   "BTC": {
     "symbol": "BTC",
     "priceUsd": 111281,
-    "lastUpdated": 1747970339390,
+    "lastUpdated": 1747970397254,
     "source": "CoinGecko",
     "change24h": 0.6883720174190416
   }

@@ -1,0 +1,20 @@
+{
+  "quantumOmega": {
+    "enabled": true,
+    "mode": "aggressive-execution",
+    "confidenceThreshold": 0.60,
+    "minimumSignalStrength": 0.55,
+    "executionParameters": {
+      "maxPositionSize": 0.95,
+      "tradeFrequency": "high",
+      "riskTolerance": "maximum",
+      "profitThreshold": 0.0001
+    },
+    "tradingFilters": {
+      "enableLowConfidenceTrading": true,
+      "skipConfidenceChecks": false,
+      "executeAllSignals": true,
+      "ignoreWeakSignals": false
+    }
+  }
+}
