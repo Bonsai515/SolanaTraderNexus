@@ -5,9 +5,9 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.31,
-      "priceChange24h": 14.66,
+      "priceChange24h": 14.57,
       "priceChange1h": 0.47,
-      "volume24h": 27059.27,
+      "volume24h": 27035.4,
       "liquidity": 4245.6392,
       "score": 21.6960708,
       "sources": {
@@ -17,7 +17,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 318422.93999999994
     },
     {
@@ -37,7 +37,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 103097.00000000001
     },
     {
@@ -57,7 +57,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 358117.21
     }
   ],
@@ -79,7 +79,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 358117.21
     },
     {
@@ -99,7 +99,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 103097.00000000001
     },
     {
@@ -107,9 +107,9 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.31,
-      "priceChange24h": 14.66,
+      "priceChange24h": 14.57,
       "priceChange1h": 0.47,
-      "volume24h": 27059.27,
+      "volume24h": 27035.4,
       "liquidity": 4245.6392,
       "score": 21.6960708,
       "sources": {
@@ -119,7 +119,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 318422.93999999994
     }
   ],
@@ -130,9 +130,9 @@
       "symbol": "$WIF",
       "name": "dogwifhat",
       "price": 1.31,
-      "priceChange24h": 14.66,
+      "priceChange24h": 14.57,
       "priceChange1h": 0.47,
-      "volume24h": 27059.27,
+      "volume24h": 27035.4,
       "liquidity": 4245.6392,
       "score": 21.6960708,
       "sources": {
@@ -142,9 +142,9 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 318422.93999999994,
-      "trendingScore": 32.025927
+      "trendingScore": 31.84354
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
@@ -163,7 +163,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 103097.00000000001,
       "trendingScore": 29.404756
     },
@@ -184,7 +184,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1747969271862,
+      "lastUpdated": 1747969451859,
       "liquidityUSD": 358117.21,
       "trendingScore": 29.249810999999998
     }
