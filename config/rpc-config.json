@@ -1,61 +1,34 @@
 {
   "primaryEndpoint": "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
-  "backupEndpoints": [
-    "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/",
-    "https://solana-mainnet.g.alchemy.com/v2/demo",
-    "https://api.mainnet-beta.solana.com",
-    "https://solana.api.minepi.com"
-  ],
-  "highPriorityEndpoints": [
+  "premiumEndpoints": [
     "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
     "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
   ],
+  "websocketEndpoints": [
+    "wss://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/ws",
+    "wss://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
+  ],
+  "disabledEndpoints": [
+    "instantnodes",
+    "solana-api.instantnodes.io",
+    "instant-nodes",
+    "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9"
+  ],
+  "connectionSettings": {
+    "useOnlyPremiumEndpoints": true,
+    "maxRetries": 3,
+    "timeoutMs": 30000,
+    "rateLimitPerSecond": 25,
+    "useWebSocketForSubscriptions": true,
+    "preferPremiumEndpoints": true,
+    "avoidRateLimitedEndpoints": true,
+    "enableFailover": true,
+    "healthCheckInterval": 60000
+  },
   "rateLimiting": {
     "enabled": true,
     "maxRequestsPerSecond": 25,
+    "burstLimit": 50,
     "delayBetweenRequests": 40
-  },
-  "retryStrategy": {
-    "enabled": true,
-    "maxRetries": 5,
-    "initialDelay": 150,
-    "maxDelay": 2000
-  },
-  "fallbackStrategy": {
-    "enabled": true,
-    "rotateEndpointsOnFailure": true,
-    "useBackupForHighPriority": true,
-    "preferPremiumEndpoints": true
-  },
-  "disabledEndpoints": [
-    "instantnodes"
-  ],
-  "providerPreferences": {
-    "preferSyndica": true,
-    "preferQuickNode": true,
-    "avoidInstantNodes": true
-  },
-  "connectionOptimizations": {
-    "keepAlive": true,
-    "keepAliveMsecs": 60000,
-    "maxSockets": 25,
-    "maxFreeSockets": 10,
-    "timeout": 60000,
-    "usePipelining": true,
-    "useConnectionPooling": true,
-    "useParallelRequests": true,
-    "useJsonBatchRequests": true,
-    "useWebSocketForHighPriority": true
-  },
-  "websocketConfig": {
-    "enabled": true,
-    "endpoint": "wss://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/ws",
-    "reconnectOnClose": true,
-    "maxReconnectAttempts": 5,
-    "reconnectDelay": 1000,
-    "pingInterval": 10000,
-    "pongTimeout": 5000,
-    "useForSubscriptions": true,
-    "useForTransactionConfirmation": true
   }
 }

@@ -1,47 +1,34 @@
 {
-  "providers": [
-    {
-      "name": "Syndica",
-      "url": "https://solana-api.syndica.io/rpc",
-      "websocketUrl": "wss://solana-api.syndica.io/rpc",
-      "priority": 1,
-      "weight": 100,
-      "rateLimit": {
-        "requestsPerMinute": 300
-      },
-      "inUse": true
-    }
+  "primaryEndpoint": "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
+  "premiumEndpoints": [
+    "https://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/rpc",
+    "https://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
   ],
-  "caching": {
+  "websocketEndpoints": [
+    "wss://solana-api.syndica.io/access-token/UEjTFkyf1vQ99VGfY5Y74GXkUckitTvQodQV2tw9jKPmzNL1q7LCvdcv8Adnbqm9/ws",
+    "wss://divine-wispy-sanctuary.solana-mainnet.discover.quiknode.pro/8785a9391619df4e9ebbff59d3a43a30dbaca318/"
+  ],
+  "disabledEndpoints": [
+    "instantnodes",
+    "solana-api.instantnodes.io",
+    "instant-nodes",
+    "NoMfKoqTuBzaxqYhciqqi7IVfypYvyE9"
+  ],
+  "connectionSettings": {
+    "useOnlyPremiumEndpoints": true,
+    "maxRetries": 3,
+    "timeoutMs": 30000,
+    "rateLimitPerSecond": 25,
+    "useWebSocketForSubscriptions": true,
+    "preferPremiumEndpoints": true,
+    "avoidRateLimitedEndpoints": true,
+    "enableFailover": true,
+    "healthCheckInterval": 60000
+  },
+  "rateLimiting": {
     "enabled": true,
-    "accountInfoTtlMs": 300000,
-    "balanceTtlMs": 300000,
-    "transactionTtlMs": 3600000,
-    "blockTtlMs": 600000,
-    "slotTtlMs": 120000
-  },
-  "fallback": {
-    "enabled": false,
-    "maxRetries": 5,
-    "retryDelayMs": 1000
-  },
-  "loadBalancing": {
-    "enabled": false,
-    "strategy": "priority-only",
-    "healthCheckIntervalMs": 300000
-  },
-  "streaming": {
-    "enabled": true,
-    "maxSubscriptions": 10,
-    "reconnectOnError": true,
-    "reconnectIntervalMs": 5000
-  },
-  "rateLimit": {
-    "enabled": true,
-    "strategy": "fixed",
-    "maxRequestsPerSecond": 2,
-    "maxRequestsPerMinute": 100,
-    "maxRequestsPerHour": 2000
-  },
-  "mainWalletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+    "maxRequestsPerSecond": 25,
+    "burstLimit": 50,
+    "delayBetweenRequests": 40
+  }
 }
