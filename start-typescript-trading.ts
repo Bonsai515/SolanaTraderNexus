@@ -5,6 +5,8 @@
 
 import RealTradingSystem from './src/real-trading-system';
 import NeuralSignalProcessor from './src/neural-signal-processor';
+import RealFundTrader from './src/real-fund-trader';
+import { Connection, Keypair } from '@solana/web3.js';
 
 interface TradingSystemConfig {
   realTrading: boolean;
@@ -17,6 +19,7 @@ class TypeScriptTradingLauncher {
   private config: TradingSystemConfig;
   private realTradingSystem: RealTradingSystem;
   private neuralProcessor: NeuralSignalProcessor;
+  private realFundTrader: RealFundTrader;
   private launcherActive: boolean;
 
   constructor() {
@@ -29,6 +32,11 @@ class TypeScriptTradingLauncher {
 
     this.realTradingSystem = new RealTradingSystem();
     this.neuralProcessor = new NeuralSignalProcessor();
+    
+    // Initialize connection and wallet for fund trader
+    const connection = new Connection('https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8/', 'confirmed');
+    this.realFundTrader = new RealFundTrader(connection, null);
+    
     this.launcherActive = false;
 
     console.log('[TSLauncher] TypeScript trading system launcher initialized');
@@ -55,10 +63,14 @@ class TypeScriptTradingLauncher {
       // Start neural signal processing
       this.startNeuralProcessing();
       
+      // Start real fund trading with borrowed capital
+      console.log('[TSLauncher] Activating real fund trading with lending protocols...');
+      await this.realFundTrader.startContinuousRealFundTrading();
+      
       // Start performance monitoring
       this.startPerformanceMonitoring();
       
-      console.log('[TSLauncher] ✅ TYPESCRIPT TRADING SYSTEM FULLY OPERATIONAL');
+      console.log('[TSLauncher] ✅ TYPESCRIPT TRADING SYSTEM WITH REAL FUNDS FULLY OPERATIONAL');
       this.displaySystemStatus();
       
     } catch (error) {
