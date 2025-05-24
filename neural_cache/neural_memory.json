@@ -1,0 +1,67 @@
+{
+  "price_patterns": {
+    "1748101124028": {
+      "prices": {
+        "SOL": 0.176417,
+        "USDT": 1.000411,
+        "BONK": 0.000216,
+        "WIF": 1.092181,
+        "JUP": 0.557109,
+        "BOME": 0.002278,
+        "POPCAT": 0.000489
+      },
+      "liquidity": {
+        "SOL": 9321636.056286158,
+        "USDT": 6997021.1845816225,
+        "BONK": 8963385.56034692,
+        "WIF": 9161888.475636916,
+        "JUP": 5256111.77263801,
+        "BOME": 2652046.7006254257,
+        "POPCAT": 4707559.270931288
+      },
+      "volume": {
+        "SOL": 579617.0858718536,
+        "USDT": 618190.8516440904,
+        "BONK": 91341.9035889802,
+        "WIF": 298404.18023602845,
+        "JUP": 754867.6784302044,
+        "BOME": 831159.87019451,
+        "POPCAT": 163937.03487483613
+      }
+    }
+  },
+  "arbitrage_history": [
+    {
+      "timestamp": 1748101124031,
+      "opportunities": 24,
+      "topProfit": 0.04831232824631209
+    }
+  ],
+  "execution_metrics": {},
+  "quantum_coherence": 0.92,
+  "neural_efficiency": 0.95,
+  "transformer_config": {
+    "priceTransformer": {
+      "inputDimensions": 10,
+      "hiddenLayers": [
+        128,
+        64,
+        32
+      ],
+      "outputDimensions": 10,
+      "activationFunction": "quantum_relu",
+      "learningRate": 0.001
+    },
+    "arbitrageTransformer": {
+      "inputDimensions": 50,
+      "contextWindow": 24,
+      "attentionHeads": 8,
+      "quantumEntanglement": true
+    },
+    "executionTransformer": {
+      "realTimeProcessing": true,
+      "stealthOptimization": true,
+      "profitMaximization": true
+    }
+  }
+}

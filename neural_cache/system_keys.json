@@ -1,0 +1,23 @@
+{
+  "primary_wallet": {
+    "id": "primary_wallet",
+    "type": "wallet",
+    "encrypted": "MTc4LDI0NCwxMiwyNSwyNywyMDIsMjUxLDEwLDIxMiw5MCwzNywxMTYsMjE4LDQyLDIyLDE2NSwxMzQsMTY1LDE1MSw1NCwyMjUsMjE1LDE5NCw4LDE3NywyMDEsMTA1LDEwMSwyMTIsMTIwLDI0OSw3NCwyNDMsMTE4LDU1LDE4NywxNTgsMzUsNzUsMTM4LDE3MywxNDgsMzksMTcxLDE2MCwyNyw4OSw2LDEwNSwxNzQsMjMzLDgyLDE4Nyw0OSw0MiwxOTMsMTgyLDExMiwxOTUsNjUsNTYsMTQ0LDgzLDIxOA==",
+    "writeOnly": true,
+    "lastAccessed": 1748101121193
+  },
+  "jupiter_api": {
+    "id": "jupiter_api",
+    "type": "api",
+    "encrypted": "cHVibGljX2p1cGl0ZXJfZW5kcG9pbnQ=",
+    "writeOnly": false,
+    "lastAccessed": 1748101121193
+  },
+  "neural_memory": {
+    "id": "neural_memory",
+    "type": "neural",
+    "encrypted": "cXVhbnR1bV9uZXVyYWxfYWNjZXNz",
+    "writeOnly": true,
+    "lastAccessed": 1748101121193
+  }
+}
