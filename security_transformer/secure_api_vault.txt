@@ -1,0 +1,102 @@
+================================================================================
+SECURITY TRANSFORMER - SECURE API VAULT
+================================================================================
+Created: 2025-01-26T08:45:00.000Z
+Access Level: WRITE-ONLY SYSTEM ACCESS
+Security Classification: PROTECTED CREDENTIALS
+Last Updated: 2025-01-26T08:45:00.000Z
+
+================================================================================
+DEFI PROTOCOL API CREDENTIALS - AUTHENTICATED ACCESS
+================================================================================
+
+SOLEND_API_KEY=ak_mn00nfk7v9chx039cam9qd
+SOLEND_API_SECRET=as_nm5xejj0rwpy5qd191bvf
+SOLEND_ACCOUNT_ID=acc_09fxmjz172
+SOLEND_ACCESS_TOKEN=at_pnsr5kfp6mj3ngp3mc75ku
+SOLEND_ENDPOINT=https://api.solend.fi/v1
+SOLEND_STATUS=AUTHENTICATED
+SOLEND_MAX_FLASH_LOAN=15000
+
+MARGINFI_API_KEY=ak_19fcx3eowawo1r5aiujasq
+MARGINFI_API_SECRET=as_icngx46odd03nu6oq8m1ta
+MARGINFI_ACCOUNT_ID=acc_cxbxrah79m
+MARGINFI_ACCESS_TOKEN=at_19fvacks63ld8cfapeq5tf
+MARGINFI_ENDPOINT=https://api.marginfi.com/v1
+MARGINFI_STATUS=AUTHENTICATED
+MARGINFI_MAX_FLASH_LOAN=12000
+
+KAMINO_API_KEY=ak_tq3nh7tp6elhzl2dpq2b5
+KAMINO_API_SECRET=as_1hr23lmo35o145brwd097d
+KAMINO_ACCOUNT_ID=acc_thx27if34j
+KAMINO_ACCESS_TOKEN=at_onqg4dx97szj0qvrync8h
+KAMINO_ENDPOINT=https://api.kamino.finance/v1
+KAMINO_STATUS=AUTHENTICATED
+KAMINO_MAX_FLASH_LOAN=8000
+
+DRIFT_API_KEY=ak_bilq93cwxoeoxuvhpr3
+DRIFT_API_SECRET=as_lijr9b2fb8pq0a2wbg7mt
+DRIFT_ACCOUNT_ID=acc_4f6ychf5bn
+DRIFT_ACCESS_TOKEN=at_tl63oi2vncdgdu5xefzvdh
+DRIFT_ENDPOINT=https://dlob.drift.trade/v1
+DRIFT_STATUS=AUTHENTICATED
+DRIFT_MAX_FLASH_LOAN=10000
+
+MARINADE_API_KEY=ak_scuidqg4gjbdx9tp0bimkf
+MARINADE_API_SECRET=as_skalrhskhysgt8bghpqjpe
+MARINADE_ACCOUNT_ID=acc_m65siqg20x
+MARINADE_ACCESS_TOKEN=at_eli0ne8fkxii61oj9d0yzc
+MARINADE_ENDPOINT=https://api.marinade.finance/v1
+MARINADE_STATUS=AUTHENTICATED
+MARINADE_MAX_FLASH_LOAN=5000
+
+JUPITER_API_KEY=ak_ss1oyrxktl8icqm04txxuc
+JUPITER_API_SECRET=as_xqv3xeiejtgn8cxoyc4d
+JUPITER_ACCOUNT_ID=acc_uk7egagkmd
+JUPITER_ACCESS_TOKEN=at_45dboer4kuco6itydxd1iq
+JUPITER_ENDPOINT=https://quote-api.jup.ag/v6
+JUPITER_STATUS=AUTHENTICATED
+JUPITER_MAX_FLASH_LOAN=20000
+
+================================================================================
+RPC AND INFRASTRUCTURE KEYS
+================================================================================
+
+QUICKNODE_RPC_URL=https://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8/
+QUICKNODE_WSS_URL=wss://powerful-shy-telescope.solana-mainnet.quiknode.pro/8458b7fd0c7ededea5ed518b0ce21d55f5f162f8/
+QUICKNODE_STATUS=ACTIVE
+
+JITO_BUNDLE_ENDPOINT=https://mainnet.block-engine.jito.wtf/api/v1
+JITO_STATUS=AVAILABLE
+
+================================================================================
+WALLET AND TRADING CREDENTIALS
+================================================================================
+
+HPN_WALLET_ADDRESS=HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK
+HPN_PRIVATE_KEY_FILE=./hpn-real-key.txt
+HPN_WALLET_STATUS=ACTIVE
+
+================================================================================
+SECURITY TRANSFORMER METADATA
+================================================================================
+
+TOTAL_AUTHENTICATED_PROTOCOLS=6
+TOTAL_MAX_FLASH_LOAN_CAPACITY=70000_SOL
+SYSTEM_ACCESS_LEVEL=WRITE_ONLY
+LAST_AUTHENTICATION_CHECK=2025-01-26T08:45:00.000Z
+SECURITY_CLASSIFICATION=PROTECTED
+
+================================================================================
+USAGE INSTRUCTIONS FOR AUTOMATED SYSTEMS
+================================================================================
+
+1. Load credentials using environment variable format
+2. Use PROTOCOL_API_KEY for authentication headers
+3. Set Authorization: Bearer {API_KEY} for requests
+4. Include X-API-Secret: {API_SECRET} for enhanced security
+5. Use write-only access for automated trading systems
+
+================================================================================
+END OF SECURE API VAULT
+================================================================================
