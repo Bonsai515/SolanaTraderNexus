@@ -17,18 +17,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
+      "lastUpdated": 1748213005289,
       "liquidityUSD": 15515.25
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002025,
-      "priceChange24h": -4.43,
-      "priceChange1h": 3.41,
-      "volume24h": 18856.06,
-      "liquidity": 300.8825333333333,
+      "price": 0.00002034,
+      "priceChange24h": -4.12,
+      "priceChange1h": 3.8,
+      "volume24h": 18855.88,
+      "liquidity": 302.1281333333333,
       "score": 27.523274,
       "sources": {
         "pumpFun": false,
@@ -37,18 +37,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 22566.19
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 22659.61
     },
     {
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
       "symbol": "RAY",
       "name": "Raydium",
-      "price": 3.048,
-      "priceChange24h": -3.91,
-      "priceChange1h": 3.41,
-      "volume24h": 95065.32,
-      "liquidity": 4343.9012,
+      "price": 3.064,
+      "priceChange24h": -3.36,
+      "priceChange1h": 3.94,
+      "volume24h": 98079.42,
+      "liquidity": 4360.1356,
       "score": 37.711639,
       "sources": {
         "pumpFun": false,
@@ -57,8 +57,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 325792.59
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 327010.17
     }
   ],
   "topTokens": [
@@ -66,11 +66,11 @@
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
       "symbol": "RAY",
       "name": "Raydium",
-      "price": 3.048,
-      "priceChange24h": -3.91,
-      "priceChange1h": 3.41,
-      "volume24h": 95065.32,
-      "liquidity": 4343.9012,
+      "price": 3.064,
+      "priceChange24h": -3.36,
+      "priceChange1h": 3.94,
+      "volume24h": 98079.42,
+      "liquidity": 4360.1356,
       "score": 37.711639,
       "sources": {
         "pumpFun": false,
@@ -79,18 +79,18 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 325792.59
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 327010.17
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002025,
-      "priceChange24h": -4.43,
-      "priceChange1h": 3.41,
-      "volume24h": 18856.06,
-      "liquidity": 300.8825333333333,
+      "price": 0.00002034,
+      "priceChange24h": -4.12,
+      "priceChange1h": 3.8,
+      "volume24h": 18855.88,
+      "liquidity": 302.1281333333333,
       "score": 27.523274,
       "sources": {
         "pumpFun": false,
@@ -99,8 +99,8 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 22566.19
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 22659.61
     },
     {
       "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
@@ -119,7 +119,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
+      "lastUpdated": 1748213005289,
       "liquidityUSD": 15515.25
     }
   ],
@@ -142,7 +142,7 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
+      "lastUpdated": 1748213005289,
       "liquidityUSD": 15515.25,
       "trendingScore": 28.206446999999997
     },
@@ -150,11 +150,11 @@
       "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
       "symbol": "RAY",
       "name": "Raydium",
-      "price": 3.048,
-      "priceChange24h": -3.91,
-      "priceChange1h": 3.41,
-      "volume24h": 95065.32,
-      "liquidity": 4343.9012,
+      "price": 3.064,
+      "priceChange24h": -3.36,
+      "priceChange1h": 3.94,
+      "volume24h": 98079.42,
+      "liquidity": 4360.1356,
       "score": 37.711639,
       "sources": {
         "pumpFun": false,
@@ -163,19 +163,19 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 325792.59,
-      "trendingScore": 9.506532
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 327010.17,
+      "trendingScore": 9.807942
     },
     {
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       "symbol": "Bonk",
       "name": "Bonk",
-      "price": 0.00002025,
-      "priceChange24h": -4.43,
-      "priceChange1h": 3.41,
-      "volume24h": 18856.06,
-      "liquidity": 300.8825333333333,
+      "price": 0.00002034,
+      "priceChange24h": -4.12,
+      "priceChange1h": 3.8,
+      "volume24h": 18855.88,
+      "liquidity": 302.1281333333333,
       "score": 27.523274,
       "sources": {
         "pumpFun": false,
@@ -184,9 +184,9 @@
         "gmgn": false,
         "jupiter": false
       },
-      "lastUpdated": 1748212825291,
-      "liquidityUSD": 22566.19,
-      "trendingScore": 1.8856060000000001
+      "lastUpdated": 1748213005289,
+      "liquidityUSD": 22659.61,
+      "trendingScore": 1.885588
     }
   ],
   "lastFullUpdate": 0
