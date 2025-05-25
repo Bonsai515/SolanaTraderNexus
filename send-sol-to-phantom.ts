@@ -42,7 +42,7 @@ class SendSOLToPhantom {
       
       console.log(`[SendSOL] 💰 Current Balance: ${currentBalance.toFixed(6)} SOL`);
       
-      const amountToSend = 0.2;
+      const amountToSend = 0.3;
       
       if (currentBalance < amountToSend + 0.001) { // Include fee buffer
         console.log(`[SendSOL] ⚠️ Insufficient balance. Need ${amountToSend + 0.001} SOL, have ${currentBalance.toFixed(6)} SOL`);
