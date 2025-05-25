@@ -49,8 +49,8 @@ class SendSOLToPhantom {
         return;
       }
       
-      // Your Phantom wallet address - you'll need to provide this
-      const phantomWalletAddress = 'PHANTOM_WALLET_ADDRESS_HERE'; // Replace with actual address
+      // Your Phantom wallet address
+      const phantomWalletAddress = '2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH';
       
       console.log(`[SendSOL] 📤 Sending ${amountToSend} SOL to Phantom wallet...`);
       console.log(`[SendSOL] 🎯 To: ${phantomWalletAddress}`);
