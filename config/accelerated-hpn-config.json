@@ -1,0 +1,23 @@
+{
+  "tradingMode": "MAXIMUM_AGGRESSIVE",
+  "signalThreshold": 0.65,
+  "executionFrequency": "EVERY_10_SECONDS",
+  "capitalUtilization": 0.95,
+  "riskTolerance": "MODERATE_AGGRESSIVE",
+  "profitTarget": 0.92,
+  "stopLoss": 0.01,
+  "compounding": true,
+  "flashLoanEnabled": true,
+  "flashLoanMultiplier": 15000,
+  "strategies": {
+    "memeCortexSignals": true,
+    "crossChainArbitrage": true,
+    "quantumOmegaIntegration": true,
+    "solendLiquidations": true,
+    "dexArbitrage": true
+  },
+  "walletAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "activatedAt": "2025-05-25T21:52:52.851Z",
+  "targetBalance": 1,
+  "currentBalance": 0.097072837
+}

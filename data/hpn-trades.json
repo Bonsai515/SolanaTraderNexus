@@ -1,0 +1,26 @@
+[
+  {
+    "strategy": "WIF_BULLISH",
+    "amount": 0.027665758544999995,
+    "profit": 0.0022132606836,
+    "success": true,
+    "timestamp": "2025-05-25T21:52:52.854Z",
+    "roi": 8
+  },
+  {
+    "strategy": "CROSS_CHAIN_ARB",
+    "amount": 0.027665758544999995,
+    "profit": 0.0012449591345249998,
+    "success": true,
+    "timestamp": "2025-05-25T21:52:52.855Z",
+    "roi": 4.5
+  },
+  {
+    "strategy": "FLASH_LOAN",
+    "amount": 0.03688767806,
+    "profit": 0.0044265213672,
+    "success": true,
+    "timestamp": "2025-05-25T21:52:52.857Z",
+    "roi": 12
+  }
+]
