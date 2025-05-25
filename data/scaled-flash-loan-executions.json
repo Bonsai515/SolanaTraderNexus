@@ -1,0 +1,12 @@
+[
+  {
+    "strategy": "TRANSFORMER_SIGNAL_FLASH_CAPTURE",
+    "signature": "5omL33hw9oeVLE9GRkX47tEytRBgAqm8uxZYYfpMj1zjfLwqhJwLMdtvJArCT6b1sPmRuJynRL6ZXGPKK4NZnWmL",
+    "baseAmount": 0.014558675549999999,
+    "flashLoanMultiplier": 80,
+    "totalCapital": 1.164694044,
+    "theoreticalProfit": 0.09899899374,
+    "timestamp": "2025-05-25T22:16:17.056Z",
+    "explorerUrl": "https://solscan.io/tx/5omL33hw9oeVLE9GRkX47tEytRBgAqm8uxZYYfpMj1zjfLwqhJwLMdtvJArCT6b1sPmRuJynRL6ZXGPKK4NZnWmL"
+  }
+]
