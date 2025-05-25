@@ -410,8 +410,8 @@ class GiganticStrategies {
 async function main(): Promise<void> {
   console.log('🌟 DEPLOYING 9 GIGANTIC STRATEGIES + AIMODELSYNAPSE...');
   
-  const gigantic = new GiganticStrategiesAIModelSynapse();
-  await gigantic.deployGiganticStrategiesWithAI();
+  const gigantic = new GiganticStrategies();
+  await gigantic.deployGiganticStrategies();
   
   console.log('✅ GIGANTIC STRATEGIES + AI SYNAPSE DEPLOYED!');
 }
