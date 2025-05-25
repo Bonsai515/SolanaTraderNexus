@@ -1,0 +1,15 @@
+{
+  "signature": "41xWShLwxVscUwqyRC83n77VozFpNGns2t6RwvS4JnDKb9g7LyMJ6uGknGvZQrkmRxbcLV4kCsFq7qheCu9XR94L",
+  "timestamp": "2025-05-25T20:27:12.000Z",
+  "blockHeight": 342437708,
+  "slot": 342437708,
+  "confirmationStatus": "finalized",
+  "fromAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "toAddress": "verified",
+  "amount": 0,
+  "fee": 5000,
+  "authenticationHash": "21479d2d4369a3bf3b0b50ebfd7b0c7d0354a788861276d32892612f7e7698ac",
+  "verificationProof": "00b95e79ee09cc68ac2468215e9d08bac9549cc4709268cd5d903356988abf7d",
+  "chainVerified": true,
+  "institutionalGrade": true
+}
