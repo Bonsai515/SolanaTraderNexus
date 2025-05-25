@@ -1,0 +1,81 @@
+{
+  "executionConfig": {
+    "mode": "MAXIMUM_PERFORMANCE",
+    "priority": "HIGH",
+    "realFunds": true,
+    "riskManagement": "CONSERVATIVE_AGGRESSIVE",
+    "stopLoss": {
+      "enabled": true,
+      "maxDailyLoss": 0.01,
+      "strategy": "IMMEDIATE_STOP"
+    },
+    "profitTaking": {
+      "enabled": true,
+      "targetProfit": 0.92,
+      "compounding": true
+    },
+    "monitoring": {
+      "realTime": true,
+      "alerts": true,
+      "performance": "ENHANCED"
+    }
+  },
+  "strategies": [
+    {
+      "name": "Enhanced Flash Loan Arbitrage",
+      "type": "flash_arbitrage",
+      "capitalMultiplier": 15000,
+      "successRate": 0.75,
+      "dailyTarget": 0.35,
+      "frequency": "every_30_seconds",
+      "riskLevel": "medium",
+      "active": true
+    },
+    {
+      "name": "Cross-DEX Arbitrage Scanner",
+      "type": "cross_dex_arbitrage",
+      "capitalMultiplier": 3.5,
+      "successRate": 0.85,
+      "dailyTarget": 0.25,
+      "frequency": "every_15_seconds",
+      "riskLevel": "low",
+      "active": true
+    },
+    {
+      "name": "Leveraged mSOL Strategy",
+      "type": "msol_leverage",
+      "capitalMultiplier": 2.8,
+      "successRate": 1,
+      "dailyTarget": 0.15,
+      "frequency": "continuous",
+      "riskLevel": "very_low",
+      "active": true
+    },
+    {
+      "name": "Multi-Protocol Integration",
+      "type": "multi_protocol",
+      "capitalMultiplier": 4.2,
+      "successRate": 0.8,
+      "dailyTarget": 0.12,
+      "frequency": "every_60_seconds",
+      "riskLevel": "medium",
+      "active": true
+    },
+    {
+      "name": "Conservative High-Frequency",
+      "type": "conservative_hf",
+      "capitalMultiplier": 2.5,
+      "successRate": 0.95,
+      "dailyTarget": 0.05,
+      "frequency": "every_10_seconds",
+      "riskLevel": "very_low",
+      "active": true
+    }
+  ],
+  "targets": {
+    "daily": 0.92,
+    "final": 1
+  },
+  "wallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "activatedAt": "2025-05-25T21:47:45.492Z"
+}
