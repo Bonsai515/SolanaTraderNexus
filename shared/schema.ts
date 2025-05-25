@@ -1,220 +1,116 @@
-import { z } from 'zod';
-import { pgTable, serial, text, uuid, timestamp, numeric, boolean, jsonb, varchar, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, decimal, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
+import { relations } from 'drizzle-orm';
+import { z } from 'zod';
 
-// Wallet Schema
-export const walletSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  address: z.string(),
-  balance: z.number().default(0),
-  created_at: z.date()
+// Conversation memory for tracking user requests and context
+export const conversations = pgTable('conversations', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: text('session_id').notNull().unique(),
+  userId: text('user_id').notNull(),
+  context: jsonb('context').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export type Wallet = z.infer<typeof walletSchema>;
-export const insertWalletSchema = walletSchema.omit({ id: true, created_at: true });
-export type InsertWallet = z.infer<typeof insertWalletSchema>;
-
-// Strategy Types
-export enum StrategyType {
-  MARKET_MAKING = 'MARKET_MAKING',
-  ARBITRAGE = 'ARBITRAGE',
-  MOMENTUM = 'MOMENTUM',
-  RANGE_TRADING = 'RANGE_TRADING',
-  LIQUIDITY_PROVIDING = 'LIQUIDITY_PROVIDING'
-}
-
-// Strategy Schema
-export const strategySchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  type: z.nativeEnum(StrategyType),
-  pair: z.string(),
-  active: z.boolean().default(false),
-  parameters: z.record(z.string(), z.any()).optional(),
-  wallet_id: z.string().uuid().optional(),
-  created_at: z.date(),
-  updated_at: z.date()
+// Track user requests and preferences
+export const userRequests = pgTable('user_requests', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: text('session_id').notNull(),
+  requestType: text('request_type').notNull(), // 'flash_loan', 'arbitrage', 'yield_strategy', etc.
+  requestData: jsonb('request_data').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending', 'completed', 'failed'
+  priority: integer('priority').notNull().default(1),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export type Strategy = z.infer<typeof strategySchema>;
-export const insertStrategySchema = strategySchema.omit({ id: true, created_at: true, updated_at: true });
-export type InsertStrategy = z.infer<typeof insertStrategySchema>;
-
-// Signal Types
-export enum SignalType {
-  BUY = 'BUY',
-  SELL = 'SELL',
-  HOLD = 'HOLD'
-}
-
-export enum SignalStrength {
-  WEAK = 'WEAK',
-  MODERATE = 'MODERATE',
-  STRONG = 'STRONG'
-}
-
-// Trading Signal Schema
-export const tradingSignalSchema = z.object({
-  id: z.string().uuid(),
-  pair: z.string(),
-  type: z.nativeEnum(SignalType),
-  strength: z.nativeEnum(SignalStrength),
-  price: z.number(),
-  strategy_id: z.string().uuid().optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
-  created_at: z.date(),
-  expires_at: z.date().optional()
+// Wallet states and balances
+export const walletStates = pgTable('wallet_states', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: text('session_id').notNull(),
+  walletAddress: text('wallet_address').notNull(),
+  solBalance: decimal('sol_balance', { precision: 18, scale: 9 }),
+  msolBalance: decimal('msol_balance', { precision: 18, scale: 9 }),
+  totalValue: decimal('total_value', { precision: 18, scale: 9 }),
+  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
 });
 
-export type TradingSignal = z.infer<typeof tradingSignalSchema>;
-export const insertTradingSignalSchema = tradingSignalSchema.omit({ id: true, created_at: true });
-export type InsertTradingSignal = z.infer<typeof insertTradingSignalSchema>;
-
-// Transaction Types
-export enum TransactionType {
-  BUY = 'BUY',
-  SELL = 'SELL',
-  SWAP = 'SWAP',
-  PROVIDE_LIQUIDITY = 'PROVIDE_LIQUIDITY',
-  REMOVE_LIQUIDITY = 'REMOVE_LIQUIDITY',
-  STAKE = 'STAKE',
-  UNSTAKE = 'UNSTAKE'
-}
-
-export enum TransactionStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED'
-}
-
-// Transaction Schema
-export const transactionSchema = z.object({
-  id: z.string().uuid(),
-  transaction_hash: z.string().optional(),
-  type: z.nativeEnum(TransactionType),
-  status: z.nativeEnum(TransactionStatus).default(TransactionStatus.PENDING),
-  amount: z.number(),
-  fee: z.number().optional(),
-  wallet_id: z.string().uuid(),
-  pair: z.string(),
-  signal_id: z.string().uuid().optional(),
-  strategy_id: z.string().uuid().optional(),
-  price: z.number().optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
-  created_at: z.date(),
-  confirmed_at: z.date().optional()
+// Strategy preferences and history
+export const strategyPreferences = pgTable('strategy_preferences', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: text('session_id').notNull(),
+  strategyType: text('strategy_type').notNull(),
+  targetProfit: decimal('target_profit', { precision: 18, scale: 9 }),
+  riskLevel: text('risk_level').notNull(), // 'LOW', 'MEDIUM', 'HIGH'
+  protocols: jsonb('protocols').notNull(), // ['MarginFi', 'Solend', 'Marinade']
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export type Transaction = z.infer<typeof transactionSchema>;
-export const insertTransactionSchema = transactionSchema.omit({ id: true, created_at: true, confirmed_at: true });
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-
-// Learning insight types - for agent self-awareness system
-export enum InsightType {
-  TIME_BASED_EXECUTION = 'TIME_BASED_EXECUTION',
-  PAIR_PERFORMANCE = 'PAIR_PERFORMANCE',
-  DEX_PREFERENCE = 'DEX_PREFERENCE',
-  FAILURE_PATTERN = 'FAILURE_PATTERN',
-  PROFIT_OPTIMIZATION = 'PROFIT_OPTIMIZATION',
-  RISK_MANAGEMENT = 'RISK_MANAGEMENT',
-  MARKET_PATTERN = 'MARKET_PATTERN'
-}
-
-export const insightResultSchema = z.object({
-  applied_at: z.date(),
-  success: z.boolean(),
-  performance_delta: z.number(),
-  notes: z.string()
+// Executed trades and results
+export const tradeExecutions = pgTable('trade_executions', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: text('session_id').notNull(),
+  tradeType: text('trade_type').notNull(),
+  inputAmount: decimal('input_amount', { precision: 18, scale: 9 }),
+  outputAmount: decimal('output_amount', { precision: 18, scale: 9 }),
+  profit: decimal('profit', { precision: 18, scale: 9 }),
+  signature: text('signature'),
+  status: text('status').notNull(), // 'pending', 'confirmed', 'failed'
+  executedAt: timestamp('executed_at').defaultNow().notNull(),
 });
 
-export const learningInsightSchema = z.object({
-  id: z.string(),
-  agent_type: z.string(),
-  strategy_id: z.string(),
-  pair: z.string().optional(),
-  insight_type: z.nativeEnum(InsightType),
-  confidence: z.number(),
-  description: z.string(),
-  recommendation: z.string(),
-  created_at: z.date(),
-  applied: z.boolean(),
-  result: insightResultSchema.optional()
-});
+// Relations
+export const conversationRelations = relations(conversations, ({ many }) => ({
+  requests: many(userRequests),
+  walletStates: many(walletStates),
+  strategies: many(strategyPreferences),
+  trades: many(tradeExecutions),
+}));
 
-export type LearningInsight = z.infer<typeof learningInsightSchema>;
-export type InsightResult = z.infer<typeof insightResultSchema>;
+export const userRequestRelations = relations(userRequests, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [userRequests.sessionId],
+    references: [conversations.sessionId],
+  }),
+}));
 
-// Drizzle Database Tables
-export const wallets = pgTable('wallets', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  address: text('address').notNull(),
-  balance: numeric('balance').notNull().default('0'),
-  created_at: timestamp('created_at').defaultNow().notNull()
-});
+export const walletStateRelations = relations(walletStates, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [walletStates.sessionId],
+    references: [conversations.sessionId],
+  }),
+}));
 
-export const strategies = pgTable('strategies', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  description: text('description'),
-  type: text('type').notNull(),
-  pair: text('pair').notNull(),
-  active: boolean('active').notNull().default(false),
-  parameters: jsonb('parameters'),
-  wallet_id: uuid('wallet_id').references(() => wallets.id),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at').defaultNow().notNull()
-});
+export const strategyPreferenceRelations = relations(strategyPreferences, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [strategyPreferences.sessionId],
+    references: [conversations.sessionId],
+  }),
+}));
 
-export const trading_signals = pgTable('trading_signals', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  pair: text('pair').notNull(),
-  type: text('type').notNull(),
-  strength: text('strength').notNull(),
-  price: numeric('price').notNull(),
-  strategy_id: uuid('strategy_id').references(() => strategies.id),
-  metadata: jsonb('metadata'),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  expires_at: timestamp('expires_at')
-});
+export const tradeExecutionRelations = relations(tradeExecutions, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [tradeExecutions.sessionId],
+    references: [conversations.sessionId],
+  }),
+}));
 
-export const transactions = pgTable('transactions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  transaction_hash: text('transaction_hash'),
-  type: text('type').notNull(),
-  status: text('status').notNull().default('PENDING'),
-  amount: numeric('amount').notNull(),
-  fee: numeric('fee'),
-  wallet_id: uuid('wallet_id').references(() => wallets.id).notNull(),
-  pair: text('pair').notNull(),
-  signal_id: uuid('signal_id').references(() => trading_signals.id),
-  strategy_id: uuid('strategy_id').references(() => strategies.id),
-  price: numeric('price'),
-  metadata: jsonb('metadata'),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  confirmed_at: timestamp('confirmed_at')
-});
+// Zod schemas for validation
+export const insertConversationSchema = createInsertSchema(conversations);
+export const insertUserRequestSchema = createInsertSchema(userRequests);
+export const insertWalletStateSchema = createInsertSchema(walletStates);
+export const insertStrategyPreferenceSchema = createInsertSchema(strategyPreferences);
+export const insertTradeExecutionSchema = createInsertSchema(tradeExecutions);
 
-export const learning_insights = pgTable('learning_insights', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  agent_type: text('agent_type').notNull(),
-  strategy_id: uuid('strategy_id').references(() => strategies.id).notNull(),
-  pair: text('pair'),
-  insight_type: text('insight_type').notNull(),
-  confidence: numeric('confidence').notNull(),
-  description: text('description').notNull(),
-  recommendation: text('recommendation').notNull(),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  applied: boolean('applied').notNull().default(false),
-  result: jsonb('result')
-});
-
-// Drizzle schema insert types
-export const insertWalletDrizzle = createInsertSchema(wallets);
-export const insertStrategyDrizzle = createInsertSchema(strategies);
-export const insertTradingSignalDrizzle = createInsertSchema(trading_signals);
-export const insertTransactionDrizzle = createInsertSchema(transactions);
-export const insertLearningInsightDrizzle = createInsertSchema(learning_insights);
+// Types
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type UserRequest = typeof userRequests.$inferSelect;
+export type InsertUserRequest = z.infer<typeof insertUserRequestSchema>;
+export type WalletState = typeof walletStates.$inferSelect;
+export type InsertWalletState = z.infer<typeof insertWalletStateSchema>;
+export type StrategyPreference = typeof strategyPreferences.$inferSelect;
+export type InsertStrategyPreference = z.infer<typeof insertStrategyPreferenceSchema>;
+export type TradeExecution = typeof tradeExecutions.$inferSelect;
+export type InsertTradeExecution = z.infer<typeof insertTradeExecutionSchema>;
