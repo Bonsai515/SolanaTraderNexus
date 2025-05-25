@@ -2,8 +2,9 @@
   {
     "type": "PROFIT_COLLECTION",
     "publicKey": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+    "privateKey": "INSERT_HX_PRIVATE_KEY_HERE",
     "label": "Profit Collection Wallet",
-    "isActive": false
+    "isActive": true
   },
   {
     "type": "PROFIT_COLLECTION",
