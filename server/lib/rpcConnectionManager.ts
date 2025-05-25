@@ -7,7 +7,7 @@
 
 import { Connection, ConnectionConfig, PublicKey, Commitment } from '@solana/web3.js';
 import * as logger from '../logger';
-import * as rateLimiter from './rpcRateLimiter';
+import * as rateLimiter from './rpcRateLimiter.js';
 
 // Available RPC endpoints with priority order (most reliable first)
 // Check both regular and VITE_ prefixed environment variables
@@ -69,15 +69,15 @@ function initializeConnectionManager() {
   if (isConnectionManagerInitialized) {
     return;
   }
-  
+
   // Clear existing connections
   connectionPool.length = 0;
-  
+
   // Validate primary endpoint
   if (!PRIMARY_ENDPOINT) {
     logger.error('CRITICAL: INSTANT_NODES_RPC_URL is not set in environment. System will use fallbacks but performance will be degraded.');
   }
-  
+
   // Initialize endpoint health
   for (const url of RPC_ENDPOINTS) {
     endpointHealth.set(url, {
@@ -89,7 +89,7 @@ function initializeConnectionManager() {
       successRate: 1.0
     });
   }
-  
+
   // Create specialized options for Instant Nodes
   const instantNodesOptions: ConnectionConfig = {
     commitment: 'confirmed' as Commitment,
@@ -98,26 +98,26 @@ function initializeConnectionManager() {
     // NOTE: Removed custom fetch handler as it's causing TypeScript errors
     // We'll rely on built-in retry mechanisms instead
   };
-  
+
   const standardOptions: ConnectionConfig = {
     commitment: 'confirmed' as Commitment,
     confirmTransactionInitialTimeout: 60000
   };
-  
+
   // Create connections with prioritization of Instant Nodes
   let instantNodesAdded = false;
-  
+
   // Try to add Instant Nodes first
   if (PRIMARY_ENDPOINT) {
     try {
       logger.info(`[RPC] Attempting connection to Instant Nodes: ${PRIMARY_ENDPOINT.substring(0, 20)}...`);
       const connection = new Connection(PRIMARY_ENDPOINT, instantNodesOptions);
-      
+
       // Test the connection with a simple request
       connection.getBlockHeight()
         .then(() => {
           logger.info(`[RPC] ✅ Successfully verified Instant Nodes connection`);
-          
+
           // Mark as very healthy
           endpointHealth.set(PRIMARY_ENDPOINT, {
             url: PRIMARY_ENDPOINT,
@@ -130,7 +130,7 @@ function initializeConnectionManager() {
         })
         .catch(error => {
           logger.warn(`[RPC] ⚠️ Instant Nodes connection test failed: ${error.message}`);
-          
+
           // Mark as potentially unhealthy but don't fail yet
           if (endpointHealth.has(PRIMARY_ENDPOINT)) {
             const health = endpointHealth.get(PRIMARY_ENDPOINT)!;
@@ -139,56 +139,56 @@ function initializeConnectionManager() {
             endpointHealth.set(PRIMARY_ENDPOINT, health);
           }
         });
-      
+
       // Add to pool regardless of test outcome - we'll check again soon
       connectionPool.push(connection);
       instantNodesAdded = true;
-      
+
       // Register with rate limiter
       try {
         rateLimiter.setEndpointInfo(PRIMARY_ENDPOINT);
       } catch (e) {
         logger.error(`[RPC] Error registering Instant Nodes with rate limiter: ${e.message}`);
       }
-      
+
       logger.info(`[RPC] Added primary connection: Instant Nodes`);
     } catch (error) {
       logger.error(`[RPC] Failed to create connection for Instant Nodes:`, error);
     }
   }
-  
+
   // Add other connections
   for (const url of RPC_ENDPOINTS) {
     // Skip if it's the primary endpoint (already added)
     if (url === PRIMARY_ENDPOINT && instantNodesAdded) {
       continue;
     }
-    
+
     try {
       const connection = new Connection(url, standardOptions);
-      
+
       connectionPool.push(connection);
-      
+
       // Register with rate limiter
       try {
         rateLimiter.setEndpointInfo(url);
       } catch (e) {
         logger.warn(`[RPC] Error registering endpoint with rate limiter: ${e.message}`);
       }
-      
+
       logger.info(`[RPC] Added connection: ${url.includes('helius') ? 'Helius' : 
                                            url.includes('alchemy') ? 'Alchemy' : url}`);
     } catch (error) {
       logger.error(`[RPC] Failed to create connection for ${url}:`, error);
     }
   }
-  
+
   // Ensure we have at least one connection
   if (connectionPool.length === 0) {
     logger.error('[RPC] No connections available. Using fallback connection.');
     const fallbackConnection = new Connection('https://api.mainnet-beta.solana.com', standardOptions);
     connectionPool.push(fallbackConnection);
-    
+
     // Register with rate limiter
     try {
       rateLimiter.setEndpointInfo('https://api.mainnet-beta.solana.com');
@@ -196,10 +196,10 @@ function initializeConnectionManager() {
       logger.warn(`[RPC] Error registering fallback endpoint with rate limiter: ${e.message}`);
     }
   }
-  
+
   // Start health check with increased frequency initially
   startHealthCheck();
-  
+
   isConnectionManagerInitialized = true;
   logger.info(`[RPC] Connection manager initialized with ${connectionPool.length} endpoints`);
 }
@@ -215,39 +215,39 @@ function startHealthCheck(accelerated = false) {
       await checkEndpointHealth(PRIMARY_ENDPOINT);
     }, 1000);
   }
-  
+
   // Run health check every 30 seconds for primary endpoint and 60 seconds for others
   const healthCheckIntervals: NodeJS.Timeout[] = [];
-  
+
   // Special more frequent check for PRIMARY_ENDPOINT (Instant Nodes)
   if (PRIMARY_ENDPOINT) {
     const primaryInterval = setInterval(async () => {
       await checkEndpointHealth(PRIMARY_ENDPOINT);
     }, 30000); // Every 30 seconds check primary
-    
+
     healthCheckIntervals.push(primaryInterval);
   }
-  
+
   // Check all endpoints on a regular interval
   const allEndpointsInterval = setInterval(async () => {
     for (const connection of connectionPool) {
       const url = connection.rpcEndpoint;
       await checkEndpointHealth(url);
     }
-    
+
     // Log overall health stats periodically
     logEndpointHealth();
   }, 60000); // Every 60 seconds
-  
+
   healthCheckIntervals.push(allEndpointsInterval);
-  
+
   // If accelerated startup, do quick initial checks
   if (accelerated) {
     // Check all endpoints quickly at startup with slight delays
     connectionPool.forEach((connection, index) => {
       setTimeout(async () => {
         await checkEndpointHealth(connection.rpcEndpoint);
-        
+
         // After checking last endpoint, log the health status
         if (index === connectionPool.length - 1) {
           logEndpointHealth();
@@ -267,15 +267,15 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
     logger.warn(`[RPC] Cannot check health for unknown endpoint: ${url}`);
     return false;
   }
-  
+
   try {
     const startTime = Date.now();
-    
+
     // If it's the primary endpoint (Instant Nodes), do more thorough checking
     let isHealthy = false;
     let result;
     let error = null;
-    
+
     try {
       // For primary endpoint (Instant Nodes), try a more reliable test with timeout
       if (url === PRIMARY_ENDPOINT) {
@@ -290,16 +290,16 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
         // Regular health check for other endpoints
         result = await connection.getBlockHeight();
       }
-      
+
       isHealthy = result > 0;
     } catch (e) {
       error = e;
       isHealthy = false;
     }
-    
+
     const endTime = Date.now();
     const latency = endTime - startTime;
-    
+
     // Update endpoint health
     const health = endpointHealth.get(url);
     if (health) {
@@ -307,15 +307,15 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
         health.healthy = true;
         health.latency = latency;
         health.lastChecked = Date.now();
-        
+
         // Reset fail count on success
         if (health.failCount > 0) {
           health.failCount = 0;
         }
-        
+
         // Gradually improve success rate with each successful check
         health.successRate = Math.min(1.0, health.successRate + 0.05);
-        
+
         // For the primary endpoint, boost the success rate more quickly when healthy
         if (url === PRIMARY_ENDPOINT) {
           health.successRate = Math.min(1.0, health.successRate + 0.1);
@@ -324,24 +324,24 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
         health.healthy = false;
         health.lastChecked = Date.now();
         health.failCount += 1;
-        
+
         // Reduce success rate more aggressively for non-primary endpoints
         if (url === PRIMARY_ENDPOINT) {
           health.successRate = Math.max(0.1, health.successRate - 0.1);
         } else {
           health.successRate = Math.max(0, health.successRate - 0.2);
         }
-        
+
         logger.warn(`[RPC] Health check failed for ${url}: ${error}`);
       }
-      
+
       endpointHealth.set(url, health);
-      
+
       // When Instant Nodes becomes healthy again after being unhealthy, log it prominently
       if (url === PRIMARY_ENDPOINT && isHealthy && health.failCount > 0) {
         logger.info(`[RPC] ✅ Instant Nodes connection restored: ${latency}ms latency`);
       }
-      
+
       // Success log only at debug level to reduce noise
       if (isHealthy) {
         const endpointName = url === PRIMARY_ENDPOINT ? 'Instant Nodes' : 
@@ -350,7 +350,7 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
         logger.debug(`[RPC] Health check for ${endpointName}: ${result}, latency: ${latency}ms`);
       }
     }
-    
+
     return isHealthy;
   } catch (error) {
     const health = endpointHealth.get(url);
@@ -358,12 +358,12 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
       health.healthy = false;
       health.lastChecked = Date.now();
       health.failCount += 1;
-      
+
       // More severe penalty for unhandled errors
       health.successRate = Math.max(0, health.successRate - 0.3);
-      
+
       endpointHealth.set(url, health);
-      
+
       // Log error differently for primary endpoint
       if (url === PRIMARY_ENDPOINT) {
         logger.error(`[RPC] ❌ Instant Nodes health check failed (attempt ${health.failCount}): ${error}`);
@@ -371,7 +371,7 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
         logger.warn(`[RPC] Health check failed for ${url}: ${error}`);
       }
     }
-    
+
     return false;
   }
 }
@@ -384,7 +384,7 @@ function logEndpointHealth() {
     const endpointName = url === PRIMARY_ENDPOINT ? 'Instant Nodes' : 
                          url.includes('helius') ? 'Helius' :
                          url.includes('alchemy') ? 'Alchemy' : 'Public RPC';
-                         
+
     return {
       endpoint: endpointName,
       healthy: health.healthy,
@@ -392,7 +392,7 @@ function logEndpointHealth() {
       successRate: Math.round(health.successRate * 100) + '%'
     };
   });
-  
+
   logger.debug('[RPC] Endpoint health summary:', healthSummary);
 }
 
@@ -404,41 +404,41 @@ export function getManagedConnection(config?: ConnectionConfig): Connection {
   if (!isConnectionManagerInitialized) {
     initializeConnectionManager();
   }
-  
+
   const baseConfig = {
     commitment: 'confirmed',
     confirmTransactionInitialTimeout: 30000,
     ...config
   };
-  
+
   // Always prioritize Instant Nodes first if it's healthy
   for (let i = 0; i < connectionPool.length; i++) {
     const connection = connectionPool[i];
     // Check if this is the Instant Nodes connection
     if (connection.rpcEndpoint === PRIMARY_ENDPOINT) {
       const health = endpointHealth.get(connection.rpcEndpoint);
-      
+
       // If Instant Nodes is healthy, use it exclusively
       if (health && health.healthy) {
         currentConnectionIndex = i;
         logger.debug(`[RPC] Using primary Instant Nodes RPC connection`);
-        
+
         // Register endpoint with rate limiter
-        if (typeof import('./rpcRateLimiter').setEndpointInfo === 'function') {
-          import('./rpcRateLimiter').then(rateLimiter => {
+        if (typeof import('./rpcRateLimiter.js').setEndpointInfo === 'function') {
+          import('./rpcRateLimiter.js').then(rateLimiter => {
             rateLimiter.setEndpointInfo(connection.rpcEndpoint);
           }).catch(err => {
             logger.error(`[RPC] Failed to set endpoint info for rate limiter: ${err.message}`);
           });
         }
-        
+
         return connectionPool[i];
       }
     }
   }
-  
+
   // If Instant Nodes is not healthy, use a prioritized fallback approach
-  
+
   // First try Helius if available
   for (let i = 0; i < connectionPool.length; i++) {
     const connection = connectionPool[i];
@@ -447,21 +447,21 @@ export function getManagedConnection(config?: ConnectionConfig): Connection {
       if (health && health.healthy) {
         currentConnectionIndex = i;
         logger.info(`[RPC] Instant Nodes unavailable, using Helius fallback`);
-        
+
         // Register endpoint with rate limiter
-        if (typeof import('./rpcRateLimiter').setEndpointInfo === 'function') {
-          import('./rpcRateLimiter').then(rateLimiter => {
+        if (typeof import('./rpcRateLimiter.js').setEndpointInfo === 'function') {
+          import('./rpcRateLimiter.js').then(rateLimiter => {
             rateLimiter.setEndpointInfo(connection.rpcEndpoint);
           }).catch(err => {
             logger.error(`[RPC] Failed to set endpoint info for rate limiter: ${err.message}`);
           });
         }
-        
+
         return connectionPool[i];
       }
     }
   }
-  
+
   // Next try Alchemy if available
   for (let i = 0; i < connectionPool.length; i++) {
     const connection = connectionPool[i];
@@ -470,21 +470,21 @@ export function getManagedConnection(config?: ConnectionConfig): Connection {
       if (health && health.healthy) {
         currentConnectionIndex = i;
         logger.info(`[RPC] Instant Nodes and Helius unavailable, using Alchemy fallback`);
-        
+
         // Register endpoint with rate limiter
-        if (typeof import('./rpcRateLimiter').setEndpointInfo === 'function') {
-          import('./rpcRateLimiter').then(rateLimiter => {
+        if (typeof import('./rpcRateLimiter.js').setEndpointInfo === 'function') {
+          import('./rpcRateLimiter.js').then(rateLimiter => {
             rateLimiter.setEndpointInfo(connection.rpcEndpoint);
           }).catch(err => {
             logger.error(`[RPC] Failed to set endpoint info for rate limiter: ${err.message}`);
           });
         }
-        
+
         return connectionPool[i];
       }
     }
   }
-  
+
   // Last resort - use any healthy connection
   for (let i = 0; i < connectionPool.length; i++) {
     const connection = connectionPool[i];
@@ -492,36 +492,36 @@ export function getManagedConnection(config?: ConnectionConfig): Connection {
     if (health && health.healthy) {
       currentConnectionIndex = i;
       logger.warn(`[RPC] All premium RPCs unavailable, using ${connection.rpcEndpoint} as last resort`);
-      
+
       // Register endpoint with rate limiter
-      if (typeof import('./rpcRateLimiter').setEndpointInfo === 'function') {
-        import('./rpcRateLimiter').then(rateLimiter => {
+      if (typeof import('./rpcRateLimiter.js').setEndpointInfo === 'function') {
+        import('./rpcRateLimiter.js').then(rateLimiter => {
           rateLimiter.setEndpointInfo(connection.rpcEndpoint);
         }).catch(err => {
           logger.error(`[RPC] Failed to set endpoint info for rate limiter: ${err.message}`);
         });
       }
-      
+
       return connectionPool[i];
     }
   }
-  
+
   // If all connections are unhealthy, use the first connection as a last resort
   currentConnectionIndex = 0;
   logger.error(`[RPC] All connections unhealthy, using first connection as last resort`);
-  
+
   // Register endpoint with rate limiter for first connection
   if (connectionPool.length > 0) {
     const connection = connectionPool[0];
-    if (typeof import('./rpcRateLimiter').setEndpointInfo === 'function') {
-      import('./rpcRateLimiter').then(rateLimiter => {
+    if (typeof import('./rpcRateLimiter.js').setEndpointInfo === 'function') {
+      import('./rpcRateLimiter.js').then(rateLimiter => {
         rateLimiter.setEndpointInfo(connection.rpcEndpoint);
       }).catch(err => {
         logger.error(`[RPC] Failed to set endpoint info for rate limiter: ${err.message}`);
       });
     }
   }
-  
+
   return connectionPool[0];
 }
 
@@ -533,10 +533,10 @@ function getNextConnection(): Connection {
   if (!isConnectionManagerInitialized) {
     initializeConnectionManager();
   }
-  
+
   // Skip the current connection
   const currentConnection = connectionPool[currentConnectionIndex];
-  
+
   // Try to keep using Instant Nodes if possible
   if (currentConnection.rpcEndpoint === PRIMARY_ENDPOINT) {
     // If we're already using Instant Nodes, try Helius next
@@ -565,7 +565,7 @@ function getNextConnection(): Connection {
       }
     }
   }
-  
+
   // If we've exhausted the primary options or they're not healthy, 
   // check if Instant Nodes is available as it should always be the first choice
   for (let i = 0; i < connectionPool.length; i++) {
@@ -579,11 +579,11 @@ function getNextConnection(): Connection {
       }
     }
   }
-  
+
   // Last resort - find any healthy connection that isn't the current one
   for (let i = 0; i < connectionPool.length; i++) {
     if (i === currentConnectionIndex) continue; // Skip current
-    
+
     const connection = connectionPool[i];
     const health = endpointHealth.get(connection.rpcEndpoint);
     if (health && health.healthy) {
@@ -592,7 +592,7 @@ function getNextConnection(): Connection {
       return connection;
     }
   }
-  
+
   // If no other healthy connections, keep using the current one
   logger.error(`[RPC] No other healthy connections available, keeping current connection`);
   return connectionPool[currentConnectionIndex];
@@ -608,23 +608,23 @@ export async function executeWithRpcLoadBalancing<T>(
   if (!isConnectionManagerInitialized) {
     initializeConnectionManager();
   }
-  
+
   let lastError: Error | null = null;
   let retries = 0;
-  
+
   while (retries <= maxRetries) {
     const connection = retries === 0 ? getManagedConnection() : getNextConnection();
     const endpoint = connection.rpcEndpoint;
-    
+
     try {
       // Use rate limiting wrapper from imported module
       let priority = 2; // NORMAL priority (default)
-      
+
       // Adjust priority based on retry count
       if (retries > 0) {
         priority = 1; // HIGH priority for retries
       }
-      
+
       // Execute with rate limiting
       return await rateLimiter.withRateLimiting(
         async () => await fn(connection),
@@ -636,13 +636,13 @@ export async function executeWithRpcLoadBalancing<T>(
       );
     } catch (error) {
       lastError = error as Error;
-      
+
       // Check if it's a rate limit error
       const isRateLimit = error instanceof Error && 
                           (error.message.includes('429') || 
                            error.message.includes('rate limit') ||
                            error.message.toLowerCase().includes('too many requests'));
-      
+
       // Update endpoint health for rate limit errors
       if (isRateLimit) {
         const health = endpointHealth.get(connection.rpcEndpoint);
@@ -651,22 +651,22 @@ export async function executeWithRpcLoadBalancing<T>(
           endpointHealth.set(connection.rpcEndpoint, health);
         }
       }
-      
+
       logger.warn(`[RPC] Execution failed on ${connection.rpcEndpoint}: ${error instanceof Error ? error.message : String(error)}`);
-      
+
       // Only retry if we have retries left
       if (retries >= maxRetries) {
         break;
       }
-      
+
       retries++;
-      
+
       // Wait before retrying (with exponential backoff)
       const backoffMs = Math.min(100 * Math.pow(2, retries), 2000);
       await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
   }
-  
+
   // If we get here, all retries failed
   throw lastError || new Error('Failed to execute RPC request after multiple retries');
 }
@@ -710,7 +710,7 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
     'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',  // Token Program
     '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'  // Serum DEX v3
   ];
-  
+
   // Extra large programs that need even more restrictive handling
   const EXTRA_LARGE_PROGRAMS = [
     '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium Liquidity
@@ -722,7 +722,7 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
     // For now, we'll return an empty array to prevent RPC errors
     // In a real system, we would implement pagination or more specific filters
     logger.info(`[RPC] Skipping account fetch for ${programId.toString()} - too many accounts`);
-    
+
     // Return an empty array without making the RPC call
     // This prevents errors and allows the system to continue functioning
     return Promise.resolve([]);
@@ -734,7 +734,7 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
       dataSlice: { offset: 0, length: 100 } // Only get first 100 bytes of data
     };
   }
-  
+
   // If it's the Serum DEX v3, we need to add a specific filter as required by Instant Nodes
   if (programId.toString() === '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin' && (!filters || !filters.filters)) {
     filters = filters || {};
@@ -752,7 +752,7 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
   return executeWithRpcLoadBalancing(async (connection) => {
     try {
       const result = await connection.getProgramAccounts(programId, filters);
-      
+
       // Handle different return types - might be array or RpcResponseAndContext
       if (Array.isArray(result)) {
         // It's already an array, just map it
@@ -776,19 +776,19 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
       if (error.message && (
           error.message.includes('response too big') || 
           error.message.includes('requires filters'))) {
-        
+
         // Try again with more restrictive filters
         logger.warn(`[RPC] Reducing data for ${programId.toString()} due to response size limits`);
-        
+
         // Create more restrictive filters
         const restrictiveFilters = {
           ...filters,
           dataSlice: { offset: 0, length: 50 } // Even smaller slice
         };
-        
+
         try {
           const result = await connection.getProgramAccounts(programId, restrictiveFilters);
-          
+
           // Handle different return types - might be array or RpcResponseAndContext
           if (Array.isArray(result)) {
             // It's already an array, just map it
@@ -813,7 +813,7 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
           return [];
         }
       }
-      
+
       // For other errors, just re-throw
       throw error;
     }
@@ -826,12 +826,12 @@ export async function getProgramAccounts(programId: PublicKey, filters?: any): P
  */
 function schedulePeriodicHealthCheck(): void {
   const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-  
+
   setInterval(() => {
     logger.info('[RPC] Running periodic health check for all RPC endpoints');
     startHealthCheck(false);
   }, CHECK_INTERVAL_MS);
-  
+
   // Additionally schedule stats logging
   const STATS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
   setInterval(() => {

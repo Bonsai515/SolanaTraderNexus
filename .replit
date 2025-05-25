@@ -8,8 +8,8 @@ packages = ["openssl", "pkg-config", "jq"]
 
 [deployment]
 deploymentTarget = "cloudrun"
-build = ["sh", "-c", "tsc --skipLibCheck"]
-run = ["sh", "-c", "node server/production.js"]
+build = ["sh", "-c", "npx tsc --skipLibCheck --noEmitOnError false"]
+run = ["sh", "-c", "node dist/server/production.js"]
 
 [[ports]]
 localPort = 80

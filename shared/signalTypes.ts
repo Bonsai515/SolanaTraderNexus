@@ -87,6 +87,18 @@ export enum SignalSource {
   LOCAL_ANALYSIS = 'LocalAnalysis'
 }
 
+export interface SecurityCheck {
+  id: string;
+  type: string;
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface SecurityCheckResult {
+  passed: boolean;
+  score: number;
+  details: string;
+}
+
 // Base signal interface
 export interface BaseSignal {
   id: string;
