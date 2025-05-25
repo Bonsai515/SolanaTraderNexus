@@ -1,0 +1,18 @@
+[
+  {
+    "strategy": "BONK_BULLISH_MOMENTUM",
+    "signature": "2i88KuhQ1zX5LUvHdPLjYfXwxzvbNVVrceGTyErodPPJ2S8S8Z4s2hBVv25x6So4ASicw6Ba7SRCvUGwxLMYfnAJ",
+    "amount": 0.001,
+    "expectedProfit": 0.0033003064580000006,
+    "timestamp": "2025-05-25T22:12:26.423Z",
+    "explorerUrl": "https://solscan.io/tx/2i88KuhQ1zX5LUvHdPLjYfXwxzvbNVVrceGTyErodPPJ2S8S8Z4s2hBVv25x6So4ASicw6Ba7SRCvUGwxLMYfnAJ"
+  },
+  {
+    "strategy": "MEME_TOKEN_CAPTURE",
+    "signature": "5hxMt1Hhry3ALF6Xf7DUNW7Cr3bvL8d6Go2UvHGbYuySUXnjh7TKMbj3CgSi1rTbmBFveXDCHqjy9NEzBj8gmsbP",
+    "amount": 0.001,
+    "expectedProfit": 0.002329628088,
+    "timestamp": "2025-05-25T22:12:28.740Z",
+    "explorerUrl": "https://solscan.io/tx/5hxMt1Hhry3ALF6Xf7DUNW7Cr3bvL8d6Go2UvHGbYuySUXnjh7TKMbj3CgSi1rTbmBFveXDCHqjy9NEzBj8gmsbP"
+  }
+]
