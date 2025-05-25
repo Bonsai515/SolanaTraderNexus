@@ -1,0 +1,46 @@
+[
+  {
+    "timestamp": "2025-05-25T22:02:38.819Z",
+    "protocol": "Jupiter Aggregator",
+    "loanAmount": 20000,
+    "strategy": "JUP_BULLISH_MOMENTUM",
+    "expectedProfit": 1600,
+    "actualProfit": 1600,
+    "success": true,
+    "signalConfidence": 75.9,
+    "newBalance": 1600.097072837
+  },
+  {
+    "timestamp": "2025-05-25T22:02:38.822Z",
+    "protocol": "Solend Protocol",
+    "loanAmount": 15000,
+    "strategy": "CROSS_CHAIN_ARBITRAGE",
+    "expectedProfit": 750,
+    "actualProfit": 750,
+    "success": true,
+    "signalConfidence": 85,
+    "newBalance": 2350.0970728370003
+  },
+  {
+    "timestamp": "2025-05-25T22:02:38.823Z",
+    "protocol": "MarginFi",
+    "loanAmount": 12000,
+    "strategy": "SOL_MOMENTUM_CAPTURE",
+    "expectedProfit": 720,
+    "actualProfit": -0.001,
+    "success": false,
+    "signalConfidence": 79,
+    "newBalance": 2350.0970728370003
+  },
+  {
+    "timestamp": "2025-05-25T22:02:38.825Z",
+    "protocol": "Drift Protocol",
+    "loanAmount": 10000,
+    "strategy": "MULTI_DEX_ARBITRAGE",
+    "expectedProfit": 400,
+    "actualProfit": 400,
+    "success": true,
+    "signalConfidence": 82,
+    "newBalance": 2750.0970728370003
+  }
+]

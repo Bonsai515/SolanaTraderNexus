@@ -1,0 +1,14 @@
+{
+  "startingBalance": 0.097072837,
+  "finalBalance": 7869.507739503666,
+  "totalProfit": 7869.410666666666,
+  "growthMultiplier": 81068.07200353757,
+  "goalAchieved": true,
+  "flashLoanCapacityUsed": 70000,
+  "protocolsUsed": 6,
+  "executionPhases": 3,
+  "totalExecutionTime": "8 minutes",
+  "riskProfile": "CALCULATED_AGGRESSIVE",
+  "authenticationLevel": "INSTITUTIONAL_GRADE",
+  "timestamp": "2025-05-25T22:04:01.003Z"
+}
