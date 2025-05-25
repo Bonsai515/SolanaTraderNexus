@@ -1,0 +1,12 @@
+{
+  "systemActive": true,
+  "totalFlashLoanCapacity": 70000,
+  "authenticatedProtocols": 6,
+  "currentBalance": 2750.0970728370003,
+  "targetBalance": 1,
+  "progressToGoal": 275009.7072837,
+  "realTimeSignalProcessing": true,
+  "automaticExecution": true,
+  "riskManagement": "INSTITUTIONAL_GRADE",
+  "verifiedAuthentication": true
+}
