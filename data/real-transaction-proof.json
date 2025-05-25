@@ -1,0 +1,10 @@
+{
+  "signature": "2CRd4AZB52dSxmkvNymyrczFdjR1hfT9dLvWydExTLFgCA4R1xmqvkxHh6kHxGtK17uky6sqQs68FGZyn2bGWdsh",
+  "amount": 0.0001,
+  "timestamp": "2025-05-25T22:06:02.081Z",
+  "fromAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "toAddress": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
+  "type": "test_transaction",
+  "verified": true,
+  "explorerUrl": "https://solscan.io/tx/2CRd4AZB52dSxmkvNymyrczFdjR1hfT9dLvWydExTLFgCA4R1xmqvkxHh6kHxGtK17uky6sqQs68FGZyn2bGWdsh"
+}
