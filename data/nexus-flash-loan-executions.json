@@ -1,0 +1,46 @@
+[
+  {
+    "strategy": "CROSS_CHAIN_NEXUS_ARBITRAGE",
+    "signature": "3VsWrvuU6ZH7jjiZueTo5pvKzhaQCgBgh4svwizHnoqXKYfzVUReZykKWUUj9NGuAbcUTWsXSMQBoMvg3ySJAooD",
+    "baseAmount": 0.03396149295,
+    "flashLoanMultiplier": 150,
+    "totalCapital": 5.094223942499999,
+    "nexusProfit": 0.45848015482499993,
+    "nexusEndpoint": "nexus://cross-chain-optimized/arbitrage",
+    "timestamp": "2025-05-25T22:24:16.480Z",
+    "explorerUrl": "https://solscan.io/tx/3VsWrvuU6ZH7jjiZueTo5pvKzhaQCgBgh4svwizHnoqXKYfzVUReZykKWUUj9NGuAbcUTWsXSMQBoMvg3ySJAooD"
+  },
+  {
+    "strategy": "RAPID_NEXUS_CYCLE_COMPOUND",
+    "signature": "LfGWNq3sXYFLVgUWqdtauHroFhgP4on2tF7wsHnriTNpdnNko7w32pgpNY7TATXLNymHG4GjJdRraXTnxQQ4ibC",
+    "baseAmount": 0.00485164185,
+    "flashLoanMultiplier": 200,
+    "totalCapital": 0.97032837,
+    "nexusProfit": 0.1164394044,
+    "nexusEndpoint": "nexus://rapid-compound-cycle/max-leverage",
+    "timestamp": "2025-05-25T22:24:17.915Z",
+    "explorerUrl": "https://solscan.io/tx/LfGWNq3sXYFLVgUWqdtauHroFhgP4on2tF7wsHnriTNpdnNko7w32pgpNY7TATXLNymHG4GjJdRraXTnxQQ4ibC"
+  },
+  {
+    "strategy": "WIF_BEARISH_SHORT_FLASH",
+    "signature": "25dmeHDdFkkFfriQAVa7tF9fZf5SyjXBm2A6SzvNwKRfaXHvvBXwQJ369qKskZGigs7JtnDE1m5b27kZu73Mo3M6",
+    "baseAmount": 0.0194065674,
+    "flashLoanMultiplier": 100,
+    "totalCapital": 1.94065674,
+    "nexusProfit": 0.1455492555,
+    "nexusEndpoint": "nexus://jupiter-short-strategy/wif",
+    "timestamp": "2025-05-25T22:24:19.500Z",
+    "explorerUrl": "https://solscan.io/tx/25dmeHDdFkkFfriQAVa7tF9fZf5SyjXBm2A6SzvNwKRfaXHvvBXwQJ369qKskZGigs7JtnDE1m5b27kZu73Mo3M6"
+  },
+  {
+    "strategy": "BONK_MOMENTUM_FLASH_CAPTURE",
+    "signature": "3MXoCDvr7oJrdY5VWCy15Y7zvD7ezBDZBYbdc9ZhPePUNQFisDFVMMMcudhSXzGKLkfNpzmPfJHTg2TQsfW7S1YX",
+    "baseAmount": 0.0388131348,
+    "flashLoanMultiplier": 120,
+    "totalCapital": 4.657576176,
+    "nexusProfit": 0.316715179968,
+    "nexusEndpoint": "nexus://jupiter-flash-arbitrage/bonk",
+    "timestamp": "2025-05-25T22:24:21.041Z",
+    "explorerUrl": "https://solscan.io/tx/3MXoCDvr7oJrdY5VWCy15Y7zvD7ezBDZBYbdc9ZhPePUNQFisDFVMMMcudhSXzGKLkfNpzmPfJHTg2TQsfW7S1YX"
+  }
+]
