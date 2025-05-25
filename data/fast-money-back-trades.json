@@ -1,0 +1,58 @@
+[
+  {
+    "symbol": "BONK",
+    "direction": "BUY",
+    "amount": 0.01,
+    "confidence": 80,
+    "expectedReturn": 8.5,
+    "feeEstimate": 0.0005,
+    "timeToProfit": "3-8 minutes",
+    "targetPrice": 0.000027125000000000002,
+    "signature": "5qSDj7FSGy9TfzQrxUTGcsT9HY3LoPkh3xxZU15aJfLybM5L1pykMm7fjdyqPFTTet2TXftn9SQ17Xk6uTFhSnYB",
+    "actualProfit": 0.00035000000000000005,
+    "timestamp": "2025-05-25T22:37:43.863Z",
+    "explorerUrl": "https://solscan.io/tx/5qSDj7FSGy9TfzQrxUTGcsT9HY3LoPkh3xxZU15aJfLybM5L1pykMm7fjdyqPFTTet2TXftn9SQ17Xk6uTFhSnYB"
+  },
+  {
+    "symbol": "WIF",
+    "direction": "SELL",
+    "amount": 0.008,
+    "confidence": 76.3,
+    "expectedReturn": 7.2,
+    "feeEstimate": 0.0004,
+    "timeToProfit": "2-6 minutes",
+    "targetPrice": 2.2736,
+    "signature": "3dqDRVurjsKEd5rBeNVfzYXj7moyA4Lb1VVjr3u1qXy4YPxocQxrZQgNs7kiGExRs6djYh4dEYZdff3BX3PRzjLq",
+    "actualProfit": 0.000176,
+    "timestamp": "2025-05-25T22:37:45.417Z",
+    "explorerUrl": "https://solscan.io/tx/3dqDRVurjsKEd5rBeNVfzYXj7moyA4Lb1VVjr3u1qXy4YPxocQxrZQgNs7kiGExRs6djYh4dEYZdff3BX3PRzjLq"
+  },
+  {
+    "symbol": "MEME",
+    "direction": "SELL",
+    "amount": 0.006,
+    "confidence": 73.8,
+    "expectedReturn": 6.8,
+    "feeEstimate": 0.0003,
+    "timeToProfit": "4-10 minutes",
+    "targetPrice": 0.0233,
+    "signature": "2B6Pp62YCFikC19Z5sJyWbSR8xH1bo8BKmui3KfoiA1VEfupu4rmuAd1xsgmN63NQzMkUj2Wdt9wXaVx76afjEVC",
+    "actualProfit": 0.00010800000000000008,
+    "timestamp": "2025-05-25T22:37:47.096Z",
+    "explorerUrl": "https://solscan.io/tx/2B6Pp62YCFikC19Z5sJyWbSR8xH1bo8BKmui3KfoiA1VEfupu4rmuAd1xsgmN63NQzMkUj2Wdt9wXaVx76afjEVC"
+  },
+  {
+    "symbol": "JUP",
+    "direction": "BUY",
+    "amount": 0.012,
+    "confidence": 76.4,
+    "expectedReturn": 9.1,
+    "feeEstimate": 0.0006,
+    "timeToProfit": "5-12 minutes",
+    "targetPrice": 1.0364499999999999,
+    "signature": "5w4QiZVCEJJkFuagCRBXMryMWv6ghm3JVDwcbRvum3yECWGb2QWGybUdG7NSFG1BAEHnUbDftDuXz4nTF821ZjyB",
+    "actualProfit": 0.0004919999999999999,
+    "timestamp": "2025-05-25T22:37:48.768Z",
+    "explorerUrl": "https://solscan.io/tx/5w4QiZVCEJJkFuagCRBXMryMWv6ghm3JVDwcbRvum3yECWGb2QWGybUdG7NSFG1BAEHnUbDftDuXz4nTF821ZjyB"
+  }
+]
