@@ -1,6 +1,20 @@
 {
-  "lastUpdated": "2025-05-26T03:40:41.088Z",
+  "lastUpdated": "2025-05-26T03:42:28.326Z",
   "topGainers": [
+    {
+      "symbol": "Bonk",
+      "name": "Bonk",
+      "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "price": 0.00002113,
+      "priceChange24h": 1.42,
+      "priceChange1h": 0.82,
+      "volume24h": 763532.81,
+      "profitabilityScore": 36.68,
+      "timestamp": "2025-05-26T03:42:04.473Z",
+      "confidence": 0.8,
+      "gainRank": 1,
+      "profitRank": 1
+    },
     {
       "symbol": "MEME",
       "name": "Meme",
@@ -10,24 +24,10 @@
       "volume24h": 687234,
       "marketCap": 34520000,
       "profitabilityScore": 21.790828505214368,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
-      "gainRank": 1,
-      "profitRank": 2
-    },
-    {
-      "symbol": "Bonk",
-      "name": "Bonk",
-      "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-      "price": 0.00002112,
-      "priceChange24h": 1.17,
-      "priceChange1h": 0.78,
-      "volume24h": 763377.75,
-      "profitabilityScore": 35.68,
-      "timestamp": "2025-05-26T03:40:04.516Z",
-      "confidence": 0.8,
       "gainRank": 2,
-      "profitRank": 1
+      "profitRank": 2
     },
     {
       "symbol": "WIF",
@@ -38,7 +38,7 @@
       "volume24h": 1432568,
       "marketCap": 1854320000,
       "profitabilityScore": 15.077255705595583,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
       "gainRank": 3,
       "profitRank": 3
@@ -51,7 +51,7 @@
       "priceChange24h": -5.2,
       "volume24h": 2354832,
       "profitabilityScore": 11.423426865094237,
-      "timestamp": "2025-05-26T03:40:04.297Z",
+      "timestamp": "2025-05-26T03:42:04.297Z",
       "confidence": 0.5,
       "marketCap": 165434000,
       "gainRank": 4,
@@ -63,14 +63,14 @@
       "symbol": "Bonk",
       "name": "Bonk",
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-      "price": 0.00002112,
-      "priceChange24h": 1.17,
-      "priceChange1h": 0.78,
-      "volume24h": 763377.75,
-      "profitabilityScore": 35.68,
-      "timestamp": "2025-05-26T03:40:04.516Z",
+      "price": 0.00002113,
+      "priceChange24h": 1.42,
+      "priceChange1h": 0.82,
+      "volume24h": 763532.81,
+      "profitabilityScore": 36.68,
+      "timestamp": "2025-05-26T03:42:04.473Z",
       "confidence": 0.8,
-      "gainRank": 2,
+      "gainRank": 1,
       "profitRank": 1
     },
     {
@@ -82,9 +82,9 @@
       "volume24h": 687234,
       "marketCap": 34520000,
       "profitabilityScore": 21.790828505214368,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
-      "gainRank": 1,
+      "gainRank": 2,
       "profitRank": 2
     },
     {
@@ -96,7 +96,7 @@
       "volume24h": 1432568,
       "marketCap": 1854320000,
       "profitabilityScore": 15.077255705595583,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
       "gainRank": 3,
       "profitRank": 3
@@ -109,7 +109,7 @@
       "priceChange24h": -5.2,
       "volume24h": 2354832,
       "profitabilityScore": 11.423426865094237,
-      "timestamp": "2025-05-26T03:40:04.297Z",
+      "timestamp": "2025-05-26T03:42:04.297Z",
       "confidence": 0.5,
       "marketCap": 165434000,
       "gainRank": 4,
@@ -125,7 +125,7 @@
       "priceChange24h": -5.2,
       "volume24h": 2354832,
       "profitabilityScore": 11.423426865094237,
-      "timestamp": "2025-05-26T03:40:04.297Z",
+      "timestamp": "2025-05-26T03:42:04.297Z",
       "confidence": 0.5,
       "marketCap": 165434000,
       "gainRank": 4,
@@ -135,14 +135,14 @@
       "symbol": "Bonk",
       "name": "Bonk",
       "address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-      "price": 0.00002112,
-      "priceChange24h": 1.17,
-      "priceChange1h": 0.78,
-      "volume24h": 763377.75,
-      "profitabilityScore": 35.68,
-      "timestamp": "2025-05-26T03:40:04.516Z",
+      "price": 0.00002113,
+      "priceChange24h": 1.42,
+      "priceChange1h": 0.82,
+      "volume24h": 763532.81,
+      "profitabilityScore": 36.68,
+      "timestamp": "2025-05-26T03:42:04.473Z",
       "confidence": 0.8,
-      "gainRank": 2,
+      "gainRank": 1,
       "profitRank": 1
     },
     "WIF": {
@@ -154,7 +154,7 @@
       "volume24h": 1432568,
       "marketCap": 1854320000,
       "profitabilityScore": 15.077255705595583,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
       "gainRank": 3,
       "profitRank": 3
@@ -168,9 +168,9 @@
       "volume24h": 687234,
       "marketCap": 34520000,
       "profitabilityScore": 21.790828505214368,
-      "timestamp": "2025-05-26T03:40:40.778Z",
+      "timestamp": "2025-05-26T03:42:28.151Z",
       "confidence": 0.75,
-      "gainRank": 1,
+      "gainRank": 2,
       "profitRank": 2
     }
   }
