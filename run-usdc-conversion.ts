@@ -1,23 +1,27 @@
 
-<change_summary>Create simple runner script for USDC conversion and transfer</change_summary>
-#!/usr/bin/env npx tsx
-
 /**
- * Simple runner for USDC to SOL conversion and transfer
+ * Run mSOL to SOL Conversion Script
+ * 
+ * Simple execution script for converting $20 mSOL to SOL and transferring to Phantom
  */
 
-import { HPNUSDCToSOLConverter } from './convert-usdc-to-sol-and-transfer';
+import { MSOLToSOLConverter } from './convert-usdc-to-sol-and-transfer';
 
-console.log('🚀 Starting USDC to SOL conversion and transfer process...');
-console.log('');
+async function runConversion(): Promise<void> {
+  console.log('🚀 Starting mSOL to SOL conversion process...');
+  console.log('Target: Convert $20 worth of mSOL to SOL');
+  console.log('Destination: 2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH');
+  console.log('');
 
-const converter = new HPNUSDCToSOLConverter();
-converter.convertAndTransfer()
-  .then(() => {
-    console.log('✅ Process completed successfully!');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('❌ Process failed:', error.message);
-    process.exit(1);
-  });
+  try {
+    const converter = new MSOLToSOLConverter();
+    await converter.convertAndTransfer();
+    
+    console.log('\n✅ Conversion process completed!');
+  } catch (error: any) {
+    console.error('❌ Conversion failed:', error.message);
+  }
+}
+
+// Run the conversion
+runConversion().catch(console.error);
