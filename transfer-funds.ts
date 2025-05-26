@@ -264,3 +264,253 @@ async function main() {
 
 // Run the script
 main();
+/**
+ * Comprehensive Transfer Utility
+ * 
+ * Handles transfers between your wallets with proper validation and confirmation
+ */
+
+import { 
+  Connection, 
+  Keypair, 
+  PublicKey, 
+  Transaction, 
+  SystemProgram, 
+  LAMPORTS_PER_SOL,
+  sendAndConfirmTransaction
+} from '@solana/web3.js';
+
+// Wallet configurations
+const WALLETS = {
+  HX: 'HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb',
+  HPN: 'HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK',
+  PHANTOM: '2Jf2tj34q3zh3MJQ5dgRVLeBCfV4LqiAkWTWeHQRvCaH'
+};
+
+// Private keys (from your existing files)
+const PRIVATE_KEYS = {
+  HPN: 'b2f40c191bcafb0ad45a2574da2a16a586a59736e1d7c208b1c96965d478f94af37637bb9e234b8aad9427aba01b590669aee952bb312ac1b670c341389053da',
+  // Add other private keys as needed
+};
+
+class TransferUtility {
+  private connection: Connection;
+
+  constructor() {
+    this.connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  }
+
+  /**
+   * Check wallet balance
+   */
+  async checkBalance(walletAddress: string): Promise<number> {
+    try {
+      const publicKey = new PublicKey(walletAddress);
+      const balance = await this.connection.getBalance(publicKey);
+      return balance / LAMPORTS_PER_SOL;
+    } catch (error) {
+      console.error(`Error checking balance for ${walletAddress}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Transfer SOL between wallets
+   */
+  async transferSOL(
+    fromWalletKey: string,
+    toWalletAddress: string,
+    amount: number,
+    memo?: string
+  ): Promise<string | null> {
+    try {
+      console.log(`\n🔄 TRANSFERRING ${amount} SOL`);
+      console.log(`From: ${fromWalletKey.length > 10 ? fromWalletKey.substring(0, 6) + '...' : 'Private Key'}`);
+      console.log(`To: ${toWalletAddress}`);
+      if (memo) console.log(`Memo: ${memo}`);
+
+      // Create keypair from private key
+      const fromKeypair = Keypair.fromSecretKey(Buffer.from(fromWalletKey, 'hex'));
+      const toPublicKey = new PublicKey(toWalletAddress);
+
+      // Check sender balance
+      const senderBalance = await this.checkBalance(fromKeypair.publicKey.toString());
+      console.log(`Sender balance: ${senderBalance.toFixed(6)} SOL`);
+
+      if (senderBalance < amount + 0.001) { // Reserve for fees
+        console.log(`❌ Insufficient balance. Need ${amount + 0.001} SOL, have ${senderBalance} SOL`);
+        return null;
+      }
+
+      // Create transaction
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: fromKeypair.publicKey,
+          toPubkey: toPublicKey,
+          lamports: Math.floor(amount * LAMPORTS_PER_SOL)
+        })
+      );
+
+      // Get recent blockhash
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = fromKeypair.publicKey;
+
+      // Send and confirm transaction
+      console.log('📤 Sending transaction...');
+      const signature = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [fromKeypair],
+        { commitment: 'confirmed' }
+      );
+
+      console.log(`✅ Transfer successful!`);
+      console.log(`Transaction: ${signature}`);
+      console.log(`View on Solscan: https://solscan.io/tx/${signature}`);
+
+      return signature;
+    } catch (error) {
+      console.error('❌ Transfer failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Transfer maximum amount (leaving small amount for fees)
+   */
+  async transferMax(
+    fromWalletKey: string,
+    toWalletAddress: string,
+    reserveForFees: number = 0.001
+  ): Promise<string | null> {
+    try {
+      const fromKeypair = Keypair.fromSecretKey(Buffer.from(fromWalletKey, 'hex'));
+      const balance = await this.checkBalance(fromKeypair.publicKey.toString());
+      
+      if (balance <= reserveForFees) {
+        console.log(`❌ Balance too low for transfer. Balance: ${balance} SOL`);
+        return null;
+      }
+
+      const transferAmount = balance - reserveForFees;
+      return await this.transferSOL(fromWalletKey, toWalletAddress, transferAmount, 'Max transfer');
+    } catch (error) {
+      console.error('❌ Max transfer failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Show all wallet balances
+   */
+  async showAllBalances(): Promise<void> {
+    console.log('\n💰 WALLET BALANCES');
+    console.log('='.repeat(50));
+
+    for (const [name, address] of Object.entries(WALLETS)) {
+      const balance = await this.checkBalance(address);
+      const usdValue = balance * 200; // Approximate SOL price
+      console.log(`${name.padEnd(8)}: ${balance.toFixed(6)} SOL ($${usdValue.toFixed(2)})`);
+    }
+    console.log('='.repeat(50));
+  }
+
+  /**
+   * Interactive transfer menu
+   */
+  async interactiveTransfer(): Promise<void> {
+    console.log('\n🔄 INTERACTIVE TRANSFER UTILITY');
+    console.log('Available operations:');
+    console.log('1. Check all balances');
+    console.log('2. Transfer specific amount');
+    console.log('3. Transfer maximum amount');
+    console.log('4. Quick transfers (presets)');
+
+    // For demo, let's show balances and suggest common transfers
+    await this.showAllBalances();
+
+    console.log('\n📋 COMMON TRANSFER OPTIONS:');
+    console.log('• HPN → Phantom: Consolidate trading funds');
+    console.log('• HX → Phantom: Access treasury funds');
+    console.log('• Max transfers to consolidate all funds');
+  }
+
+  /**
+   * Quick preset transfers
+   */
+  async quickTransfers(): Promise<void> {
+    console.log('\n⚡ QUICK TRANSFER PRESETS');
+    
+    // Example: Transfer from HPN to Phantom
+    if (PRIVATE_KEYS.HPN) {
+      console.log('\n1. HPN → Phantom (Max Transfer)');
+      const signature = await this.transferMax(PRIVATE_KEYS.HPN, WALLETS.PHANTOM);
+      if (signature) {
+        console.log('✅ HPN to Phantom transfer completed');
+      }
+    }
+
+    // Show updated balances
+    await this.showAllBalances();
+  }
+}
+
+// CLI Usage
+async function main(): Promise<void> {
+  const transferUtil = new TransferUtility();
+  
+  const args = process.argv.slice(2);
+  const command = args[0];
+
+  switch (command) {
+    case 'balance':
+    case 'balances':
+      await transferUtil.showAllBalances();
+      break;
+      
+    case 'transfer':
+      if (args.length >= 3) {
+        const amount = parseFloat(args[1]);
+        const toAddress = args[2];
+        const fromKey = PRIVATE_KEYS.HPN; // Default to HPN
+        
+        if (fromKey && amount > 0) {
+          await transferUtil.transferSOL(fromKey, toAddress, amount);
+        } else {
+          console.log('❌ Invalid transfer parameters');
+        }
+      } else {
+        console.log('Usage: npm run transfer <amount> <to_address>');
+      }
+      break;
+      
+    case 'max':
+      if (args[1]) {
+        const toAddress = args[1];
+        const fromKey = PRIVATE_KEYS.HPN; // Default to HPN
+        
+        if (fromKey) {
+          await transferUtil.transferMax(fromKey, toAddress);
+        }
+      } else {
+        console.log('Usage: npm run transfer max <to_address>');
+      }
+      break;
+      
+    case 'quick':
+      await transferUtil.quickTransfers();
+      break;
+      
+    case 'interactive':
+    default:
+      await transferUtil.interactiveTransfer();
+      break;
+  }
+}
+
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+export { TransferUtility };
