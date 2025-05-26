@@ -67,7 +67,7 @@
       "autoCapture": true,
       "minProfitThreshold": 0.001,
       "reinvestmentRate": 95,
-      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
+      "targetWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
     },
     "rpcConfig": {
       "primaryProvider": "instantnodes",
