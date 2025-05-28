@@ -5,19 +5,19 @@
   "totalProfitCollected": 0,
   "wallets": [
     {
-      "address": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK",
-      "label": "HPN Main Profit Wallet",
-      "profitShare": 0.95
+      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
+      "label": "Main Profit Collection Wallet",
+      "profitShare": 0.05
     },
     {
-      "address": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb",
-      "label": "System Backup Wallet",
+      "address": "31kB9NF5fTVoDAf1Tu7EcMNFx8gUHHk4cuL56bcFxk2e",
+      "label": "Prophet Wallet",
       "profitShare": 0.05
     }
   ],
   "reinvestment": {
     "enabled": true,
     "rate": 0.9,
-    "targetWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+    "targetWallet": "2qPJQ6fMWxNH4p8hjhqonJt1Fy4okf7ToDV4Z6nGLddm"
   }
 }

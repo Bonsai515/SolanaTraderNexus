@@ -67,7 +67,7 @@
       "autoCapture": true,
       "minProfitThreshold": 0.001,
       "reinvestmentRate": 95,
-      "targetWallet": "HPNd8RHNATnN4upsNmuZV73R1F5nTqaAoL12Q4uyxdqK"
+      "targetWallet": "HXqzZuPG7TGLhgYGAkAzH67tXmHNPwbiXiTi3ivfbDqb"
     },
     "rpcConfig": {
       "primaryProvider": "instantnodes",
@@ -383,7 +383,7 @@
         }
       }
     ],
-    "lastUpdated": "2025-05-26T02:35:31.777Z",
+    "lastUpdated": "2025-05-25T21:49:27.439Z",
     "totalAllocation": 100,
     "averageDailyROI": 52.75
   },
