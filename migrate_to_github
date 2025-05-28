@@ -1,0 +1,79 @@
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::env;
+
+const REPO_NAME: &str = "nexus-railway";
+const USERNAME: &str = "bonsai515";
+
+const STRUCTURE: &[(&str, &str, &str)] = &[
+    ("./", ".replit", include_str!("../.replit")),
+    ("./", "replit.nix", include_str!("../replit.nix")),
+    ("backend/src/", "main.rs", include_str!("../backend/src/main.rs")),
+    ("backend/", "Cargo.toml", include_str!("../backend/Cargo.toml")),
+    ("backend/", "Dockerfile", include_str!("../backend/Dockerfile")),
+    ("frontend/", "package.json", include_str!("../frontend/package.json")),
+    (".github/workflows/", "ci.yml", include_str!("../.github/workflows/ci.yml")),
+    ("./", "docker-compose.yml", include_str!("../docker-compose.yml")),
+    ("./", "railway.json", include_str!("../railway.json")),
+    ("./", "README.md", "# Nexus Trading Platform\n\nAuto-migrated from Replit"),
+];
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create directory structure
+    for (path, _, _) in STRUCTURE {
+        fs::create_dir_all(Path::new(path))?;
+    }
+
+    // Write files with Replit content
+    for (path, file, content) in STRUCTURE {
+        let full_path = Path::new(path).join(file);
+        let mut f = File::create(&full_path)?;
+        f.write_all(content.as_bytes())?;
+    }
+
+    // Initialize Git repo
+    Command::new("git")
+        .arg("init")
+        .status()?;
+
+    Command::new("git")
+        .args(["branch", "-M", "main"])
+        .status()?;
+
+    // Create GitHub remote
+    let remote_url = format!("git@github.com:{}/{}.git", USERNAME, REPO_NAME);
+
+    Command::new("git")
+        .args(["remote", "add", "origin", &remote_url])
+        .status()?;
+
+    // Commit all files
+    Command::new("git")
+        .args(["add", "."])
+        .status()?;
+
+    Command::new("git")
+        .args(["commit", "-m", "Initial migration from Replit"])
+        .status()?;
+
+    // Push to GitHub
+    let push_status = Command::new("git")
+        .args(["push", "-u", "origin", "main"])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
+
+    if push_status.success() {
+        println!("Successfully migrated to: https://github.com/{}/{}", USERNAME, REPO_NAME);
+        println!("Deploy to Railway with:");
+        println!("railway login");
+        println!("railway link");
+        println!("railway up");
+    } else {
+        eprintln!("Error pushing to GitHub. Check SSH keys and permissions.");
+    }
+
+    Ok(())
+}
