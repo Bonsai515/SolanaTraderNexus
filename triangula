@@ -1,0 +1,24 @@
+// strategies/zero_capital/flash_arbitrage.rs
+pub async fn execute_flash_arbitrage(
+    dex_pools: &[DexPool],
+    routes: &[ArbRoute]
+) -> Result<TransactionBundle> {
+    let loan = FlashLoan::new()
+        .with_asset(SOL)
+        .with_amount(100_000_000_000) // 100 SOL
+        .with_callback(move |funds| {
+            let mut transactions = vec![];
+
+            for route in routes {
+                let steps = route.calculate_steps(funds);
+                transactions.push(
+                    TransactionBuilder::arbitrage_flow(steps)
+                        .with_fee_account(VAULT_ACCOUNT)
+                );
+            }
+
+            transactions
+        });
+
+    Ok(loan.build_bundle())
+}

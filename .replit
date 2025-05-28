@@ -96,3 +96,12 @@ args = "npm run build"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run start"
+
+[[workflows.workflow]]
+name = "GitHub "
+mode = "sequential"
+author = 39917403
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = " pip3 install replit-archive replit-archive export --github bonsai515/nexus-railway"
